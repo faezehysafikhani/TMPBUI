@@ -44,6 +44,12 @@ export const NEXUS_API_BASE_URL = (env.VITE_API_BASE_URL || '').trim().replace(/
 /** Optional tenant slug sent with login. Leave empty for a single-tenant install. */
 const NEXUS_TENANT_SLUG = (env.VITE_NEXUS_TENANT_SLUG || '').trim();
 
+/**
+ * NexusCore signs in by email only. When this is set, a username typed without '@' (as the
+ * login form allows) is sent as <username>@<domain>, e.g. Admin -> admin@taskmanager.local.
+ */
+const LOGIN_EMAIL_DOMAIN = (env.VITE_NEXUS_LOGIN_EMAIL_DOMAIN || '').trim().replace(/^@/, '');
+
 const REQUEST_TIMEOUT_MS = Number(env.VITE_API_TIMEOUT_MS) > 0 ? Number(env.VITE_API_TIMEOUT_MS) : 30000;
 
 export const NEXUS_API_ENABLED = NEXUS_API_BASE_URL.length > 0;
@@ -770,7 +776,10 @@ function toSubTaskBody(s: ProjectSubTask, sortOrder: number) {
 // ---------------------------------------------------------------------------
 
 export async function login(identity: string, password: string): Promise<User> {
-  const email = identity.trim();
+  let email = identity.trim();
+  if (!email.includes('@') && LOGIN_EMAIL_DOMAIN) {
+    email = `${email}@${LOGIN_EMAIL_DOMAIN}`;
+  }
   if (!email.includes('@')) {
     // LoginRequest(Email, Password, TenantSlug): NexusCore authenticates by email only.
     throw new NexusApiError('ورود به سامانه فقط با ایمیل امکان‌پذیر است. لطفاً ایمیل حساب کاربری خود را وارد کنید.', 400);
