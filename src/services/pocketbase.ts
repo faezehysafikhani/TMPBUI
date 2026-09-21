@@ -1,6 +1,8 @@
 import PocketBase, { RecordModel } from 'pocketbase';
 import { Task, TaskStatus, Priority, Attachment, User, AppTheme, AppColorPalette, WorkTeam, TaskComment, TaskLog, SystemNotificationSettings, DirectMessage, PersonalNote, NoteAttachment } from '../types';
 import { parseDateSafely } from '../utils/jalali';
+import * as nexusApi from './nexusApi';
+import { NEXUS_API_ENABLED } from './nexusApi';
 
 export const POCKETBASE_URL = 'https://parstask.pockethost.io';
 export const pb = new PocketBase(POCKETBASE_URL);
@@ -206,6 +208,10 @@ export function mapRecordToUser(m: RecordModel | any): User {
 }
 
 export function getCurrentUser(): User | null {
+  if (NEXUS_API_ENABLED) {
+    const user = nexusApi.getSessionUser();
+    return user ? { ...user, teams: fetchUserTeamsPB(user.id) } : null;
+  }
   if (!pb.authStore.isValid || !pb.authStore.model) {
     return null;
   }
@@ -213,6 +219,10 @@ export function getCurrentUser(): User | null {
 }
 
 export async function loginPB(identity: string, password: string): Promise<User> {
+  if (NEXUS_API_ENABLED) {
+    const user = await nexusApi.login(identity, password);
+    return { ...user, teams: fetchUserTeamsPB(user.id) };
+  }
   try {
     const trimmedIdentity = identity.trim();
     const isEmail = trimmedIdentity.includes('@');
@@ -329,6 +339,10 @@ export async function registerPB(data: {
   colorPalette?: AppColorPalette;
   themeMode?: 'light' | 'dark';
 }): Promise<User> {
+  if (NEXUS_API_ENABLED) {
+    // No public registration endpoint exists; users are created by an administrator.
+    throw nexusApi.unsupportedOperation('ثبت‌نام عمومی کاربر');
+  }
   const emailClean = data.email.trim().toLowerCase();
   const fullName = (data.name || '').trim() || 'کاربر جدید';
 
@@ -448,6 +462,9 @@ export async function registerPB(data: {
 }
 
 export async function requestPasswordResetPB(emailOrUsername: string): Promise<string> {
+  if (NEXUS_API_ENABLED) {
+    throw nexusApi.unsupportedOperation('بازیابی رمز عبور');
+  }
   const trimmed = emailOrUsername.trim();
   if (!trimmed) {
     throw new Error('لطفاً ایمیل یا نام کاربری خود را وارد نمایید.');
@@ -488,6 +505,9 @@ export async function confirmPasswordResetPB(
   password: string,
   passwordConfirm: string
 ): Promise<boolean> {
+  if (NEXUS_API_ENABLED) {
+    throw nexusApi.unsupportedOperation('بازیابی رمز عبور');
+  }
   if (!token || !token.trim()) {
     throw new Error('توکن بازیابی رمز عبور یافت نشد یا معتبر نمی‌باشد.');
   }
@@ -540,6 +560,10 @@ export function extractResetTokenFromURL(): string | null {
 }
 
 export async function refreshCurrentUserPB(): Promise<User | null> {
+  if (NEXUS_API_ENABLED) {
+    const user = await nexusApi.refreshCurrentUser();
+    return user ? { ...user, teams: fetchUserTeamsPB(user.id) } : null;
+  }
   if (!pb.authStore.isValid) return null;
   try {
     const authData = await pb.collection('users').authRefresh();
@@ -556,6 +580,10 @@ export async function refreshCurrentUserPB(): Promise<User | null> {
 }
 
 export function logoutPB(): void {
+  if (NEXUS_API_ENABLED) {
+    nexusApi.logout();
+    return;
+  }
   pb.authStore.clear();
 }
 
@@ -590,6 +618,19 @@ export function fetchUserTeamsPB(userId: string): WorkTeam[] {
 export async function fetchUserTeamsAsyncPB(userId: string): Promise<WorkTeam[]> {
   if (!userId) return [];
 
+  if (NEXUS_API_ENABLED) {
+    try {
+      const teams = await nexusApi.fetchUserGroupsAsTeams();
+      try {
+        localStorage.setItem(LOCAL_TEAMS_PREFIX + userId, JSON.stringify(teams));
+      } catch {}
+      return teams;
+    } catch (err) {
+      console.warn('Could not load user groups from NexusCore:', err instanceof Error ? err.message : err);
+      return fetchUserTeamsPB(userId);
+    }
+  }
+
   try {
     const userRec = await pb.collection('users').getOne(userId);
     if (userRec && userRec.teams) {
@@ -617,6 +658,12 @@ export async function fetchUserTeamsAsyncPB(userId: string): Promise<WorkTeam[]>
 export async function saveUserTeamsPB(userId: string, teams: WorkTeam[]): Promise<void> {
   if (!userId) return;
 
+  if (NEXUS_API_ENABLED) {
+    // UserGroup has no owner, no member role and no delete endpoint, so the team editor's
+    // changes cannot be stored faithfully. Reported instead of being kept only locally.
+    throw nexusApi.unsupportedOperation('ذخیره تغییرات تیم‌های کاری');
+  }
+
   // 1. Instant local storage cache update for smooth UI
   try {
     localStorage.setItem(LOCAL_TEAMS_PREFIX + userId, JSON.stringify(teams));
@@ -642,6 +689,16 @@ export async function saveUserTeamsPB(userId: string, teams: WorkTeam[]): Promis
 }
 
 export async function fetchAllUsersPB(): Promise<User[]> {
+  if (NEXUS_API_ENABLED) {
+    try {
+      return await nexusApi.fetchUsers();
+    } catch (err) {
+      // Listing users needs the Users.View permission; without it only the signed-in user is known.
+      console.warn('Could not load users from NexusCore:', err instanceof Error ? err.message : err);
+      const me = nexusApi.getSessionUser();
+      return me ? [me] : [];
+    }
+  }
   let pbUsers: User[] = [];
   try {
     const records = await pb.collection('users').getFullList({ sort: '-created' });
@@ -717,6 +774,9 @@ export async function adminCreateUserPB(data: {
   notifyTelegram?: boolean;
 }): Promise<User> {
   const current = getCurrentUser();
+  if (NEXUS_API_ENABLED) {
+    throw nexusApi.unsupportedOperation('تعریف کاربر با نام کاربری، نقش و شماره تماس');
+  }
   if (!current || current.role !== 'admin') {
     throw new Error('فقط مدیر سیستم (Admin) مجاز به تعریف و مدیریت کاربران می‌باشد.');
   }
@@ -787,6 +847,9 @@ export async function adminUpdateUserPB(
   }
 ): Promise<User> {
   const current = getCurrentUser();
+  if (NEXUS_API_ENABLED) {
+    throw nexusApi.unsupportedOperation('ویرایش کاربر (نام کاربری، ایمیل، رمز عبور، نقش و شماره تماس)');
+  }
   if (!current || current.role !== 'admin') {
     throw new Error('فقط مدیر سیستم (Admin) مجاز به ویرایش کاربران می‌باشد.');
   }
@@ -844,6 +907,13 @@ export async function adminUpdateUserPB(
 }
 
 export async function adminDeleteUserPB(userId: string): Promise<boolean> {
+  if (NEXUS_API_ENABLED) {
+    if (getCurrentUser()?.role !== 'admin') {
+      throw new Error('فقط مدیر سیستم (Admin) مجاز به حذف کاربران می‌باشد.');
+    }
+    await nexusApi.deleteUser(userId);
+    return true;
+  }
   const current = getCurrentUser();
   if (!current || current.role !== 'admin') {
     throw new Error('فقط مدیر سیستم (Admin) مجاز به حذف کاربران می‌باشد.');
@@ -886,6 +956,9 @@ export async function updateUserProfilePB(updates: {
   notifySms?: boolean;
   notifyTelegram?: boolean;
 }): Promise<User> {
+  if (NEXUS_API_ENABLED) {
+    throw nexusApi.unsupportedOperation('ویرایش پروفایل کاربر');
+  }
   if (!pb.authStore.isValid || !pb.authStore.model?.id) {
     throw new Error('کاربر وارد سیستم نشده است.');
   }
@@ -1392,6 +1465,9 @@ export function mapRecordToTask(record: RecordModel): Task {
 }
 
 export async function fetchTasksFromPB(): Promise<Task[]> {
+  if (NEXUS_API_ENABLED) {
+    return nexusApi.fetchTasks();
+  }
   try {
     // Fetch all tasks so team members, assignees and owners can see shared team tasks
     const records = await pb.collection('tasks').getFullList({
@@ -1552,6 +1628,13 @@ function buildBasePayload(taskData: Partial<Task>, isCreate = false) {
 export async function createTaskInPB(
   taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<Task> {
+  if (NEXUS_API_ENABLED) {
+    const newTask = await nexusApi.createTask(taskData);
+    sendNewTaskNotificationsPB(newTask).catch((err) =>
+      console.warn('Task creation notification dispatch error:', err)
+    );
+    return newTask;
+  }
   const basePayload = buildBasePayload(taskData, true);
   const attachments = taskData.attachments || [];
 
@@ -1631,6 +1714,9 @@ export async function updateTaskInPB(
   taskId: string,
   taskData: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>
 ): Promise<Task> {
+  if (NEXUS_API_ENABLED) {
+    return nexusApi.updateTask(taskId, taskData);
+  }
   const basePayload = buildBasePayload(taskData);
 
   // Always save task extra meta immediately
@@ -1696,6 +1782,10 @@ export async function updateTaskInPB(
 }
 
 export async function deleteTaskFromPB(taskId: string): Promise<boolean> {
+  if (NEXUS_API_ENABLED) {
+    await nexusApi.deleteTask(taskId);
+    return true;
+  }
   try {
     await pb.collection('tasks').delete(taskId);
     return true;
@@ -1707,6 +1797,11 @@ export async function deleteTaskFromPB(taskId: string): Promise<boolean> {
 }
 
 export function subscribeToTasksPB(onChange: () => void): () => void {
+  if (NEXUS_API_ENABLED) {
+    // NexusCore has no realtime channel for task changes (its SignalR hubs serve chat and
+    // notifications only), so there is nothing to subscribe to.
+    return () => {};
+  }
   let unsubTasks: (() => void) | null = null;
   let unsubComments: (() => void) | null = null;
   let unsubLogs: (() => void) | null = null;
@@ -1743,6 +1838,9 @@ export function subscribeToTasksPB(onChange: () => void): () => void {
 
 // Dedicated PocketBase collection: 'task_comments'
 export async function fetchCommentsForTaskPB(taskId: string): Promise<TaskComment[]> {
+  if (NEXUS_API_ENABLED) {
+    return nexusApi.fetchTaskComments(taskId);
+  }
   try {
     let records: any[] = [];
     try {
@@ -1814,6 +1912,9 @@ export async function createTaskCommentPB(commentData: {
   text: string;
   attachments?: Attachment[];
 }): Promise<TaskComment> {
+  if (NEXUS_API_ENABLED) {
+    return nexusApi.createTaskComment(commentData.taskId, commentData.text, !!commentData.attachments?.length);
+  }
   const payload: Record<string, any> = {
     taskId: commentData.taskId,
     tasId: commentData.taskId,
@@ -1873,6 +1974,15 @@ export async function createTaskCommentPB(commentData: {
 }
 
 export async function deleteTaskCommentPB(commentId: string): Promise<boolean> {
+  if (NEXUS_API_ENABLED) {
+    try {
+      await nexusApi.deleteTaskComment(commentId);
+      return true;
+    } catch (err) {
+      console.warn(`Deleting comment ${commentId} failed:`, err instanceof Error ? err.message : err);
+      return false;
+    }
+  }
   try {
     await pb.collection('task_comments').delete(commentId);
     return true;
@@ -1884,6 +1994,9 @@ export async function deleteTaskCommentPB(commentId: string): Promise<boolean> {
 
 // Dedicated PocketBase collection: 'task_logs'
 export async function fetchTaskLogsPB(taskId: string): Promise<TaskLog[]> {
+  if (NEXUS_API_ENABLED) {
+    return nexusApi.fetchTaskActivity(taskId);
+  }
   try {
     let records: any[] = [];
     try {
@@ -1950,8 +2063,9 @@ export async function createTaskLogPB(logData: {
     createdAt: new Date().toISOString(),
   };
 
-  // Try saving to PocketBase
-  try {
+  // Try saving to PocketBase (NexusCore has no endpoint for writing log entries - the server
+  // records its own activity - so in that mode only the local fallback below is kept)
+  if (!NEXUS_API_ENABLED) try {
     const record = await pb.collection('task_logs').create({
       taskId: logData.taskId,
       tasId: logData.taskId,
@@ -2208,6 +2322,25 @@ function saveLocalPersonalNotes(userId: string, notes: PersonalNote[]) {
 export async function fetchPersonalNotesPB(userId: string): Promise<PersonalNote[]> {
   if (!userId) return [];
 
+  if (NEXUS_API_ENABLED) {
+    const notes = await nexusApi.listNotes();
+    return notes.map((n) => {
+      const { content, attachments } = decodeNoteContent(n.content);
+      return {
+        id: n.id,
+        userId: n.userId,
+        title: n.title,
+        content,
+        color: n.color || 'amber',
+        isPinned: n.isPinned,
+        tags: [],
+        attachments,
+        createdAt: n.createdAtUtc,
+        updatedAt: n.modifiedAtUtc || undefined,
+      };
+    });
+  }
+
   // 1. Sync any local unsynced notes (created offline or when PB failed)
   const localNotes = getLocalPersonalNotes(userId);
   const unsyncedNotes = localNotes.filter(n => n.id && n.id.startsWith('note_'));
@@ -2267,6 +2400,27 @@ export async function createPersonalNotePB(
   userId: string,
   noteData: { title: string; content: string; color?: string; isPinned?: boolean; tags?: string[]; attachments?: NoteAttachment[] }
 ): Promise<PersonalNote> {
+  if (NEXUS_API_ENABLED) {
+    const rec = await nexusApi.createNote({
+      title: noteData.title,
+      content: encodeNoteContent(noteData.content, noteData.attachments),
+      color: noteData.color || 'amber',
+      isPinned: !!noteData.isPinned,
+    });
+    const { content, attachments } = decodeNoteContent(rec.content);
+    return {
+      id: rec.id,
+      userId: rec.userId,
+      title: rec.title,
+      content,
+      color: rec.color || 'amber',
+      isPinned: rec.isPinned,
+      tags: noteData.tags || [],
+      attachments,
+      createdAt: rec.createdAtUtc,
+      updatedAt: rec.modifiedAtUtc || undefined,
+    };
+  }
   const newNote: PersonalNote = {
     id: 'note_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     userId,
@@ -2306,6 +2460,33 @@ export async function updatePersonalNotePB(
   userId: string,
   updates: Partial<PersonalNote>
 ): Promise<PersonalNote> {
+  if (NEXUS_API_ENABLED) {
+    // PUT replaces the whole note, so fields not being changed are read back first.
+    const existing = await nexusApi.getNote(id);
+    const decoded = decodeNoteContent(existing.content);
+    const rec = await nexusApi.updateNote(id, {
+      title: updates.title ?? existing.title,
+      content: encodeNoteContent(
+        updates.content !== undefined ? updates.content : decoded.content,
+        updates.attachments !== undefined ? updates.attachments : decoded.attachments
+      ),
+      color: updates.color ?? existing.color,
+      isPinned: updates.isPinned ?? existing.isPinned,
+    });
+    const { content, attachments } = decodeNoteContent(rec.content);
+    return {
+      id: rec.id,
+      userId: rec.userId,
+      title: rec.title,
+      content,
+      color: rec.color || 'amber',
+      isPinned: rec.isPinned,
+      tags: updates.tags || [],
+      attachments,
+      createdAt: rec.createdAtUtc,
+      updatedAt: rec.modifiedAtUtc || undefined,
+    };
+  }
   let updatedNote: PersonalNote | null = null;
 
   try {
@@ -2365,6 +2546,10 @@ export async function updatePersonalNotePB(
 }
 
 export async function deletePersonalNotePB(id: string, userId: string): Promise<void> {
+  if (NEXUS_API_ENABLED) {
+    await nexusApi.deleteNote(id);
+    return;
+  }
   try {
     await pb.collection('personal_notes').delete(id);
   } catch {}
