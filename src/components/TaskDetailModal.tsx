@@ -6,6 +6,7 @@ import {
   fetchCommentsForTaskPB,
   createTaskCommentPB,
   deleteTaskCommentPB,
+  updateTaskCommentPB,
   fetchTaskLogsPB,
   createTaskLogPB
 } from '../services/pocketbase';
@@ -310,6 +311,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const handleSaveEditComment = (commentId: string) => {
     if (!editingCommentText.trim() && editingCommentAttachments.length === 0) return;
+    const previousAttachments = commentsList.find((c) => c.id === commentId)?.attachments || [];
+    // Stored on the server when there is one; a failure is reported and the list reloaded.
+    updateTaskCommentPB(commentId, editingCommentText.trim(), editingCommentAttachments, previousAttachments).catch((err) => {
+      alert(err?.message || 'خطا در ذخیره ویرایش نظر');
+      fetchCommentsForTaskPB(task.id).then((fresh) => setCommentsList(fresh)).catch(() => {});
+    });
     const updatedComments = commentsList.map((c) => {
       if (c.id === commentId) {
         return {

@@ -7,6 +7,9 @@ import { NEXUS_API_ENABLED } from './nexusApi';
 export const POCKETBASE_URL = 'https://parstask.pockethost.io';
 export const pb = new PocketBase(POCKETBASE_URL);
 
+/** The data server in use: NexusCore when configured, otherwise PocketBase. */
+export const ACTIVE_DATA_SERVER_URL = NEXUS_API_ENABLED ? nexusApi.NEXUS_API_BASE_URL : POCKETBASE_URL;
+
 // Local Storage Keys for offline/fallback caching
 const LOCAL_USERS_KEY = 'parstask_managed_users_v2';
 const LOCAL_TEAMS_PREFIX = 'parstask_teams_';
@@ -340,8 +343,8 @@ export async function registerPB(data: {
   themeMode?: 'light' | 'dark';
 }): Promise<User> {
   if (NEXUS_API_ENABLED) {
-    // No public registration endpoint exists; users are created by an administrator.
-    throw nexusApi.unsupportedOperation('ثبت‌نام عمومی کاربر');
+    const user = await nexusApi.register(data);
+    return { ...user, teams: fetchUserTeamsPB(user.id) };
   }
   const emailClean = data.email.trim().toLowerCase();
   const fullName = (data.name || '').trim() || 'کاربر جدید';
@@ -463,7 +466,10 @@ export async function registerPB(data: {
 
 export async function requestPasswordResetPB(emailOrUsername: string): Promise<string> {
   if (NEXUS_API_ENABLED) {
-    throw nexusApi.unsupportedOperation('بازیابی رمز عبور');
+    if (!emailOrUsername.trim()) {
+      throw new Error('لطفاً ایمیل یا نام کاربری خود را وارد نمایید.');
+    }
+    return nexusApi.requestPasswordReset(emailOrUsername);
   }
   const trimmed = emailOrUsername.trim();
   if (!trimmed) {
@@ -506,7 +512,14 @@ export async function confirmPasswordResetPB(
   passwordConfirm: string
 ): Promise<boolean> {
   if (NEXUS_API_ENABLED) {
-    throw nexusApi.unsupportedOperation('بازیابی رمز عبور');
+    if (!password || password.length < 8) {
+      throw new Error('رمز عبور جدید باید حداقل ۸ کاراکتر باشد.');
+    }
+    if (password !== passwordConfirm) {
+      throw new Error('رمز عبور جدید و تکرار آن با یکدیگر مطابقت ندارند.');
+    }
+    await nexusApi.confirmPasswordReset(token, password);
+    return true;
   }
   if (!token || !token.trim()) {
     throw new Error('توکن بازیابی رمز عبور یافت نشد یا معتبر نمی‌باشد.');
@@ -659,9 +672,13 @@ export async function saveUserTeamsPB(userId: string, teams: WorkTeam[]): Promis
   if (!userId) return;
 
   if (NEXUS_API_ENABLED) {
-    // UserGroup has no owner, no member role and no delete endpoint, so the team editor's
-    // changes cannot be stored faithfully. Reported instead of being kept only locally.
-    throw nexusApi.unsupportedOperation('ذخیره تغییرات تیم‌های کاری');
+    // Personal work teams (UserGroups owned by the user) - created, renamed, re-membered and
+    // deleted to match the list the team editor holds.
+    const saved = await nexusApi.saveMyTeams(teams);
+    try {
+      localStorage.setItem(LOCAL_TEAMS_PREFIX + userId, JSON.stringify(saved));
+    } catch {}
+    return;
   }
 
   // 1. Instant local storage cache update for smooth UI
@@ -774,11 +791,11 @@ export async function adminCreateUserPB(data: {
   notifyTelegram?: boolean;
 }): Promise<User> {
   const current = getCurrentUser();
-  if (NEXUS_API_ENABLED) {
-    throw nexusApi.unsupportedOperation('تعریف کاربر با نام کاربری، نقش و شماره تماس');
-  }
   if (!current || current.role !== 'admin') {
     throw new Error('فقط مدیر سیستم (Admin) مجاز به تعریف و مدیریت کاربران می‌باشد.');
+  }
+  if (NEXUS_API_ENABLED) {
+    return nexusApi.createUser(data);
   }
 
   let newUser: User;
@@ -847,11 +864,11 @@ export async function adminUpdateUserPB(
   }
 ): Promise<User> {
   const current = getCurrentUser();
-  if (NEXUS_API_ENABLED) {
-    throw nexusApi.unsupportedOperation('ویرایش کاربر (نام کاربری، ایمیل، رمز عبور، نقش و شماره تماس)');
-  }
   if (!current || current.role !== 'admin') {
     throw new Error('فقط مدیر سیستم (Admin) مجاز به ویرایش کاربران می‌باشد.');
+  }
+  if (NEXUS_API_ENABLED) {
+    return nexusApi.updateUser(userId, updates);
   }
 
   if (updates.disabled !== undefined) {
@@ -935,6 +952,14 @@ export async function adminDeleteUserPB(userId: string): Promise<boolean> {
 }
 
 export async function updateUserThemePB(settings: { theme?: AppTheme; colorPalette?: AppColorPalette; themeMode?: 'light' | 'dark' }): Promise<void> {
+  if (NEXUS_API_ENABLED) {
+    try {
+      await nexusApi.updateMyPreferences(settings);
+    } catch (err) {
+      console.warn('Could not save theme/settings to NexusCore:', err instanceof Error ? err.message : err);
+    }
+    return;
+  }
   if (!pb.authStore.isValid || !pb.authStore.model?.id) return;
   const userId = pb.authStore.model.id;
   try {
@@ -957,7 +982,8 @@ export async function updateUserProfilePB(updates: {
   notifyTelegram?: boolean;
 }): Promise<User> {
   if (NEXUS_API_ENABLED) {
-    throw nexusApi.unsupportedOperation('ویرایش پروفایل کاربر');
+    const user = await nexusApi.updateMyProfile(updates);
+    return { ...user, teams: fetchUserTeamsPB(user.id) };
   }
   if (!pb.authStore.isValid || !pb.authStore.model?.id) {
     throw new Error('کاربر وارد سیستم نشده است.');
@@ -1035,6 +1061,17 @@ export function getSystemNotificationSettingsPB(): SystemNotificationSettings {
 }
 
 export async function fetchSystemNotificationSettingsPB(): Promise<SystemNotificationSettings> {
+  if (NEXUS_API_ENABLED) {
+    try {
+      const settings = await nexusApi.fetchNotificationChannelSettings();
+      localStorage.setItem(NOTIFICATION_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+      return settings;
+    } catch {
+      // Only administrators (settings.view) may read the gateway settings; everyone else never
+      // needs them, because messages are sent by the server.
+      return getSystemNotificationSettingsPB();
+    }
+  }
   const current = getSystemNotificationSettingsPB();
   const collectionsToTry = ['system_setting', 'system_settings'];
 
@@ -1073,6 +1110,11 @@ export async function fetchSystemNotificationSettingsPB(): Promise<SystemNotific
 }
 
 export async function saveSystemNotificationSettingsPB(settings: SystemNotificationSettings): Promise<void> {
+  if (NEXUS_API_ENABLED) {
+    await nexusApi.saveNotificationChannelSettings(settings);
+    localStorage.setItem(NOTIFICATION_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    return;
+  }
   // Always update local cache for immediate feedback
   localStorage.setItem(NOTIFICATION_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
 
@@ -1136,6 +1178,16 @@ export async function saveSystemNotificationSettingsPB(settings: SystemNotificat
 }
 
 export async function testSmsNotificationPB(phone: string, message?: string): Promise<{ success: boolean; message: string }> {
+  if (NEXUS_API_ENABLED) {
+    if (!phone) {
+      return { success: false, message: 'لطفاً شماره تلفن همراه را جهت تست وارد نمایید.' };
+    }
+    try {
+      return await nexusApi.testSms(phone, message);
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'ارسال پیامک آزمایشی ناموفق بود.' };
+    }
+  }
   if (!phone) {
     return { success: false, message: 'لطفاً شماره تلفن همراه را جهت تست وارد نمایید.' };
   }
@@ -1184,6 +1236,16 @@ export async function testSmsNotificationPB(phone: string, message?: string): Pr
 }
 
 export async function testTelegramNotificationPB(chatId: string, text?: string): Promise<{ success: boolean; message: string }> {
+  if (NEXUS_API_ENABLED) {
+    if (!chatId) {
+      return { success: false, message: 'لطفاً شناسه چت تلگرام (Chat ID) را جهت تست وارد نمایید.' };
+    }
+    try {
+      return await nexusApi.testTelegram(chatId, text);
+    } catch (err: any) {
+      return { success: false, message: err?.message || 'ارسال پیام آزمایشی تلگرام ناموفق بود.' };
+    }
+  }
   if (!chatId) {
     return { success: false, message: 'لطفاً شناسه چت تلگرام (Chat ID) را جهت تست وارد نمایید.' };
   }
@@ -1217,6 +1279,10 @@ export async function testTelegramNotificationPB(chatId: string, text?: string):
 }
 
 export async function sendNewTaskNotificationsPB(task: Task): Promise<void> {
+  if (NEXUS_API_ENABLED) {
+    // The server sends task-created SMS/Telegram itself (the gateway keys never reach the browser).
+    return;
+  }
   try {
     const config = await fetchSystemNotificationSettingsPB().catch(() => getSystemNotificationSettingsPB());
 
@@ -1798,9 +1864,7 @@ export async function deleteTaskFromPB(taskId: string): Promise<boolean> {
 
 export function subscribeToTasksPB(onChange: () => void): () => void {
   if (NEXUS_API_ENABLED) {
-    // NexusCore has no realtime channel for task changes (its SignalR hubs serve chat and
-    // notifications only), so there is nothing to subscribe to.
-    return () => {};
+    return nexusApi.subscribeToTaskChanges(onChange);
   }
   let unsubTasks: (() => void) | null = null;
   let unsubComments: (() => void) | null = null;
@@ -1913,7 +1977,7 @@ export async function createTaskCommentPB(commentData: {
   attachments?: Attachment[];
 }): Promise<TaskComment> {
   if (NEXUS_API_ENABLED) {
-    return nexusApi.createTaskComment(commentData.taskId, commentData.text, !!commentData.attachments?.length);
+    return nexusApi.createTaskComment(commentData.taskId, commentData.text, commentData.attachments || []);
   }
   const payload: Record<string, any> = {
     taskId: commentData.taskId,
@@ -1970,6 +2034,21 @@ export async function createTaskCommentPB(commentData: {
       attachments: commentData.attachments && commentData.attachments.length > 0 ? commentData.attachments : undefined,
       createdAt: new Date().toISOString(),
     };
+  }
+}
+
+/**
+ * Saves an edited comment. With NexusCore the text and attachment changes are stored; with
+ * PocketBase comment edits were only ever kept in the browser, and that is unchanged.
+ */
+export async function updateTaskCommentPB(
+  commentId: string,
+  text: string,
+  attachments: Attachment[],
+  previousAttachments: Attachment[]
+): Promise<void> {
+  if (NEXUS_API_ENABLED) {
+    await nexusApi.updateTaskComment(commentId, text, attachments, previousAttachments);
   }
 }
 
@@ -2063,9 +2142,18 @@ export async function createTaskLogPB(logData: {
     createdAt: new Date().toISOString(),
   };
 
-  // Try saving to PocketBase (NexusCore has no endpoint for writing log entries - the server
-  // records its own activity - so in that mode only the local fallback below is kept)
-  if (!NEXUS_API_ENABLED) try {
+  if (NEXUS_API_ENABLED) {
+    // Stored in the task's server-side history, under the signed-in user.
+    try {
+      await nexusApi.addTaskActivityEntry(logData.taskId, logData.action, logData.details);
+    } catch (err) {
+      console.warn('Could not store the task history entry:', err instanceof Error ? err.message : err);
+    }
+    return newLog;
+  }
+
+  // Try saving to PocketBase
+  try {
     const record = await pb.collection('task_logs').create({
       taskId: logData.taskId,
       tasId: logData.taskId,
@@ -2116,6 +2204,9 @@ function saveLocalDirectMessages(messages: DirectMessage[]) {
 }
 
 export async function fetchDirectMessagesPB(currentUserId: string, partnerId: string): Promise<DirectMessage[]> {
+  if (NEXUS_API_ENABLED) {
+    return nexusApi.fetchDirectMessages(partnerId);
+  }
   if (!currentUserId || !partnerId) return [];
 
   try {
@@ -2157,6 +2248,9 @@ export async function sendDirectMessagePB(msgData: {
   attachmentUrl?: string;
   attachmentName?: string;
 }): Promise<DirectMessage> {
+  if (NEXUS_API_ENABLED) {
+    return nexusApi.sendDirectMessage(msgData);
+  }
   const newMsg: DirectMessage = {
     id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
     senderId: msgData.senderId,
@@ -2195,6 +2289,12 @@ export async function sendDirectMessagePB(msgData: {
 }
 
 export async function markDirectMessagesAsReadPB(senderId: string, receiverId: string): Promise<void> {
+  if (NEXUS_API_ENABLED) {
+    // The reader is always the signed-in user (receiverId); the server takes it from the token.
+    await nexusApi.markDirectMessagesRead(senderId).catch((err) =>
+      console.warn('Could not mark messages as read:', err instanceof Error ? err.message : err));
+    return;
+  }
   if (!senderId || !receiverId) return;
 
   try {
@@ -2216,6 +2316,10 @@ export async function markDirectMessagesAsReadPB(senderId: string, receiverId: s
 }
 
 export async function updateDirectMessagePB(messageId: string, text: string): Promise<void> {
+  if (NEXUS_API_ENABLED) {
+    await nexusApi.updateDirectMessage(messageId, text);
+    return;
+  }
   if (!messageId) return;
   try {
     await pb.collection('direct_messages').update(messageId, { text });
@@ -2229,6 +2333,10 @@ export async function updateDirectMessagePB(messageId: string, text: string): Pr
 }
 
 export async function deleteDirectMessagePB(messageId: string): Promise<void> {
+  if (NEXUS_API_ENABLED) {
+    await nexusApi.deleteDirectMessage(messageId);
+    return;
+  }
   if (!messageId) return;
   try {
     await pb.collection('direct_messages').delete(messageId);
@@ -2242,6 +2350,14 @@ export async function deleteDirectMessagePB(messageId: string): Promise<void> {
 }
 
 export async function fetchUnreadMessageCountsPB(currentUserId: string): Promise<Record<string, number>> {
+  if (NEXUS_API_ENABLED) {
+    try {
+      return await nexusApi.fetchUnreadMessageCounts();
+    } catch (err) {
+      console.warn('Could not load unread message counts:', err instanceof Error ? err.message : err);
+      return {};
+    }
+  }
   if (!currentUserId) return {};
   const counts: Record<string, number> = {};
 

@@ -12,6 +12,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@microsoft/signalr": "^8.0.29",
     "@tailwindcss/vite": "^4.1.14",
     "@types/pngjs": "^6.0.5",
     "@vitejs/plugin-react": "^5.0.4",

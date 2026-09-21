@@ -47,7 +47,7 @@ import {
   fetchSystemNotificationSettingsPB,
   fetchUnreadMessageCountsPB,
   extractResetTokenFromURL,
-  POCKETBASE_URL
+  ACTIVE_DATA_SERVER_URL
 } from './services/pocketbase';
 import { Database, PanelRightOpen } from 'lucide-react';
 
@@ -1183,7 +1183,7 @@ export default function App() {
             <div className="flex items-start gap-3">
               <Database className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div className="space-y-1 text-xs">
-                <h4 className="font-bold text-sm text-amber-800 dark:text-amber-300">خطا در ارتباط با پایگاه داده ({POCKETBASE_URL})</h4>
+                <h4 className="font-bold text-sm text-amber-800 dark:text-amber-300">خطا در ارتباط با پایگاه داده ({ACTIVE_DATA_SERVER_URL})</h4>
                 <p className="leading-relaxed">{pbError}</p>
               </div>
             </div>

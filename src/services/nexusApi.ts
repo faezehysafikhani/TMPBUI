@@ -29,8 +29,11 @@ import {
   RecurringFrequency,
   OccurrenceNth,
   STATUSES,
+  DirectMessage,
+  SystemNotificationSettings,
 } from '../types';
 import { parseDateSafely } from '../utils/jalali';
+import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -57,13 +60,6 @@ export const NEXUS_API_ENABLED = NEXUS_API_BASE_URL.length > 0;
 /** Name of the seeded system role (NexusCore.Infrastructure/Persistence/DefaultDataSeeder.cs). */
 const ADMIN_ROLE_NAME = 'Administrator';
 
-/**
- * The upload endpoint stores the file record but not its bytes (TaskFileService.UploadAsync
- * never writes the content; download then answers 404). Uploading would lose the file
- * silently, so it stays off until the backend persists file content.
- */
-const BACKEND_STORES_FILE_CONTENT = false;
-
 /** Parallel requests used when a screen needs one call per task. */
 const DETAIL_CONCURRENCY = 6;
 
@@ -79,6 +75,15 @@ interface UserDto {
   isActive: boolean;
   lastLoginAtUtc: string | null;
   roles: string[];
+  username?: string | null;
+  phoneNumber?: string | null;
+  telegramChatId?: string | null;
+  notifySms?: boolean;
+  notifyTelegram?: boolean;
+  avatarUrl?: string | null;
+  theme?: string | null;
+  colorPalette?: string | null;
+  themeMode?: string | null;
 }
 
 interface AuthResponse {
@@ -126,6 +131,7 @@ interface SubTaskDto {
   tags: TagDto[];
   files: TaskFileDto[];
   createdAtUtc: string;
+  isGeneratedOccurrence?: boolean;
 }
 
 interface RepetitiveTaskDto {
@@ -183,6 +189,7 @@ interface TaskCommentDto {
   text: string;
   createdAtUtc: string;
   modifiedAtUtc: string | null;
+  files?: TaskFileDto[] | null;
 }
 
 interface TaskActivityDto {
@@ -205,6 +212,7 @@ interface UserGroupDto {
   isActive: boolean;
   memberCount: number;
   members: UserGroupMemberDto[];
+  ownerUserId?: string | null;
 }
 
 export interface NoteDto {
@@ -569,13 +577,21 @@ function dataUrlToBlob(dataUrl: string, fallbackType: string): Blob {
 export function mapUserDto(u: UserDto): User {
   return {
     id: u.id,
-    // NexusCore has no username; the email is the login identifier, so it fills that role.
-    username: u.email,
+    // Accounts created without a username sign in by email; the email then stands in for it.
+    username: u.username || u.email,
     email: u.email,
     name: u.displayName || u.email,
+    avatar: u.avatarUrl || undefined,
+    theme: (u.theme as User['theme']) || undefined,
+    colorPalette: (u.colorPalette as User['colorPalette']) || undefined,
+    themeMode: (u.themeMode as User['themeMode']) || undefined,
     role: (u.roles || []).includes(ADMIN_ROLE_NAME) ? 'admin' : 'user',
     disabled: !u.isActive,
     lastLogin: u.lastLoginAtUtc || undefined,
+    phoneNumber: u.phoneNumber || '',
+    telegramChatId: u.telegramChatId || '',
+    notifySms: u.notifySms !== false,
+    notifyTelegram: u.notifyTelegram !== false,
   };
 }
 
@@ -597,9 +613,29 @@ function mapRecurrence(r: RepetitiveTaskDto): RecurringConfig {
   };
 }
 
+/**
+ * The UI recognises the occurrences it generated from a recurrence schedule by a "rec_occ_"
+ * id prefix and replaces them when the schedule is saved again. The server keeps that fact
+ * (IsGeneratedOccurrence), and the prefix is restored here around the server id.
+ */
+const OCCURRENCE_PREFIX = 'rec_occ_';
+
+function toUiSubTaskId(s: SubTaskDto): string {
+  return s.isGeneratedOccurrence ? `${OCCURRENCE_PREFIX}${s.id}` : s.id;
+}
+
+/** The server id behind a UI subtask id, or the id itself for one not yet saved. */
+function toServerSubTaskId(uiId: string): string {
+  if (uiId.startsWith(OCCURRENCE_PREFIX)) {
+    const rest = uiId.slice(OCCURRENCE_PREFIX.length);
+    if (isGuid(rest)) return rest;
+  }
+  return uiId;
+}
+
 function mapSubTask(s: SubTaskDto): ProjectSubTask {
   return {
-    id: s.id,
+    id: toUiSubTaskId(s),
     title: s.title,
     startDate: fromDateOnly(s.startDate),
     endDate: fromDateOnly(s.endDate),
@@ -674,16 +710,21 @@ function mapActivity(a: TaskActivityDto): TaskLog {
   };
 }
 
-function mapComment(c: TaskCommentDto): TaskComment {
+function mapComment(c: TaskCommentDto, attachments?: Attachment[]): TaskComment {
   return {
     id: c.id,
     taskId: c.taskId,
     userId: c.userId,
     userName: c.userDisplayName || 'کاربر',
     text: c.text,
+    attachments: attachments && attachments.length > 0 ? attachments : undefined,
     createdAt: c.createdAtUtc,
     updatedAt: c.modifiedAtUtc || undefined,
   };
+}
+
+async function mapCommentWithFiles(c: TaskCommentDto): Promise<TaskComment> {
+  return mapComment(c, await mapFiles(c.files || []));
 }
 
 async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[]): Promise<Task> {
@@ -768,6 +809,7 @@ function toSubTaskBody(s: ProjectSubTask, sortOrder: number) {
     startDate: toDateOnly(s.startDate),
     endDate: toDateOnly(s.endDate),
     sortOrder,
+    isGeneratedOccurrence: s.id.startsWith(OCCURRENCE_PREFIX),
   };
 }
 
@@ -775,22 +817,29 @@ function toSubTaskBody(s: ProjectSubTask, sortOrder: number) {
 // Authentication
 // ---------------------------------------------------------------------------
 
-export async function login(identity: string, password: string): Promise<User> {
-  let email = identity.trim();
-  if (!email.includes('@') && LOGIN_EMAIL_DOMAIN) {
-    email = `${email}@${LOGIN_EMAIL_DOMAIN}`;
-  }
-  if (!email.includes('@')) {
-    // LoginRequest(Email, Password, TenantSlug): NexusCore authenticates by email only.
-    throw new NexusApiError('ورود به سامانه فقط با ایمیل امکان‌پذیر است. لطفاً ایمیل حساب کاربری خود را وارد کنید.', 400);
-  }
-
-  const auth = await request<AuthResponse>('POST', '/api/identity/auth/login', {
-    body: { email, password, tenantSlug: NEXUS_TENANT_SLUG || null },
+async function loginWith(identifier: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>('POST', '/api/identity/auth/login', {
+    body: { email: identifier, password, tenantSlug: NEXUS_TENANT_SLUG || null },
     auth: false,
     retryOnUnauthorized: false,
-    unauthorizedMessage: 'ورود ناموفق بود! ایمیل یا رمز عبور اشتباه است، یا حساب کاربری غیرفعال شده است.',
+    unauthorizedMessage: 'ورود ناموفق بود! نام کاربری/ایمیل یا رمز عبور اشتباه است، یا حساب کاربری غیرفعال شده است.',
   });
+}
+
+/** The identifier may be an email address, a username or a mobile number. */
+export async function login(identity: string, password: string): Promise<User> {
+  const identifier = identity.trim();
+  let auth: AuthResponse;
+  try {
+    auth = await loginWith(identifier, password);
+  } catch (err) {
+    // Optional fallback for accounts that only have an email: "name" -> name@domain.
+    if (err instanceof NexusApiError && err.httpStatus === 401 && !identifier.includes('@') && LOGIN_EMAIL_DOMAIN) {
+      auth = await loginWith(`${identifier}@${LOGIN_EMAIL_DOMAIN}`, password);
+    } else {
+      throw err;
+    }
+  }
   saveAuthResponse(auth);
   return mapUserDto(auth.user);
 }
@@ -846,23 +895,69 @@ export async function deleteUser(userId: string): Promise<void> {
   await request<void>('DELETE', `/api/identity/users/${requireGuid(userId, 'کاربر')}`);
 }
 
+const MY_TEAMS = '/api/identity/groups/mine';
+const TEAM_MANAGER_ROLE = 'مدیر تیم';
+const TEAM_MEMBER_ROLE = 'عضو تیم';
+
+function mapTeam(g: UserGroupDto): WorkTeam {
+  const ownerId = g.ownerUserId || '';
+  return {
+    id: g.id,
+    name: g.name,
+    ownerId,
+    // The UI's roles follow ownership: the owner manages the team, everyone else is a member.
+    members: (g.members || []).map((m) => ({
+      userId: m.userId,
+      name: m.displayName,
+      username: m.email,
+      role: m.userId === ownerId ? TEAM_MANAGER_ROLE : TEAM_MEMBER_ROLE,
+    })),
+    createdAt: '',
+  };
+}
+
+/** The signed-in user's own work teams (personal teams, owned by them). */
 export async function fetchUserGroupsAsTeams(): Promise<WorkTeam[]> {
   if (!readSession()) return [];
-  const tenantId = getSessionTenantId();
-  const result = await request<UserGroupDto[] | PagedResult<UserGroupDto>>('GET', '/api/identity/groups', {
-    query: { tenantId },
-  });
-  const groups = Array.isArray(result) ? result : result?.items || [];
-  return groups
-    .filter((g) => g.isActive)
-    .map((g) => ({
-      id: g.id,
-      name: g.name,
-      // UserGroup has no owner - the field is left empty rather than invented.
-      ownerId: '',
-      members: (g.members || []).map((m) => ({ userId: m.userId, name: m.displayName, username: m.email })),
-      createdAt: '',
-    }));
+  const teams = await request<UserGroupDto[]>('GET', MY_TEAMS);
+  return (teams || []).filter((g) => g.isActive).map(mapTeam);
+}
+
+/**
+ * Stores the whole team list the team editor holds: new teams are created, renamed ones
+ * updated, member lists replaced and teams no longer in the list deleted. Returns the teams
+ * as saved, with server ids.
+ */
+export async function saveMyTeams(teams: WorkTeam[]): Promise<WorkTeam[]> {
+  const current = await request<UserGroupDto[]>('GET', MY_TEAMS);
+  const currentById = new Map((current || []).map((g) => [g.id, g]));
+  const keep = new Set<string>();
+
+  for (const team of teams) {
+    const memberIds = (team.members || []).map((m) => m.userId).filter((id) => isGuid(id));
+    let saved = isGuid(team.id) ? currentById.get(team.id) : undefined;
+
+    if (!saved) {
+      saved = await request<UserGroupDto>('POST', MY_TEAMS, { body: { name: team.name } });
+    } else if (saved.name !== team.name) {
+      saved = await request<UserGroupDto>('PUT', `${MY_TEAMS}/${saved.id}`, { body: { name: team.name, description: saved.description } });
+    }
+
+    keep.add(saved.id);
+    const before = new Set((saved.members || []).map((m) => m.userId));
+    const changed = memberIds.length !== before.size || memberIds.some((id) => !before.has(id));
+    if (changed) {
+      await request<UserGroupDto>('PUT', `${MY_TEAMS}/${saved.id}/members`, { body: { userIds: memberIds } });
+    }
+  }
+
+  for (const existing of current || []) {
+    if (!keep.has(existing.id)) {
+      await request('DELETE', `${MY_TEAMS}/${existing.id}`);
+    }
+  }
+
+  return fetchUserGroupsAsTeams();
 }
 
 // ---------------------------------------------------------------------------
@@ -877,7 +972,7 @@ async function getTaskDto(taskId: string): Promise<TaskDto> {
 
 async function fetchComments(taskId: string): Promise<TaskComment[]> {
   const items = await request<TaskCommentDto[]>('GET', `${TASKS}/${taskId}/comments`);
-  return (items || []).map(mapComment).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return (await Promise.all((items || []).map(mapCommentWithFiles))).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 async function fetchActivity(taskId: string): Promise<TaskLog[]> {
@@ -910,17 +1005,7 @@ async function fetchTask(taskId: string): Promise<Task> {
   return mapTask(dto, comments, logs);
 }
 
-function assertUploadsSupported(): void {
-  if (!BACKEND_STORES_FILE_CONTENT) {
-    throw new NexusApiError(
-      'بارگذاری فایل پیوست در سرور NexusCore فعلاً ممکن نیست: سرور مشخصات فایل را ثبت می‌کند اما محتوای آن را ذخیره نمی‌کند. فعالیت را بدون فایل جدید ذخیره کنید.',
-      501
-    );
-  }
-}
-
 async function uploadAttachment(taskId: string, attachment: Attachment): Promise<void> {
-  assertUploadsSupported();
   const form = new FormData();
   form.append('file', dataUrlToBlob(attachment.dataUrl, attachment.type), attachment.name);
   await request<TaskFileDto>('POST', `/api/task-management/files/tasks/${taskId}`, { form });
@@ -936,7 +1021,6 @@ async function resolveTagId(name: string): Promise<string> {
 }
 
 export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
-  if ((taskData.attachments || []).length > 0) assertUploadsSupported();
   const subTasks = taskData.projectSubTasks || [];
   const dueDate = toDateOnly(taskData.dueDate);
   if (!dueDate) throw new NexusApiError('تاریخ سررسید فعالیت نامعتبر است.', 400);
@@ -1006,33 +1090,17 @@ export async function updateTask(
 ): Promise<Task> {
   const current = await getTaskDto(taskId);
 
-  // Refuse before changing anything, so a rejected upload does not leave a half-applied edit.
-  if (taskData.attachments?.some((a) => !current.files.some((f) => f.linkId === a.id))) {
-    assertUploadsSupported();
-  }
 
-  // The UI rebuilds a recurring task's occurrences on every save and recognises the old ones
-  // by their "rec_occ_" ids. The backend assigns its own ids, so after a reload the old
-  // occurrences are no longer recognisable and a save would add a second full set.
   const desiredSubTasks = taskData.projectSubTasks;
-  if (
-    desiredSubTasks &&
-    current.recurrence &&
-    current.subTasks.length > 0 &&
-    desiredSubTasks.some((s) => s.id.startsWith('rec_occ_'))
-  ) {
-    throw new NexusApiError(
-      'ویرایش فرم وظیفهٔ تکرارشونده در اتصال NexusCore پشتیبانی نمی‌شود: سرور شناسهٔ رخدادهای تولیدشده را نگه نمی‌دارد و ذخیره باعث تکرار همهٔ رخدادها می‌شود. تغییر وضعیت زیرفعالیت‌ها همچنان ممکن است.',
-      409
-    );
-  }
 
   // 1. New subtasks first: promoting a task to a project requires subtasks to exist already.
+  //    A regenerated schedule arrives as new "rec_occ_" items; the old ones are no longer in
+  //    the list and are removed in step 3 - the same replace-on-save the UI always did.
   const currentById = new Map(current.subTasks.map((s) => [s.id, s]));
   if (desiredSubTasks) {
     for (let i = 0; i < desiredSubTasks.length; i++) {
       const s = desiredSubTasks[i];
-      if (currentById.has(s.id)) continue;
+      if (currentById.has(toServerSubTaskId(s.id))) continue;
       const added = await request<SubTaskDto>('POST', `${TASKS}/${taskId}/subtasks`, { body: toSubTaskBody(s, i) });
       if (s.completed) {
         await request('PATCH', `/api/task-management/subtasks/${added.id}/status`, { body: { isCompleted: true } });
@@ -1087,10 +1155,11 @@ export async function updateTask(
   // 3. Existing subtasks: edits, completion toggles, then removals (a plain task may drop
   //    them all; a project keeps at least one, which the server enforces).
   if (desiredSubTasks) {
-    const desiredIds = new Set(desiredSubTasks.map((s) => s.id));
+    const desiredIds = new Set(desiredSubTasks.map((s) => toServerSubTaskId(s.id)));
     for (let i = 0; i < desiredSubTasks.length; i++) {
       const s = desiredSubTasks[i];
-      const existing = currentById.get(s.id);
+      const serverId = toServerSubTaskId(s.id);
+      const existing = currentById.get(serverId);
       if (!existing) continue;
       const body = toSubTaskBody(s, i);
       const changed =
@@ -1100,10 +1169,10 @@ export async function updateTask(
         (existing.endDate || null) !== body.endDate ||
         existing.sortOrder !== body.sortOrder;
       if (changed) {
-        await request('PUT', `/api/task-management/subtasks/${s.id}`, { body });
+        await request('PUT', `/api/task-management/subtasks/${serverId}`, { body });
       }
       if (existing.isCompleted !== !!s.completed) {
-        await request('PATCH', `/api/task-management/subtasks/${s.id}/status`, { body: { isCompleted: !!s.completed } });
+        await request('PATCH', `/api/task-management/subtasks/${serverId}/status`, { body: { isCompleted: !!s.completed } });
       }
     }
     for (const existing of current.subTasks) {
@@ -1184,13 +1253,57 @@ export async function fetchTaskComments(taskId: string): Promise<TaskComment[]> 
   return fetchComments(taskId);
 }
 
-export async function createTaskComment(taskId: string, text: string, hasAttachments: boolean): Promise<TaskComment> {
-  if (hasAttachments) {
-    // CreateTaskCommentRequest carries only Text; the files would be silently lost.
-    throw new NexusApiError('پیوست کردن فایل به نظر در سرور NexusCore پشتیبانی نمی‌شود. نظر را بدون پیوست ارسال کنید.', 400);
-  }
+async function uploadCommentAttachment(commentId: string, attachment: Attachment): Promise<void> {
+  const form = new FormData();
+  form.append('file', dataUrlToBlob(attachment.dataUrl, attachment.type), attachment.name);
+  await request<TaskFileDto>('POST', `/api/task-management/files/comments/${commentId}`, { form });
+}
+
+export async function createTaskComment(taskId: string, text: string, attachments: Attachment[] = []): Promise<TaskComment> {
   const created = await request<TaskCommentDto>('POST', `${TASKS}/${taskId}/comments`, { body: { text } });
-  return mapComment(created);
+  try {
+    for (const attachment of attachments) {
+      await uploadCommentAttachment(created.id, attachment);
+    }
+  } catch (err) {
+    // A comment that lost its files would read as complete; remove it and report instead.
+    await request('DELETE', `/api/task-management/comments/${created.id}`).catch(() => undefined);
+    throw err;
+  }
+
+  if (attachments.length === 0) {
+    return mapComment(created);
+  }
+
+  const saved = (await request<TaskCommentDto[]>('GET', `${TASKS}/${taskId}/comments`)).find((c) => c.id === created.id);
+  return saved ? mapCommentWithFiles(saved) : mapComment(created);
+}
+
+/**
+ * Saves an edited comment: its text, plus attachments added (uploaded) or removed (their links
+ * deleted). Attachments that came from the server carry their link id as id.
+ */
+export async function updateTaskComment(
+  commentId: string,
+  text: string,
+  attachments: Attachment[],
+  previous: Attachment[]
+): Promise<void> {
+  await request<TaskCommentDto>('PUT', `/api/task-management/comments/${commentId}`, { body: { text } });
+
+  const keep = new Set(attachments.map((a) => a.id));
+  for (const old of previous) {
+    if (!keep.has(old.id) && isGuid(old.id)) {
+      await request('DELETE', `/api/task-management/files/${old.id}`);
+    }
+  }
+
+  const had = new Set(previous.map((a) => a.id));
+  for (const attachment of attachments) {
+    if (!had.has(attachment.id)) {
+      await uploadCommentAttachment(commentId, attachment);
+    }
+  }
 }
 
 export async function deleteTaskComment(commentId: string): Promise<void> {
@@ -1230,7 +1343,437 @@ export async function deleteNote(id: string): Promise<void> {
   await request('DELETE', `${NOTES}/${id}`);
 }
 
-/** Message for operations the backend cannot serve, shown through the existing error UI. */
-export function unsupportedOperation(what: string): NexusApiError {
-  return new NexusApiError(`${what} در سرور NexusCore پشتیبانی نمی‌شود.`, 501);
+
+// ---------------------------------------------------------------------------
+// Own account: sign-up, password reset, profile, preferences
+// ---------------------------------------------------------------------------
+
+function updateSessionUser(user: UserDto): void {
+  const session = readSession();
+  if (session) writeSession({ ...session, user });
+}
+
+export async function register(data: {
+  username?: string;
+  email: string;
+  password: string;
+  name?: string;
+  phoneNumber?: string;
+  telegramChatId?: string;
+  notifySms?: boolean;
+  notifyTelegram?: boolean;
+  theme?: string;
+  colorPalette?: string;
+  themeMode?: string;
+}): Promise<User> {
+  const auth = await request<AuthResponse>('POST', '/api/identity/auth/register', {
+    auth: false,
+    retryOnUnauthorized: false,
+    body: {
+      email: data.email.trim(),
+      password: data.password,
+      displayName: (data.name || '').trim() || data.email.trim(),
+      username: data.username?.trim() || null,
+      phoneNumber: data.phoneNumber?.trim() || null,
+      telegramChatId: data.telegramChatId?.trim() || null,
+      notifySms: data.notifySms ?? true,
+      notifyTelegram: data.notifyTelegram ?? true,
+      theme: data.theme || null,
+      colorPalette: data.colorPalette || null,
+      themeMode: data.themeMode || null,
+    },
+  });
+  saveAuthResponse(auth);
+  return mapUserDto(auth.user);
+}
+
+/** Emails a reset link. The answer is the same whether or not the account exists. */
+export async function requestPasswordReset(identifier: string): Promise<string> {
+  await request('POST', '/api/identity/auth/forgot-password', {
+    auth: false,
+    retryOnUnauthorized: false,
+    body: { email: identifier.trim(), tenantSlug: NEXUS_TENANT_SLUG || null },
+  });
+  return identifier.trim();
+}
+
+export async function confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+  await request('POST', '/api/identity/auth/reset-password', {
+    auth: false,
+    retryOnUnauthorized: false,
+    body: { token: token.trim(), newPassword },
+  });
+}
+
+/** Fields left undefined keep their current value. */
+export async function updateMyProfile(updates: {
+  name?: string;
+  username?: string;
+  avatar?: string;
+  phoneNumber?: string;
+  telegramChatId?: string;
+  notifySms?: boolean;
+  notifyTelegram?: boolean;
+}): Promise<User> {
+  const me = readSession()?.user;
+  if (!me) throw new NexusApiError('کاربر وارد سیستم نشده است.', 401);
+
+  const saved = await request<UserDto>('PUT', '/api/identity/auth/me/profile', {
+    body: {
+      displayName: (updates.name ?? me.displayName).trim() || me.displayName,
+      username: (updates.username !== undefined ? updates.username : me.username)?.trim() || null,
+      avatarUrl: updates.avatar !== undefined ? updates.avatar || null : me.avatarUrl ?? null,
+      phoneNumber: (updates.phoneNumber !== undefined ? updates.phoneNumber : me.phoneNumber)?.trim() || null,
+      telegramChatId: (updates.telegramChatId !== undefined ? updates.telegramChatId : me.telegramChatId)?.trim() || null,
+      notifySms: updates.notifySms ?? me.notifySms ?? true,
+      notifyTelegram: updates.notifyTelegram ?? me.notifyTelegram ?? true,
+    },
+  });
+  updateSessionUser(saved);
+  return mapUserDto(saved);
+}
+
+export async function updateMyPreferences(settings: { theme?: string; colorPalette?: string; themeMode?: string }): Promise<void> {
+  const me = readSession()?.user;
+  if (!me) return;
+  const saved = await request<UserDto>('PUT', '/api/identity/auth/me/preferences', {
+    body: {
+      theme: settings.theme ?? me.theme ?? null,
+      colorPalette: settings.colorPalette ?? me.colorPalette ?? null,
+      themeMode: settings.themeMode ?? me.themeMode ?? null,
+    },
+  });
+  updateSessionUser(saved);
+}
+
+// ---------------------------------------------------------------------------
+// User administration
+// ---------------------------------------------------------------------------
+
+/** Role given to accounts the UI calls "user" (seeded by the host, see Identity:SeedRoles). */
+const MEMBER_ROLE_NAME = 'Member';
+
+interface RoleDto { id: string; name: string; }
+
+async function roleIdsFor(role: string | undefined): Promise<string[]> {
+  const roles = await request<RoleDto[]>('GET', '/api/identity/roles', { query: { tenantId: getSessionTenantId() } });
+  const wanted = role === 'admin' ? ADMIN_ROLE_NAME : MEMBER_ROLE_NAME;
+  const match = (roles || []).find((r) => r.name === wanted);
+  if (!match) {
+    throw new NexusApiError(`نقش «${wanted}» در سرور تعریف نشده است.`, 400);
+  }
+  return [match.id];
+}
+
+async function findUserDto(userId: string): Promise<UserDto> {
+  const users = await getAllPages<UserDto>('/api/identity/users', {}, 100);
+  const user = users.find((u) => u.id === userId);
+  if (!user) throw new NexusApiError('کاربر یافت نشد.', 404);
+  return user;
+}
+
+export async function createUser(data: {
+  username: string;
+  name: string;
+  email: string;
+  password: string;
+  role?: string;
+  disabled?: boolean;
+  phoneNumber?: string;
+  telegramChatId?: string;
+  notifySms?: boolean;
+  notifyTelegram?: boolean;
+}): Promise<User> {
+  const roleIds = await roleIdsFor(data.role);
+  const created = await request<UserDto>('POST', '/api/identity/users', {
+    body: {
+      tenantId: getSessionTenantId(),
+      email: data.email.trim(),
+      displayName: (data.name || data.username).trim(),
+      password: data.password,
+      isActive: !data.disabled,
+      username: data.username?.trim() || null,
+      phoneNumber: data.phoneNumber?.trim() || null,
+      telegramChatId: data.telegramChatId?.trim() || null,
+      notifySms: data.notifySms ?? true,
+      notifyTelegram: data.notifyTelegram ?? true,
+    },
+  });
+  await request('PUT', `/api/identity/users/${created.id}/roles`, { body: { roleIds } });
+  return mapUserDto({ ...created, roles: [data.role === 'admin' ? ADMIN_ROLE_NAME : MEMBER_ROLE_NAME] });
+}
+
+/** Fields left undefined keep their current value. */
+export async function updateUser(
+  userId: string,
+  updates: {
+    name?: string;
+    username?: string;
+    email?: string;
+    password?: string;
+    role?: string;
+    disabled?: boolean;
+    phoneNumber?: string;
+    telegramChatId?: string;
+    notifySms?: boolean;
+    notifyTelegram?: boolean;
+  }
+): Promise<User> {
+  const current = await findUserDto(requireGuid(userId, 'کاربر')!);
+  const saved = await request<UserDto>('PUT', `/api/identity/users/${current.id}`, {
+    body: {
+      displayName: (updates.name ?? current.displayName).trim() || current.displayName,
+      isActive: updates.disabled !== undefined ? !updates.disabled : current.isActive,
+      email: updates.email?.trim() || null,
+      password: updates.password?.trim() || null,
+      username: updates.username !== undefined ? updates.username.trim() : null,
+      phoneNumber: updates.phoneNumber !== undefined ? updates.phoneNumber.trim() : null,
+      telegramChatId: updates.telegramChatId !== undefined ? updates.telegramChatId.trim() : null,
+      notifySms: updates.notifySms ?? null,
+      notifyTelegram: updates.notifyTelegram ?? null,
+    },
+  });
+
+  if (updates.role !== undefined) {
+    const wantsAdmin = updates.role === 'admin';
+    const isAdmin = (current.roles || []).includes(ADMIN_ROLE_NAME);
+    if (wantsAdmin !== isAdmin) {
+      await request('PUT', `/api/identity/users/${current.id}/roles`, { body: { roleIds: await roleIdsFor(updates.role) } });
+      saved.roles = [wantsAdmin ? ADMIN_ROLE_NAME : MEMBER_ROLE_NAME];
+    }
+  }
+
+  return mapUserDto(saved);
+}
+
+// ---------------------------------------------------------------------------
+// Direct messages (chat)
+// ---------------------------------------------------------------------------
+
+interface DirectMessageDto {
+  id: string;
+  conversationId: string;
+  senderUserId: string;
+  receiverUserId: string;
+  senderDisplayName: string;
+  senderAvatarUrl: string | null;
+  text: string;
+  sentAtUtc: string;
+  editedAtUtc: string | null;
+  isRead: boolean;
+  attachment: { fileName: string; contentType: string; sizeBytes: number } | null;
+}
+
+const CHAT = '/api/chat';
+
+// The chat screen polls every few seconds; an attachment is downloaded once per message.
+const attachmentUrls = new Map<string, Promise<string>>();
+
+function attachmentUrlFor(messageId: string): Promise<string> {
+  let url = attachmentUrls.get(messageId);
+  if (!url) {
+    url = request<Blob>('GET', `${CHAT}/messages/${messageId}/attachment`, { responseType: 'blob' })
+      .then((blob) => (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' && typeof window !== 'undefined'
+        ? URL.createObjectURL(blob)
+        : blobToDataUrl(blob)))
+      .catch((err) => {
+        attachmentUrls.delete(messageId);
+        console.warn('Chat attachment could not be downloaded:', err instanceof Error ? err.message : err);
+        return '';
+      });
+    attachmentUrls.set(messageId, url);
+  }
+  return url;
+}
+
+async function mapDirectMessage(m: DirectMessageDto): Promise<DirectMessage> {
+  return {
+    id: m.id,
+    senderId: m.senderUserId,
+    senderName: m.senderDisplayName || 'کاربر',
+    senderAvatar: m.senderAvatarUrl || undefined,
+    receiverId: m.receiverUserId,
+    text: m.text,
+    attachmentUrl: m.attachment ? (await attachmentUrlFor(m.id)) || undefined : undefined,
+    attachmentName: m.attachment?.fileName,
+    isRead: m.isRead,
+    createdAt: m.sentAtUtc,
+  };
+}
+
+export async function fetchDirectMessages(partnerId: string): Promise<DirectMessage[]> {
+  if (!readSession() || !isGuid(partnerId)) return [];
+  const messages = await request<DirectMessageDto[]>('GET', `${CHAT}/direct/${partnerId}/messages`);
+  return Promise.all((messages || []).map(mapDirectMessage));
+}
+
+/** The sender is the signed-in user; the server takes it from the token. */
+export async function sendDirectMessage(msg: {
+  receiverId: string;
+  text: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+}): Promise<DirectMessage> {
+  const form = new FormData();
+  form.append('text', msg.text || '');
+  if (msg.attachmentUrl) {
+    const blob = dataUrlToBlob(msg.attachmentUrl, 'application/octet-stream');
+    form.append('file', blob, msg.attachmentName || 'attachment');
+  }
+
+  const sent = await request<DirectMessageDto>('POST', `${CHAT}/direct/${requireGuid(msg.receiverId, 'گیرنده')}/messages`, { form });
+  if (msg.attachmentUrl) {
+    // The sender already has the file; no need to download it back.
+    attachmentUrls.set(sent.id, Promise.resolve(msg.attachmentUrl));
+  }
+  return mapDirectMessage(sent);
+}
+
+/** Marks everything the sender sent to the signed-in user as read. */
+export async function markDirectMessagesRead(senderId: string): Promise<void> {
+  if (!readSession() || !isGuid(senderId)) return;
+  await request('POST', `${CHAT}/direct/${senderId}/read`);
+}
+
+export async function updateDirectMessage(messageId: string, text: string): Promise<void> {
+  await request('PUT', `${CHAT}/messages/${messageId}`, { body: { text } });
+}
+
+export async function deleteDirectMessage(messageId: string): Promise<void> {
+  await request('DELETE', `${CHAT}/messages/${messageId}`);
+}
+
+export async function fetchUnreadMessageCounts(): Promise<Record<string, number>> {
+  if (!readSession()) return {};
+  const counts = await request<{ senderUserId: string; count: number }[]>('GET', `${CHAT}/direct/unread-counts`);
+  return Object.fromEntries((counts || []).map((c) => [c.senderUserId, c.count]));
+}
+
+// ---------------------------------------------------------------------------
+// SMS / Telegram gateway settings (administrators)
+// ---------------------------------------------------------------------------
+
+const CHANNELS = '/api/platform/notification-channels';
+
+export async function fetchNotificationChannelSettings(): Promise<SystemNotificationSettings> {
+  if (!readSession()) {
+    // Signed out: nothing to ask the server; the caller falls back to its local copy.
+    throw new NexusApiError('کاربر وارد سیستم نشده است.', 401);
+  }
+  const s = await request<SystemNotificationSettings>('GET', CHANNELS);
+  return {
+    sms: {
+      enabled: !!s.sms?.enabled,
+      provider: (s.sms?.provider || 'kavenegar') as SystemNotificationSettings['sms']['provider'],
+      apiKey: s.sms?.apiKey || '',
+      lineNumber: s.sms?.lineNumber || '',
+      patternCode: s.sms?.patternCode || '',
+      apiUrl: s.sms?.apiUrl || '',
+    },
+    telegram: {
+      enabled: !!s.telegram?.enabled,
+      botToken: s.telegram?.botToken || '',
+      botUsername: s.telegram?.botUsername || '',
+      adminChatId: s.telegram?.adminChatId || '',
+      apiUrl: s.telegram?.apiUrl || '',
+    },
+  };
+}
+
+export async function saveNotificationChannelSettings(settings: SystemNotificationSettings): Promise<void> {
+  const blank = (v?: string) => (v && v.trim() ? v.trim() : null);
+  await request('PUT', CHANNELS, {
+    body: {
+      sms: {
+        enabled: !!settings.sms.enabled,
+        provider: settings.sms.provider,
+        apiKey: blank(settings.sms.apiKey),
+        lineNumber: blank(settings.sms.lineNumber),
+        patternCode: blank(settings.sms.patternCode),
+        apiUrl: blank(settings.sms.apiUrl),
+      },
+      telegram: {
+        enabled: !!settings.telegram.enabled,
+        botToken: blank(settings.telegram.botToken),
+        botUsername: blank(settings.telegram.botUsername),
+        adminChatId: blank(settings.telegram.adminChatId),
+        apiUrl: blank(settings.telegram.apiUrl),
+      },
+    },
+  });
+}
+
+export async function testSms(phoneNumber: string, message?: string): Promise<{ success: boolean; message: string }> {
+  return request('POST', `${CHANNELS}/test-sms`, { body: { phoneNumber, message: message || null } });
+}
+
+export async function testTelegram(chatId: string, text?: string): Promise<{ success: boolean; message: string }> {
+  return request('POST', `${CHANNELS}/test-telegram`, { body: { chatId, text: text || null } });
+}
+
+// ---------------------------------------------------------------------------
+// Task history entries written by the UI
+// ---------------------------------------------------------------------------
+
+/** Adds an entry to the task's history; the server records it under the signed-in user. */
+export async function addTaskActivityEntry(taskId: string, action: string, details?: string): Promise<void> {
+  await request('POST', `${TASKS}/${requireGuid(taskId, 'فعالیت')}/activity`, {
+    body: { action: action.slice(0, 120), details: details ? details.slice(0, 2000) : null },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Live updates (SignalR hub of the TaskManagement module)
+// ---------------------------------------------------------------------------
+
+const taskChangeListeners = new Set<() => void>();
+let taskHub: HubConnection | null = null;
+let changeTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function hubAccessToken(): Promise<string> {
+  const session = readSession();
+  if (!session) return '';
+  // A token that is about to expire would get the connection rejected; renew it first.
+  if (new Date(session.accessTokenExpiresAtUtc).getTime() - Date.now() < 30_000) {
+    await refreshSession();
+  }
+  return readSession()?.accessToken || '';
+}
+
+function notifyTaskChange(): void {
+  // Several writes in a row (a form save touches many endpoints) become one reload.
+  if (changeTimer) clearTimeout(changeTimer);
+  changeTimer = setTimeout(() => {
+    changeTimer = null;
+    taskChangeListeners.forEach((listener) => listener());
+  }, 400);
+}
+
+/**
+ * Calls onChange whenever tasks, subtasks, comments, files, tags or schedules change anywhere
+ * in the tenant - the same moments the PocketBase realtime subscription fired.
+ */
+export function subscribeToTaskChanges(onChange: () => void): () => void {
+  if (!readSession()) return () => {};
+
+  taskChangeListeners.add(onChange);
+  if (!taskHub) {
+    const hub = new HubConnectionBuilder()
+      .withUrl(`${NEXUS_API_BASE_URL}/hubs/task-management`, { accessTokenFactory: hubAccessToken })
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.Warning)
+      .build();
+    hub.on('TasksChanged', notifyTaskChange);
+    taskHub = hub;
+    hub.start().catch((err) => console.warn('Live task updates are unavailable:', err instanceof Error ? err.message : err));
+  }
+
+  return () => {
+    taskChangeListeners.delete(onChange);
+    if (taskChangeListeners.size === 0 && taskHub) {
+      const hub = taskHub;
+      taskHub = null;
+      hub.stop().catch(() => undefined);
+    }
+  };
 }
