@@ -1,0 +1,260 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+* {
+  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+@layer base {
+  body {
+    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+}
+
+/* Color Palette Variables for Pattern Lines */
+:root, .palette-indigo {
+  --pattern-color: rgba(99, 102, 241, 0.28);
+}
+.dark, .dark .palette-indigo, .dark.palette-indigo {
+  --pattern-color: rgba(129, 140, 248, 0.35);
+}
+
+.palette-emerald {
+  --pattern-color: rgba(16, 185, 129, 0.32);
+}
+.dark .palette-emerald, .dark.palette-emerald {
+  --pattern-color: rgba(52, 211, 153, 0.38);
+}
+
+.palette-rose {
+  --pattern-color: rgba(244, 63, 94, 0.30);
+}
+.dark .palette-rose, .dark.palette-rose {
+  --pattern-color: rgba(251, 113, 133, 0.36);
+}
+
+.palette-amber {
+  --pattern-color: rgba(245, 158, 11, 0.32);
+}
+.dark .palette-amber, .dark.palette-amber {
+  --pattern-color: rgba(251, 191, 36, 0.36);
+}
+
+.palette-cyan {
+  --pattern-color: rgba(6, 182, 212, 0.30);
+}
+.dark .palette-cyan, .dark.palette-cyan {
+  --pattern-color: rgba(34, 211, 238, 0.36);
+}
+
+.palette-slate {
+  --pattern-color: rgba(100, 116, 139, 0.30);
+}
+.dark .palette-slate, .dark.palette-slate {
+  --pattern-color: rgba(148, 163, 184, 0.36);
+}
+
+/* Background Patterns */
+.bg-pattern-default {
+  background-color: #f8fafc;
+}
+.dark .bg-pattern-default {
+  background-color: #0f172a;
+}
+
+/* Checkerboard (شطرنجی) */
+.bg-pattern-checkerboard {
+  background-color: #f8fafc;
+  background-image: 
+    linear-gradient(45deg, var(--pattern-color) 25%, transparent 25%), 
+    linear-gradient(-45deg, var(--pattern-color) 25%, transparent 25%), 
+    linear-gradient(45deg, transparent 75%, var(--pattern-color) 75%), 
+    linear-gradient(-45deg, transparent 75%, var(--pattern-color) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+.dark .bg-pattern-checkerboard {
+  background-color: #0f172a;
+  background-image: 
+    linear-gradient(45deg, var(--pattern-color) 25%, transparent 25%), 
+    linear-gradient(-45deg, var(--pattern-color) 25%, transparent 25%), 
+    linear-gradient(45deg, transparent 75%, var(--pattern-color) 75%), 
+    linear-gradient(-45deg, transparent 75%, var(--pattern-color) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+/* Diagonal Lines (خط مورب) */
+.bg-pattern-diagonal {
+  background-color: #f8fafc;
+  background-image: repeating-linear-gradient(45deg, var(--pattern-color) 0, var(--pattern-color) 1px, transparent 0, transparent 10px);
+}
+.dark .bg-pattern-diagonal {
+  background-color: #0f172a;
+  background-image: repeating-linear-gradient(45deg, var(--pattern-color) 0, var(--pattern-color) 1px, transparent 0, transparent 10px);
+}
+
+/* Grid (شبکه‌ای) */
+.bg-pattern-grid {
+  background-color: #f8fafc;
+  background-image: linear-gradient(to right, var(--pattern-color) 1px, transparent 1px),
+                    linear-gradient(to bottom, var(--pattern-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.dark .bg-pattern-grid {
+  background-color: #0f172a;
+  background-image: linear-gradient(to right, var(--pattern-color) 1px, transparent 1px),
+                    linear-gradient(to bottom, var(--pattern-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Polka Dots (نقطه‌ای) */
+.bg-pattern-dots {
+  background-color: #f8fafc;
+  background-image: radial-gradient(var(--pattern-color) 1.5px, transparent 1.5px);
+  background-size: 18px 18px;
+}
+.dark .bg-pattern-dots {
+  background-color: #0f172a;
+  background-image: radial-gradient(var(--pattern-color) 1.5px, transparent 1.5px);
+  background-size: 18px 18px;
+}
+
+/* Cross / Mesh (چهارخانه) */
+.bg-pattern-cross {
+  background-color: #f8fafc;
+  background-image: radial-gradient(var(--pattern-color) 1.5px, transparent 1.5px), radial-gradient(var(--pattern-color) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+}
+.dark .bg-pattern-cross {
+  background-color: #0f172a;
+  background-image: radial-gradient(var(--pattern-color) 1.5px, transparent 1.5px), radial-gradient(var(--pattern-color) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+}
+
+/* Waves (موجی) */
+.bg-pattern-waves {
+  background-color: #f8fafc;
+  background-image: radial-gradient(circle at 100% 150%, transparent 15px, var(--pattern-color) 16px, var(--pattern-color) 17px, transparent 18px), radial-gradient(circle at 0% -50%, transparent 15px, var(--pattern-color) 16px, var(--pattern-color) 17px, transparent 18px);
+  background-size: 28px 28px;
+}
+.dark .bg-pattern-waves {
+  background-color: #0f172a;
+  background-image: radial-gradient(circle at 100% 150%, transparent 15px, var(--pattern-color) 16px, var(--pattern-color) 17px, transparent 18px), radial-gradient(circle at 0% -50%, transparent 15px, var(--pattern-color) 16px, var(--pattern-color) 17px, transparent 18px);
+  background-size: 28px 28px;
+}
+
+/* Custom scrollbar styling for kanban columns */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.6);
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Irregular Floating Small White Orbs for Login Page */
+@keyframes float-irregular-1 {
+  0% { transform: translate(0px, 0px) scale(1); opacity: 0.8; }
+  25% { transform: translate(140px, -120px) scale(1.3); opacity: 1; }
+  50% { transform: translate(-90px, -200px) scale(0.8); opacity: 0.6; }
+  75% { transform: translate(110px, -80px) scale(1.2); opacity: 0.9; }
+  100% { transform: translate(0px, 0px) scale(1); opacity: 0.8; }
+}
+
+@keyframes float-irregular-2 {
+  0% { transform: translate(0px, 0px) scale(1); opacity: 0.85; }
+  33% { transform: translate(-160px, 130px) scale(0.85); opacity: 1; }
+  66% { transform: translate(140px, -100px) scale(1.35); opacity: 0.5; }
+  100% { transform: translate(0px, 0px) scale(1); opacity: 0.85; }
+}
+
+@keyframes float-irregular-3 {
+  0% { transform: translate(0px, 0px) scale(1); opacity: 0.7; }
+  20% { transform: translate(-120px, -140px) scale(1.4); opacity: 0.95; }
+  50% { transform: translate(170px, 110px) scale(0.7); opacity: 0.6; }
+  80% { transform: translate(-80px, 150px) scale(1.25); opacity: 1; }
+  100% { transform: translate(0px, 0px) scale(1); opacity: 0.7; }
+}
+
+@keyframes float-irregular-4 {
+  0% { transform: translate(0px, 0px) scale(1); opacity: 0.8; }
+  40% { transform: translate(180px, 140px) scale(1.3); opacity: 0.5; }
+  70% { transform: translate(-130px, -170px) scale(0.8); opacity: 0.95; }
+  100% { transform: translate(0px, 0px) scale(1); opacity: 0.8; }
+}
+
+@keyframes float-irregular-5 {
+  0% { transform: translate(0px, 0px) scale(1); opacity: 0.9; }
+  30% { transform: translate(-150px, -90px) scale(0.75); opacity: 0.55; }
+  60% { transform: translate(120px, 160px) scale(1.2); opacity: 1; }
+  100% { transform: translate(0px, 0px) scale(1); opacity: 0.9; }
+}
+
+.animate-float-1 {
+  animation: float-irregular-1 12s ease-in-out infinite;
+}
+.animate-float-2 {
+  animation: float-irregular-2 17s ease-in-out infinite;
+}
+.animate-float-3 {
+  animation: float-irregular-3 21s ease-in-out infinite;
+}
+.animate-float-4 {
+  animation: float-irregular-4 15s ease-in-out infinite;
+}
+.animate-float-5 {
+  animation: float-irregular-5 18s ease-in-out infinite;
+}
+
+/* Continuous silky-smooth linear spinning animation with seamless revolving motion */
+@keyframes smooth-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-smooth-spin {
+  animation: smooth-spin 0.85s linear infinite !important;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+/* Print CSS for clean PDF export */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #pdf-report-content, #pdf-report-content * {
+    visibility: visible !important;
+  }
+  #pdf-report-content {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
