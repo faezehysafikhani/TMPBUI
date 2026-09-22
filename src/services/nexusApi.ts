@@ -32,7 +32,7 @@ import {
   DirectMessage,
   SystemNotificationSettings,
 } from '../types';
-import { parseDateSafely } from '../utils/jalali';
+import { iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 
 // ---------------------------------------------------------------------------
@@ -132,6 +132,8 @@ interface SubTaskDto {
   files: TaskFileDto[];
   createdAtUtc: string;
   isGeneratedOccurrence?: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 interface RepetitiveTaskDto {
@@ -177,6 +179,8 @@ interface TaskDto {
   recurrence: RepetitiveTaskDto | null;
   createdAtUtc: string;
   modifiedAtUtc: string | null;
+  /** Time of day on dueDate ("HH:mm:ss"); null when the task has only a date. */
+  dueTime?: string | null;
 }
 
 interface TaskListItemDto { id: string; }
@@ -514,25 +518,24 @@ const NTH_FROM_API: Record<string, OccurrenceNth> = {
 };
 
 /**
- * UI dates are ISO instants of a local calendar day; the backend stores a DateOnly. The
- * local calendar parts are used, not the UTC ones: in Iran (UTC+3:30) local midnight is the
- * previous day in UTC, and taking the UTC date would shift every due date back by one.
+ * UI dates are ISO instants; the backend keeps what the user picked - a calendar date
+ * (DateOnly) and, separately, a wall-clock time (TimeOnly). Both are taken in Iran time
+ * (UTC+3:30), the zone every date picker and label in the app works in (utils/jalali.ts), so
+ * the stored day is the day the user clicked whatever the browser's own time zone is. Taking
+ * the UTC date instead would move anything picked before 03:30 to the previous day.
  */
 function toDateOnly(value: string | undefined | null): string | null {
-  if (!value) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const d = parseDateSafely(value) || new Date(value);
-  if (isNaN(d.getTime())) return null;
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return (value && isoToIranDateTimeParts(value)?.date) || null;
 }
 
-/** Inverse of toDateOnly: local midnight of that calendar day, as the UI stores dates. */
-function fromDateOnly(value: string | null | undefined): string | undefined {
-  if (!value) return undefined;
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (!match) return undefined;
-  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).toISOString();
+/** The wall-clock time ("HH:mm:00") of a UI date; null for a bare date. 00:00 is kept as a time. */
+function toTimeOfDay(value: string | undefined | null): string | null {
+  return (value && isoToIranDateTimeParts(value)?.time) || null;
+}
+
+/** Inverse of toDateOnly + toTimeOfDay. Without a time it is the start of that Iranian day. */
+function fromDateOnly(value: string | null | undefined, time?: string | null): string | undefined {
+  return iranDateTimeToISO(value, time);
 }
 
 /** "09:00" -> "09:00:00" (System.Text.Json TimeOnly format). */
@@ -637,8 +640,8 @@ function mapSubTask(s: SubTaskDto): ProjectSubTask {
   return {
     id: toUiSubTaskId(s),
     title: s.title,
-    startDate: fromDateOnly(s.startDate),
-    endDate: fromDateOnly(s.endDate),
+    startDate: fromDateOnly(s.startDate, s.startTime),
+    endDate: fromDateOnly(s.endDate, s.endTime),
     importance: LEVEL_FROM_API[s.importance] || 'medium',
     completed: s.isCompleted,
     createdAt: s.createdAtUtc,
@@ -735,7 +738,7 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     id: dto.id,
     title: dto.title,
     description: dto.description || '',
-    dueDate: fromDateOnly(dto.dueDate) || new Date().toISOString(),
+    dueDate: fromDateOnly(dto.dueDate, dto.dueTime) || new Date().toISOString(),
     actualCompletionDate: dto.actualCompletionDateUtc || undefined,
     priority: LEVEL_FROM_API[dto.priority] || 'medium',
     status: STATUS_FROM_API[dto.status] || 'todo',
@@ -808,6 +811,8 @@ function toSubTaskBody(s: ProjectSubTask, sortOrder: number) {
     importance: LEVEL_TO_API[s.importance] || 'Medium',
     startDate: toDateOnly(s.startDate),
     endDate: toDateOnly(s.endDate),
+    startTime: toTimeOfDay(s.startDate),
+    endTime: toTimeOfDay(s.endDate),
     sortOrder,
     isGeneratedOccurrence: s.id.startsWith(OCCURRENCE_PREFIX),
   };
@@ -1030,6 +1035,7 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
     body: {
       title: taskData.title,
       dueDate,
+      dueTime: toTimeOfDay(taskData.dueDate),
       priority: LEVEL_TO_API[taskData.priority] || 'Medium',
       description: taskData.description || null,
       isProject: !!taskData.isProject,
@@ -1128,6 +1134,8 @@ export async function updateTask(
       body: {
         title: taskData.title ?? current.title,
         dueDate: toDateOnly(taskData.dueDate) || current.dueDate,
+        // The PUT replaces the time too, so an untouched due date keeps the time it has.
+        dueTime: taskData.dueDate !== undefined ? toTimeOfDay(taskData.dueDate) : current.dueTime ?? null,
         priority: taskData.priority ? LEVEL_TO_API[taskData.priority] : current.priority,
         description: taskData.description !== undefined ? taskData.description || null : current.description,
         isProject: taskData.isProject ?? current.isProject,
@@ -1167,6 +1175,8 @@ export async function updateTask(
         existing.importance !== body.importance ||
         (existing.startDate || null) !== body.startDate ||
         (existing.endDate || null) !== body.endDate ||
+        (existing.startTime || null) !== body.startTime ||
+        (existing.endTime || null) !== body.endTime ||
         existing.sortOrder !== body.sortOrder;
       if (changed) {
         await request('PUT', `/api/task-management/subtasks/${serverId}`, { body });
@@ -1759,7 +1769,9 @@ export function subscribeToTaskChanges(onChange: () => void): () => void {
   taskChangeListeners.add(onChange);
   if (!taskHub) {
     const hub = new HubConnectionBuilder()
-      .withUrl(`${NEXUS_API_BASE_URL}/hubs/task-management`, { accessTokenFactory: hubAccessToken })
+      // The token travels as access_token; no cookies are needed. With credentials the browser's
+      // negotiate request is refused by the API's CORS policy and live updates never connect.
+      .withUrl(`${NEXUS_API_BASE_URL}/hubs/task-management`, { accessTokenFactory: hubAccessToken, withCredentials: false })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();

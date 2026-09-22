@@ -329,6 +329,20 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
   const handlePrevYear = () => setViewYear(viewYear - 1);
   const handleNextYear = () => setViewYear(viewYear + 1);
 
+  // Opens the new-activity form for a day of the month on view. The date is built from the
+  // Jalali year/month/day that was clicked (in Iran time, like every date in the app), with the
+  // current time of day - the same default the "افزودن" button has always used.
+  const openCreateForDay = (day: number) => {
+    if (!onOpenCreateForDate) return;
+    const cur = getCurrentJalali();
+    onOpenCreateForDate(jalaliToISO(viewYear, viewMonth, day, cur.hour, cur.minute));
+  };
+
+  const handleSelectDay = (day: number) => {
+    setSelectedDay(day);
+    openCreateForDay(day);
+  };
+
   const handleGoToToday = () => {
     const today = getCurrentJalali();
     setViewYear(today.jy);
@@ -573,7 +587,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
               <button
                 key={`day-${dayNum}`}
                 type="button"
-                onClick={() => setSelectedDay(dayNum)}
+                onClick={() => handleSelectDay(dayNum)}
                 title={holidayInfo.isHoliday ? holidayInfo.title : undefined}
                 className={`relative h-14 sm:h-20 p-1 sm:p-2 rounded-2xl border transition-all duration-200 flex flex-col justify-between items-center cursor-pointer ${
                   isSelected
@@ -665,11 +679,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
               {onOpenCreateForDate && (
                 <button
                   type="button"
-                  onClick={() => {
-                    const cur = getCurrentJalali();
-                    const isoDate = jalaliToISO(viewYear, viewMonth, selectedDay, cur.hour, cur.minute);
-                    onOpenCreateForDate(isoDate);
-                  }}
+                  onClick={() => openCreateForDay(selectedDay)}
                   className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer shrink-0"
                   title="افزودن فعالیت جدید"
                 >

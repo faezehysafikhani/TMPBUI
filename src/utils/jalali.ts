@@ -235,6 +235,46 @@ export function jalaliToISO(jy: number, jm: number, jd: number, hour: number = 0
   return utcDate.toISOString();
 }
 
+const IRAN_OFFSET_MS = 3.5 * 3600 * 1000;
+
+/**
+ * Number of the Iran (UTC+3:30) calendar day an instant falls on. Two instants on the same
+ * Iranian day give the same number, whatever the browser's own time zone is.
+ */
+export function iranDayNumber(d: Date): number {
+  return Math.floor((d.getTime() + IRAN_OFFSET_MS) / 86400000);
+}
+
+/**
+ * Splits an instant into the Iranian calendar date and wall-clock time the user picked:
+ * { date: 'YYYY-MM-DD', time: 'HH:mm:00' }. A bare 'YYYY-MM-DD' is a date with no time.
+ */
+export function isoToIranDateTimeParts(value: string): { date: string; time: string | null } | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return { date: value, time: null };
+  const d = parseDateSafely(value);
+  if (!d) return null;
+  const shifted = new Date(d.getTime() + IRAN_OFFSET_MS);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    date: `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`,
+    time: `${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}:00`,
+  };
+}
+
+/**
+ * The inverse: an Iranian calendar date ('YYYY-MM-DD') plus an optional wall-clock time
+ * ('HH:mm' or 'HH:mm:ss') as an ISO instant. Without a time it is the start of that day.
+ */
+export function iranDateTimeToISO(date: string | null | undefined, time?: string | null): string | undefined {
+  if (!date) return undefined;
+  const d = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+  if (!d) return undefined;
+  const t = time ? /^(\d{1,2}):(\d{2})/.exec(time) : null;
+  const utc = Date.UTC(Number(d[1]), Number(d[2]) - 1, Number(d[3]), t ? Number(t[1]) : 0, t ? Number(t[2]) : 0);
+  return new Date(utc - IRAN_OFFSET_MS).toISOString();
+}
+
 // Parse ISO string to Jalali parts in Iran local time (UTC+3:30)
 export function parseISOToJalali(isoString: string): { jy: number; jm: number; jd: number; hour: number; minute: number } {
   if (!isoString) return getCurrentJalali();

@@ -338,6 +338,19 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           continue;
         }
+        // The server refuses empty files, which would fail the whole save later on.
+        if (file.size === 0) {
+          alert(`فایل «${file.name}» خالی است و قابل پیوست نیست.`);
+          continue;
+        }
+        // Choosing the same file again would upload and store it twice.
+        const isDuplicate = [...attachments, ...newAttachments].some(
+          (att) => att.name === file.name && att.size === file.size
+        );
+        if (isDuplicate) {
+          alert(`فایل «${file.name}» قبلاً به این فعالیت پیوست شده است.`);
+          continue;
+        }
         // Read file content as base64
         const dataUrl = await readFileAsDataUrl(file);
         newAttachments.push({
@@ -1740,6 +1753,16 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             {!isStatusOnlyEdit && (
               <div
                 onClick={() => fileInputRef.current?.click()}
+                // Without these the browser handles a dropped file itself: it opens the file in
+                // the tab and the form is lost.
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (!isUploading) handleFileUpload(e.dataTransfer.files);
+                }}
                 className="border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-indigo-400 bg-slate-50/70 dark:bg-slate-800/50 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/30 rounded-2xl p-4 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1"
               >
                 <UploadCloud className="w-6 h-6 text-indigo-500 dark:text-indigo-400" />

@@ -1,4 +1,4 @@
-import { formatISOToJalaliDateTime, parseDateSafely } from './jalali';
+import { formatISOToJalaliDateTime, iranDayNumber, parseDateSafely } from './jalali';
 import { TaskStatus } from '../types';
 
 // Compute automatic task status based on subtasks completion
@@ -140,11 +140,10 @@ export function getDaysDiff(dueDateString: string): { days: number; text: string
   const due = parseDateSafely(dueDateString);
   if (!due) return { days: 0, text: '', isPast: false };
 
-  const now = new Date();
-  const todayStart = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueStart = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
-
-  const diffDays = Math.round((dueStart - todayStart) / (1000 * 60 * 60 * 24));
+  // Both sides as Iranian calendar days (UTC+3:30), the same calendar every date in the app is
+  // shown in. Mixing the browser's local date for "today" with the UTC date of the due instant
+  // put any task due before 03:30 Tehran time - including every midnight - on the previous day.
+  const diffDays = iranDayNumber(due) - iranDayNumber(new Date());
 
   if (diffDays === 0) {
     return { days: 0, text: 'امروز', isPast: false };
