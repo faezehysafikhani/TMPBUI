@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Settings, Sun, Moon, Grid, Palette, Check, LogOut, LogIn, User as UserIcon, ChevronDown, ChevronUp, Upload, Camera, Loader2, ShieldCheck, Users, Bell, MessageSquare, Send, Smartphone, HelpCircle, FileText, Printer } from 'lucide-react';
+import { X, Settings, Sun, Moon, Grid, Palette, Check, LogOut, LogIn, User as UserIcon, ChevronDown, ChevronUp, Upload, Camera, Loader2, ShieldCheck, Users, Bell, MessageSquare, Smartphone, FileText, Printer } from 'lucide-react';
 import { AppTheme, AppColorPalette, User as UserType, WorkTeam } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 import { PRESET_AVATARS, compressImageFile } from '../utils/avatars';
@@ -27,9 +27,7 @@ interface SettingsModalProps {
     username?: string;
     avatar?: string;
     phoneNumber?: string;
-    telegramChatId?: string;
     notifySms?: boolean;
-    notifyTelegram?: boolean;
   }) => Promise<void>;
   onTeamsUpdated?: (updatedTeams: WorkTeam[]) => void;
   onOpenPdfCatalog?: () => void;
@@ -75,9 +73,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [profileUsername, setProfileUsername] = useState<string>('');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('');
   const [profilePhoneNumber, setProfilePhoneNumber] = useState<string>('');
-  const [profileTelegramChatId, setProfileTelegramChatId] = useState<string>('');
   const [notifySms, setNotifySms] = useState<boolean>(true);
-  const [notifyTelegram, setNotifyTelegram] = useState<boolean>(true);
 
   const [isSavingProfile, setIsSavingProfile] = useState<boolean>(false);
   const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -90,9 +86,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setProfileUsername(currentUser.username || '');
       setSelectedAvatar(currentUser.avatar || '');
       setProfilePhoneNumber(currentUser.phoneNumber || '');
-      setProfileTelegramChatId(currentUser.telegramChatId || '');
       setNotifySms(currentUser.notifySms !== undefined ? !!currentUser.notifySms : true);
-      setNotifyTelegram(currentUser.notifyTelegram !== undefined ? !!currentUser.notifyTelegram : true);
     }
   }, [currentUser, isOpen]);
 
@@ -150,9 +144,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         username: profileUsername.trim(),
         avatar: selectedAvatar,
         phoneNumber: profilePhoneNumber.trim(),
-        telegramChatId: profileTelegramChatId.trim(),
         notifySms: notifySms,
-        notifyTelegram: notifyTelegram,
       });
       setProfileMsg({ type: 'success', text: 'تغییرات پروفایل، شماره همراه و تنظیمات اطلاع‌رسانی با موفقیت ذخیره شد 🎉' });
     } catch (err: any) {
@@ -379,11 +371,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Notification Settings Section (SMS & Telegram) */}
+                    {/* Notification Settings Section (SMS) */}
                     <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-800 dark:text-slate-200">
                         <Bell className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                        <span>تنظیمات اطلاع‌رسانی شخصی کاربر (SMS و تلگرام)</span>
+                        <span>تنظیمات اطلاع‌رسانی شخصی کاربر (پیامک)</span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -391,7 +383,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <div>
                           <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
                             <Smartphone className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>شماره تلفن همراه (پیامک):</span>
+                            <span>شماره تلفن همراه (ورود و پیامک):</span>
                           </label>
                           <input
                             type="tel"
@@ -402,20 +394,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           />
                         </div>
 
-                        {/* Telegram Chat ID Field */}
-                        <div>
-                          <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-                            <Send className="w-3.5 h-3.5 text-sky-500" />
-                            <span>شناسه چت تلگرام (Telegram Chat ID):</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={profileTelegramChatId}
-                            onChange={(e) => setProfileTelegramChatId(e.target.value)}
-                            placeholder="مثلاً: 123456789"
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right"
-                          />
-                        </div>
                       </div>
 
                       {/* Notification Toggles */}
@@ -438,31 +416,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           />
                         </label>
 
-                        {/* Telegram Toggle Option */}
-                        <label className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
-                          notifyTelegram
-                            ? 'bg-sky-50 dark:bg-sky-950/60 border-sky-300 dark:border-sky-700 text-sky-900 dark:text-sky-200'
-                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                        }`}>
-                          <div className="flex items-center gap-2">
-                            <Send className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-                            <span className="text-xs font-semibold">اطلاع‌رسانی با تلگرام</span>
-                          </div>
-                          <input
-                            type="checkbox"
-                            checked={notifyTelegram}
-                            onChange={(e) => setNotifyTelegram(e.target.checked)}
-                            className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
-                          />
-                        </label>
                       </div>
-
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                        <HelpCircle className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                        <span>
-                          جهت دریافت شناسه تلگرام می‌توانید به ربات <code className="bg-slate-200 dark:bg-slate-800 px-1 rounded font-mono dir-ltr inline-block text-indigo-600 dark:text-indigo-400">@userinfobot</code> پیام دهید.
-                        </span>
-                      </p>
                     </div>
 
                     {/* Submit Button */}

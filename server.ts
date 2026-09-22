@@ -26,7 +26,7 @@ app.get(["/api/health", "/health"], (_req, res) => {
   res.json({ status: "ok" });
 });
 
-// App Icon endpoint with WhatsApp/Telegram crawler compatibility
+// App Icon endpoint with link-preview crawler compatibility
 app.get(["/icon.svg", "/favicon.svg"], (req, res) => {
   const userAgent = (req.headers["user-agent"] || "").toLowerCase();
   // WhatsApp and Facebook scrapers fail on vector SVGs and require raster images (PNG)

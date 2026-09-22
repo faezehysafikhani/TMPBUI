@@ -285,10 +285,6 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
                 </li>
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>ربات تلگرام (Telegram Bot Integration):</strong> ارسال اعلان‌های تغییر وضعیت و یادآوری کارهای معوقه به تلگرام</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <span><strong>تبدیل پیام به وظیفه:</strong> تبدیل مستقیم هر پیام چت به یک کار جدید با ۱ کلیک</span>
                 </li>
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
@@ -315,7 +311,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
                 </li>
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>احراز هویت و ورود ایمن:</strong> ورود و ثبت‌نام با نام‌کاربری، شماره موبایل یا ایمیل</span>
+                  <span><strong>احراز هویت و ورود ایمن:</strong> ورود با نام کاربری یا شماره موبایل، همراه با کد امنیتی (CAPTCHA) پس از ورود ناموفق</span>
                 </li>
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />

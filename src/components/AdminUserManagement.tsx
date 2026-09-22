@@ -9,9 +9,9 @@ import {
   getSystemNotificationSettingsPB,
   fetchSystemNotificationSettingsPB,
   saveSystemNotificationSettingsPB,
-  testSmsNotificationPB,
-  testTelegramNotificationPB
+  testSmsNotificationPB
 } from '../services/pocketbase';
+import { NEXUS_API_ENABLED } from '../services/nexusApi';
 import {
   ShieldCheck,
   UserPlus,
@@ -30,7 +30,6 @@ import {
   Clock,
   Bell,
   MessageSquare,
-  Send,
   Smartphone,
   Save,
   SendHorizontal,
@@ -59,9 +58,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
   const [formRole, setFormRole] = useState<string>('user');
   const [formDisabled, setFormDisabled] = useState<boolean>(false);
   const [formPhoneNumber, setFormPhoneNumber] = useState<string>('');
-  const [formTelegramChatId, setFormTelegramChatId] = useState<string>('');
   const [formNotifySms, setFormNotifySms] = useState<boolean>(true);
-  const [formNotifyTelegram, setFormNotifyTelegram] = useState<boolean>(true);
 
   const [submitting, setSubmitting] = useState<boolean>(false);
 
@@ -73,8 +70,6 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
   const [testSmsPhone, setTestSmsPhone] = useState<string>('');
   const [testingSms, setTestingSms] = useState<boolean>(false);
   
-  const [testTelegramChatId, setTestTelegramChatId] = useState<string>('');
-  const [testingTelegram, setTestingTelegram] = useState<boolean>(false);
 
   // Load user list
   const loadUsers = async () => {
@@ -105,9 +100,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
     setFormRole('user');
     setFormDisabled(false);
     setFormPhoneNumber('');
-    setFormTelegramChatId('');
     setFormNotifySms(true);
-    setFormNotifyTelegram(true);
     setIsFormOpen(true);
   };
 
@@ -120,9 +113,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
     setFormRole(user.role || (user.username.toLowerCase() === 'admin' ? 'admin' : 'user'));
     setFormDisabled(!!user.disabled);
     setFormPhoneNumber(user.phoneNumber || '');
-    setFormTelegramChatId(user.telegramChatId || '');
     setFormNotifySms(user.notifySms !== undefined ? !!user.notifySms : true);
-    setFormNotifyTelegram(user.notifyTelegram !== undefined ? !!user.notifyTelegram : true);
     setIsFormOpen(true);
   };
 
@@ -184,9 +175,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
           role: formRole,
           disabled: formDisabled,
           phoneNumber: formPhoneNumber.trim(),
-          telegramChatId: formTelegramChatId.trim(),
           notifySms: formNotifySms,
-          notifyTelegram: formNotifyTelegram,
         });
         setActionMsg({ type: 'success', text: 'مشخصات و تنظیمات اطلاع‌رسانی کاربر با موفقیت به‌روزرسانی شد.' });
       } else {
@@ -199,14 +188,14 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
         await adminCreateUserPB({
           name: formName.trim() || formUsername.trim(),
           username: formUsername.trim(),
-          email: formEmail.trim() || `${formUsername.trim()}@example.com`,
+          // Email is optional in NexusCore (sign-in is by username or mobile number); PocketBase
+          // accounts are keyed by email, so that mode keeps its placeholder address.
+          email: formEmail.trim() || (NEXUS_API_ENABLED ? undefined : `${formUsername.trim()}@example.com`),
           password: formPassword.trim(),
           role: formRole,
           disabled: formDisabled,
           phoneNumber: formPhoneNumber.trim(),
-          telegramChatId: formTelegramChatId.trim(),
           notifySms: formNotifySms,
-          notifyTelegram: formNotifyTelegram,
         });
         setActionMsg({ type: 'success', text: 'کاربر جدید با موفقیت ایجاد گردید 🎉' });
       }
@@ -224,7 +213,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
     setActionMsg(null);
     try {
       await saveSystemNotificationSettingsPB(sysNotifySettings);
-      setActionMsg({ type: 'success', text: 'تنظیمات اطلاع‌رسانی پیامک و تلگرام در سیستم با موفقیت ذخیره گردید 🎉' });
+      setActionMsg({ type: 'success', text: 'تنظیمات اطلاع‌رسانی پیامکی در سیستم با موفقیت ذخیره گردید 🎉' });
     } catch (err: any) {
       setActionMsg({ type: 'error', text: err.message || 'خطا در ذخیره‌سازی تنظیمات اطلاع‌رسانی.' });
     } finally {
@@ -246,23 +235,6 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
       setActionMsg({ type: 'error', text: err.message || 'خطا در تست پیامک.' });
     } finally {
       setTestingSms(false);
-    }
-  };
-
-  const handleTestTelegram = async () => {
-    if (!testTelegramChatId.trim()) {
-      setActionMsg({ type: 'error', text: 'لطفاً شناسه چت تلگرام (Chat ID) را جهت تست وارد نمایید.' });
-      return;
-    }
-    setTestingTelegram(true);
-    setActionMsg(null);
-    try {
-      const res = await testTelegramNotificationPB(testTelegramChatId.trim());
-      setActionMsg({ type: res.success ? 'success' : 'error', text: res.message });
-    } catch (err: any) {
-      setActionMsg({ type: 'error', text: err.message || 'خطا در ارتباط با ربات تلگرام.' });
-    } finally {
-      setTestingTelegram(false);
     }
   };
 
@@ -300,7 +272,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
           }`}
         >
           <Bell className="w-4 h-4" />
-          <span>تنظیمات SMS و تلگرام</span>
+          <span>تنظیمات پیامک (SMS)</span>
         </button>
       </div>
 
@@ -412,7 +384,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      پست الکترونیکی (ایمیل)
+                      پست الکترونیکی (ایمیل) {NEXUS_API_ENABLED && <span className="font-normal text-slate-400">— اختیاری، برای بازیابی رمز</span>}
                     </label>
                     <div className="relative">
                       <Mail className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
@@ -444,7 +416,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
 
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      شماره تلفن همراه (پیامک)
+                      شماره تلفن همراه (ورود و پیامک)
                     </label>
                     <div className="relative">
                       <Smartphone className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
@@ -453,22 +425,6 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
                         value={formPhoneNumber}
                         onChange={(e) => setFormPhoneNumber(e.target.value)}
                         placeholder="09121234567"
-                        className="w-full pr-8 pl-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 dir-ltr text-right"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      شناسه چت تلگرام (Telegram Chat ID)
-                    </label>
-                    <div className="relative">
-                      <Send className="w-3.5 h-3.5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={formTelegramChatId}
-                        onChange={(e) => setFormTelegramChatId(e.target.value)}
-                        placeholder="123456789"
                         className="w-full pr-8 pl-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 dir-ltr text-right"
                       />
                     </div>
@@ -504,7 +460,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
                 </div>
 
                 {/* User Level Notification Toggles */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-indigo-200/60 dark:border-indigo-800">
+                <div className="grid grid-cols-1 gap-2 pt-2 border-t border-indigo-200/60 dark:border-indigo-800">
                   <label className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
                     <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">دریافت اطلاع‌رسانی با پیامک (SMS)</span>
                     <input
@@ -512,16 +468,6 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
                       checked={formNotifySms}
                       onChange={(e) => setFormNotifySms(e.target.checked)}
                       className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
-                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">دریافت اطلاع‌رسانی با تلگرام</span>
-                    <input
-                      type="checkbox"
-                      checked={formNotifyTelegram}
-                      onChange={(e) => setFormNotifyTelegram(e.target.checked)}
-                      className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
                     />
                   </label>
                 </div>
@@ -603,23 +549,23 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
                         </div>
 
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                          <span>نام کاربری: {user.username}</span>
+                          <span>نام کاربری: {user.username || '—'}</span>
+                          {NEXUS_API_ENABLED && !user.username && !user.phoneNumber && (
+                            <span
+                              className="px-1.5 py-0.5 rounded text-[10px] font-bold border bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800"
+                              title="ورود فقط با نام کاربری یا شماره تلفن همراه ممکن است؛ برای این کاربر یکی از این دو را ثبت کنید."
+                            >
+                              بدون نام کاربری و شماره تلفن — امکان ورود ندارد
+                            </span>
+                          )}
                           {user.email && <span className="hidden sm:inline">| {user.email}</span>}
                           {user.phoneNumber && <span className="text-indigo-600 dark:text-indigo-400">| 📱 {user.phoneNumber}</span>}
-                          {user.telegramChatId && <span className="text-sky-600 dark:text-sky-400">| ✈️ {user.telegramChatId}</span>}
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
                             user.notifySms !== false
                               ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                               : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
                           }`}>
                             پیامک: {user.notifySms !== false ? 'فعال' : 'غیرفعال'}
-                          </span>
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                            user.notifyTelegram !== false
-                              ? 'bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700'
-                          }`}>
-                            تلگرام: {user.notifyTelegram !== false ? 'فعال' : 'غیرفعال'}
                           </span>
                           <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-semibold bg-indigo-50/80 dark:bg-indigo-950/60 px-2 py-0.5 rounded-lg border border-indigo-100 dark:border-indigo-900/60">
                             <Clock className="w-3 h-3 text-indigo-500 shrink-0" />
@@ -672,7 +618,7 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
         </div>
       )}
 
-      {/* TAB 2: PARAMETRIC NOTIFICATION SETTINGS (SMS & TELEGRAM) */}
+      {/* TAB 2: PARAMETRIC NOTIFICATION SETTINGS (SMS) */}
       {adminTab === 'notifications' && (
         <div className="space-y-4 animate-in fade-in duration-200">
           {/* SMS Gateway Settings Card */}
@@ -791,123 +737,6 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({ curren
               >
                 {testingSms ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SendHorizontal className="w-3.5 h-3.5" />}
                 <span>ارسال پیامک آزمایشی</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Telegram Bot Settings Card */}
-          <div className="p-4 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-4 shadow-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-sky-50 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
-                  <Send className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">تنظیمات ربات تلگرام (Telegram Bot)</h4>
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400">ارسال پیام‌های سیستمی و هشدار فعالیت‌ها به تلگرام کاربر</p>
-                </div>
-              </div>
-
-              {/* Telegram Enable Switch */}
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  {sysNotifySettings.telegram.enabled ? '🟢 فعال' : '🔴 غیرفعال'}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={sysNotifySettings.telegram.enabled}
-                  onChange={(e) => setSysNotifySettings({
-                    ...sysNotifySettings,
-                    telegram: { ...sysNotifySettings.telegram, enabled: e.target.checked }
-                  })}
-                  className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
-                />
-              </label>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  توکن ربات تلگرام (Bot Token)
-                </label>
-                <input
-                  type="password"
-                  value={sysNotifySettings.telegram.botToken}
-                  onChange={(e) => setSysNotifySettings({
-                    ...sysNotifySettings,
-                    telegram: { ...sysNotifySettings.telegram, botToken: e.target.value }
-                  })}
-                  placeholder="123456789:ABCdefGhIJK..."
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 dir-ltr text-right"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  آیدی ربات تلگرام (Bot Username)
-                </label>
-                <input
-                  type="text"
-                  value={sysNotifySettings.telegram.botUsername}
-                  onChange={(e) => setSysNotifySettings({
-                    ...sysNotifySettings,
-                    telegram: { ...sysNotifySettings.telegram, botUsername: e.target.value }
-                  })}
-                  placeholder="@ParsTaskBot"
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 dir-ltr text-right"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  شناسه چت مدیر (Admin Chat ID)
-                </label>
-                <input
-                  type="text"
-                  value={sysNotifySettings.telegram.adminChatId || ''}
-                  onChange={(e) => setSysNotifySettings({
-                    ...sysNotifySettings,
-                    telegram: { ...sysNotifySettings.telegram, adminChatId: e.target.value }
-                  })}
-                  placeholder="12345678"
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 dir-ltr text-right"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  آدرس API تلگرام (پیش‌فرض Telegram API)
-                </label>
-                <input
-                  type="text"
-                  value={sysNotifySettings.telegram.apiUrl || 'https://api.telegram.org'}
-                  onChange={(e) => setSysNotifySettings({
-                    ...sysNotifySettings,
-                    telegram: { ...sysNotifySettings.telegram, apiUrl: e.target.value }
-                  })}
-                  placeholder="https://api.telegram.org"
-                  className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 dir-ltr text-right"
-                />
-              </div>
-            </div>
-
-            {/* Test Telegram Box */}
-            <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex flex-col sm:flex-row items-center gap-2">
-              <input
-                type="text"
-                value={testTelegramChatId}
-                onChange={(e) => setTestTelegramChatId(e.target.value)}
-                placeholder="Chat ID جهت تست پیام تلگرام..."
-                className="w-full sm:w-64 px-3 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 dir-ltr text-right"
-              />
-              <button
-                type="button"
-                onClick={handleTestTelegram}
-                disabled={testingTelegram}
-                className="w-full sm:w-auto px-4 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 dark:bg-sky-950 dark:hover:bg-sky-900 text-sky-300 border border-sky-200 dark:border-sky-800 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {testingTelegram ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SendHorizontal className="w-3.5 h-3.5" />}
-                <span>تست ارسال پیام تلگرام</span>
               </button>
             </div>
           </div>

@@ -204,9 +204,7 @@ export function mapRecordToUser(m: RecordModel | any): User {
     teams: fetchUserTeamsPB(m.id),
     lastLogin: lastLoginTime,
     phoneNumber: m.phoneNumber || m.phone || m.mobile || '',
-    telegramChatId: m.telegramChatId || m.chatId || m.telegram_chat_id || '',
     notifySms: m.notifySms === false || m.notifySms === 'false' ? false : true,
-    notifyTelegram: m.notifyTelegram === false || m.notifyTelegram === 'false' ? false : true,
   };
 }
 
@@ -221,9 +219,13 @@ export function getCurrentUser(): User | null {
   return mapRecordToUser(pb.authStore.model);
 }
 
-export async function loginPB(identity: string, password: string): Promise<User> {
+export async function loginPB(
+  identity: string,
+  password: string,
+  captcha?: { captchaId: string; answer: string }
+): Promise<User> {
   if (NEXUS_API_ENABLED) {
-    const user = await nexusApi.login(identity, password);
+    const user = await nexusApi.login(identity, password, captcha);
     return { ...user, teams: fetchUserTeamsPB(user.id) };
   }
   try {
@@ -329,15 +331,13 @@ export async function loginPB(identity: string, password: string): Promise<User>
 }
 
 export async function registerPB(data: {
-  username?: string;
-  email: string;
+  username: string;
+  phoneNumber: string;
+  email?: string;
   password: string;
   passwordConfirm: string;
   name?: string;
-  phoneNumber?: string;
-  telegramChatId?: string;
   notifySms?: boolean;
-  notifyTelegram?: boolean;
   theme?: AppTheme;
   colorPalette?: AppColorPalette;
   themeMode?: 'light' | 'dark';
@@ -345,6 +345,10 @@ export async function registerPB(data: {
   if (NEXUS_API_ENABLED) {
     const user = await nexusApi.register(data);
     return { ...user, teams: fetchUserTeamsPB(user.id) };
+  }
+  // PocketBase accounts are keyed by email, so in that mode it stays required.
+  if (!data.email || !data.email.includes('@')) {
+    throw new Error('لطفاً یک ایمیل معتبر وارد نمایید.');
   }
   const emailClean = data.email.trim().toLowerCase();
   const fullName = (data.name || '').trim() || 'کاربر جدید';
@@ -370,7 +374,6 @@ export async function registerPB(data: {
     colorPalette: data.colorPalette || 'indigo',
     themeMode: data.themeMode || 'light',
     notifySms: data.notifySms !== undefined ? data.notifySms : true,
-    notifyTelegram: data.notifyTelegram !== undefined ? data.notifyTelegram : true,
   };
 
   if (data.phoneNumber) {
@@ -379,12 +382,6 @@ export async function registerPB(data: {
     payload.phone = cleanPhone;
     payload.mobile = cleanPhone;
   }
-  if (data.telegramChatId) {
-    const cleanTg = data.telegramChatId.trim();
-    payload.telegramChatId = cleanTg;
-    payload.telegram_chat_id = cleanTg;
-  }
-
   try {
     // 1. Create user in PocketBase
     try {
@@ -432,29 +429,22 @@ export async function registerPB(data: {
     // 2. Auto login with email
     const user = await loginPB(emailClean, data.password);
 
-    // Try to ensure phoneNumber, telegramChatId & notification preferences are set on user record
+    // Try to ensure phoneNumber & notification preference are set on user record
     try {
       const updateObj: Record<string, any> = {
         notifySms: data.notifySms !== undefined ? data.notifySms : true,
-        notifyTelegram: data.notifyTelegram !== undefined ? data.notifyTelegram : true,
       };
       if (data.phoneNumber) {
         updateObj.phoneNumber = data.phoneNumber.trim();
         updateObj.phone = data.phoneNumber.trim();
         updateObj.mobile = data.phoneNumber.trim();
       }
-      if (data.telegramChatId) {
-        updateObj.telegramChatId = data.telegramChatId.trim();
-        updateObj.telegram_chat_id = data.telegramChatId.trim();
-      }
       await pb.collection('users').update(user.id, updateObj);
     } catch {
       // Ignore if update fails
     }
     user.phoneNumber = data.phoneNumber?.trim() || user.phoneNumber;
-    user.telegramChatId = data.telegramChatId?.trim() || user.telegramChatId;
     user.notifySms = data.notifySms !== undefined ? data.notifySms : true;
-    user.notifyTelegram = data.notifyTelegram !== undefined ? data.notifyTelegram : true;
 
     return user;
   } catch (err: any) {
@@ -741,7 +731,6 @@ export async function fetchAllUsersPB(): Promise<User[]> {
     colorPalette: 'indigo',
     themeMode: 'light',
     notifySms: true,
-    notifyTelegram: true,
   };
   userMap.set('admin', adminUser);
 
@@ -781,14 +770,12 @@ export async function fetchAllUsersPB(): Promise<User[]> {
 export async function adminCreateUserPB(data: {
   username: string;
   name: string;
-  email: string;
+  email?: string;
   password: string;
   role?: string;
   disabled?: boolean;
   phoneNumber?: string;
-  telegramChatId?: string;
   notifySms?: boolean;
-  notifyTelegram?: boolean;
 }): Promise<User> {
   const current = getCurrentUser();
   if (!current || current.role !== 'admin') {
@@ -808,12 +795,9 @@ export async function adminCreateUserPB(data: {
       passwordConfirm: data.password,
       role: data.role || 'user',
       notifySms: data.notifySms !== undefined ? data.notifySms : true,
-      notifyTelegram: data.notifyTelegram !== undefined ? data.notifyTelegram : true,
     };
     if (data.phoneNumber !== undefined) payload.phoneNumber = data.phoneNumber;
-    if (data.telegramChatId !== undefined) payload.telegramChatId = data.telegramChatId;
     if (data.notifySms !== undefined) payload.notifySms = data.notifySms;
-    if (data.notifyTelegram !== undefined) payload.notifyTelegram = data.notifyTelegram;
 
     const record = await pb.collection('users').create(payload);
     newUser = mapRecordToUser(record);
@@ -823,16 +807,14 @@ export async function adminCreateUserPB(data: {
       id: 'usr_' + Date.now(),
       username: data.username,
       name: data.name,
-      email: data.email,
+      email: data.email || '',
       role: data.role || 'user',
       disabled: data.disabled || false,
       theme: 'default',
       colorPalette: 'indigo',
       themeMode: 'light',
       phoneNumber: data.phoneNumber,
-      telegramChatId: data.telegramChatId,
       notifySms: data.notifySms !== undefined ? data.notifySms : true,
-      notifyTelegram: data.notifyTelegram !== undefined ? data.notifyTelegram : true,
     };
   }
 
@@ -858,9 +840,7 @@ export async function adminUpdateUserPB(
     role?: string;
     disabled?: boolean;
     phoneNumber?: string;
-    telegramChatId?: string;
     notifySms?: boolean;
-    notifyTelegram?: boolean;
   }
 ): Promise<User> {
   const current = getCurrentUser();
@@ -882,9 +862,7 @@ export async function adminUpdateUserPB(
   if (updates.email) pbPayload.email = updates.email;
   if (updates.role) pbPayload.role = updates.role;
   if (updates.phoneNumber !== undefined) pbPayload.phoneNumber = updates.phoneNumber;
-  if (updates.telegramChatId !== undefined) pbPayload.telegramChatId = updates.telegramChatId;
   if (updates.notifySms !== undefined) pbPayload.notifySms = updates.notifySms;
-  if (updates.notifyTelegram !== undefined) pbPayload.notifyTelegram = updates.notifyTelegram;
 
   if (updates.password) {
     pbPayload.password = updates.password;
@@ -977,9 +955,7 @@ export async function updateUserProfilePB(updates: {
   username?: string;
   avatar?: string;
   phoneNumber?: string;
-  telegramChatId?: string;
   notifySms?: boolean;
-  notifyTelegram?: boolean;
 }): Promise<User> {
   if (NEXUS_API_ENABLED) {
     const user = await nexusApi.updateMyProfile(updates);
@@ -1007,9 +983,7 @@ export async function updateUserProfilePB(updates: {
       const mergedRecord = {
         ...updatedRecord,
         phoneNumber: updates.phoneNumber !== undefined ? updates.phoneNumber : (updatedRecord.phoneNumber || ''),
-        telegramChatId: updates.telegramChatId !== undefined ? updates.telegramChatId : (updatedRecord.telegramChatId || ''),
         notifySms: updates.notifySms !== undefined ? updates.notifySms : (updatedRecord.notifySms !== false),
-        notifyTelegram: updates.notifyTelegram !== undefined ? updates.notifyTelegram : (updatedRecord.notifyTelegram !== false),
       };
       pb.authStore.save(pb.authStore.token, mergedRecord);
       return mapRecordToUser(mergedRecord);
@@ -1022,7 +996,7 @@ export async function updateUserProfilePB(updates: {
   }
 }
 
-// System Notification Gateway Settings Persistence (SMS & Telegram)
+// System Notification Gateway Settings Persistence (SMS)
 const NOTIFICATION_SETTINGS_STORAGE_KEY = 'parstask_system_notification_settings';
 
 export function getSystemNotificationSettingsPB(): SystemNotificationSettings {
@@ -1035,13 +1009,6 @@ export function getSystemNotificationSettingsPB(): SystemNotificationSettings {
       patternCode: '',
       apiUrl: 'https://api.kavenegar.com/v1/',
     },
-    telegram: {
-      enabled: false,
-      botToken: '',
-      botUsername: '',
-      adminChatId: '',
-      apiUrl: 'https://api.telegram.org',
-    },
   };
 
   try {
@@ -1050,7 +1017,6 @@ export function getSystemNotificationSettingsPB(): SystemNotificationSettings {
       const parsed = JSON.parse(raw);
       return {
         sms: { ...defaultSettings.sms, ...(parsed.sms || {}) },
-        telegram: { ...defaultSettings.telegram, ...(parsed.telegram || {}) },
       };
     }
   } catch (e) {
@@ -1096,7 +1062,6 @@ export async function fetchSystemNotificationSettingsPB(): Promise<SystemNotific
 
         const merged: SystemNotificationSettings = {
           sms: { ...current.sms, ...(parsedVal.sms || {}) },
-          telegram: { ...current.telegram, ...(parsedVal.telegram || {}) },
         };
         localStorage.setItem(NOTIFICATION_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
         return merged;
@@ -1235,61 +1200,17 @@ export async function testSmsNotificationPB(phone: string, message?: string): Pr
   };
 }
 
-export async function testTelegramNotificationPB(chatId: string, text?: string): Promise<{ success: boolean; message: string }> {
-  if (NEXUS_API_ENABLED) {
-    if (!chatId) {
-      return { success: false, message: 'لطفاً شناسه چت تلگرام (Chat ID) را جهت تست وارد نمایید.' };
-    }
-    try {
-      return await nexusApi.testTelegram(chatId, text);
-    } catch (err: any) {
-      return { success: false, message: err?.message || 'ارسال پیام آزمایشی تلگرام ناموفق بود.' };
-    }
-  }
-  if (!chatId) {
-    return { success: false, message: 'لطفاً شناسه چت تلگرام (Chat ID) را جهت تست وارد نمایید.' };
-  }
-  const config = getSystemNotificationSettingsPB();
-  if (!config.telegram.enabled) {
-    return { success: false, message: 'ارسال اطلاع‌رسانی تلگرام در تنظیمات پارامتریک ادمین غیرفعال است.' };
-  }
-  if (!config.telegram.botToken) {
-    return { success: false, message: 'توکن ربات تلگرام (Bot Token) تنظیم نشده است.' };
-  }
-
-  try {
-    const baseUrl = config.telegram.apiUrl || 'https://api.telegram.org';
-    const response = await fetch(`${baseUrl}/bot${config.telegram.botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text || '🔔 پیام آزمایشی سیستم مدیریت فعالیت‌های پارس‌تسک (ParsTask)',
-      }),
-    });
-    const resData = await response.json();
-    if (resData.ok) {
-      return { success: true, message: `پیام آزمایشی تلگرام با موفقیت به شناسه چت ${chatId} ارسال گردید 🎉` };
-    } else {
-      return { success: false, message: `پاسخ تلگرام: ${resData.description || 'توکن ربات یا چت آیدی معتبر نیست.'}` };
-    }
-  } catch (err: any) {
-    return { success: false, message: `خطا در اتصال به API تلگرام: ${err.message || 'شبکه غیرقابل دسترس است.'}` };
-  }
-}
-
 export async function sendNewTaskNotificationsPB(task: Task): Promise<void> {
   if (NEXUS_API_ENABLED) {
-    // The server sends task-created SMS/Telegram itself (the gateway keys never reach the browser).
+    // The server sends task-created SMS itself (the gateway key never reaches the browser).
     return;
   }
   try {
     const config = await fetchSystemNotificationSettingsPB().catch(() => getSystemNotificationSettingsPB());
 
     const smsEnabled = config?.sms?.enabled;
-    const telegramEnabled = config?.telegram?.enabled;
 
-    if (!smsEnabled && !telegramEnabled) {
+    if (!smsEnabled) {
       return;
     }
 
@@ -1359,18 +1280,10 @@ export async function sendNewTaskNotificationsPB(task: Task): Promise<void> {
 
     const smsText = `📋 پارس‌تسک: فعالیت جدید "${title}" به ${assignee} واگذار شد.\nایجادکننده: ${creator}\nاولویت: ${priority} | مهلت: ${formattedDue}`;
 
-    const telegramText = `🔔 *فعالیت جدید در پارس‌تسک*\n\n📌 *عنوان:* ${title}\n👤 *ایجادکننده:* ${creator}\n🎯 *واگذار شده به:* ${assignee}\n⚡ *اولویت:* ${priority}\n📅 *مهلت تحویل:* ${formattedDue}\n\nجهت مشاهده و مدیریت فعالیت وارد سامانه شوید.`;
-
     for (const user of recipients) {
       if (smsEnabled && user.notifySms !== false && user.phoneNumber) {
         testSmsNotificationPB(user.phoneNumber, smsText).catch((e) =>
           console.warn(`Failed to send SMS to user ${user.name || user.id}:`, e)
-        );
-      }
-
-      if (telegramEnabled && user.notifyTelegram !== false && user.telegramChatId) {
-        testTelegramNotificationPB(user.telegramChatId, telegramText).catch((e) =>
-          console.warn(`Failed to send Telegram to user ${user.name || user.id}:`, e)
         );
       }
     }
@@ -1766,7 +1679,7 @@ export async function createTaskInPB(
     saveTaskExtraMeta(createdRecord.id, taskData);
     const newTask = mapRecordToTask(createdRecord);
 
-    // Automatically trigger SMS and Telegram notifications for assignee and team members
+    // Automatically trigger SMS notifications for assignee and team members
     sendNewTaskNotificationsPB(newTask).catch((err) =>
       console.warn('Task creation notification dispatch error:', err)
     );

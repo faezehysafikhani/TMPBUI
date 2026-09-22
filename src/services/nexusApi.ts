@@ -47,12 +47,6 @@ export const NEXUS_API_BASE_URL = (env.VITE_API_BASE_URL || '').trim().replace(/
 /** Optional tenant slug sent with login. Leave empty for a single-tenant install. */
 const NEXUS_TENANT_SLUG = (env.VITE_NEXUS_TENANT_SLUG || '').trim();
 
-/**
- * NexusCore signs in by email only. When this is set, a username typed without '@' (as the
- * login form allows) is sent as <username>@<domain>, e.g. Admin -> admin@taskmanager.local.
- */
-const LOGIN_EMAIL_DOMAIN = (env.VITE_NEXUS_LOGIN_EMAIL_DOMAIN || '').trim().replace(/^@/, '');
-
 const REQUEST_TIMEOUT_MS = Number(env.VITE_API_TIMEOUT_MS) > 0 ? Number(env.VITE_API_TIMEOUT_MS) : 30000;
 
 export const NEXUS_API_ENABLED = NEXUS_API_BASE_URL.length > 0;
@@ -70,16 +64,14 @@ const DETAIL_CONCURRENCY = 6;
 interface UserDto {
   id: string;
   tenantId: string;
-  email: string;
+  email: string | null;
   displayName: string;
   isActive: boolean;
   lastLoginAtUtc: string | null;
   roles: string[];
   username?: string | null;
   phoneNumber?: string | null;
-  telegramChatId?: string | null;
   notifySms?: boolean;
-  notifyTelegram?: boolean;
   avatarUrl?: string | null;
   theme?: string | null;
   colorPalette?: string | null;
@@ -364,6 +356,8 @@ function toApiError(status: number, body: any, unauthorizedMessage?: string): Ne
       );
     case 403:
       return new NexusApiError('دسترسی غیرمجاز: حساب کاربری شما مجوز لازم برای این عملیات را ندارد.', status, code);
+    case 429:
+      return new NexusApiError('تعداد تلاش‌ها بیش از حد مجاز است. لطفاً چند دقیقه بعد دوباره تلاش کنید.', status, code);
     case 404:
       return new NexusApiError(`مورد درخواستی در سرور یافت نشد.${detail ? ` (${detail})` : ''}`, status, code);
     case 409:
@@ -580,10 +574,9 @@ function dataUrlToBlob(dataUrl: string, fallbackType: string): Blob {
 export function mapUserDto(u: UserDto): User {
   return {
     id: u.id,
-    // Accounts created without a username sign in by email; the email then stands in for it.
-    username: u.username || u.email,
-    email: u.email,
-    name: u.displayName || u.email,
+    username: u.username || '',
+    email: u.email || '',
+    name: u.displayName || u.username || '',
     avatar: u.avatarUrl || undefined,
     theme: (u.theme as User['theme']) || undefined,
     colorPalette: (u.colorPalette as User['colorPalette']) || undefined,
@@ -592,9 +585,7 @@ export function mapUserDto(u: UserDto): User {
     disabled: !u.isActive,
     lastLogin: u.lastLoginAtUtc || undefined,
     phoneNumber: u.phoneNumber || '',
-    telegramChatId: u.telegramChatId || '',
     notifySms: u.notifySms !== false,
-    notifyTelegram: u.notifyTelegram !== false,
   };
 }
 
@@ -822,28 +813,62 @@ function toSubTaskBody(s: ProjectSubTask, sortOrder: number) {
 // Authentication
 // ---------------------------------------------------------------------------
 
-async function loginWith(identifier: string, password: string): Promise<AuthResponse> {
-  return request<AuthResponse>('POST', '/api/identity/auth/login', {
-    body: { email: identifier, password, tenantSlug: NEXUS_TENANT_SLUG || null },
-    auth: false,
-    retryOnUnauthorized: false,
-    unauthorizedMessage: 'ورود ناموفق بود! نام کاربری/ایمیل یا رمز عبور اشتباه است، یا حساب کاربری غیرفعال شده است.',
-  });
+/** A CAPTCHA the server asked for: the image to show and the id to send back with the answer. */
+export interface LoginCaptcha {
+  captchaId: string;
+  imageDataUrl: string;
+  expiresInSeconds: number;
 }
 
-/** The identifier may be an email address, a username or a mobile number. */
-export async function login(identity: string, password: string): Promise<User> {
+/**
+ * Error codes (ProblemDetails title) with which sign-in says a CAPTCHA is needed for the next
+ * attempt: none was sent, the one sent was wrong or expired, or the credentials were wrong and
+ * the server now wants one.
+ */
+export const CAPTCHA_ERROR_CODES = ['captcha.required', 'captcha.invalid', 'unauthorized.captcha_required'];
+
+/** A new single-use CAPTCHA for this client. The answer is never sent to the browser. */
+export async function requestLoginCaptcha(): Promise<LoginCaptcha> {
+  return request<LoginCaptcha>('POST', '/api/identity/auth/captcha', { auth: false, retryOnUnauthorized: false, body: {} });
+}
+
+/**
+ * Signs in with a username or a mobile number (email addresses are not sign-in names). After a
+ * failed attempt the server requires a CAPTCHA; the error then carries one of
+ * CAPTCHA_ERROR_CODES and the caller shows a CAPTCHA from requestLoginCaptcha().
+ */
+export async function login(
+  identity: string,
+  password: string,
+  captcha?: { captchaId: string; answer: string }
+): Promise<User> {
   const identifier = identity.trim();
+  if (identifier.includes('@')) {
+    throw new NexusApiError('ورود با ایمیل امکان‌پذیر نیست. لطفاً نام کاربری یا شماره تلفن همراه خود را وارد کنید.', 400);
+  }
+
   let auth: AuthResponse;
   try {
-    auth = await loginWith(identifier, password);
+    auth = await request<AuthResponse>('POST', '/api/identity/auth/login', {
+      body: {
+        identifier,
+        password,
+        tenantSlug: NEXUS_TENANT_SLUG || null,
+        captchaId: captcha?.captchaId || null,
+        captchaAnswer: captcha?.answer?.trim() || null,
+      },
+      auth: false,
+      retryOnUnauthorized: false,
+      unauthorizedMessage: 'ورود ناموفق بود! نام کاربری/شماره تلفن یا رمز عبور اشتباه است، یا حساب کاربری غیرفعال شده است.',
+    });
   } catch (err) {
-    // Optional fallback for accounts that only have an email: "name" -> name@domain.
-    if (err instanceof NexusApiError && err.httpStatus === 401 && !identifier.includes('@') && LOGIN_EMAIL_DOMAIN) {
-      auth = await loginWith(`${identifier}@${LOGIN_EMAIL_DOMAIN}`, password);
-    } else {
-      throw err;
+    if (err instanceof NexusApiError && err.code === 'captcha.required') {
+      throw new NexusApiError('برای ادامه، کد امنیتی تصویر را وارد کنید.', err.httpStatus, err.code);
     }
+    if (err instanceof NexusApiError && err.code === 'captcha.invalid') {
+      throw new NexusApiError('کد امنیتی نادرست است یا منقضی شده است. کد جدید را وارد کنید.', err.httpStatus, err.code);
+    }
+    throw err;
   }
   saveAuthResponse(auth);
   return mapUserDto(auth.user);
@@ -1363,15 +1388,14 @@ function updateSessionUser(user: UserDto): void {
   if (session) writeSession({ ...session, user });
 }
 
+/** Username and mobile number are the sign-in names, so both are required; email is optional. */
 export async function register(data: {
-  username?: string;
-  email: string;
+  username: string;
+  phoneNumber: string;
+  email?: string;
   password: string;
   name?: string;
-  phoneNumber?: string;
-  telegramChatId?: string;
   notifySms?: boolean;
-  notifyTelegram?: boolean;
   theme?: string;
   colorPalette?: string;
   themeMode?: string;
@@ -1380,14 +1404,12 @@ export async function register(data: {
     auth: false,
     retryOnUnauthorized: false,
     body: {
-      email: data.email.trim(),
+      username: data.username.trim(),
+      phoneNumber: data.phoneNumber.trim(),
+      email: data.email?.trim() || null,
       password: data.password,
-      displayName: (data.name || '').trim() || data.email.trim(),
-      username: data.username?.trim() || null,
-      phoneNumber: data.phoneNumber?.trim() || null,
-      telegramChatId: data.telegramChatId?.trim() || null,
+      displayName: (data.name || '').trim() || data.username.trim(),
       notifySms: data.notifySms ?? true,
-      notifyTelegram: data.notifyTelegram ?? true,
       theme: data.theme || null,
       colorPalette: data.colorPalette || null,
       themeMode: data.themeMode || null,
@@ -1397,12 +1419,15 @@ export async function register(data: {
   return mapUserDto(auth.user);
 }
 
-/** Emails a reset link. The answer is the same whether or not the account exists. */
+/**
+ * Emails a reset link to the account with this username or mobile number (to its email address,
+ * if it has one). The answer is the same whether or not such an account exists.
+ */
 export async function requestPasswordReset(identifier: string): Promise<string> {
   await request('POST', '/api/identity/auth/forgot-password', {
     auth: false,
     retryOnUnauthorized: false,
-    body: { email: identifier.trim(), tenantSlug: NEXUS_TENANT_SLUG || null },
+    body: { identifier: identifier.trim(), tenantSlug: NEXUS_TENANT_SLUG || null },
   });
   return identifier.trim();
 }
@@ -1421,9 +1446,7 @@ export async function updateMyProfile(updates: {
   username?: string;
   avatar?: string;
   phoneNumber?: string;
-  telegramChatId?: string;
   notifySms?: boolean;
-  notifyTelegram?: boolean;
 }): Promise<User> {
   const me = readSession()?.user;
   if (!me) throw new NexusApiError('کاربر وارد سیستم نشده است.', 401);
@@ -1431,12 +1454,10 @@ export async function updateMyProfile(updates: {
   const saved = await request<UserDto>('PUT', '/api/identity/auth/me/profile', {
     body: {
       displayName: (updates.name ?? me.displayName).trim() || me.displayName,
-      username: (updates.username !== undefined ? updates.username : me.username)?.trim() || null,
+      username: (updates.username !== undefined ? updates.username : me.username)?.trim() || '',
       avatarUrl: updates.avatar !== undefined ? updates.avatar || null : me.avatarUrl ?? null,
       phoneNumber: (updates.phoneNumber !== undefined ? updates.phoneNumber : me.phoneNumber)?.trim() || null,
-      telegramChatId: (updates.telegramChatId !== undefined ? updates.telegramChatId : me.telegramChatId)?.trim() || null,
       notifySms: updates.notifySms ?? me.notifySms ?? true,
-      notifyTelegram: updates.notifyTelegram ?? me.notifyTelegram ?? true,
     },
   });
   updateSessionUser(saved);
@@ -1482,31 +1503,28 @@ async function findUserDto(userId: string): Promise<UserDto> {
   return user;
 }
 
+/** A new account needs a username (its sign-in name); mobile number and email are optional. */
 export async function createUser(data: {
   username: string;
   name: string;
-  email: string;
+  email?: string;
   password: string;
   role?: string;
   disabled?: boolean;
   phoneNumber?: string;
-  telegramChatId?: string;
   notifySms?: boolean;
-  notifyTelegram?: boolean;
 }): Promise<User> {
   const roleIds = await roleIdsFor(data.role);
   const created = await request<UserDto>('POST', '/api/identity/users', {
     body: {
       tenantId: getSessionTenantId(),
-      email: data.email.trim(),
+      username: data.username.trim(),
       displayName: (data.name || data.username).trim(),
       password: data.password,
       isActive: !data.disabled,
-      username: data.username?.trim() || null,
+      email: data.email?.trim() || null,
       phoneNumber: data.phoneNumber?.trim() || null,
-      telegramChatId: data.telegramChatId?.trim() || null,
       notifySms: data.notifySms ?? true,
-      notifyTelegram: data.notifyTelegram ?? true,
     },
   });
   await request('PUT', `/api/identity/users/${created.id}/roles`, { body: { roleIds } });
@@ -1524,9 +1542,7 @@ export async function updateUser(
     role?: string;
     disabled?: boolean;
     phoneNumber?: string;
-    telegramChatId?: string;
     notifySms?: boolean;
-    notifyTelegram?: boolean;
   }
 ): Promise<User> {
   const current = await findUserDto(requireGuid(userId, 'کاربر')!);
@@ -1534,13 +1550,12 @@ export async function updateUser(
     body: {
       displayName: (updates.name ?? current.displayName).trim() || current.displayName,
       isActive: updates.disabled !== undefined ? !updates.disabled : current.isActive,
-      email: updates.email?.trim() || null,
+      // undefined keeps the current value; an empty string clears email or mobile number.
+      email: updates.email !== undefined ? updates.email.trim() : null,
       password: updates.password?.trim() || null,
       username: updates.username !== undefined ? updates.username.trim() : null,
       phoneNumber: updates.phoneNumber !== undefined ? updates.phoneNumber.trim() : null,
-      telegramChatId: updates.telegramChatId !== undefined ? updates.telegramChatId.trim() : null,
       notifySms: updates.notifySms ?? null,
-      notifyTelegram: updates.notifyTelegram ?? null,
     },
   });
 
@@ -1660,7 +1675,7 @@ export async function fetchUnreadMessageCounts(): Promise<Record<string, number>
 }
 
 // ---------------------------------------------------------------------------
-// SMS / Telegram gateway settings (administrators)
+// SMS gateway settings (administrators)
 // ---------------------------------------------------------------------------
 
 const CHANNELS = '/api/platform/notification-channels';
@@ -1680,13 +1695,6 @@ export async function fetchNotificationChannelSettings(): Promise<SystemNotifica
       patternCode: s.sms?.patternCode || '',
       apiUrl: s.sms?.apiUrl || '',
     },
-    telegram: {
-      enabled: !!s.telegram?.enabled,
-      botToken: s.telegram?.botToken || '',
-      botUsername: s.telegram?.botUsername || '',
-      adminChatId: s.telegram?.adminChatId || '',
-      apiUrl: s.telegram?.apiUrl || '',
-    },
   };
 }
 
@@ -1702,23 +1710,12 @@ export async function saveNotificationChannelSettings(settings: SystemNotificati
         patternCode: blank(settings.sms.patternCode),
         apiUrl: blank(settings.sms.apiUrl),
       },
-      telegram: {
-        enabled: !!settings.telegram.enabled,
-        botToken: blank(settings.telegram.botToken),
-        botUsername: blank(settings.telegram.botUsername),
-        adminChatId: blank(settings.telegram.adminChatId),
-        apiUrl: blank(settings.telegram.apiUrl),
-      },
     },
   });
 }
 
 export async function testSms(phoneNumber: string, message?: string): Promise<{ success: boolean; message: string }> {
   return request('POST', `${CHANNELS}/test-sms`, { body: { phoneNumber, message: message || null } });
-}
-
-export async function testTelegram(chatId: string, text?: string): Promise<{ success: boolean; message: string }> {
-  return request('POST', `${CHANNELS}/test-telegram`, { body: { chatId, text: text || null } });
 }
 
 // ---------------------------------------------------------------------------

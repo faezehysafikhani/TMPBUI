@@ -49,9 +49,7 @@ export interface User {
   teams?: WorkTeam[];
   lastLogin?: string;
   phoneNumber?: string;
-  telegramChatId?: string;
   notifySms?: boolean;
-  notifyTelegram?: boolean;
 }
 
 export interface SmsGatewaySettings {
@@ -63,17 +61,8 @@ export interface SmsGatewaySettings {
   apiUrl?: string;
 }
 
-export interface TelegramBotSettings {
-  enabled: boolean;
-  botToken: string;
-  botUsername: string;
-  adminChatId?: string;
-  apiUrl?: string;
-}
-
 export interface SystemNotificationSettings {
   sms: SmsGatewaySettings;
-  telegram: TelegramBotSettings;
 }
 
 export interface Attachment {

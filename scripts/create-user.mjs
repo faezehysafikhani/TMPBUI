@@ -135,7 +135,6 @@ async function main() {
     colorPalette: 'indigo',
     themeMode: 'light',
     notifySms: true,
-    notifyTelegram: true,
   };
   if (phone) {
     payload.phoneNumber = phone;

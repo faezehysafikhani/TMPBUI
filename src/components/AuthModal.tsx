@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { LogIn, UserPlus, KeyRound, AtSign, AlertCircle, X, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Mail, Smartphone, Send } from 'lucide-react';
+import { LogIn, UserPlus, KeyRound, User as UserIcon, AlertCircle, X, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Mail, Smartphone, RefreshCw, ShieldCheck } from 'lucide-react';
 import { AppTheme } from '../types';
 import { loginPB, registerPB, requestPasswordResetPB } from '../services/pocketbase';
+import { CAPTCHA_ERROR_CODES, LoginCaptcha, NEXUS_API_ENABLED, NexusApiError, requestLoginCaptcha } from '../services/nexusApi';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -29,6 +30,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  // CAPTCHA: shown only once the server asks for one (after a failed sign-in). Each one can be
+  // used once; the server checks it, this only displays it.
+  const [captcha, setCaptcha] = useState<LoginCaptcha | null>(null);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+
   // Forgot Password fields
   const [forgotInput, setForgotInput] = useState('');
   const [forgotSuccessMsg, setForgotSuccessMsg] = useState<string | null>(null);
@@ -38,11 +45,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [regEmail, setRegEmail] = useState('');
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
-  const [regTelegram, setRegTelegram] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regPasswordConfirm, setRegPasswordConfirm] = useState('');
   const [regNotifySms, setRegNotifySms] = useState(true);
-  const [regNotifyTelegram, setRegNotifyTelegram] = useState(true);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegPasswordConfirm, setShowRegPasswordConfirm] = useState(false);
 
@@ -57,24 +62,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const loadCaptcha = async () => {
+    setCaptchaAnswer('');
+    setCaptchaLoading(true);
+    try {
+      setCaptcha(await requestLoginCaptcha());
+    } catch (err: any) {
+      setCaptcha(null);
+      setErrorMsg(err?.message || 'دریافت کد امنیتی ممکن نشد. لطفاً دوباره تلاش کنید.');
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     if (!identity.trim() || !password.trim()) {
-      setErrorMsg('لطفاً نام کاربری/ایمیل و رمز عبور را وارد فرمایید.');
+      setErrorMsg('لطفاً نام کاربری یا شماره تلفن همراه و رمز عبور را وارد فرمایید.');
+      return;
+    }
+    if (captcha && !captchaAnswer.trim()) {
+      setErrorMsg('لطفاً کد امنیتی تصویر را وارد کنید.');
       return;
     }
 
     setIsLoading(true);
     try {
-      const user = await loginPB(identity.trim(), password);
+      const user = await loginPB(
+        identity.trim(),
+        password,
+        captcha ? { captchaId: captcha.captchaId, answer: captchaAnswer } : undefined
+      );
+      setCaptcha(null);
+      setCaptchaAnswer('');
       if (user.theme) {
         onThemeSelect(user.theme);
       }
       onSuccess();
       if (canClose) onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'ورود ناموفق بود. نام کاربری یا رمز عبور اشتباه است.');
+      setErrorMsg(err.message || 'ورود ناموفق بود. نام کاربری/شماره تلفن یا رمز عبور اشتباه است.');
+      // The server wants a CAPTCHA for the next attempt, or the one just sent is used up.
+      const code = err instanceof NexusApiError ? err.code : undefined;
+      if (NEXUS_API_ENABLED && ((code && CAPTCHA_ERROR_CODES.includes(code)) || captcha)) {
+        await loadCaptcha();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -86,15 +119,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setForgotSuccessMsg(null);
 
     if (!forgotInput.trim()) {
-      setErrorMsg('لطفاً ایمیل یا نام کاربری خود را وارد نمایید.');
+      setErrorMsg(NEXUS_API_ENABLED
+        ? 'لطفاً نام کاربری یا شماره تلفن همراه خود را وارد نمایید.'
+        : 'لطفاً ایمیل یا نام کاربری خود را وارد نمایید.');
       return;
     }
 
     setIsLoading(true);
     try {
-      const sentEmail = await requestPasswordResetPB(forgotInput);
-      setForgotSuccessMsg(
-        `لینک بازنشانی رمز عبور با موفقیت به ایمیل (${sentEmail}) ارسال گردید. لطفاً صندوق ورودی و پوشه اسپم (Spam) ایمیل خود را بررسی نمایید.`
+      const sentTo = await requestPasswordResetPB(forgotInput);
+      setForgotSuccessMsg(NEXUS_API_ENABLED
+        // Same text whether or not the account exists (the server does not say either).
+        ? 'اگر حسابی با این مشخصات وجود داشته باشد و ایمیل برای آن ثبت شده باشد، لینک بازنشانی رمز عبور به آن ایمیل ارسال شد. صندوق ورودی و پوشه اسپم (Spam) را بررسی کنید.'
+        : `لینک بازنشانی رمز عبور با موفقیت به ایمیل (${sentTo}) ارسال گردید. لطفاً صندوق ورودی و پوشه اسپم (Spam) ایمیل خود را بررسی نمایید.`
       );
     } catch (err: any) {
       setErrorMsg(err.message || 'خطا در ارسال درخواست بازنشانی رمز عبور.');
@@ -119,8 +156,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMsg('لطفاً نام کاربری را وارد نمایید.');
       return;
     }
-    if (!regEmail.trim() || !regEmail.includes('@')) {
-      setErrorMsg('لطفاً یک ایمیل معتبر وارد نمایید.');
+    if (!/^[A-Za-z][A-Za-z0-9_.-]{2,63}$/.test(regUsername.trim())) {
+      setErrorMsg('نام کاربری باید با حرف انگلیسی شروع شود و ۳ تا ۶۴ کاراکتر از حروف انگلیسی، عدد، «_»، «.» یا «-» باشد.');
+      return;
+    }
+    if (regEmail.trim() && !regEmail.includes('@')) {
+      setErrorMsg('ایمیل واردشده معتبر نیست.');
       return;
     }
     if (regPassword.length < 8) {
@@ -138,13 +179,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const usernameInput = regUsername.trim() || undefined;
 
       await registerPB({
-        username: usernameInput,
-        email: regEmail.trim().toLowerCase(),
+        username: usernameInput || '',
+        email: regEmail.trim().toLowerCase() || undefined,
         name: fullName,
         phoneNumber: regPhone.trim(),
-        telegramChatId: regTelegram.trim(),
         notifySms: regNotifySms,
-        notifyTelegram: regNotifyTelegram,
         password: regPassword,
         passwordConfirm: regPasswordConfirm,
         theme: currentTheme || 'default',
@@ -260,18 +299,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  نام کاربری، شماره موبایل یا ایمیل
+                  نام کاربری یا شماره تلفن همراه
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={identity}
                     onChange={(e) => setIdentity(e.target.value)}
-                    placeholder="نام کاربری، ۰۹۱۲۳۴۵۶۷۸۹ یا info@example.com"
+                    placeholder="نام کاربری یا ۰۹۱۲۳۴۵۶۷۸۹"
+                    autoComplete="username"
                     className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
                     required
                   />
-                  <AtSign className="w-4 h-4 absolute right-3 top-3 text-slate-400" />
+                  <UserIcon className="w-4 h-4 absolute right-3 top-3 text-slate-400" />
                 </div>
               </div>
 
@@ -316,9 +356,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
+              {(captcha || captchaLoading) && (
+                <div className="p-3 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/70 space-y-2 animate-in fade-in">
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <span>کد امنیتی تصویر را وارد کنید</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {captcha ? (
+                      <img
+                        src={captcha.imageDataUrl}
+                        alt="کد امنیتی"
+                        width={200}
+                        height={70}
+                        className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white select-none"
+                        draggable={false}
+                      />
+                    ) : (
+                      <div className="w-[200px] h-[70px] rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={loadCaptcha}
+                      disabled={captchaLoading || isLoading}
+                      className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50"
+                      title="دریافت کد جدید"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${captchaLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value)}
+                    placeholder="کد نمایش‌داده‌شده در تصویر"
+                    className="w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-center tracking-[0.3em]"
+                  />
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || captchaLoading || (!!captcha && !captchaAnswer.trim())}
                 className="w-full mt-2 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isLoading ? (
@@ -366,19 +449,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    ایمیل یا نام کاربری ثبت‌شده در سیستم را وارد نمایید. لینک بازنشانی رمز عبور به ایمیل شما ارسال خواهد شد.
+                    {NEXUS_API_ENABLED
+                      ? 'نام کاربری یا شماره تلفن همراه ثبت‌شده را وارد نمایید. لینک بازنشانی رمز عبور به ایمیل ثبت‌شده برای حساب شما ارسال خواهد شد.'
+                      : 'ایمیل یا نام کاربری ثبت‌شده در سیستم را وارد نمایید. لینک بازنشانی رمز عبور به ایمیل شما ارسال خواهد شد.'}
                   </p>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      ایمیل یا نام کاربری
+                      {NEXUS_API_ENABLED ? 'نام کاربری یا شماره تلفن همراه' : 'ایمیل یا نام کاربری'}
                     </label>
                     <div className="relative">
                       <input
                         type="text"
                         value={forgotInput}
                         onChange={(e) => setForgotInput(e.target.value)}
-                        placeholder="مثلاً: info@example.com یا user123"
+                        placeholder={NEXUS_API_ENABLED ? 'مثلاً: user123 یا ۰۹۱۲۳۴۵۶۷۸۹' : 'مثلاً: info@example.com یا user123'}
                         className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
                         required
                       />
@@ -450,10 +535,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    شماره موبایل *
+                    شماره تلفن همراه * <span className="font-normal text-slate-400">(برای ورود و دریافت پیامک)</span>
                   </label>
                   <div className="relative">
                     <input
@@ -468,27 +553,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    آیدی تلگرام (اختیاری)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={regTelegram}
-                      onChange={(e) => setRegTelegram(e.target.value)}
-                      placeholder="@username یا چت آیدی"
-                      className="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
-                    />
-                    <Send className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    نام کاربری *
+                    نام کاربری * <span className="font-normal text-slate-400">(برای ورود)</span>
                   </label>
                   <input
                     type="text"
@@ -502,15 +572,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    ایمیل *
+                    {NEXUS_API_ENABLED ? 'ایمیل (اختیاری)' : 'ایمیل *'}
                   </label>
                   <input
                     type="email"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="email@example.com"
+                    placeholder="برای بازیابی رمز عبور"
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
-                    required
+                    required={!NEXUS_API_ENABLED}
                   />
                 </div>
               </div>
@@ -566,7 +636,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               {/* Default Notification Preferences */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-1 gap-2 pt-1">
                 <label className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 cursor-pointer">
                   <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">اطلاع‌رسانی با پیامک</span>
                   <input
@@ -574,16 +644,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     checked={regNotifySms}
                     onChange={(e) => setRegNotifySms(e.target.checked)}
                     className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 cursor-pointer">
-                  <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">اطلاع‌رسانی با تلگرام</span>
-                  <input
-                    type="checkbox"
-                    checked={regNotifyTelegram}
-                    onChange={(e) => setRegNotifyTelegram(e.target.checked)}
-                    className="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 cursor-pointer"
                   />
                 </label>
               </div>
