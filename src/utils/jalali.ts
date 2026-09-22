@@ -175,7 +175,7 @@ export function getNowISO(): string {
   return new Date().toISOString();
 }
 
-// Parse ISO string safely ensuring timezone offsets and PocketBase date strings are properly parsed
+// Parse ISO string safely ensuring timezone offsets and server date strings are properly parsed
 export function parseDateSafely(str: string): Date | null {
   if (!str) return null;
   const raw = String(str).trim();

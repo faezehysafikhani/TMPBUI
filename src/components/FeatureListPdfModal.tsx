@@ -139,7 +139,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
                   <strong>نسخه سامانه:</strong> ۳.۰.۰ Pro
                 </div>
                 <div>
-                  <strong>پایگاه داده:</strong> PocketBase / SQLite
+                  <strong>پایگاه داده:</strong> NexusCore / SQL Server
                 </div>
               </div>
             </div>
@@ -307,7 +307,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
                 </li>
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>پایگاه داده PocketBase / SQLite & کش محلی:</strong> ذخیره‌سازی همگام‌سازی‌شده داده‌ها با کارکرد آفلاین</span>
+                  <span><strong>پایگاه داده NexusCore / SQL Server & کش محلی:</strong> ذخیره‌سازی همگام‌سازی‌شده داده‌ها با کارکرد آفلاین</span>
                 </li>
                 <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -364,7 +364,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
                 این دفترچه به صورت خودکار مطابق آخرین وضعیت و امکانات فعال برنامه به‌روزرسانی می‌شود.
               </p>
               <p className="text-[10px] text-slate-400">
-                طراحی شده با React, TypeScript, Express, PocketBase, Vercel & Tailwind CSS
+                طراحی شده با React, TypeScript, Express, NexusCore (ASP.NET Core) & Tailwind CSS
               </p>
             </div>
           </div>

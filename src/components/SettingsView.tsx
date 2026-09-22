@@ -9,7 +9,6 @@ import { COLOR_PALETTES } from '../utils/theme';
 import { PRESET_AVATARS, compressImageFile } from '../utils/avatars';
 import { readFileAsDataUrl } from '../utils/storage';
 import { SystemAdministration, ChangePasswordCard } from './admin/SystemAdministration';
-import { NEXUS_API_ENABLED } from '../services/nexusApi';
 import { WorkTeamManagement } from './WorkTeamManagement';
 
 export type ThemeMode = 'light' | 'dark';
@@ -164,7 +163,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   return (
     <SystemAdministration currentUserId={currentUser?.id} general={
     <div className="w-full space-y-6 animate-in fade-in duration-200">
-      {currentUser && NEXUS_API_ENABLED && <ChangePasswordCard />}
+      {currentUser && <ChangePasswordCard />}
 
       {/* Section 2: User Profile & Avatar Form */}
       {currentUser && (

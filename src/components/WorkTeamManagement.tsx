@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { User, WorkTeam, WorkTeamMember } from '../types';
-import { fetchAllUsersPB, fetchUserTeamsAsyncPB, saveUserTeamsPB } from '../services/pocketbase';
+import { fetchAllUsersPB, fetchUserTeamsAsyncPB, saveUserTeamsPB } from '../services/dataService';
 import {
   Users,
   UserPlus,

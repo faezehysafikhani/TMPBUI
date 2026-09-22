@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { LogIn, KeyRound, User as UserIcon, AlertCircle, X, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Mail, RefreshCw, ShieldCheck } from 'lucide-react';
 import { AppTheme } from '../types';
-import { loginPB, requestPasswordResetPB } from '../services/pocketbase';
-import { CAPTCHA_ERROR_CODES, LoginCaptcha, NEXUS_API_ENABLED, NexusApiError, requestLoginCaptcha } from '../services/nexusApi';
+import { loginPB, requestPasswordResetPB } from '../services/dataService';
+import { CAPTCHA_ERROR_CODES, LoginCaptcha, NexusApiError, requestLoginCaptcha } from '../services/nexusApi';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -95,7 +95,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMsg(err.message || 'ورود ناموفق بود. نام کاربری/شماره تلفن یا رمز عبور اشتباه است.');
       // The server wants a CAPTCHA for the next attempt, or the one just sent is used up.
       const code = err instanceof NexusApiError ? err.code : undefined;
-      if (NEXUS_API_ENABLED && ((code && CAPTCHA_ERROR_CODES.includes(code)) || captcha)) {
+      if ((code && CAPTCHA_ERROR_CODES.includes(code)) || captcha) {
         await loadCaptcha();
       }
     } finally {
@@ -109,20 +109,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setForgotSuccessMsg(null);
 
     if (!forgotInput.trim()) {
-      setErrorMsg(NEXUS_API_ENABLED
-        ? 'لطفاً نام کاربری یا شماره تلفن همراه خود را وارد نمایید.'
-        : 'لطفاً ایمیل یا نام کاربری خود را وارد نمایید.');
+      setErrorMsg('لطفاً نام کاربری یا شماره تلفن همراه خود را وارد نمایید.');
       return;
     }
 
     setIsLoading(true);
     try {
-      const sentTo = await requestPasswordResetPB(forgotInput);
-      setForgotSuccessMsg(NEXUS_API_ENABLED
-        // Same text whether or not the account exists (the server does not say either).
-        ? 'اگر حسابی با این مشخصات وجود داشته باشد و ایمیل برای آن ثبت شده باشد، لینک بازنشانی رمز عبور به آن ایمیل ارسال شد. صندوق ورودی و پوشه اسپم (Spam) را بررسی کنید.'
-        : `لینک بازنشانی رمز عبور با موفقیت به ایمیل (${sentTo}) ارسال گردید. لطفاً صندوق ورودی و پوشه اسپم (Spam) ایمیل خود را بررسی نمایید.`
-      );
+      await requestPasswordResetPB(forgotInput);
+      // Same text whether or not the account exists (the server does not say either).
+      setForgotSuccessMsg('اگر حسابی با این مشخصات وجود داشته باشد و ایمیل برای آن ثبت شده باشد، لینک بازنشانی رمز عبور به آن ایمیل ارسال شد. صندوق ورودی و پوشه اسپم (Spam) را بررسی کنید.');
     } catch (err: any) {
       setErrorMsg(err.message || 'خطا در ارسال درخواست بازنشانی رمز عبور.');
     } finally {
@@ -347,21 +342,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               ) : (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    {NEXUS_API_ENABLED
-                      ? 'نام کاربری یا شماره تلفن همراه ثبت‌شده را وارد نمایید. لینک بازنشانی رمز عبور به ایمیل ثبت‌شده برای حساب شما ارسال خواهد شد.'
-                      : 'ایمیل یا نام کاربری ثبت‌شده در سیستم را وارد نمایید. لینک بازنشانی رمز عبور به ایمیل شما ارسال خواهد شد.'}
+                    نام کاربری یا شماره تلفن همراه ثبت‌شده را وارد نمایید. لینک بازنشانی رمز عبور به ایمیل ثبت‌شده برای حساب شما ارسال خواهد شد.
                   </p>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      {NEXUS_API_ENABLED ? 'نام کاربری یا شماره تلفن همراه' : 'ایمیل یا نام کاربری'}
+                      نام کاربری یا شماره تلفن همراه
                     </label>
                     <div className="relative">
                       <input
                         type="text"
                         value={forgotInput}
                         onChange={(e) => setForgotInput(e.target.value)}
-                        placeholder={NEXUS_API_ENABLED ? 'مثلاً: user123 یا ۰۹۱۲۳۴۵۶۷۸۹' : 'مثلاً: info@example.com یا user123'}
+                        placeholder={'مثلاً: user123 یا ۰۹۱۲۳۴۵۶۷۸۹'}
                         className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
                         required
                       />

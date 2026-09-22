@@ -27,7 +27,7 @@ import {
   createPersonalNotePB,
   updatePersonalNotePB,
   deletePersonalNotePB,
-} from '../services/pocketbase';
+} from '../services/dataService';
 
 interface PersonalNotesViewProps {
   currentUser: User | null;

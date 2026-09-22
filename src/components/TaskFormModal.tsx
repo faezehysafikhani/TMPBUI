@@ -5,7 +5,7 @@ import { readFileAsDataUrl } from '../utils/storage';
 import { formatFileSize, toPersianDigits, computeAutoTaskStatus } from '../utils/helpers';
 import { JalaliDateTimePicker } from './JalaliDateTimePicker';
 import { getNowISO } from '../utils/jalali';
-import { fetchUserTeamsPB, fetchUserTeamsAsyncPB, fetchAllUsersPB } from '../services/pocketbase';
+import { fetchUserTeamsPB, fetchUserTeamsAsyncPB, fetchAllUsersPB } from '../services/dataService';
 import { generateRecurringOccurrences } from '../utils/recurring';
 import {
   X,
@@ -205,7 +205,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       const cachedTeams = fetchUserTeamsPB(currentUser.id);
       setAvailableTeams(cachedTeams);
 
-      // Then sync live from PocketBase database
+      // Then refresh from the server
       fetchUserTeamsAsyncPB(currentUser.id).then((liveTeams) => {
         if (liveTeams && liveTeams.length > 0) {
           setAvailableTeams(liveTeams);

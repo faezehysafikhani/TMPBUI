@@ -32,7 +32,7 @@ import {
   fetchAllUsersPB,
   updateDirectMessagePB,
   deleteDirectMessagePB,
-} from '../services/pocketbase';
+} from '../services/dataService';
 
 interface TeamChatViewProps {
   currentUser: User | null;

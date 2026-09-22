@@ -1,12 +1,11 @@
 /**
  * REST connection to the NexusCore backend (ASP.NET Core 8, TaskManagement module).
  *
- * Active only when VITE_API_BASE_URL is set. Without it the app keeps running against
- * PocketBase exactly as before, so nothing changes for a deployment that has not been
- * configured for NexusCore yet.
+ * This is the app's only backend. The origin comes from VITE_API_BASE_URL; without it the
+ * app calls the origin it is served from (a reverse proxy in front of both).
  *
- * The functions in pocketbase.ts delegate here for every operation the backend fully
- * supports; the components keep calling the same functions and receive the same shapes.
+ * The functions in dataService.ts delegate here; the components keep calling the same
+ * functions and receive the same shapes.
  * All translation between the backend DTOs and the UI types happens in this file.
  *
  * Request and response shapes are taken from the backend source:
@@ -40,15 +39,15 @@ import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signal
 
 const env = ((import.meta as any).env || {}) as Record<string, string | undefined>;
 
-/** Backend origin, e.g. http://localhost:5151. Empty means "stay on PocketBase". */
-export const NEXUS_API_BASE_URL = (env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+/** Backend origin, e.g. http://localhost:5151. Defaults to the origin serving the app. */
+export const NEXUS_API_BASE_URL = ((env.VITE_API_BASE_URL || '').trim()
+  || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/+$/, '');
 
 /** Optional tenant slug sent with login. Leave empty for a single-tenant install. */
 const NEXUS_TENANT_SLUG = (env.VITE_NEXUS_TENANT_SLUG || '').trim();
 
 const REQUEST_TIMEOUT_MS = Number(env.VITE_API_TIMEOUT_MS) > 0 ? Number(env.VITE_API_TIMEOUT_MS) : 30000;
 
-export const NEXUS_API_ENABLED = NEXUS_API_BASE_URL.length > 0;
 
 /** Name of the seeded system role (NexusCore.Infrastructure/Persistence/DefaultDataSeeder.cs). */
 const ADMIN_ROLE_NAME = 'Administrator';
@@ -304,7 +303,7 @@ async function refreshSession(): Promise<boolean> {
 
 /**
  * Carries the HTTP status as `httpStatus`, not `status`: App.tsx reads `error.status` to
- * show PocketBase-specific hints ("collection tasks not found"), which would be wrong here.
+ * show hints of the previous backend ("collection tasks not found"), which would be wrong here.
  */
 export class NexusApiError extends Error {
   constructor(message: string, public readonly httpStatus: number, public readonly code?: string) {
@@ -886,7 +885,7 @@ export function getSessionTenantId(): string | null {
 
 /**
  * GET /api/identity/auth/me. Returns null when the session is gone (refresh failed); keeps
- * the stored user when the server is merely unreachable, as the PocketBase version did.
+ * the stored user when the server is merely unreachable.
  */
 export async function refreshCurrentUser(): Promise<User | null> {
   const session = readSession();
@@ -1111,7 +1110,7 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
 }
 
 /**
- * Applies a partial update. Mirrors the PocketBase contract: a field left `undefined` is not
+ * Applies a partial update. A field left `undefined` is not
  * changed. Each part goes to the endpoint that owns it - details (PUT), status (PATCH),
  * subtasks, tags, files and the recurrence schedule.
  */
@@ -1897,7 +1896,7 @@ function notifyTaskChange(): void {
 
 /**
  * Calls onChange whenever tasks, subtasks, comments, files, tags or schedules change anywhere
- * in the tenant - the same moments the PocketBase realtime subscription fired.
+ * in the tenant - whenever tasks change.
  */
 export function subscribeToTaskChanges(onChange: () => void): () => void {
   if (!readSession()) return () => {};

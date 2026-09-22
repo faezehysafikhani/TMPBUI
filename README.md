@@ -2,7 +2,7 @@
 
 سامانه مدیریت وظایف و پروژه با بورد کانبان، تقویم شمسی، فیلترهای ترکیبی، گفتگوی تیمی و یادداشت‌های شخصی.
 
-ساخته‌شده با React، TypeScript، Express، Tailwind CSS و PocketBase.
+ساخته‌شده با React، TypeScript، Express و Tailwind CSS؛ بک‌اند آن NexusCore (ASP.NET Core) است.
 
 ## قابلیت‌ها
 
@@ -18,7 +18,7 @@
 ## پیش‌نیازها
 
 - Node.js نسخه ۲۰ یا بالاتر
-- یک نمونه در حال اجرا از PocketBase
+- یک نمونه در حال اجرا از API سامانه NexusCore (آدرس آن در `VITE_API_BASE_URL` فایل `.env`)
 
 ## راه‌اندازی
 
@@ -63,7 +63,7 @@ public/       آیکون‌ها، manifest و service worker
 scripts/      ابزار ساخت آیکون‌ها
 src/
   components/ کامپوننت‌های رابط کاربری
-  services/   ارتباط با PocketBase
+  services/   ارتباط با API سامانه NexusCore
   utils/      توابع کمکی، تاریخ شمسی، تم و ذخیره‌سازی
 server.ts     سرور Express
 ```

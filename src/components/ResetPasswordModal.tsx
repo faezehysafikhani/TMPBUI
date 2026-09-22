@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { KeyRound, Lock, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff, ShieldCheck, X } from 'lucide-react';
-import { confirmPasswordResetPB } from '../services/pocketbase';
+import { confirmPasswordResetPB } from '../services/dataService';
 
 interface ResetPasswordModalProps {
   isOpen: boolean;

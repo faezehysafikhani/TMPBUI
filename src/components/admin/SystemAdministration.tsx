@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Settings2, MessageSquare, Users, History, Network, KeyRound, Loader2, Save } from 'lucide-react';
-import { NEXUS_API_ENABLED, getMyPermissions, changeMyPassword } from '../../services/nexusApi';
+import { getMyPermissions, changeMyPassword } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
@@ -10,11 +10,11 @@ import { SmsPanel } from './SmsPanel';
 type MainTab = 'general' | 'sms' | 'users';
 type UsersTab = 'list' | 'history' | 'ldap';
 
-/** Permission names the signed-in user holds; empty outside NexusCore mode. The server re-checks every call. */
+/** Permission names the signed-in user holds. The server re-checks every call. */
 export function useMyPermissions(userId: string | undefined): Set<string> | null {
-  const [permissions, setPermissions] = useState<Set<string> | null>(NEXUS_API_ENABLED ? null : new Set());
+  const [permissions, setPermissions] = useState<Set<string> | null>(null);
   useEffect(() => {
-    if (!NEXUS_API_ENABLED || !userId) { setPermissions(new Set()); return; }
+    if (!userId) { setPermissions(new Set()); return; }
     let alive = true;
     getMyPermissions()
       .then((names) => alive && setPermissions(new Set(names)))
@@ -112,7 +112,7 @@ export const ChangePasswordCard: React.FC = () => {
 
 /**
  * «تنظیمات سامانه»: the header card with the main tabs. The general tab shows `general`
- * (the personal settings); the SMS panel and user management appear by permission, in NexusCore mode only.
+ * (the personal settings); the SMS panel and user management appear by permission.
  */
 export const SystemAdministration: React.FC<{ currentUserId?: string; general: React.ReactNode }> = ({ currentUserId, general }) => {
   const permissions = useMyPermissions(currentUserId);

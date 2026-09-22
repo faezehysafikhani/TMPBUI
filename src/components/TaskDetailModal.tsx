@@ -9,7 +9,7 @@ import {
   updateTaskCommentPB,
   fetchTaskLogsPB,
   createTaskLogPB
-} from '../services/pocketbase';
+} from '../services/dataService';
 import {
   X,
   Calendar,
@@ -85,7 +85,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const editCommentFileInputRef = useRef<HTMLInputElement>(null);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
 
-  // Load comments & activity logs from PocketBase / local storage
+  // Load comments & activity logs from the server
   useEffect(() => {
     if (task && task.id) {
       setIsLoadingComments(true);

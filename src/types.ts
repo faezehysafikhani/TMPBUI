@@ -144,7 +144,7 @@ export interface Task {
   priority: Priority;
   status: TaskStatus;
   attachments: Attachment[];
-  user?: string; // PocketBase relation to user id (Owner/Creator)
+  user?: string; // id of the owner/creator
   ownerName?: string;
   ownerAvatar?: string;
   assignedUserId?: string;

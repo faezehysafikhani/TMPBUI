@@ -48,7 +48,7 @@ import {
   fetchUnreadMessageCountsPB,
   extractResetTokenFromURL,
   ACTIVE_DATA_SERVER_URL
-} from './services/pocketbase';
+} from './services/dataService';
 import { Database, PanelRightOpen } from 'lucide-react';
 
 export default function App() {
@@ -126,7 +126,7 @@ export default function App() {
     return user?.themeMode || 'light';
   });
 
-  // Handle color pattern theme selection (PocketBase sync live)
+  // Handle color pattern theme selection (saved to the server)
   const handleSelectColorTheme = async (newTheme: AppTheme) => {
     setAppColorTheme(newTheme);
     if (currentUser) {
@@ -135,7 +135,7 @@ export default function App() {
     }
   };
 
-  // Handle color palette selection (PocketBase sync live)
+  // Handle color palette selection (saved to the server)
   const handleSelectColorPalette = async (newPalette: AppColorPalette) => {
     setAppColorPalette(newPalette);
     localStorage.setItem('app_color_palette', newPalette);
@@ -145,7 +145,7 @@ export default function App() {
     }
   };
 
-  // Handle theme mode selection (Light/Dark - PocketBase sync live)
+  // Handle theme mode selection (Light/Dark - saved to the server)
   const handleSelectThemeMode = async (newMode: ThemeMode) => {
     setThemeMode(newMode);
     if (currentUser) {
@@ -424,7 +424,7 @@ export default function App() {
           );
         }
       } else {
-        // Create in PocketBase
+        // Create on the server
         if (taskData.status === 'completed' && !taskData.actualCompletionDate) {
           taskData.actualCompletionDate = new Date().toISOString();
         }
