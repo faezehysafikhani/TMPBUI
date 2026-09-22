@@ -8,7 +8,8 @@ import { AppTheme, AppColorPalette, User as UserType, WorkTeam } from '../types'
 import { COLOR_PALETTES } from '../utils/theme';
 import { PRESET_AVATARS, compressImageFile } from '../utils/avatars';
 import { readFileAsDataUrl } from '../utils/storage';
-import { AdminUserManagement } from './AdminUserManagement';
+import { SystemAdministration, ChangePasswordCard } from './admin/SystemAdministration';
+import { NEXUS_API_ENABLED } from '../services/nexusApi';
 import { WorkTeamManagement } from './WorkTeamManagement';
 
 export type ThemeMode = 'light' | 'dark';
@@ -75,7 +76,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     profile: false,
-    adminUsers: false,
     team: false,
     themeMode: false,
     colorPalette: false,
@@ -149,7 +149,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     try {
       await onSaveProfile({
         name: profileName.trim(),
-        username: profileUsername.trim(),
         avatar: selectedAvatar,
         phoneNumber: profilePhoneNumber.trim(),
         notifySms: notifySms,
@@ -163,34 +162,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
+    <SystemAdministration currentUserId={currentUser?.id} general={
     <div className="w-full space-y-6 animate-in fade-in duration-200">
-      {/* Section 1: Admin User Management Card (Admin Only - Top Item) */}
-      {currentUser && (currentUser.role === 'admin' || currentUser.username.toLowerCase() === 'admin') && (
-        <div className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800/80 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
-          <button
-            type="button"
-            onClick={() => toggleSection('adminUsers')}
-            className={`w-full flex items-center justify-between text-slate-900 dark:text-white font-bold text-sm select-none cursor-pointer group ${
-              openSections.adminUsers ? 'pb-3 border-b border-amber-200/60 dark:border-amber-800/60' : ''
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform" />
-              <span>مدیریت کاربران سامانه</span>
-              <span className="text-xs font-bold text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 px-2.5 py-1 rounded-xl border border-amber-300 dark:border-amber-800 shrink-0">
-                پنل مدیر (Admin)
-              </span>
-            </div>
-            {openSections.adminUsers ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-          </button>
-
-          {openSections.adminUsers && (
-            <div className="animate-in fade-in duration-200">
-              <AdminUserManagement currentUser={currentUser} />
-            </div>
-          )}
-        </div>
-      )}
+      {currentUser && NEXUS_API_ENABLED && <ChangePasswordCard />}
 
       {/* Section 2: User Profile & Avatar Form */}
       {currentUser && (
@@ -342,8 +316,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <input
                       type="text"
                       value={profileUsername}
-                      onChange={(e) => setProfileUsername(e.target.value)}
-                      placeholder="username"
+                      readOnly
+                      title="نام کاربری (کد ملی) فقط توسط مدیر سامانه قابل تغییر است."
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right font-mono"
                     />
                   </div>
@@ -718,5 +692,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
     </div>
+    } />
   );
 };

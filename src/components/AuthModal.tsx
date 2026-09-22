@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { LogIn, UserPlus, KeyRound, User as UserIcon, AlertCircle, X, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Mail, Smartphone, RefreshCw, ShieldCheck } from 'lucide-react';
+import { LogIn, KeyRound, User as UserIcon, AlertCircle, X, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Mail, RefreshCw, ShieldCheck } from 'lucide-react';
 import { AppTheme } from '../types';
-import { loginPB, registerPB, requestPasswordResetPB } from '../services/pocketbase';
+import { loginPB, requestPasswordResetPB } from '../services/pocketbase';
 import { CAPTCHA_ERROR_CODES, LoginCaptcha, NEXUS_API_ENABLED, NexusApiError, requestLoginCaptcha } from '../services/nexusApi';
 
 interface AuthModalProps {
@@ -23,7 +23,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   canClose = true,
   onOpenResetWithToken,
 }) => {
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  // Sign-in and password recovery only: accounts are created by an administrator.
+  const [mode, setMode] = useState<'login' | 'forgot'>('login');
   
   // Login fields
   const [identity, setIdentity] = useState('');
@@ -39,17 +40,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Forgot Password fields
   const [forgotInput, setForgotInput] = useState('');
   const [forgotSuccessMsg, setForgotSuccessMsg] = useState<string | null>(null);
-
-  // Register fields
-  const [regUsername, setRegUsername] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regName, setRegName] = useState('');
-  const [regPhone, setRegPhone] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [regPasswordConfirm, setRegPasswordConfirm] = useState('');
-  const [regNotifySms, setRegNotifySms] = useState(true);
-  const [showRegPassword, setShowRegPassword] = useState(false);
-  const [showRegPasswordConfirm, setShowRegPasswordConfirm] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -140,63 +130,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-
-    if (!regName.trim()) {
-      setErrorMsg('لطفاً نام و نام خانوادگی خود را وارد نمایید.');
-      return;
-    }
-    if (!regPhone.trim()) {
-      setErrorMsg('لطفاً شماره موبایل خود را وارد نمایید.');
-      return;
-    }
-    if (!regUsername.trim()) {
-      setErrorMsg('لطفاً نام کاربری را وارد نمایید.');
-      return;
-    }
-    if (!/^[A-Za-z][A-Za-z0-9_.-]{2,63}$/.test(regUsername.trim())) {
-      setErrorMsg('نام کاربری باید با حرف انگلیسی شروع شود و ۳ تا ۶۴ کاراکتر از حروف انگلیسی، عدد، «_»، «.» یا «-» باشد.');
-      return;
-    }
-    if (regEmail.trim() && !regEmail.includes('@')) {
-      setErrorMsg('ایمیل واردشده معتبر نیست.');
-      return;
-    }
-    if (regPassword.length < 8) {
-      setErrorMsg('رمز عبور باید حداقل ۸ کاراکتر باشد.');
-      return;
-    }
-    if (regPassword !== regPasswordConfirm) {
-      setErrorMsg('رمز عبور و تکرار آن یکسان نیستند.');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const fullName = regName.trim();
-      const usernameInput = regUsername.trim() || undefined;
-
-      await registerPB({
-        username: usernameInput || '',
-        email: regEmail.trim().toLowerCase() || undefined,
-        name: fullName,
-        phoneNumber: regPhone.trim(),
-        notifySms: regNotifySms,
-        password: regPassword,
-        passwordConfirm: regPasswordConfirm,
-        theme: currentTheme || 'default',
-      });
-      onSuccess();
-      if (canClose) onClose();
-    } catch (err: any) {
-      setErrorMsg(err.message || 'ثبت‌نام ناموفق بود.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden"
@@ -248,41 +181,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           </div>
 
-          {/* Mode Tabs */}
-          <div className="flex bg-slate-950/50 p-1 rounded-2xl mt-5 border border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('login');
-                setErrorMsg(null);
-                setForgotSuccessMsg(null);
-              }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                mode === 'login'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>ورود به حساب</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                setErrorMsg(null);
-                setForgotSuccessMsg(null);
-              }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                mode === 'register'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>ثبت نام جدید</span>
-            </button>
-          </div>
         </div>
 
         {/* Modal Body */}
@@ -417,7 +315,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 )}
               </button>
             </form>
-          ) : mode === 'forgot' ? (
+          ) : (
             /* Forgot Password Form */
             <div className="space-y-4 animate-in fade-in duration-200">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -518,154 +416,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </form>
               )}
             </div>
-          ) : (
-            /* Register Form */
-            <form onSubmit={handleRegister} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  نام و نام خانوادگی *
-                </label>
-                <input
-                  type="text"
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                  placeholder="مثلاً: علی محمدی"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-                  required
-                />
-              </div>
-
-              <div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    شماره تلفن همراه * <span className="font-normal text-slate-400">(برای ورود و دریافت پیامک)</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="tel"
-                      value={regPhone}
-                      onChange={(e) => setRegPhone(e.target.value)}
-                      placeholder="۰۹۱۲۳۴۵۶۷۸۹"
-                      className="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
-                      required
-                    />
-                    <Smartphone className="w-3.5 h-3.5 absolute right-2.5 top-2.5 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
-
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    نام کاربری * <span className="font-normal text-slate-400">(برای ورود)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={regUsername}
-                    onChange={(e) => setRegUsername(e.target.value)}
-                    placeholder="username"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    {NEXUS_API_ENABLED ? 'ایمیل (اختیاری)' : 'ایمیل *'}
-                  </label>
-                  <input
-                    type="email"
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="برای بازیابی رمز عبور"
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
-                    required={!NEXUS_API_ENABLED}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    رمز عبور (حداقل ۸ حرف) *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showRegPassword ? 'text' : 'password'}
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowRegPassword(!showRegPassword)}
-                      className="absolute left-2 top-2 p-0.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
-                      title={showRegPassword ? 'پنهان کردن رمز' : 'مشاهده رمز'}
-                    >
-                      {showRegPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    تکرار رمز عبور *
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showRegPasswordConfirm ? 'text' : 'password'}
-                      value={regPasswordConfirm}
-                      onChange={(e) => setRegPasswordConfirm(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowRegPasswordConfirm(!showRegPasswordConfirm)}
-                      className="absolute left-2 top-2 p-0.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer transition-colors"
-                      title={showRegPasswordConfirm ? 'پنهان کردن رمز' : 'مشاهده رمز'}
-                    >
-                      {showRegPasswordConfirm ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Default Notification Preferences */}
-              <div className="grid grid-cols-1 gap-2 pt-1">
-                <label className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 cursor-pointer">
-                  <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">اطلاع‌رسانی با پیامک</span>
-                  <input
-                    type="checkbox"
-                    checked={regNotifySms}
-                    onChange={(e) => setRegNotifySms(e.target.checked)}
-                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                  />
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full mt-2 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>در حال ایجاد حساب...</span>
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4" />
-                    <span>ایجاد حساب کاربری</span>
-                  </>
-                )}
-              </button>
-            </form>
           )}
 
           {/* Company Footer Info */}

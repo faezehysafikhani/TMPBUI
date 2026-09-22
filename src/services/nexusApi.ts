@@ -30,7 +30,6 @@ import {
   OccurrenceNth,
   STATUSES,
   DirectMessage,
-  SystemNotificationSettings,
 } from '../types';
 import { iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
@@ -90,11 +89,12 @@ interface CurrentUserResponse {
   permissions: string[];
 }
 
-interface PagedResult<T> {
+export interface PagedResult<T> {
   items: T[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
+  totalPages?: number;
 }
 
 interface UserSummaryDto { id: string; displayName: string; email: string; }
@@ -1380,43 +1380,12 @@ export async function deleteNote(id: string): Promise<void> {
 
 
 // ---------------------------------------------------------------------------
-// Own account: sign-up, password reset, profile, preferences
+// Own account: password reset, profile, preferences (there is no self-registration)
 // ---------------------------------------------------------------------------
 
 function updateSessionUser(user: UserDto): void {
   const session = readSession();
   if (session) writeSession({ ...session, user });
-}
-
-/** Username and mobile number are the sign-in names, so both are required; email is optional. */
-export async function register(data: {
-  username: string;
-  phoneNumber: string;
-  email?: string;
-  password: string;
-  name?: string;
-  notifySms?: boolean;
-  theme?: string;
-  colorPalette?: string;
-  themeMode?: string;
-}): Promise<User> {
-  const auth = await request<AuthResponse>('POST', '/api/identity/auth/register', {
-    auth: false,
-    retryOnUnauthorized: false,
-    body: {
-      username: data.username.trim(),
-      phoneNumber: data.phoneNumber.trim(),
-      email: data.email?.trim() || null,
-      password: data.password,
-      displayName: (data.name || '').trim() || data.username.trim(),
-      notifySms: data.notifySms ?? true,
-      theme: data.theme || null,
-      colorPalette: data.colorPalette || null,
-      themeMode: data.themeMode || null,
-    },
-  });
-  saveAuthResponse(auth);
-  return mapUserDto(auth.user);
 }
 
 /**
@@ -1443,6 +1412,7 @@ export async function confirmPasswordReset(token: string, newPassword: string): 
 /** Fields left undefined keep their current value. */
 export async function updateMyProfile(updates: {
   name?: string;
+  /** Ignored: the username (national code) is changed only by an administrator. */
   username?: string;
   avatar?: string;
   phoneNumber?: string;
@@ -1454,7 +1424,6 @@ export async function updateMyProfile(updates: {
   const saved = await request<UserDto>('PUT', '/api/identity/auth/me/profile', {
     body: {
       displayName: (updates.name ?? me.displayName).trim() || me.displayName,
-      username: (updates.username !== undefined ? updates.username : me.username)?.trim() || '',
       avatarUrl: updates.avatar !== undefined ? updates.avatar || null : me.avatarUrl ?? null,
       phoneNumber: (updates.phoneNumber !== undefined ? updates.phoneNumber : me.phoneNumber)?.trim() || null,
       notifySms: updates.notifySms ?? me.notifySms ?? true,
@@ -1478,97 +1447,311 @@ export async function updateMyPreferences(settings: { theme?: string; colorPalet
 }
 
 // ---------------------------------------------------------------------------
-// User administration
+// Administration (Settings → User management, Login history, SMS panel, LDAP)
 // ---------------------------------------------------------------------------
 
-/** Role given to accounts the UI calls "user" (seeded by the host, see Identity:SeedRoles). */
-const MEMBER_ROLE_NAME = 'Member';
-
-interface RoleDto { id: string; name: string; }
-
-async function roleIdsFor(role: string | undefined): Promise<string[]> {
-  const roles = await request<RoleDto[]>('GET', '/api/identity/roles', { query: { tenantId: getSessionTenantId() } });
-  const wanted = role === 'admin' ? ADMIN_ROLE_NAME : MEMBER_ROLE_NAME;
-  const match = (roles || []).find((r) => r.name === wanted);
-  if (!match) {
-    throw new NexusApiError(`نقش «${wanted}» در سرور تعریف نشده است.`, 400);
-  }
-  return [match.id];
-}
-
-async function findUserDto(userId: string): Promise<UserDto> {
-  const users = await getAllPages<UserDto>('/api/identity/users', {}, 100);
-  const user = users.find((u) => u.id === userId);
-  if (!user) throw new NexusApiError('کاربر یافت نشد.', 404);
-  return user;
-}
-
-/** A new account needs a username (its sign-in name); mobile number and email are optional. */
-export async function createUser(data: {
+/** A user as the administration grid shows it. */
+export interface AdminUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
   username: string;
-  name: string;
+  phoneNumber: string;
+  email: string;
+  isActive: boolean;
+  isSystem: boolean;
+  roles: string[];
+  lastLoginAtUtc: string | null;
+}
+
+function toAdminUser(u: UserDto & { firstName?: string | null; lastName?: string | null; isSystem?: boolean }): AdminUser {
+  return {
+    id: u.id,
+    firstName: u.firstName || '',
+    lastName: u.lastName || '',
+    displayName: u.displayName || '',
+    username: u.username || '',
+    phoneNumber: u.phoneNumber || '',
+    email: u.email || '',
+    isActive: u.isActive,
+    isSystem: !!u.isSystem,
+    roles: u.roles || [],
+    lastLoginAtUtc: u.lastLoginAtUtc,
+  };
+}
+
+/** Permission names of the signed-in user, as the server grants them (roles, direct, groups). */
+export async function getMyPermissions(): Promise<string[]> {
+  if (!readSession()) return [];
+  const me = await request<CurrentUserResponse>('GET', '/api/identity/auth/me');
+  return me.permissions || [];
+}
+
+/** Server-side search (every searchable column) and paging of the caller's tenant users. */
+export async function listUsersPage(options: { page: number; pageSize: number; search?: string }): Promise<PagedResult<AdminUser>> {
+  const page = await request<PagedResult<UserDto>>('GET', '/api/identity/users', {
+    query: { pageNumber: options.page, pageSize: options.pageSize, search: options.search?.trim() || undefined },
+  });
+  return { ...page, items: (page.items || []).map(toAdminUser) };
+}
+
+export interface AdminUserInput {
+  firstName: string;
+  lastName: string;
+  username: string;
+  phoneNumber: string;
   email?: string;
-  password: string;
-  role?: string;
-  disabled?: boolean;
-  phoneNumber?: string;
-  notifySms?: boolean;
-}): Promise<User> {
-  const roleIds = await roleIdsFor(data.role);
+  password?: string;
+}
+
+/** Creates an account (users.create). Username is the national code; the server checks everything again. */
+export async function adminCreateUser(input: AdminUserInput, roleIds: string[]): Promise<AdminUser> {
   const created = await request<UserDto>('POST', '/api/identity/users', {
     body: {
       tenantId: getSessionTenantId(),
-      username: data.username.trim(),
-      displayName: (data.name || data.username).trim(),
-      password: data.password,
-      isActive: !data.disabled,
-      email: data.email?.trim() || null,
-      phoneNumber: data.phoneNumber?.trim() || null,
-      notifySms: data.notifySms ?? true,
+      username: input.username.trim(),
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
+      phoneNumber: input.phoneNumber.trim(),
+      password: input.password || '',
+      email: input.email?.trim() || null,
+      isActive: true,
     },
   });
-  await request('PUT', `/api/identity/users/${created.id}/roles`, { body: { roleIds } });
-  return mapUserDto({ ...created, roles: [data.role === 'admin' ? ADMIN_ROLE_NAME : MEMBER_ROLE_NAME] });
+  if (roleIds.length > 0) {
+    await request('PUT', `/api/identity/users/${created.id}/roles`, { body: { roleIds } });
+  }
+  return toAdminUser(created);
 }
 
-/** Fields left undefined keep their current value. */
-export async function updateUser(
-  userId: string,
-  updates: {
-    name?: string;
-    username?: string;
-    email?: string;
-    password?: string;
-    role?: string;
-    disabled?: boolean;
-    phoneNumber?: string;
-    notifySms?: boolean;
-  }
-): Promise<User> {
-  const current = await findUserDto(requireGuid(userId, 'کاربر')!);
-  const saved = await request<UserDto>('PUT', `/api/identity/users/${current.id}`, {
+/** Edits an account (users.update). An empty password keeps the current one. */
+export async function adminUpdateUser(user: AdminUser, input: AdminUserInput): Promise<AdminUser> {
+  const saved = await request<UserDto>('PUT', `/api/identity/users/${requireGuid(user.id, 'کاربر')}`, {
     body: {
-      displayName: (updates.name ?? current.displayName).trim() || current.displayName,
-      isActive: updates.disabled !== undefined ? !updates.disabled : current.isActive,
-      // undefined keeps the current value; an empty string clears email or mobile number.
-      email: updates.email !== undefined ? updates.email.trim() : null,
-      password: updates.password?.trim() || null,
-      username: updates.username !== undefined ? updates.username.trim() : null,
-      phoneNumber: updates.phoneNumber !== undefined ? updates.phoneNumber.trim() : null,
-      notifySms: updates.notifySms ?? null,
+      displayName: `${input.firstName.trim()} ${input.lastName.trim()}`.trim() || user.displayName,
+      isActive: user.isActive,
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
+      username: input.username.trim(),
+      phoneNumber: input.phoneNumber.trim(),
+      email: (input.email ?? '').trim(),
+      password: input.password?.trim() || null,
     },
   });
+  return toAdminUser(saved);
+}
 
-  if (updates.role !== undefined) {
-    const wantsAdmin = updates.role === 'admin';
-    const isAdmin = (current.roles || []).includes(ADMIN_ROLE_NAME);
-    if (wantsAdmin !== isAdmin) {
-      await request('PUT', `/api/identity/users/${current.id}/roles`, { body: { roleIds: await roleIdsFor(updates.role) } });
-      saved.roles = [wantsAdmin ? ADMIN_ROLE_NAME : MEMBER_ROLE_NAME];
-    }
-  }
+/** Enables or disables an account (users.change_status). */
+export async function setUserActive(userId: string, isActive: boolean): Promise<AdminUser> {
+  const saved = await request<UserDto>('PATCH', `/api/identity/users/${requireGuid(userId, 'کاربر')}/status`, { body: { isActive } });
+  return toAdminUser(saved);
+}
 
-  return mapUserDto(saved);
+export interface AdminRole {
+  id: string;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
+  permissions: string[];
+}
+
+export async function listRoles(): Promise<AdminRole[]> {
+  return request<AdminRole[]>('GET', '/api/identity/roles', { query: { tenantId: getSessionTenantId() } });
+}
+
+export interface UserAccessEntry {
+  permissionId: string;
+  name: string;
+  module: string;
+  description: string;
+  grantedDirectly: boolean;
+  grantedByRole: boolean;
+  grantingRoles: string[];
+  grantedByGroup: boolean;
+  grantingGroups: string[];
+}
+
+export interface UserAccess {
+  userId: string;
+  displayName: string;
+  roles: string[];
+  permissions: UserAccessEntry[];
+}
+
+/** Every permission of the user and where it comes from (direct, role, group). */
+export async function getUserAccess(userId: string): Promise<UserAccess> {
+  return request<UserAccess>('GET', `/api/identity/users/${requireGuid(userId, 'کاربر')}/permissions`);
+}
+
+export async function setUserRoles(userId: string, roleIds: string[]): Promise<void> {
+  await request('PUT', `/api/identity/users/${requireGuid(userId, 'کاربر')}/roles`, { body: { roleIds } });
+}
+
+export async function setUserDirectPermissions(userId: string, permissionIds: string[]): Promise<void> {
+  await request('PUT', `/api/identity/users/${requireGuid(userId, 'کاربر')}/permissions`, { body: { permissionIds } });
+}
+
+export interface LoginHistoryEntry {
+  id: string;
+  action: string;
+  details: string | null;
+  ipAddress: string | null;
+  occurredAtUtc: string;
+  userDisplayName: string | null;
+  username: string | null;
+}
+
+/** Sign-in history: the audit log's identity.login* entries (success, failure, blocked). */
+export async function listLoginHistory(options: { page: number; pageSize: number; search?: string; newestFirst: boolean }): Promise<PagedResult<LoginHistoryEntry>> {
+  return request<PagedResult<LoginHistoryEntry>>('GET', '/api/platform/audit-logs', {
+    query: {
+      action: 'identity.login',
+      pageNumber: options.page,
+      pageSize: options.pageSize,
+      search: options.search?.trim() || undefined,
+      sort: options.newestFirst ? 'desc' : 'asc',
+    },
+  });
+}
+
+// ---- SMS panel -------------------------------------------------------------
+
+const CHANNELS = '/api/platform/notification-channels';
+
+export interface SmsPanelSettings {
+  enabled: boolean;
+  provider: string;
+  apiUrl: string;
+  /** Write-only: empty keeps the stored key. Never filled from the server. */
+  apiKey: string;
+  lineNumber: string;
+  apiKeyConfigured: boolean;
+}
+
+export interface SmsProviderOption { key: string; displayName: string; defaultBaseUrl: string; }
+
+export interface SmsTemplate { key: string; title: string; text: string; placeholders: string[]; }
+
+export async function getSmsProviders(): Promise<SmsProviderOption[]> {
+  return request<SmsProviderOption[]>('GET', `${CHANNELS}/providers`);
+}
+
+export async function getSmsPanelSettings(): Promise<SmsPanelSettings> {
+  const s = await request<{ sms: any }>('GET', CHANNELS);
+  return {
+    enabled: !!s.sms?.enabled,
+    provider: s.sms?.provider || 'kavenegar',
+    apiUrl: s.sms?.apiUrl || '',
+    apiKey: '',
+    lineNumber: s.sms?.lineNumber || '',
+    apiKeyConfigured: !!s.sms?.apiKeyConfigured,
+  };
+}
+
+export async function saveSmsPanelSettings(settings: SmsPanelSettings): Promise<SmsPanelSettings> {
+  const saved = await request<{ sms: any }>('PUT', CHANNELS, {
+    body: {
+      sms: {
+        enabled: settings.enabled,
+        provider: settings.provider,
+        apiUrl: settings.apiUrl.trim() || null,
+        apiKey: settings.apiKey.trim() || null,
+        lineNumber: settings.lineNumber.trim() || null,
+      },
+    },
+  });
+  return { ...settings, apiKey: '', apiKeyConfigured: !!saved.sms?.apiKeyConfigured };
+}
+
+export async function sendTestSms(phoneNumber: string, message?: string): Promise<{ success: boolean; message: string }> {
+  return request('POST', `${CHANNELS}/test-sms`, { body: { phoneNumber, message: message || null } });
+}
+
+export async function getSmsTemplates(): Promise<SmsTemplate[]> {
+  return request<SmsTemplate[]>('GET', `${CHANNELS}/templates`);
+}
+
+export async function saveSmsTemplates(templates: { key: string; text: string }[]): Promise<SmsTemplate[]> {
+  return request<SmsTemplate[]>('PUT', `${CHANNELS}/templates`, { body: { templates } });
+}
+
+// ---- LDAP ------------------------------------------------------------------
+
+export interface LdapSettings {
+  enabled: boolean;
+  host: string;
+  port: number;
+  useSsl: boolean;
+  useStartTls: boolean;
+  domain: string;
+  baseDn: string;
+  bindUsername: string;
+  /** Write-only: empty keeps the stored password. Never filled from the server. */
+  bindPassword: string;
+  userSearchBase: string;
+  userFilter: string;
+  connectionTimeoutSeconds: number;
+  trustServerCertificate: boolean;
+  bindPasswordConfigured: boolean;
+}
+
+export interface LdapTestResult { success: boolean; message: string; entriesFound: number | null; elapsedMilliseconds: number; }
+
+function toLdapBody(s: LdapSettings) {
+  const blank = (v: string) => (v.trim() ? v.trim() : null);
+  return {
+    enabled: s.enabled,
+    host: blank(s.host),
+    port: Number(s.port) || 389,
+    useSsl: s.useSsl,
+    useStartTls: s.useStartTls,
+    domain: blank(s.domain),
+    baseDn: blank(s.baseDn),
+    bindUsername: blank(s.bindUsername),
+    bindPassword: s.bindPassword || null,
+    userSearchBase: blank(s.userSearchBase),
+    userFilter: blank(s.userFilter),
+    connectionTimeoutSeconds: Number(s.connectionTimeoutSeconds) || 10,
+    trustServerCertificate: s.trustServerCertificate,
+  };
+}
+
+function fromLdapDto(d: any): LdapSettings {
+  return {
+    enabled: !!d.enabled,
+    host: d.host || '',
+    port: d.port || 389,
+    useSsl: !!d.useSsl,
+    useStartTls: !!d.useStartTls,
+    domain: d.domain || '',
+    baseDn: d.baseDn || '',
+    bindUsername: d.bindUsername || '',
+    bindPassword: '',
+    userSearchBase: d.userSearchBase || '',
+    userFilter: d.userFilter || '',
+    connectionTimeoutSeconds: d.connectionTimeoutSeconds || 10,
+    trustServerCertificate: !!d.trustServerCertificate,
+    bindPasswordConfigured: !!d.bindPasswordConfigured,
+  };
+}
+
+export async function getLdapSettings(): Promise<LdapSettings> {
+  return fromLdapDto(await request('GET', '/api/platform/ldap'));
+}
+
+export async function saveLdapSettings(settings: LdapSettings): Promise<LdapSettings> {
+  return fromLdapDto(await request('PUT', '/api/platform/ldap', { body: toLdapBody(settings) }));
+}
+
+/** Tests the settings as entered (not saved); an empty password uses the stored one. */
+export async function testLdapConnection(settings: LdapSettings): Promise<LdapTestResult> {
+  return request<LdapTestResult>('POST', '/api/platform/ldap/test', { body: toLdapBody(settings) });
+}
+
+/** Changes the signed-in user's own password; the current one is required. */
+export async function changeMyPassword(currentPassword: string, newPassword: string): Promise<void> {
+  await request('PUT', '/api/identity/auth/me/password', { body: { currentPassword, newPassword } });
 }
 
 // ---------------------------------------------------------------------------
@@ -1672,50 +1855,6 @@ export async function fetchUnreadMessageCounts(): Promise<Record<string, number>
   if (!readSession()) return {};
   const counts = await request<{ senderUserId: string; count: number }[]>('GET', `${CHAT}/direct/unread-counts`);
   return Object.fromEntries((counts || []).map((c) => [c.senderUserId, c.count]));
-}
-
-// ---------------------------------------------------------------------------
-// SMS gateway settings (administrators)
-// ---------------------------------------------------------------------------
-
-const CHANNELS = '/api/platform/notification-channels';
-
-export async function fetchNotificationChannelSettings(): Promise<SystemNotificationSettings> {
-  if (!readSession()) {
-    // Signed out: nothing to ask the server; the caller falls back to its local copy.
-    throw new NexusApiError('کاربر وارد سیستم نشده است.', 401);
-  }
-  const s = await request<SystemNotificationSettings>('GET', CHANNELS);
-  return {
-    sms: {
-      enabled: !!s.sms?.enabled,
-      provider: (s.sms?.provider || 'kavenegar') as SystemNotificationSettings['sms']['provider'],
-      apiKey: s.sms?.apiKey || '',
-      lineNumber: s.sms?.lineNumber || '',
-      patternCode: s.sms?.patternCode || '',
-      apiUrl: s.sms?.apiUrl || '',
-    },
-  };
-}
-
-export async function saveNotificationChannelSettings(settings: SystemNotificationSettings): Promise<void> {
-  const blank = (v?: string) => (v && v.trim() ? v.trim() : null);
-  await request('PUT', CHANNELS, {
-    body: {
-      sms: {
-        enabled: !!settings.sms.enabled,
-        provider: settings.sms.provider,
-        apiKey: blank(settings.sms.apiKey),
-        lineNumber: blank(settings.sms.lineNumber),
-        patternCode: blank(settings.sms.patternCode),
-        apiUrl: blank(settings.sms.apiUrl),
-      },
-    },
-  });
-}
-
-export async function testSms(phoneNumber: string, message?: string): Promise<{ success: boolean; message: string }> {
-  return request('POST', `${CHANNELS}/test-sms`, { body: { phoneNumber, message: message || null } });
 }
 
 // ---------------------------------------------------------------------------

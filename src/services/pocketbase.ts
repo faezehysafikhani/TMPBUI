@@ -330,130 +330,6 @@ export async function loginPB(
   }
 }
 
-export async function registerPB(data: {
-  username: string;
-  phoneNumber: string;
-  email?: string;
-  password: string;
-  passwordConfirm: string;
-  name?: string;
-  notifySms?: boolean;
-  theme?: AppTheme;
-  colorPalette?: AppColorPalette;
-  themeMode?: 'light' | 'dark';
-}): Promise<User> {
-  if (NEXUS_API_ENABLED) {
-    const user = await nexusApi.register(data);
-    return { ...user, teams: fetchUserTeamsPB(user.id) };
-  }
-  // PocketBase accounts are keyed by email, so in that mode it stays required.
-  if (!data.email || !data.email.includes('@')) {
-    throw new Error('لطفاً یک ایمیل معتبر وارد نمایید.');
-  }
-  const emailClean = data.email.trim().toLowerCase();
-  const fullName = (data.name || '').trim() || 'کاربر جدید';
-
-  // Sanitize username for PocketBase compatibility (alphanumeric, _, .)
-  let cleanUsername = (data.username || emailClean.split('@')[0] || 'user')
-    .trim()
-    .replace(/[^a-zA-Z0-9_.]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  if (cleanUsername.length < 3) {
-    cleanUsername = 'user_' + Math.random().toString(36).substring(2, 8);
-  }
-
-  const payload: Record<string, any> = {
-    username: cleanUsername,
-    email: emailClean,
-    password: data.password,
-    passwordConfirm: data.passwordConfirm,
-    name: fullName,
-    theme: data.theme || 'default',
-    colorPalette: data.colorPalette || 'indigo',
-    themeMode: data.themeMode || 'light',
-    notifySms: data.notifySms !== undefined ? data.notifySms : true,
-  };
-
-  if (data.phoneNumber) {
-    const cleanPhone = data.phoneNumber.trim();
-    payload.phoneNumber = cleanPhone;
-    payload.phone = cleanPhone;
-    payload.mobile = cleanPhone;
-  }
-  try {
-    // 1. Create user in PocketBase
-    try {
-      await pb.collection('users').create(payload);
-    } catch (createErr1: any) {
-      console.warn('Initial registration attempt failed:', createErr1?.data || createErr1);
-
-      const rawData = createErr1?.data?.data || createErr1?.data || createErr1?.response?.data;
-
-      // If username conflict or invalid username format, append random suffix
-      if (rawData?.username) {
-        cleanUsername = `${cleanUsername.substring(0, 10)}_${Math.random().toString(36).substring(2, 6)}`;
-        payload.username = cleanUsername;
-      }
-
-      // Try again without custom optional fields if custom schema fields caused issue
-      try {
-        await pb.collection('users').create(payload);
-      } catch (createErr2: any) {
-        console.warn('Second attempt failed, retrying with core PocketBase fields...', createErr2?.data || createErr2);
-        
-        const corePayload = {
-          username: cleanUsername,
-          email: emailClean,
-          password: data.password,
-          passwordConfirm: data.passwordConfirm,
-          name: fullName,
-        };
-
-        try {
-          await pb.collection('users').create(corePayload);
-        } catch (createErr3: any) {
-          // If all attempts failed, throw the detailed error
-          throw createErr3 || createErr2 || createErr1;
-        }
-      }
-    }
-
-    // Save mapping for username, email, phone
-    registerIdentityEmailMapping(emailClean, emailClean);
-    registerIdentityEmailMapping(cleanUsername, emailClean);
-    if (data.username) registerIdentityEmailMapping(data.username, emailClean);
-    if (data.phoneNumber) registerIdentityEmailMapping(data.phoneNumber, emailClean);
-
-    // 2. Auto login with email
-    const user = await loginPB(emailClean, data.password);
-
-    // Try to ensure phoneNumber & notification preference are set on user record
-    try {
-      const updateObj: Record<string, any> = {
-        notifySms: data.notifySms !== undefined ? data.notifySms : true,
-      };
-      if (data.phoneNumber) {
-        updateObj.phoneNumber = data.phoneNumber.trim();
-        updateObj.phone = data.phoneNumber.trim();
-        updateObj.mobile = data.phoneNumber.trim();
-      }
-      await pb.collection('users').update(user.id, updateObj);
-    } catch {
-      // Ignore if update fails
-    }
-    user.phoneNumber = data.phoneNumber?.trim() || user.phoneNumber;
-    user.notifySms = data.notifySms !== undefined ? data.notifySms : true;
-
-    return user;
-  } catch (err: any) {
-    const msg = parsePBError(err);
-    console.error('Registration failed:', msg, err);
-    throw new Error(msg);
-  }
-}
-
 export async function requestPasswordResetPB(emailOrUsername: string): Promise<string> {
   if (NEXUS_API_ENABLED) {
     if (!emailOrUsername.trim()) {
@@ -782,7 +658,8 @@ export async function adminCreateUserPB(data: {
     throw new Error('فقط مدیر سیستم (Admin) مجاز به تعریف و مدیریت کاربران می‌باشد.');
   }
   if (NEXUS_API_ENABLED) {
-    return nexusApi.createUser(data);
+    // NexusCore accounts are managed in Settings → User management (nexusApi.adminCreateUser).
+    throw new Error('در حالت NexusCore کاربران از «تنظیمات سامانه ← مدیریت کاربران» مدیریت می‌شوند.');
   }
 
   let newUser: User;
@@ -848,7 +725,8 @@ export async function adminUpdateUserPB(
     throw new Error('فقط مدیر سیستم (Admin) مجاز به ویرایش کاربران می‌باشد.');
   }
   if (NEXUS_API_ENABLED) {
-    return nexusApi.updateUser(userId, updates);
+    // NexusCore accounts are managed in Settings → User management (nexusApi.adminUpdateUser).
+    throw new Error('در حالت NexusCore کاربران از «تنظیمات سامانه ← مدیریت کاربران» مدیریت می‌شوند.');
   }
 
   if (updates.disabled !== undefined) {
@@ -1028,15 +906,9 @@ export function getSystemNotificationSettingsPB(): SystemNotificationSettings {
 
 export async function fetchSystemNotificationSettingsPB(): Promise<SystemNotificationSettings> {
   if (NEXUS_API_ENABLED) {
-    try {
-      const settings = await nexusApi.fetchNotificationChannelSettings();
-      localStorage.setItem(NOTIFICATION_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-      return settings;
-    } catch {
-      // Only administrators (settings.view) may read the gateway settings; everyone else never
-      // needs them, because messages are sent by the server.
-      return getSystemNotificationSettingsPB();
-    }
+    // NexusCore sends SMS itself and the SMS panel reads its own settings; the browser needs
+    // no copy (and the API key is never sent to it).
+    return getSystemNotificationSettingsPB();
   }
   const current = getSystemNotificationSettingsPB();
   const collectionsToTry = ['system_setting', 'system_settings'];
@@ -1076,9 +948,8 @@ export async function fetchSystemNotificationSettingsPB(): Promise<SystemNotific
 
 export async function saveSystemNotificationSettingsPB(settings: SystemNotificationSettings): Promise<void> {
   if (NEXUS_API_ENABLED) {
-    await nexusApi.saveNotificationChannelSettings(settings);
-    localStorage.setItem(NOTIFICATION_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-    return;
+    // Saved from Settings → SMS panel (nexusApi.saveSmsPanelSettings).
+    throw new Error('تنظیمات پیامک در حالت NexusCore از «تنظیمات سامانه ← پنل پیامکی» ذخیره می‌شود.');
   }
   // Always update local cache for immediate feedback
   localStorage.setItem(NOTIFICATION_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
@@ -1148,7 +1019,7 @@ export async function testSmsNotificationPB(phone: string, message?: string): Pr
       return { success: false, message: 'لطفاً شماره تلفن همراه را جهت تست وارد نمایید.' };
     }
     try {
-      return await nexusApi.testSms(phone, message);
+      return await nexusApi.sendTestSms(phone, message);
     } catch (err: any) {
       return { success: false, message: err?.message || 'ارسال پیامک آزمایشی ناموفق بود.' };
     }

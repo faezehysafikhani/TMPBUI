@@ -4,7 +4,6 @@ import { AppTheme, AppColorPalette, User as UserType, WorkTeam } from '../types'
 import { COLOR_PALETTES } from '../utils/theme';
 import { PRESET_AVATARS, compressImageFile } from '../utils/avatars';
 import { readFileAsDataUrl } from '../utils/storage';
-import { AdminUserManagement } from './AdminUserManagement';
 import { WorkTeamManagement } from './WorkTeamManagement';
 
 export type ThemeMode = 'light' | 'dark';
@@ -180,34 +179,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Content Body */}
         <div className="p-6 space-y-4 text-xs sm:text-sm overflow-y-auto">
-
-          {/* Admin User Management Accordion (Only for Admin User - Top Item) */}
-          {currentUser && (currentUser.role === 'admin' || currentUser.username.toLowerCase() === 'admin') && (
-            <div className="border border-amber-300 dark:border-amber-800 rounded-2xl overflow-hidden bg-amber-50/40 dark:bg-amber-950/20">
-              <button
-                type="button"
-                onClick={() => setIsAdminMgmtOpen(!isAdminMgmtOpen)}
-                className="w-full flex items-center justify-between p-4 font-bold text-slate-900 dark:text-slate-100 text-xs hover:bg-amber-100/50 dark:hover:bg-amber-900/40 transition-colors cursor-pointer select-none"
-              >
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span>مدیریت کاربران</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-400">
-                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900 px-2 py-0.5 rounded-lg border border-amber-300 dark:border-amber-800">
-                    پنل مدیر (Admin)
-                  </span>
-                  {isAdminMgmtOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </div>
-              </button>
-
-              {isAdminMgmtOpen && (
-                <div className="p-4 pt-0 border-t border-amber-200/60 dark:border-amber-900/50 animate-in fade-in duration-150 mt-3">
-                  <AdminUserManagement currentUser={currentUser} />
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Accordion Group 0: User Profile & Avatar Selection */}
           {currentUser && (
