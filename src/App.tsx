@@ -50,6 +50,7 @@ import {
   ACTIVE_DATA_SERVER_URL
 } from './services/dataService';
 import { Database, PanelRightOpen } from 'lucide-react';
+import { SESSION_ENDED_EVENT } from './services/nexusApi';
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -286,6 +287,16 @@ export default function App() {
       unsubscribe();
     };
   }, [loadTasks]);
+
+  // The server ended the session (account disabled, tokens revoked): back to sign-in.
+  useEffect(() => {
+    const onSessionEnded = () => {
+      setCurrentUser(null);
+      setIsAuthModalOpen(true);
+    };
+    window.addEventListener(SESSION_ENDED_EVENT, onSessionEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
+  }, []);
 
   // Handle Logout
   const handleLogout = () => {

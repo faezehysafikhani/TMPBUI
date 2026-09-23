@@ -234,6 +234,21 @@ interface StoredSession {
 
 const SESSION_KEY = 'nexuscore_auth_session_v1';
 
+/**
+ * Fired on window when the server no longer accepts the session (account disabled, tokens
+ * revoked or expired), so the UI can go back to the sign-in screen. Not fired by logout().
+ */
+export const SESSION_ENDED_EVENT = 'nexuscore:session-ended';
+
+function endSession(): void {
+  writeSession(null);
+  try {
+    window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
+  } catch {
+    // No window (tests, SSR): nothing to notify.
+  }
+}
+
 function readSession(): StoredSession | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
@@ -284,7 +299,7 @@ async function refreshSession(): Promise<boolean> {
       return true;
     } catch (err) {
       if (err instanceof NexusApiError && (err.httpStatus === 401 || err.httpStatus === 400)) {
-        writeSession(null);
+        endSession();
       }
       return false;
     }
@@ -858,9 +873,13 @@ export async function login(
       },
       auth: false,
       retryOnUnauthorized: false,
-      unauthorizedMessage: 'ورود ناموفق بود! نام کاربری/شماره تلفن یا رمز عبور اشتباه است، یا حساب کاربری غیرفعال شده است.',
+      unauthorizedMessage: 'نام کاربری، شماره تلفن یا رمز عبور صحیح نیست.',
     });
   } catch (err) {
+    // Only sent when the password was right, so it tells nothing to someone guessing.
+    if (err instanceof NexusApiError && err.code === 'account.disabled') {
+      throw new NexusApiError('حساب کاربری شما غیرفعال شده است. لطفاً با مدیر سامانه تماس بگیرید.', err.httpStatus, err.code);
+    }
     if (err instanceof NexusApiError && err.code === 'captcha.required') {
       throw new NexusApiError('برای ادامه، کد امنیتی تصویر را وارد کنید.', err.httpStatus, err.code);
     }
@@ -894,10 +913,14 @@ export async function refreshCurrentUser(): Promise<User | null> {
     const me = await request<CurrentUserResponse>('GET', '/api/identity/auth/me');
     const latest = readSession();
     if (latest) writeSession({ ...latest, user: me.user });
-    return me.user.isActive ? mapUserDto(me.user) : null;
+    if (!me.user.isActive) {
+      endSession();
+      return null;
+    }
+    return mapUserDto(me.user);
   } catch (err) {
     if (err instanceof NexusApiError && err.httpStatus === 401) {
-      writeSession(null);
+      endSession();
       return null;
     }
     console.warn('Could not refresh the current user from NexusCore:', err instanceof Error ? err.message : err);
@@ -905,9 +928,20 @@ export async function refreshCurrentUser(): Promise<User | null> {
   }
 }
 
-/** The backend has no logout/revoke endpoint, so signing out only discards the tokens. */
+/**
+ * Signs out: the refresh token is revoked on the server (POST /auth/logout) and the stored
+ * tokens are discarded at once. The server call is best effort - sign-out never waits for it.
+ */
 export function logout(): void {
+  const refreshToken = readSession()?.refreshToken;
   writeSession(null);
+  if (refreshToken) {
+    request<void>('POST', '/api/identity/auth/logout', {
+      body: { refreshToken },
+      auth: false,
+      retryOnUnauthorized: false,
+    }).catch(() => undefined);
+  }
 }
 
 // ---------------------------------------------------------------------------

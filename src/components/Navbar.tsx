@@ -171,7 +171,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className={`flex items-center gap-1.5 px-3 py-2 ${palette.accentBg} ${palette.accentHover} text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer my-auto`}
               >
                 <LogIn className="w-4 h-4" />
-                <span>ورود / ثبت‌نام</span>
+                <span>ورود</span>
               </button>
             )}
 
