@@ -9,8 +9,11 @@ export type ActiveTab = 'kanban' | 'calendar' | 'overdue' | 'chat' | 'notes' | '
 interface SandwichBarProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
-  onOpenCreateModal: () => void;
+  /** Omitted when the user may not create tasks: the add button is not shown. */
+  onOpenCreateModal?: () => void;
   onOpenSettings?: () => void;
+  /** Whether a section is available to the user (permissions); all are when omitted. */
+  canOpenTab?: (tab: ActiveTab) => boolean;
   overdueCount: number;
   unreadChatCount?: number;
   appColorPalette?: AppColorPalette;
@@ -24,6 +27,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
   overdueCount,
   unreadChatCount = 0,
   appColorPalette = 'indigo',
+  canOpenTab = (_tab: ActiveTab) => true,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
@@ -76,6 +80,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                   </button>
 
                   {/* 2. Personal Notes Icon Button */}
+                  {canOpenTab('notes') && (
                   <button
                     type="button"
                     onClick={() => {
@@ -92,6 +97,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                   >
                     <FileText className="w-5.5 h-5.5" />
                   </button>
+                  )}
 
                 </div>
               )}
@@ -123,6 +129,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
             </div>
 
             {/* Kanban / Card View Button */}
+            {canOpenTab('kanban') && (
             <button
               type="button"
               onClick={() => setActiveTab('kanban')}
@@ -136,9 +143,11 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
               <Kanban className="w-7 h-7 shrink-0" />
               <span className="text-xs hidden sm:inline">کانبان</span>
             </button>
+            )}
           </div>
 
           {/* 2. Calendar View Button */}
+          {canOpenTab('calendar') && (
           <button
             type="button"
             onClick={() => setActiveTab('calendar')}
@@ -152,8 +161,10 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
             <Calendar className="w-7 h-7 shrink-0" />
             <span className="text-xs hidden sm:inline">تقویم</span>
           </button>
+          )}
 
           {/* 3. Central Add Task Plus Button */}
+          {onOpenCreateModal && (
           <button
             type="button"
             onClick={onOpenCreateModal}
@@ -163,8 +174,10 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           >
             <Plus className="w-7.5 h-7.5 sm:w-8.5 sm:h-8.5 stroke-[2.5]" />
           </button>
+          )}
 
           {/* 4. Overdue Tasks Button */}
+          {canOpenTab('overdue') && (
           <button
             type="button"
             onClick={() => setActiveTab('overdue')}
@@ -189,6 +202,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
               </span>
             )}
           </button>
+          )}
 
           {/* 5. Settings Tab Button */}
           <button

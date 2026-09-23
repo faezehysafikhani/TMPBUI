@@ -25,6 +25,7 @@ import {
   Users,
   User as UserIcon
 } from 'lucide-react';
+import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 
 interface DashboardChartsProps {
   tasks: Task[];
@@ -67,13 +68,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
 
   // Helper to check current user's task permissions
   const checkTaskPermissions = (task: Task) => {
-    const isAdmin = !!(
-      currentUser &&
-      (currentUser.isAdmin ||
-        currentUser.role === 'admin' ||
-        currentUser.username?.toLowerCase() === 'admin' ||
-        currentUser.email?.toLowerCase().startsWith('admin@'))
-    );
+    const isAdmin = isTaskAdmin(currentUser);
 
     const isAssignee = !!(
       currentUser &&
@@ -100,8 +95,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       !isAssignee
     );
 
-    const canEditTask = isAdmin || isTaskCreator || isAssignee || isTeamMember || isOwnerByDetails;
-    const canDeleteTask = isAdmin || isTaskCreator || isOwnerByDetails;
+    const canEditTask = (isAdmin || isTaskCreator || isAssignee || isTeamMember || isOwnerByDetails) && can(currentUser, PERMISSIONS.tasksEdit);
+    const canDeleteTask = (isAdmin || isTaskCreator || isOwnerByDetails) && can(currentUser, PERMISSIONS.tasksDelete);
 
     return { canEditTask, canDeleteTask };
   };

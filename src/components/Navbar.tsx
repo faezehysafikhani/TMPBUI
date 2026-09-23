@@ -5,7 +5,8 @@ import { User as UserType, AppTheme, AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 
 interface NavbarProps {
-  onOpenCreateModal: () => void;
+  /** Omitted when the user may not create tasks: the add button is not shown. */
+  onOpenCreateModal?: () => void;
   totalTasks: number;
   completedTasks: number;
   onToggleFilterBar: () => void;
@@ -176,6 +177,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
 
             {/* Add Task Button (Icon Only on Desktop Header) */}
+            {onOpenCreateModal && (
             <button
               type="button"
               onClick={onOpenCreateModal}
@@ -184,6 +186,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Plus className="w-4 h-4" />
             </button>
+            )}
           </div>
 
         </div>

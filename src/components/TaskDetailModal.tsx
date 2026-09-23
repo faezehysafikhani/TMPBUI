@@ -34,6 +34,7 @@ import {
   ExternalLink,
   Loader2,
 } from 'lucide-react';
+import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -128,12 +129,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   }, [task?.id]);
 
-  const isAdmin = !!(
-    currentUser &&
-    (currentUser.role === 'admin' ||
-      currentUser.username.toLowerCase() === 'admin' ||
-      currentUser.email.toLowerCase().startsWith('admin@'))
-  );
+  const isAdmin = isTaskAdmin(currentUser);
 
   const isAssignee = !!(
     currentUser &&
@@ -174,12 +170,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   // Permissions:
   // Status Change: Allowed for Admin, Task Owner, Assignee (if allowStatusUpdateForAssignee is true), or Team Member (ONLY if not auto-calculated)
-  const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee) || isTeamMember) && !isAutoStatusTask;
+  const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee) || isTeamMember) && !isAutoStatusTask && can(currentUser, PERMISSIONS.tasksEdit);
 
   // Edit / Delete: STRICTLY for System Admin or Task Creator / Real Owner.
   // Assignees and Team Members who are NOT the original creator/admin can NEVER edit or delete!
-  const canEditTask = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails;
-  const canDeleteTask = canEditTask;
+  const isOwnerOrTaskAdmin = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails;
+  const canEditTask = isOwnerOrTaskAdmin && can(currentUser, PERMISSIONS.tasksEdit);
+  const canDeleteTask = isOwnerOrTaskAdmin && can(currentUser, PERMISSIONS.tasksDelete);
+  const canComment = can(currentUser, PERMISSIONS.tasksComment);
 
   const statusCfg = STATUSES[currentComputedStatus] || STATUSES.todo;
 
@@ -940,7 +938,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </div>
             )}
 
-            {/* New Comment Input Form with File Upload & Drag & Drop */}
+            {/* New Comment Input Form with File Upload & Drag & Drop (Tasks.Comment) */}
+            {canComment && (
             <form
               onSubmit={handleAddComment}
               onDragOver={(e) => {
@@ -1059,6 +1058,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </button>
               </div>
             </form>
+            )}
 
           </div>
 

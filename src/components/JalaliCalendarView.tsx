@@ -26,6 +26,7 @@ import {
   Check,
   Lock
 } from 'lucide-react';
+import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 
 interface JalaliCalendarViewProps {
   tasks: Task[];
@@ -263,13 +264,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
 
   // Permission calculation helper for a task
   const checkTaskPermissions = (task: Task) => {
-    const isAdmin = !!(
-      currentUser &&
-      (currentUser.isAdmin ||
-        currentUser.role === 'admin' ||
-        currentUser.username?.toLowerCase() === 'admin' ||
-        currentUser.email?.toLowerCase().startsWith('admin@'))
-    );
+    const isAdmin = isTaskAdmin(currentUser);
 
     const isAssignee = !!(
       currentUser &&
@@ -299,10 +294,11 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
 
     const isTaskOwner = isTaskCreator || isOwnerByDetails;
     const allowStatusUpdateForAssignee = task.allowAssigneeStatusUpdate !== false;
-    const canChangeStatus = isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee) || isTeamMember;
+    const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee) || isTeamMember) && can(currentUser, PERMISSIONS.tasksEdit);
 
-    const canEditTask = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails || (isAssignee && allowStatusUpdateForAssignee);
-    const canDeleteTask = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails;
+    const isOwnerOrTaskAdmin = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails;
+    const canEditTask = isOwnerOrTaskAdmin && can(currentUser, PERMISSIONS.tasksEdit);
+    const canDeleteTask = isOwnerOrTaskAdmin && can(currentUser, PERMISSIONS.tasksDelete);
 
     return { canEditTask, canDeleteTask, canChangeStatus };
   };

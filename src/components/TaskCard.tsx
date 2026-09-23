@@ -28,6 +28,7 @@ import {
   Tag,
   GripVertical
 } from 'lucide-react';
+import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 
 interface TaskCardProps {
   task: Task;
@@ -124,12 +125,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
   const overdue = isOverdue(task.dueDate, task.status);
   const daysDiff = getDaysDiff(task.dueDate);
 
-  const isAdmin = !!(
-    currentUser &&
-    (currentUser.role === 'admin' ||
-      currentUser.username.toLowerCase() === 'admin' ||
-      currentUser.email.toLowerCase().startsWith('admin@'))
-  );
+  const isAdmin = isTaskAdmin(currentUser);
 
   const isAssignee = !!(
     currentUser &&
@@ -166,11 +162,12 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
 
   // Permissions:
   // Status Change: Allowed for Admin, Task Owner, Assignee (if allowStatusUpdateForAssignee is true), or Team Member
-  const canChangeStatus = isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee) || isTeamMember;
+  const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee) || isTeamMember) && can(currentUser, PERMISSIONS.tasksEdit);
 
   // Edit Button: Allowed for Admin, Creator/Owner, OR Assignee with status update permission
-  const canEditTask = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails || (isAssignee && allowStatusUpdateForAssignee);
-  const canDeleteTask = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails;
+  // Full edit and delete: owner or task administrator only (the server enforces the same).
+  const canEditTask = (isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails) && can(currentUser, PERMISSIONS.tasksEdit);
+  const canDeleteTask = (isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails) && can(currentUser, PERMISSIONS.tasksDelete);
 
   const commentCount = task.comments?.length || 0;
 

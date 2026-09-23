@@ -3,6 +3,7 @@ import { Task, TaskStatus, STATUSES, Attachment, User } from '../types';
 import { TaskCard } from './TaskCard';
 import { toPersianDigits } from '../utils/helpers';
 import { Plus, Minus, Move } from 'lucide-react';
+import { can, PERMISSIONS } from '../utils/permissions';
 
 interface KanbanColumnProps {
   status: TaskStatus;
@@ -138,6 +139,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-medium mb-2">
                   هیچ فعالیتی در این بخش وجود ندارد
                 </p>
+                {can(currentUser, PERMISSIONS.tasksCreate) && (
                 <button
                   type="button"
                   onClick={() => onOpenCreateForStatus(status)}
@@ -146,6 +148,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
                   <Plus className="w-3.5 h-3.5" />
                   <span>ثبت فعالیت جدید</span>
                 </button>
+                )}
               </div>
             ) : (
               tasks.map((task) => (

@@ -230,6 +230,8 @@ interface StoredSession {
   refreshToken: string;
   accessTokenExpiresAtUtc: string;
   user: UserDto;
+  /** The user's permissions from the last /me answer. */
+  permissions?: string[];
 }
 
 const SESSION_KEY = 'nexuscore_auth_session_v1';
@@ -271,11 +273,14 @@ function writeSession(session: StoredSession | null): void {
 }
 
 function saveAuthResponse(auth: AuthResponse): void {
+  const previous = readSession();
   writeSession({
     accessToken: auth.accessToken,
     refreshToken: auth.refreshToken,
     accessTokenExpiresAtUtc: auth.accessTokenExpiresAtUtc,
     user: auth.user,
+    // A renewed token keeps the known permissions; a new sign-in reads them from /me.
+    permissions: previous?.user?.id === auth.user.id ? previous.permissions : undefined,
   });
 }
 
@@ -895,7 +900,7 @@ export async function login(
 /** Signed-in user from the stored session, without a network call (used on first render). */
 export function getSessionUser(): User | null {
   const session = readSession();
-  return session?.refreshToken && session.user ? mapUserDto(session.user) : null;
+  return session?.refreshToken && session.user ? { ...mapUserDto(session.user), permissions: session.permissions } : null;
 }
 
 export function getSessionTenantId(): string | null {
@@ -912,12 +917,13 @@ export async function refreshCurrentUser(): Promise<User | null> {
   try {
     const me = await request<CurrentUserResponse>('GET', '/api/identity/auth/me');
     const latest = readSession();
-    if (latest) writeSession({ ...latest, user: me.user });
+    const permissions = me.permissions || [];
+    if (latest) writeSession({ ...latest, user: me.user, permissions });
     if (!me.user.isActive) {
       endSession();
       return null;
     }
-    return mapUserDto(me.user);
+    return { ...mapUserDto(me.user), permissions };
   } catch (err) {
     if (err instanceof NexusApiError && err.httpStatus === 401) {
       endSession();

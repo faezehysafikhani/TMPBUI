@@ -28,6 +28,7 @@ import {
   FolderKanban,
   ListChecks,
 } from 'lucide-react';
+import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 
 interface TaskFormModalProps {
   isOpen: boolean;
@@ -127,12 +128,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     (t) => !tags.includes(t) && t.toLowerCase().includes(tagInput.trim().toLowerCase())
   );
 
-  const isAdmin = !!(
-    currentUser &&
-    (currentUser.role === 'admin' ||
-      currentUser.username?.toLowerCase() === 'admin' ||
-      currentUser.email?.toLowerCase().startsWith('admin@'))
-  );
+  const isAdmin = isTaskAdmin(currentUser);
 
   const isAssignee = !!(
     taskToEdit &&
@@ -165,6 +161,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
   const isTaskOwner = isAdmin || isTaskCreator || isOwnerByDetails;
 
+  const canUploadFiles = can(currentUser, PERMISSIONS.tasksUploadFiles);
   const isStatusOnlyEdit = !!(
     taskToEdit &&
     !isTaskOwner &&
@@ -1727,7 +1724,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 )}
               </label>
               
-              {!isStatusOnlyEdit && (
+              {!isStatusOnlyEdit && canUploadFiles && (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -1750,7 +1747,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             />
 
             {/* Drag & Drop Dropzone */}
-            {!isStatusOnlyEdit && (
+            {!isStatusOnlyEdit && canUploadFiles && (
               <div
                 onClick={() => fileInputRef.current?.click()}
                 // Without these the browser handles a dropped file itself: it opens the file in

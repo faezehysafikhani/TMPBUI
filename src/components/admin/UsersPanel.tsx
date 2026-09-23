@@ -10,6 +10,7 @@ import {
   AdminCard, SearchBox, StatusBadge, IconAction, Pagination, Field, inputClass, Notice,
   AdminDialog, PrimaryButton, SecondaryButton, toLatinDigits, useDebounced,
 } from './AdminUi';
+import { moduleTitle } from '../../utils/permissions';
 
 const PAGE_SIZE = 10;
 const NATIONAL_CODE = /^[0-9]{10}$/;
@@ -324,7 +325,7 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
     const term = filter.trim().toLowerCase();
     const groups = new Map<string, UserAccess['permissions']>();
     for (const entry of access?.permissions || []) {
-      if (term && !`${entry.name} ${entry.description} ${entry.module}`.toLowerCase().includes(term)) continue;
+      if (term && !`${entry.name} ${entry.description} ${entry.module} ${moduleTitle(entry.module)}`.toLowerCase().includes(term)) continue;
       groups.set(entry.module, [...(groups.get(entry.module) || []), entry]);
     }
     return [...groups.entries()];
@@ -395,7 +396,7 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
             <div className="space-y-3">
               {modules.map(([module, entries]) => (
                 <div key={module} className="rounded-xl border border-slate-200 dark:border-slate-700">
-                  <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-t-xl text-xs font-extrabold text-slate-600 dark:text-slate-300">{module}</div>
+                  <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-t-xl text-xs font-extrabold text-slate-600 dark:text-slate-300">{moduleTitle(module)}</div>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {entries.map((entry) => (
                       <label key={entry.permissionId} className={`flex items-center justify-between gap-3 px-3 py-2 ${rights.assignPermissions ? 'cursor-pointer' : ''}`}>

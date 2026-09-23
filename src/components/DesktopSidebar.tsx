@@ -20,6 +20,8 @@ interface DesktopSidebarProps {
   currentUser?: UserType | null;
   isOpen?: boolean;
   onToggleOpen?: () => void;
+  /** Whether a section is available to the user (permissions); all are when omitted. */
+  canOpenTab?: (tab: ActiveTab) => boolean;
 }
 
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
@@ -37,6 +39,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   currentUser,
   isOpen = true,
   onToggleOpen,
+  canOpenTab = (_tab: ActiveTab) => true,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
@@ -75,6 +78,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         </div>
 
         {/* 1. Kanban View */}
+        {canOpenTab('kanban') && (
         <button
           type="button"
           onClick={() => setActiveTab('kanban')}
@@ -89,8 +93,10 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             <span className="truncate">بورد کانبان</span>
           </div>
         </button>
+        )}
 
         {/* 2. Jalali Calendar View */}
+        {canOpenTab('calendar') && (
         <button
           type="button"
           onClick={() => setActiveTab('calendar')}
@@ -105,6 +111,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             <span className="truncate">نمای تقویم</span>
           </div>
         </button>
+        )}
 
         {/* 3. Team Chat */}
         <button
@@ -128,6 +135,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         </button>
 
         {/* 4. Personal Notes */}
+        {canOpenTab('notes') && (
         <button
           type="button"
           onClick={() => setActiveTab('notes')}
@@ -142,8 +150,10 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             <span className="truncate">یادداشت شخصی</span>
           </div>
         </button>
+        )}
 
         {/* 5. Overdue Tasks View */}
+        {canOpenTab('overdue') && (
         <button
           type="button"
           onClick={() => setActiveTab('overdue')}
@@ -169,6 +179,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             </span>
           )}
         </button>
+        )}
       </div>
 
 

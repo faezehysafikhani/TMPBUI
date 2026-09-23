@@ -45,6 +45,8 @@ export interface User {
   colorPalette?: AppColorPalette;
   themeMode?: 'light' | 'dark';
   role?: 'admin' | 'user' | string;
+  /** Permission names granted by the server (GET /auth/me). Undefined until known. */
+  permissions?: string[];
   disabled?: boolean;
   teams?: WorkTeam[];
   lastLogin?: string;

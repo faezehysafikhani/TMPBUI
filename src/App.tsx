@@ -51,6 +51,7 @@ import {
 } from './services/dataService';
 import { Database, PanelRightOpen } from 'lucide-react';
 import { SESSION_ENDED_EVENT } from './services/nexusApi';
+import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -298,6 +299,26 @@ export default function App() {
     return () => window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
   }, []);
 
+  // Permissions can change while signed in (the server applies them at once); the menus follow
+  // when the window is focused again.
+  useEffect(() => {
+    const onFocus = async () => {
+      if (!getCurrentUser()) return;
+      const liveUser = await refreshCurrentUserPB();
+      if (liveUser) setCurrentUser((prev) => (prev ? { ...prev, permissions: liveUser.permissions } : prev));
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
+
+  // Route guard: a section the user may not open (e.g. after a permission was withdrawn) is left
+  // for the first one they may.
+  useEffect(() => {
+    if (!canOpenTab(currentUser, activeTab)) setActiveTab(firstAllowedTab(currentUser));
+  }, [currentUser, activeTab]);
+
+  const canCreateTask = can(currentUser, PERMISSIONS.tasksCreate);
+
   // Handle Logout
   const handleLogout = () => {
     logoutPB();
@@ -329,7 +350,7 @@ export default function App() {
   // Handle Save User Profile & Avatar
   const handleSaveProfile = async (updates: { name?: string; username?: string; avatar?: string }) => {
     const updatedUser = await updateUserProfilePB(updates);
-    setCurrentUser(updatedUser);
+    setCurrentUser((prev) => (updatedUser ? { ...updatedUser, permissions: prev?.permissions } : updatedUser));
   };
 
   // Create or Update Task
@@ -670,13 +691,14 @@ export default function App() {
     initialTitle: string = '',
     initialDescription: string = ''
   ) => {
+    if (!can(currentUser, PERMISSIONS.tasksCreate)) return;
     setTaskToEdit(null);
     setInitialStatusForNewTask(status);
     setInitialDueDateForNewTask(isoDate || new Date().toISOString());
     setInitialTitleForNewTask(initialTitle);
     setInitialDescriptionForNewTask(initialDescription);
     setIsFormModalOpen(true);
-  }, []);
+  }, [currentUser]);
 
   // Handler to convert chat messages, activity comments, or personal notes into a new task
   const handleConvertToTask = useCallback((title: string, description?: string) => {
@@ -1131,7 +1153,7 @@ export default function App() {
 
       {/* Top Navbar */}
       <Navbar
-        onOpenCreateModal={() => handleOpenCreateModal('todo')}
+        onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
         totalTasks={visibleTasks.length}
         completedTasks={completedCount}
         onToggleFilterBar={() => setShowFilterBar((prev) => !prev)}
@@ -1170,7 +1192,8 @@ export default function App() {
           <DesktopSidebar
             activeTab={activeTab}
             setActiveTab={handleNavigateTab}
-            onOpenCreateModal={() => handleOpenCreateModal('todo')}
+            onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
+            canOpenTab={(tab) => canOpenTab(currentUser, tab)}
             onOpenSettings={() => handleNavigateTab('settings')}
             onOpenPdfCatalog={() => setIsPdfCatalogOpen(true)}
             onLogout={handleLogout}
@@ -1226,7 +1249,7 @@ export default function App() {
         ) : (
           <>
             {/* Tab 1: Kanban View */}
-            {activeTab === 'kanban' && (
+            {activeTab === 'kanban' && canOpenTab(currentUser, 'kanban') && (
               <div className="space-y-6">
                 <KanbanBoard
                   tasks={filteredTasks}
@@ -1244,12 +1267,12 @@ export default function App() {
             )}
 
             {/* Tab 2: Jalali Calendar View */}
-            {activeTab === 'calendar' && (
+            {activeTab === 'calendar' && canOpenTab(currentUser, 'calendar') && (
               <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
                 <JalaliCalendarView
                   tasks={visibleTasks}
                   currentUser={currentUser}
-                  onOpenCreateForDate={(isoDate) => handleOpenCreateModal('todo', isoDate)}
+                  onOpenCreateForDate={canCreateTask ? (isoDate) => handleOpenCreateModal('todo', isoDate) : undefined}
                   onEditTask={handleOpenEditModal}
                   onDeleteTask={handleDeleteTask}
                   onStatusChange={handleStatusChange}
@@ -1260,7 +1283,7 @@ export default function App() {
             )}
 
             {/* Tab 3: Overdue Tasks View */}
-            {activeTab === 'overdue' && (
+            {activeTab === 'overdue' && canOpenTab(currentUser, 'overdue') && (
               <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
                 <OverdueTasksView
                   tasks={visibleTasks}
@@ -1290,7 +1313,7 @@ export default function App() {
             )}
 
             {/* Tab 5: Personal Notes View */}
-            {activeTab === 'notes' && (
+            {activeTab === 'notes' && canOpenTab(currentUser, 'notes') && (
               <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
                 <PersonalNotesView
                   currentUser={currentUser}
@@ -1474,7 +1497,8 @@ export default function App() {
       <SandwichBar
         activeTab={activeTab}
         setActiveTab={handleNavigateTab}
-        onOpenCreateModal={() => handleOpenCreateModal('todo')}
+        onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
+        canOpenTab={(tab) => canOpenTab(currentUser, tab)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         overdueCount={overdueCount}
         unreadChatCount={totalUnreadChatCount}

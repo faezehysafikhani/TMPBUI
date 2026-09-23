@@ -3,6 +3,7 @@ import { Task, TaskStatus, Attachment, PRIORITIES, User, Priority } from '../typ
 import { isOverdue, toPersianDigits, formatToJalali, getDaysDiff } from '../utils/helpers';
 import { parseDateSafely } from '../utils/jalali';
 import { AlertCircle, AlertTriangle, CheckCircle2, Calendar, MessageSquare, Edit2, Trash2, ArrowDownUp } from 'lucide-react';
+import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 
 interface OverdueTasksViewProps {
   tasks: Task[];
@@ -33,7 +34,7 @@ interface OverdueTaskRowProps {
   setDeletingTaskId: (taskId: string) => void;
   onViewDetails?: (task: Task) => void;
   onCompleteItem: (item: OverdueTaskItem) => void;
-  checkTaskPermissions: (task: Task) => { canEditTask: boolean; canDeleteTask: boolean };
+  checkTaskPermissions: (task: Task) => { canEditTask: boolean; canDeleteTask: boolean; canCompleteTask: boolean };
 }
 
 const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
@@ -48,7 +49,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
   const parent = item.parentTask;
   const priorityCfg = PRIORITIES[item.priority] || PRIORITIES.medium;
   const commentCount = parent.comments?.length || 0;
-  const { canEditTask, canDeleteTask } = checkTaskPermissions(parent);
+  const { canEditTask, canDeleteTask, canCompleteTask } = checkTaskPermissions(parent);
 
   const daysDiffInfo = getDaysDiff(item.dueDate);
   const delayDays = daysDiffInfo.isPast ? Math.abs(daysDiffInfo.days) : 0;
@@ -100,7 +101,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
   const handlePointerEnd = () => {
     if (isDragging) {
       if (dragX <= -50) {
-        if (canEditTask) {
+        if (canCompleteTask) {
           setIsCompletedAnim(true);
           setTimeout(() => {
             onCompleteItem(item);
@@ -227,7 +228,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
         {/* Actions Column */}
         <div className="col-span-4 sm:col-span-4 md:col-span-3 flex items-center justify-end gap-1.5 pl-1 shrink-0">
           {/* Complete Button (Mark as finished) */}
-          {canEditTask && (
+          {canCompleteTask && (
             <button
               type="button"
               onClick={(e) => {
@@ -407,13 +408,7 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
 
   // Permission calculation helper for a task
   const checkTaskPermissions = (task: Task) => {
-    const isAdmin = !!(
-      currentUser &&
-      (currentUser.isAdmin ||
-        currentUser.role === 'admin' ||
-        currentUser.username?.toLowerCase() === 'admin' ||
-        currentUser.email?.toLowerCase().startsWith('admin@'))
-    );
+    const isAdmin = isTaskAdmin(currentUser);
 
     const isAssignee = !!(
       currentUser &&
@@ -442,10 +437,13 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
     );
 
     const allowStatusUpdateForAssignee = task.allowAssigneeStatusUpdate !== false;
-    const canEditTask = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails || (isAssignee && allowStatusUpdateForAssignee);
-    const canDeleteTask = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails;
+    const isOwnerOrTaskAdmin = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails;
+    // Completing is a status change, open to the assignee when the owner allows it.
+    const canCompleteTask = (isOwnerOrTaskAdmin || (isAssignee && allowStatusUpdateForAssignee)) && can(currentUser, PERMISSIONS.tasksEdit);
+    const canEditTask = isOwnerOrTaskAdmin && can(currentUser, PERMISSIONS.tasksEdit);
+    const canDeleteTask = isOwnerOrTaskAdmin && can(currentUser, PERMISSIONS.tasksDelete);
 
-    return { canEditTask, canDeleteTask };
+    return { canEditTask, canDeleteTask, canCompleteTask };
   };
 
   const handleCompleteItem = (item: OverdueTaskItem) => {
