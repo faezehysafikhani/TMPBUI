@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { KeyRound, Lock, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff, ShieldCheck, X } from 'lucide-react';
 import { confirmPasswordResetPB } from '../services/dataService';
+import { userErrorMessage } from '../utils/errorMessages';
 
 interface ResetPasswordModalProps {
   isOpen: boolean;
@@ -36,7 +37,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
     setErrorMsg(null);
 
     if (!token.trim()) {
-      setErrorMsg('لطفاً توکن بازیابی یا کد ارسال شده به ایمیل را وارد نمایید.');
+      setErrorMsg('لطفاً توکن بازیابی رمز عبور را وارد نمایید.');
       return;
     }
 
@@ -61,7 +62,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
         window.history.replaceState({}, document.title, cleanUrl);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'تغییر رمز عبور با خطا مواجه شد. ممکن است توکن منقضی شده باشد.');
+      setErrorMsg(userErrorMessage(err, 'تغییر رمز عبور با خطا مواجه شد. ممکن است توکن منقضی شده باشد.'));
     } finally {
       setIsLoading(false);
     }
@@ -140,7 +141,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
                   type="text"
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
-                  placeholder="توکن دریافت شده از لینک ایمیل"
+                  placeholder="توکن بازیابی رمز عبور"
                   className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono dir-ltr"
                   required
                 />

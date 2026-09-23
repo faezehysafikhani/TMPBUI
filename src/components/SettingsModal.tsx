@@ -5,6 +5,7 @@ import { COLOR_PALETTES } from '../utils/theme';
 import { PRESET_AVATARS, compressImageFile } from '../utils/avatars';
 import { readFileAsDataUrl } from '../utils/storage';
 import { WorkTeamManagement } from './WorkTeamManagement';
+import { userErrorMessage } from '../utils/errorMessages';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -128,7 +129,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     } catch (err: any) {
       console.error('Failed to process custom avatar:', err);
-      setProfileMsg({ type: 'error', text: err.message || 'بارگذاری یا فشرده‌سازی تصویر با خطا مواجه شد.' });
+      setProfileMsg({ type: 'error', text: userErrorMessage(err, 'بارگذاری یا فشرده‌سازی تصویر با خطا مواجه شد.') });
     }
   };
 
@@ -147,7 +148,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       });
       setProfileMsg({ type: 'success', text: 'تغییرات پروفایل، شماره همراه و تنظیمات اطلاع‌رسانی با موفقیت ذخیره شد 🎉' });
     } catch (err: any) {
-      setProfileMsg({ type: 'error', text: err.message || 'خطا در ذخیره‌سازی پروفایل در دیتابیس.' });
+      setProfileMsg({ type: 'error', text: userErrorMessage(err, 'خطا در ذخیره‌سازی پروفایل در دیتابیس.') });
     } finally {
       setIsSavingProfile(false);
     }

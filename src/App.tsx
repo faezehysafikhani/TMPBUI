@@ -52,6 +52,7 @@ import {
 import { Database, PanelRightOpen } from 'lucide-react';
 import { SESSION_ENDED_EVENT } from './services/nexusApi';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
+import { userErrorMessage } from './utils/errorMessages';
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -249,13 +250,7 @@ export default function App() {
       setTasks(processed);
     } catch (error: any) {
       console.error('Error connecting to database:', error);
-      let errMsg = 'خطا در برقراری ارتباط با پایگاه داده.';
-      if (error?.status === 404) {
-        errMsg = 'کالکشن tasks در سرور یافت نشد. لطفاً ساختار کالکشن را طبق راهنما ایجاد و فعال فرمایید.';
-      } else if (error?.status === 403) {
-        errMsg = 'دسترسی غیرمجاز به کالکشن tasks. برای پشتیبانی از کاربران، قوانین API Rules را طبق راهنما تنظیم نمایید.';
-      }
-      setPbError(errMsg);
+      setPbError(userErrorMessage(error, 'دریافت فعالیت‌ها از سرور انجام نشد. لطفاً دوباره تلاش کنید.'));
     } finally {
       setIsLoading(false);
       setIsSyncing(false);
@@ -489,7 +484,7 @@ export default function App() {
       setPbError(null);
     } catch (err: any) {
       console.error('Error saving task:', err);
-      const errMsg = err?.message || 'خطا در ذخیره‌سازی فعالیت';
+      const errMsg = userErrorMessage(err, 'خطا در ذخیره‌سازی فعالیت');
       setPbError(errMsg);
       alert(`خطا در ذخیره‌سازی:\n${errMsg}`);
       loadTasks(false);
@@ -523,7 +518,7 @@ export default function App() {
       setPbError(null);
     } catch (err: any) {
       console.error('Error deleting task:', err);
-      const errMsg = err?.message || 'خطا در حذف فعالیت.';
+      const errMsg = userErrorMessage(err, 'خطا در حذف فعالیت.');
       setPbError(errMsg);
       alert(errMsg);
       loadTasks(false);
@@ -621,7 +616,7 @@ export default function App() {
       }
     } catch (err: any) {
       console.error('Error updating task status:', err);
-      const errMsg = err?.message || 'خطا در تغییر وضعیت.';
+      const errMsg = userErrorMessage(err, 'خطا در تغییر وضعیت.');
       setPbError(errMsg);
       loadTasks(false);
     }
@@ -1217,7 +1212,7 @@ export default function App() {
             <div className="flex items-start gap-3">
               <Database className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div className="space-y-1 text-xs">
-                <h4 className="font-bold text-sm text-amber-800 dark:text-amber-300">خطا در ارتباط با پایگاه داده ({ACTIVE_DATA_SERVER_URL})</h4>
+                <h4 className="font-bold text-sm text-amber-800 dark:text-amber-300">خطا در انجام عملیات</h4>
                 <p className="leading-relaxed">{pbError}</p>
               </div>
             </div>

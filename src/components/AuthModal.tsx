@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { LogIn, KeyRound, User as UserIcon, AlertCircle, X, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Mail, RefreshCw, ShieldCheck } from 'lucide-react';
 import { AppTheme } from '../types';
-import { loginPB, requestPasswordResetPB } from '../services/dataService';
+import { confirmPasswordResetPB, loginPB, requestPasswordResetPB, verifyPasswordResetCodePB } from '../services/dataService';
+import { userErrorMessage } from '../utils/errorMessages';
 import { CAPTCHA_ERROR_CODES, LoginCaptcha, NexusApiError, requestLoginCaptcha } from '../services/nexusApi';
 
 interface AuthModalProps {
@@ -37,9 +38,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [captchaAnswer, setCaptchaAnswer] = useState('');
   const [captchaLoading, setCaptchaLoading] = useState(false);
 
-  // Forgot Password fields
+  // Forgot Password: identifier -> SMS code -> new password. The server checks the code; the
+  // token it returns for the last step is kept in memory only.
   const [forgotInput, setForgotInput] = useState('');
   const [forgotSuccessMsg, setForgotSuccessMsg] = useState<string | null>(null);
+  const [forgotStep, setForgotStep] = useState<'request' | 'code' | 'password'>('request');
+  const [forgotInfo, setForgotInfo] = useState<string | null>(null);
+  const [resetCode, setResetCode] = useState('');
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -59,7 +67,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setCaptcha(await requestLoginCaptcha());
     } catch (err: any) {
       setCaptcha(null);
-      setErrorMsg(err?.message || 'دریافت کد امنیتی ممکن نشد. لطفاً دوباره تلاش کنید.');
+      setErrorMsg(userErrorMessage(err, 'دریافت کد امنیتی ممکن نشد. لطفاً دوباره تلاش کنید.'));
     } finally {
       setCaptchaLoading(false);
     }
@@ -92,7 +100,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onSuccess();
       if (canClose) onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'ورود ناموفق بود. نام کاربری/شماره تلفن یا رمز عبور اشتباه است.');
+      setErrorMsg(userErrorMessage(err, 'ورود ناموفق بود. نام کاربری/شماره تلفن یا رمز عبور اشتباه است.'));
       // The server wants a CAPTCHA for the next attempt, or the one just sent is used up.
       const code = err instanceof NexusApiError ? err.code : undefined;
       if ((code && CAPTCHA_ERROR_CODES.includes(code)) || captcha) {
@@ -103,8 +111,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const resetForgotFlow = () => {
+    setForgotStep('request');
+    setForgotInfo(null);
+    setResetCode('');
+    setResetToken(null);
+    setNewPassword('');
+    setNewPasswordConfirm('');
+  };
+
+  const backToLogin = () => {
+    setMode('login');
+    setErrorMsg(null);
+    setForgotSuccessMsg(null);
+    resetForgotFlow();
+  };
+
+  const handleForgotPassword = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setErrorMsg(null);
     setForgotSuccessMsg(null);
 
@@ -115,11 +139,53 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setIsLoading(true);
     try {
-      await requestPasswordResetPB(forgotInput);
-      // Same text whether or not the account exists (the server does not say either).
-      setForgotSuccessMsg('اگر حسابی با این مشخصات وجود داشته باشد و ایمیل برای آن ثبت شده باشد، لینک بازنشانی رمز عبور به آن ایمیل ارسال شد. صندوق ورودی و پوشه اسپم (Spam) را بررسی کنید.');
-    } catch (err: any) {
-      setErrorMsg(err.message || 'خطا در ارسال درخواست بازنشانی رمز عبور.');
+      // Same answer whether or not the account exists (the server does not say either).
+      setForgotInfo(await requestPasswordResetPB(forgotInput));
+      setResetCode('');
+      setForgotStep('code');
+    } catch (err: unknown) {
+      setErrorMsg(userErrorMessage(err, 'ارسال کد بازیابی انجام نشد. لطفاً دوباره تلاش کنید.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    if (!resetCode.trim()) {
+      setErrorMsg('لطفاً کد تأیید پیامک‌شده را وارد کنید.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      setResetToken(await verifyPasswordResetCodePB(forgotInput, resetCode));
+      setForgotStep('password');
+    } catch (err: unknown) {
+      setErrorMsg(userErrorMessage(err, 'بررسی کد تأیید انجام نشد. لطفاً دوباره تلاش کنید.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    if (!resetToken) {
+      resetForgotFlow();
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await confirmPasswordResetPB(resetToken, newPassword, newPasswordConfirm);
+      resetForgotFlow();
+      setForgotSuccessMsg('رمز عبور شما با موفقیت تغییر کرد. اکنون با رمز جدید وارد شوید.');
+    } catch (err: unknown) {
+      const code = err instanceof NexusApiError ? err.code : undefined;
+      if (code === 'reset_token.invalid') resetForgotFlow();
+      setErrorMsg(userErrorMessage(err, 'ثبت رمز عبور جدید انجام نشد. لطفاً دوباره تلاش کنید.'));
     } finally {
       setIsLoading(false);
     }
@@ -328,21 +394,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode('login');
-                      setErrorMsg(null);
-                      setForgotSuccessMsg(null);
-                    }}
+                    onClick={backToLogin}
                     className="w-full mt-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2"
                   >
                     <LogIn className="w-3.5 h-3.5" />
                     <span>بازگشت به صفحه ورود</span>
                   </button>
                 </div>
-              ) : (
+              ) : forgotStep === 'request' ? (
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    نام کاربری یا شماره تلفن همراه ثبت‌شده را وارد نمایید. لینک بازنشانی رمز عبور به ایمیل ثبت‌شده برای حساب شما ارسال خواهد شد.
+                    نام کاربری یا شماره تلفن همراه ثبت‌شده را وارد نمایید. کد تأیید به شماره تلفن همراه ثبت‌شده برای حساب شما پیامک خواهد شد.
                   </p>
 
                   <div>
@@ -358,7 +420,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
                         required
                       />
-                      <Mail className="w-4 h-4 absolute right-3 top-3 text-slate-400" />
+                      <UserIcon className="w-4 h-4 absolute right-3 top-3 text-slate-400" />
                     </div>
                   </div>
 
@@ -370,42 +432,153 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     {isLoading ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>در حال ارسال لینک...</span>
+                        <span>در حال ارسال کد...</span>
                       </>
                     ) : (
                       <>
-                        <Mail className="w-4 h-4" />
-                        <span>ارسال لینک بازنشانی رمز عبور</span>
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>ارسال کد تأیید</span>
                       </>
                     )}
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode('login');
-                      setErrorMsg(null);
-                    }}
+                    onClick={backToLogin}
                     className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <ArrowRight className="w-3.5 h-3.5" />
                     <span>انصراف و بازگشت به ورود</span>
                   </button>
-
-                  {onOpenResetWithToken && (
-                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setErrorMsg(null);
-                          onOpenResetWithToken();
-                        }}
-                        className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
-                      >
-                        توکن یا کد بازیابی دریافت کرده‌اید؟ تعیین رمز عبور جدید
-                      </button>
+                </form>
+              ) : forgotStep === 'code' ? (
+                <form onSubmit={handleVerifyCode} className="space-y-4">
+                  {forgotInfo && (
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-xs text-emerald-800 dark:text-emerald-200 flex items-start gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                      <p className="leading-relaxed font-medium">{forgotInfo}</p>
                     </div>
                   )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      کد تأیید پیامک‌شده
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={resetCode}
+                        onChange={(e) => setResetCode(e.target.value)}
+                        placeholder={'مثلاً: ۱۲۳۴۵۶'}
+                        className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
+                        required
+                      />
+                      <KeyRound className="w-4 h-4 absolute right-3 top-3 text-slate-400" />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>در حال بررسی...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>بررسی کد</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={() => handleForgotPassword()}
+                    className="w-full py-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>ارسال مجدد کد</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={backToLogin}
+                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>انصراف و بازگشت به ورود</span>
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleSetNewPassword} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      رمز عبور جدید
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder={'حداقل ۸ کاراکتر'}
+                        className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
+                        required
+                      />
+                      <KeyRound className="w-4 h-4 absolute right-3 top-3 text-slate-400" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      تکرار رمز عبور جدید
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={newPasswordConfirm}
+                        onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                        className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
+                        required
+                      />
+                      <KeyRound className="w-4 h-4 absolute right-3 top-3 text-slate-400" />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>در حال ثبت...</span>
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="w-4 h-4" />
+                        <span>ثبت رمز عبور جدید</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={backToLogin}
+                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>انصراف و بازگشت به ورود</span>
+                  </button>
                 </form>
               )}
             </div>

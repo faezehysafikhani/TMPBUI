@@ -22,11 +22,15 @@ export async function loginPB(
     return { ...user, teams: fetchUserTeamsPB(user.id) };
 }
 
-export async function requestPasswordResetPB(emailOrUsername: string): Promise<string> {
-  if (!emailOrUsername.trim()) {
-      throw new Error('لطفاً ایمیل یا نام کاربری خود را وارد نمایید.');
+export async function requestPasswordResetPB(identifier: string): Promise<string> {
+  if (!identifier.trim()) {
+      throw new Error('لطفاً نام کاربری یا شماره تلفن همراه خود را وارد نمایید.');
     }
-    return nexusApi.requestPasswordReset(emailOrUsername);
+    return (await nexusApi.requestPasswordReset(identifier)).message;
+}
+
+export async function verifyPasswordResetCodePB(identifier: string, code: string): Promise<string> {
+  return nexusApi.verifyPasswordResetCode(identifier, code);
 }
 
 export async function confirmPasswordResetPB(

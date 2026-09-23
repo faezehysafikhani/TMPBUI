@@ -4,6 +4,7 @@ import { LoginHistoryEntry, listLoginHistory } from '../../services/nexusApi';
 import { parseISOToJalali } from '../../utils/jalali';
 import { toPersianDigits } from '../../utils/helpers';
 import { AdminCard, SearchBox, StatusBadge, Pagination, Notice, BadgeTone, useDebounced } from './AdminUi';
+import { userErrorMessage } from '../../utils/errorMessages';
 
 const PAGE_SIZE = 15;
 
@@ -52,7 +53,7 @@ export const LoginHistoryPanel: React.FC = () => {
       setRows(result.items);
       setTotal(result.totalCount);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'دریافت تاریخچه ورود ممکن نشد.');
+      setError(userErrorMessage(err, 'دریافت تاریخچه ورود ممکن نشد.'));
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,7 @@ import { UsersPanel } from './UsersPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
 import { LdapPanel } from './LdapPanel';
 import { SmsPanel } from './SmsPanel';
+import { userErrorMessage } from '../../utils/errorMessages';
 
 type MainTab = 'general' | 'sms' | 'users';
 type UsersTab = 'list' | 'history' | 'ldap';
@@ -74,7 +75,7 @@ export const ChangePasswordCard: React.FC = () => {
       setCurrent(''); setNext(''); setRepeat('');
       setMessage({ type: 'success', text: 'رمز عبور شما تغییر کرد.' });
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'تغییر رمز عبور انجام نشد.' });
+      setMessage({ type: 'error', text: userErrorMessage(err, 'تغییر رمز عبور انجام نشد.') });
     } finally {
       setBusy(false);
     }

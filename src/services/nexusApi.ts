@@ -32,6 +32,7 @@ import {
 } from '../types';
 import { iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import { NETWORK_ERROR, TIMEOUT_ERROR, persianApiMessage } from '../utils/errorMessages';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -359,34 +360,15 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
  * The backend answers failures with RFC 7807 ProblemDetails: { title: <error code>,
  * detail: <message>, status } (NexusCore.Application/Common/EndpointResults.cs). Policy
  * failures (403) and authentication failures from the JWT middleware have an empty body.
+ * See utils/errorMessages.ts: never English, never internals.
  */
 function toApiError(status: number, body: any, unauthorizedMessage?: string): NexusApiError {
   const detail: string = (body && (body.detail || body.message)) || '';
   const code: string | undefined = body?.title;
-
-  switch (status) {
-    case 400:
-      return new NexusApiError(`خطا در اطلاعات ورودی: ${detail || 'درخواست نامعتبر است.'}`, status, code);
-    case 401:
-      return new NexusApiError(
-        unauthorizedMessage || 'نشست کاربری شما منقضی شده است. لطفاً دوباره وارد سیستم شوید.',
-        status,
-        code
-      );
-    case 403:
-      return new NexusApiError('دسترسی غیرمجاز: حساب کاربری شما مجوز لازم برای این عملیات را ندارد.', status, code);
-    case 429:
-      return new NexusApiError('تعداد تلاش‌ها بیش از حد مجاز است. لطفاً چند دقیقه بعد دوباره تلاش کنید.', status, code);
-    case 404:
-      return new NexusApiError(`مورد درخواستی در سرور یافت نشد.${detail ? ` (${detail})` : ''}`, status, code);
-    case 409:
-      return new NexusApiError(`تداخل اطلاعات: ${detail || 'این مورد قبلاً ثبت شده است.'}`, status, code);
-    default:
-      if (status >= 500) {
-        return new NexusApiError('خطای داخلی در سرور NexusCore رخ داد. لطفاً بعداً دوباره تلاش کنید.', status, code);
-      }
-      return new NexusApiError(detail || `خطای ارتباط با سرور (کد ${status})`, status, code);
+  if (status === 401 && unauthorizedMessage) {
+    return new NexusApiError(unauthorizedMessage, status, code);
   }
+  return new NexusApiError(persianApiMessage(status, code, detail), status, code);
 }
 
 async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
@@ -413,9 +395,9 @@ async function request<T>(method: string, path: string, options: RequestOptions 
     });
   } catch (err: any) {
     if (err?.name === 'AbortError') {
-      throw new NexusApiError('زمان انتظار برای پاسخ سرور NexusCore به پایان رسید.', 0);
+      throw new NexusApiError(TIMEOUT_ERROR, 0);
     }
-    throw new NexusApiError('ارتباط با سرور NexusCore برقرار نشد. آدرس سرور و وضعیت شبکه را بررسی کنید.', 0);
+    throw new NexusApiError(NETWORK_ERROR, 0);
   } finally {
     clearTimeout(timer);
   }
@@ -1431,15 +1413,32 @@ function updateSessionUser(user: UserDto): void {
  * Emails a reset link to the account with this username or mobile number (to its email address,
  * if it has one). The answer is the same whether or not such an account exists.
  */
-export async function requestPasswordReset(identifier: string): Promise<string> {
-  await request('POST', '/api/identity/auth/forgot-password', {
+/**
+ * Password recovery, step 1: the server sends a one-time code by SMS to the account's mobile
+ * number. The answer is the same whether or not an account matches.
+ */
+export async function requestPasswordReset(identifier: string): Promise<{ message: string; codeLifetimeSeconds: number }> {
+  return request('POST', '/api/identity/auth/forgot-password', {
     auth: false,
     retryOnUnauthorized: false,
     body: { identifier: identifier.trim(), tenantSlug: NEXUS_TENANT_SLUG || null },
   });
-  return identifier.trim();
 }
 
+/**
+ * Step 2: the server checks the code (only the server can) and answers with a short-lived token
+ * for step 3. The token is kept in memory only, never stored.
+ */
+export async function verifyPasswordResetCode(identifier: string, code: string): Promise<string> {
+  const result = await request<{ resetToken: string; expiresAtUtc: string }>('POST', '/api/identity/auth/forgot-password/verify', {
+    auth: false,
+    retryOnUnauthorized: false,
+    body: { identifier: identifier.trim(), code: code.trim(), tenantSlug: NEXUS_TENANT_SLUG || null },
+  });
+  return result.resetToken;
+}
+
+/** Step 3: the new password, with the token from step 2. */
 export async function confirmPasswordReset(token: string, newPassword: string): Promise<void> {
   await request('POST', '/api/identity/auth/reset-password', {
     auth: false,

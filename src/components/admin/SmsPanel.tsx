@@ -5,6 +5,7 @@ import {
   getSmsPanelSettings, getSmsProviders, getSmsTemplates, saveSmsPanelSettings, saveSmsTemplates, sendTestSms,
 } from '../../services/nexusApi';
 import { AdminCard, Field, inputClass, Toggle, Notice, PrimaryButton, SecondaryButton, StatusBadge, toLatinDigits } from './AdminUi';
+import { userErrorMessage } from '../../utils/errorMessages';
 
 /** The SMS panel (پنل پیامکی): provider settings, the system's SMS texts and a test message. */
 export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ canUpdate, canTest }) => {
@@ -20,7 +21,7 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
   useEffect(() => {
     Promise.all([getSmsProviders(), getSmsPanelSettings(), getSmsTemplates()])
       .then(([p, s, t]) => { setProviders(p); setSettings(s); setTemplates(t); })
-      .catch((err) => setLoadError(err?.message || 'دریافت تنظیمات پنل پیامکی ممکن نشد.'));
+      .catch((err) => setLoadError(userErrorMessage(err, 'دریافت تنظیمات پنل پیامکی ممکن نشد.')));
   }, []);
 
   if (!settings) {
@@ -56,7 +57,7 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
     try {
       if (await saveAll()) setMessage({ type: 'success', text: 'تنظیمات و متن پیامک‌ها ذخیره شد.' });
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'ذخیره تنظیمات انجام نشد.' });
+      setMessage({ type: 'error', text: userErrorMessage(err, 'ذخیره تنظیمات انجام نشد.') });
     } finally {
       setBusy(null);
     }
@@ -74,7 +75,7 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
       const result = await sendTestSms(testPhone.trim(), testMessage.trim() || undefined);
       setMessage({ type: result.success ? 'success' : 'error', text: result.message });
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'ارسال پیامک آزمایشی انجام نشد.' });
+      setMessage({ type: 'error', text: userErrorMessage(err, 'ارسال پیامک آزمایشی انجام نشد.') });
     } finally {
       setBusy(null);
     }

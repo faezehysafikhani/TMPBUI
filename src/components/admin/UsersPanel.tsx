@@ -11,6 +11,7 @@ import {
   AdminDialog, PrimaryButton, SecondaryButton, toLatinDigits, useDebounced,
 } from './AdminUi';
 import { moduleTitle } from '../../utils/permissions';
+import { userErrorMessage } from '../../utils/errorMessages';
 
 const PAGE_SIZE = 10;
 const NATIONAL_CODE = /^[0-9]{10}$/;
@@ -28,7 +29,7 @@ const ROLE_TITLES: Record<string, string> = { Administrator: 'مدیر سیست�
 const roleTitle = (name: string) => ROLE_TITLES[name] || name;
 
 function errorText(err: unknown, fallback: string): string {
-  return err instanceof Error && err.message ? err.message : fallback;
+  return userErrorMessage(err, fallback);
 }
 
 export const UsersPanel: React.FC<{ currentUserId: string; rights: UserAdminRights }> = ({ currentUserId, rights }) => {
@@ -243,9 +244,7 @@ const UserFormDialog: React.FC<{
         onSaved(`مشخصات «${form.firstName} ${form.lastName}» ذخیره شد.`);
       }
     } catch (err) {
-      setError(err instanceof NexusApiError && err.httpStatus === 409
-        ? err.message.replace('تداخل اطلاعات: ', 'این مشخصات تکراری است: ')
-        : errorText(err, 'ذخیره کاربر انجام نشد.'));
+      setError(errorText(err, 'ذخیره کاربر انجام نشد.'));
     } finally {
       setSaving(false);
     }

@@ -35,6 +35,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
+import { userErrorMessage } from '../utils/errorMessages';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -312,7 +313,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const previousAttachments = commentsList.find((c) => c.id === commentId)?.attachments || [];
     // Stored on the server when there is one; a failure is reported and the list reloaded.
     updateTaskCommentPB(commentId, editingCommentText.trim(), editingCommentAttachments, previousAttachments).catch((err) => {
-      alert(err?.message || 'خطا در ذخیره ویرایش نظر');
+      alert(userErrorMessage(err, 'خطا در ذخیره ویرایش نظر'));
       fetchCommentsForTaskPB(task.id).then((fresh) => setCommentsList(fresh)).catch(() => {});
     });
     const updatedComments = commentsList.map((c) => {

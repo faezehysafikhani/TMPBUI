@@ -3,6 +3,7 @@ import { Loader2, PlugZap, Save } from 'lucide-react';
 import { LdapSettings, LdapTestResult, getLdapSettings, saveLdapSettings, testLdapConnection } from '../../services/nexusApi';
 import { toPersianDigits } from '../../utils/helpers';
 import { AdminCard, Field, inputClass, Toggle, Notice, PrimaryButton, SecondaryButton, toLatinDigits } from './AdminUi';
+import { userErrorMessage } from '../../utils/errorMessages';
 
 export const LdapPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ canUpdate, canTest }) => {
   const [settings, setSettings] = useState<LdapSettings | null>(null);
@@ -12,7 +13,7 @@ export const LdapPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ 
   const [testResult, setTestResult] = useState<LdapTestResult | null>(null);
 
   useEffect(() => {
-    getLdapSettings().then(setSettings).catch((err) => setMessage({ type: 'error', text: err?.message || 'دریافت تنظیمات LDAP ممکن نشد.' }));
+    getLdapSettings().then(setSettings).catch((err) => setMessage({ type: 'error', text: userErrorMessage(err, 'دریافت تنظیمات LDAP ممکن نشد.') }));
   }, []);
 
   if (!settings) {
@@ -33,7 +34,7 @@ export const LdapPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ 
       setSettings(await saveLdapSettings(settings));
       setMessage({ type: 'success', text: 'تنظیمات LDAP ذخیره شد.' });
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'ذخیره تنظیمات LDAP انجام نشد.' });
+      setMessage({ type: 'error', text: userErrorMessage(err, 'ذخیره تنظیمات LDAP انجام نشد.') });
     } finally {
       setSaving(false);
     }
@@ -46,7 +47,7 @@ export const LdapPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ 
     try {
       setTestResult(await testLdapConnection(settings));
     } catch (err: any) {
-      setMessage({ type: 'error', text: err?.message || 'تست اتصال انجام نشد.' });
+      setMessage({ type: 'error', text: userErrorMessage(err, 'تست اتصال انجام نشد.') });
     } finally {
       setTesting(false);
     }
