@@ -1030,9 +1030,21 @@ async function fetchComments(taskId: string): Promise<TaskComment[]> {
   return (await Promise.all((items || []).map(mapCommentWithFiles))).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
+/** The creation entry this app writes itself, with the assignees in its text. */
+export const TASK_CREATED_ACTION = 'ثبت و ایجاد فعالیت جدید';
+
+/**
+ * The server records "Task created" (details: just the title) on its own, and this app adds its
+ * fuller creation entry right after. Both are the same event, so when the fuller one exists the
+ * server's short one is left out - otherwise the history and the bell show the creation twice.
+ */
+export function withoutDuplicateCreation<T extends { action: string }>(items: T[]): T[] {
+  return items.some((a) => a.action === TASK_CREATED_ACTION) ? items.filter((a) => a.action !== 'Task created') : items;
+}
+
 async function fetchActivity(taskId: string): Promise<TaskLog[]> {
   const items = await request<TaskActivityDto[]>('GET', `${TASKS}/${taskId}/activity`);
-  return (items || []).map(mapActivity).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return withoutDuplicateCreation(items || []).map(mapActivity).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 /**
@@ -1633,6 +1645,12 @@ export interface UserAccessEntry {
   grantingRoles: string[];
   grantedByGroup: boolean;
   grantingGroups: string[];
+  /** Explicitly denied to this user: overrides roles, groups and direct grants. */
+  deniedForUser?: boolean;
+  /** Whether the user actually has it, as the server enforces it. */
+  effective?: boolean;
+  /** Effective only because another permission of the user needs it. */
+  grantedAsPrerequisite?: boolean;
 }
 
 export interface UserAccess {
@@ -1642,7 +1660,7 @@ export interface UserAccess {
   permissions: UserAccessEntry[];
 }
 
-/** Every permission of the user and where it comes from (direct, role, group). */
+/** Every permission of the user: where it comes from (direct, role, group), whether it is denied and whether it is in effect. */
 export async function getUserAccess(userId: string): Promise<UserAccess> {
   return request<UserAccess>('GET', `/api/identity/users/${requireGuid(userId, 'کاربر')}/permissions`);
 }
@@ -1651,8 +1669,9 @@ export async function setUserRoles(userId: string, roleIds: string[]): Promise<v
   await request('PUT', `/api/identity/users/${requireGuid(userId, 'کاربر')}/roles`, { body: { roleIds } });
 }
 
-export async function setUserDirectPermissions(userId: string, permissionIds: string[]): Promise<void> {
-  await request('PUT', `/api/identity/users/${requireGuid(userId, 'کاربر')}/permissions`, { body: { permissionIds } });
+/** Replaces the user's direct grants and explicit denials (a denial wins over roles and groups). */
+export async function setUserDirectPermissions(userId: string, permissionIds: string[], deniedPermissionIds: string[]): Promise<void> {
+  await request('PUT', `/api/identity/users/${requireGuid(userId, 'کاربر')}/permissions`, { body: { permissionIds, deniedPermissionIds } });
 }
 
 export interface LoginHistoryEntry {

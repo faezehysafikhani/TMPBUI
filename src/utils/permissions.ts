@@ -3,6 +3,7 @@
 // checks every request itself, so this is never the security boundary.
 import type { User } from '../types';
 import type { ActiveTab } from '../components/SandwichBar';
+import type { UserAccessEntry } from '../services/nexusApi';
 
 export const PERMISSIONS = {
   tasksView: 'Tasks.View',
@@ -48,6 +49,40 @@ export function canOpenTab(user: User | null | undefined, tab: ActiveTab): boole
 export function firstAllowedTab(user: User | null | undefined): ActiveTab {
   const order: ActiveTab[] = ['kanban', 'calendar', 'overdue', 'notes', 'chat', 'settings'];
   return order.find((tab) => canOpenTab(user, tab)) || 'settings';
+}
+
+/**
+ * One permission on the user access page, as the server will apply it after saving: the user
+ * has it unless it is denied to them, when it is granted directly, by a role or group, or needed
+ * by another permission they have. `direct` and `denied` are the page's current (unsaved) choices.
+ */
+export function accessIsEffective(entry: UserAccessEntry, direct: ReadonlySet<string>, denied: ReadonlySet<string>): boolean {
+  if (denied.has(entry.permissionId)) return false;
+  return direct.has(entry.permissionId) || entry.grantedByRole || entry.grantedByGroup || !!entry.grantedAsPrerequisite;
+}
+
+/**
+ * Turning a permission on or off for this user. Off: the direct grant goes, and if a role, a
+ * group or another permission would still give it, it is denied to the user. On: a denial goes,
+ * and it is granted directly only when nothing else gives it.
+ */
+export function toggleUserAccess(
+  entry: UserAccessEntry,
+  enable: boolean,
+  direct: ReadonlySet<string>,
+  denied: ReadonlySet<string>,
+): { direct: Set<string>; denied: Set<string> } {
+  const nextDirect = new Set(direct);
+  const nextDenied = new Set(denied);
+  const inherited = entry.grantedByRole || entry.grantedByGroup || !!entry.grantedAsPrerequisite;
+  if (enable) {
+    nextDenied.delete(entry.permissionId);
+    if (!inherited) nextDirect.add(entry.permissionId);
+  } else {
+    nextDirect.delete(entry.permissionId);
+    if (inherited) nextDenied.add(entry.permissionId);
+  }
+  return { direct: nextDirect, denied: nextDenied };
 }
 
 /** Persian titles of the permission groups (the server sends module ids such as "TaskManagement"). */

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pencil, ShieldCheck, UserX, UserCheck, UserPlus, Loader2, Lock } from 'lucide-react';
 import {
-  AdminUser, AdminUserInput, AdminRole, UserAccess, NexusApiError,
+  AdminUser, AdminUserInput, AdminRole, UserAccess, UserAccessEntry, NexusApiError,
   listUsersPage, adminCreateUser, adminUpdateUser, setUserActive,
   listRoles, getUserAccess, setUserRoles, setUserDirectPermissions,
 } from '../../services/nexusApi';
@@ -10,7 +10,7 @@ import {
   AdminCard, SearchBox, StatusBadge, IconAction, Pagination, Field, inputClass, Notice,
   AdminDialog, PrimaryButton, SecondaryButton, toLatinDigits, useDebounced,
 } from './AdminUi';
-import { moduleTitle } from '../../utils/permissions';
+import { moduleTitle, accessIsEffective, toggleUserAccess } from '../../utils/permissions';
 import { userErrorMessage } from '../../utils/errorMessages';
 
 const PAGE_SIZE = 10;
@@ -302,21 +302,48 @@ const UserFormDialog: React.FC<{
 
 // ---------------------------------------------------------------- access
 
+/** Where a permission reaches the user from, and whether it is in effect for them. */
+const AccessSourceBadges: React.FC<{ entry: UserAccessEntry; direct: ReadonlySet<string>; denied: ReadonlySet<string> }> = ({ entry, direct, denied }) => {
+  const roles = entry.grantingRoles.map(roleTitle).join('، ');
+  const groups = entry.grantingGroups.join('، ');
+  if (denied.has(entry.permissionId)) {
+    const despite = [entry.grantedByRole && `نقش ${roles}`, entry.grantedByGroup && `گروه ${groups}`].filter(Boolean).join(' و ');
+    return (
+      <StatusBadge tone="red" title={despite ? `با وجود دسترسی از طریق ${despite}، برای این کاربر ممنوع شده است.` : 'برای این کاربر ممنوع شده است.'}>
+        غیرفعال برای این کاربر
+      </StatusBadge>
+    );
+  }
+  return (
+    <>
+      {direct.has(entry.permissionId) && <StatusBadge tone="green">دسترسی مستقیم</StatusBadge>}
+      {entry.grantedByRole && <StatusBadge tone="indigo" title={roles}>فعال از طریق نقش {roles}</StatusBadge>}
+      {entry.grantedByGroup && <StatusBadge tone="amber" title={groups}>فعال از طریق گروه {groups}</StatusBadge>}
+      {entry.grantedAsPrerequisite && !direct.has(entry.permissionId) && !entry.grantedByRole && !entry.grantedByGroup && (
+        <StatusBadge tone="slate" title="مجوز دیگری از این کاربر به آن نیاز دارد.">لازمهٔ مجوزی دیگر</StatusBadge>
+      )}
+    </>
+  );
+};
+
 const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onClose: () => void; onSaved: () => void }> = ({ user, rights, onClose, onSaved }) => {
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [access, setAccess] = useState<UserAccess | null>(null);
   const [roleIds, setRoleIds] = useState<string[]>([]);
-  const [direct, setDirect] = useState<string[]>([]);
+  const [direct, setDirect] = useState<Set<string>>(new Set());
+  const [denied, setDenied] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([listRoles(), getUserAccess(user.id)]).then(([roleList, userAccess]) => {
+    // The role list needs roles.view; without it the permissions are still shown.
+    Promise.all([listRoles().catch(() => [] as AdminRole[]), getUserAccess(user.id)]).then(([roleList, userAccess]) => {
       setRoles(roleList);
       setAccess(userAccess);
       setRoleIds(roleList.filter((r) => userAccess.roles.includes(r.name)).map((r) => r.id));
-      setDirect(userAccess.permissions.filter((p) => p.grantedDirectly).map((p) => p.permissionId));
+      setDirect(new Set(userAccess.permissions.filter((p) => p.grantedDirectly).map((p) => p.permissionId)));
+      setDenied(new Set(userAccess.permissions.filter((p) => p.deniedForUser).map((p) => p.permissionId)));
     }).catch((err) => setError(errorText(err, 'دریافت دسترسی‌ها ممکن نشد.')));
   }, [user.id]);
 
@@ -340,8 +367,9 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
         await setUserRoles(user.id, roleIds);
       }
       const originalDirect = access.permissions.filter((p) => p.grantedDirectly).map((p) => p.permissionId).sort().join(',');
-      if (rights.assignPermissions && [...direct].sort().join(',') !== originalDirect) {
-        await setUserDirectPermissions(user.id, direct);
+      const originalDenied = access.permissions.filter((p) => p.deniedForUser).map((p) => p.permissionId).sort().join(',');
+      if (rights.assignPermissions && ([...direct].sort().join(',') !== originalDirect || [...denied].sort().join(',') !== originalDenied)) {
+        await setUserDirectPermissions(user.id, [...direct], [...denied]);
       }
       onSaved();
     } catch (err) {
@@ -386,11 +414,11 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
 
           <section className="space-y-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">مجوزهای مستقیم</h4>
+              <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100">مجوزهای این کاربر</h4>
               <SearchBox value={filter} onChange={setFilter} placeholder="جستجوی مجوز..." />
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              مجوزی که از نقش یا گروه سازمانی می‌آید اینجا فقط نمایش داده می‌شود و از همان نقش/گروه تغییر می‌کند. فقط مجوزهایی را می‌توانید اعطا کنید که خودتان دارید.
+              تیک هر مجوز یعنی این کاربر واقعاً آن را دارد. برداشتن تیک مجوزی که از نقش یا گروه می‌آید، آن را فقط برای همین کاربر غیرفعال می‌کند و نقش یا گروه تغییر نمی‌کند؛ با زدن دوباره تیک، دسترسی برمی‌گردد. فقط مجوزهایی را می‌توانید اعطا یا غیرفعال کنید که خودتان دارید.
             </p>
             <div className="space-y-3">
               {modules.map(([module, entries]) => (
@@ -400,15 +428,23 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
                     {entries.map((entry) => (
                       <label key={entry.permissionId} className={`flex items-center justify-between gap-3 px-3 py-2 ${rights.assignPermissions ? 'cursor-pointer' : ''}`}>
                         <span className="flex items-center gap-2 min-w-0">
-                          <input type="checkbox" disabled={!rights.assignPermissions} checked={direct.includes(entry.permissionId)} onChange={(e) => setDirect((ids) => e.target.checked ? [...ids, entry.permissionId] : ids.filter((id) => id !== entry.permissionId))} />
+                          <input
+                            type="checkbox"
+                            disabled={!rights.assignPermissions}
+                            checked={accessIsEffective(entry, direct, denied)}
+                            onChange={(e) => {
+                              const next = toggleUserAccess(entry, e.target.checked, direct, denied);
+                              setDirect(next.direct);
+                              setDenied(next.denied);
+                            }}
+                          />
                           <span className="min-w-0">
                             <span className="block text-sm text-slate-800 dark:text-slate-100">{entry.description}</span>
                             <span className="block text-[11px] font-mono text-slate-400 dir-ltr text-right">{entry.name}</span>
                           </span>
                         </span>
                         <span className="flex flex-wrap gap-1 justify-end">
-                          {entry.grantedByRole && <StatusBadge tone="indigo" title={entry.grantingRoles.map(roleTitle).join('، ')}>از نقش</StatusBadge>}
-                          {entry.grantedByGroup && <StatusBadge tone="amber" title={entry.grantingGroups.join('، ')}>از گروه</StatusBadge>}
+                          <AccessSourceBadges entry={entry} direct={direct} denied={denied} />
                         </span>
                       </label>
                     ))}

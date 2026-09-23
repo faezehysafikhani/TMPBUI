@@ -60,7 +60,7 @@ import {
   toAppNotification,
 } from './utils/serverNotifications';
 import { Database, PanelRightOpen } from 'lucide-react';
-import { SESSION_ENDED_EVENT } from './services/nexusApi';
+import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION } from './services/nexusApi';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
 
@@ -483,11 +483,12 @@ export default function App() {
             userId: currentUser.id,
             userName: currentUser.name || currentUser.username,
             userAvatar: currentUser.avatar,
-            action: 'ثبت و ایجاد فعالیت جدید',
+            action: TASK_CREATED_ACTION,
             details: detailsText,
           });
+          // It replaces the server's own short "created" entry (see withoutDuplicateCreation).
           setTasks((prev) =>
-            prev.map((t) => (t.id === created.id ? { ...t, logs: [newLog, ...(t.logs || [])] } : t))
+            prev.map((t) => (t.id === created.id ? { ...t, logs: [newLog, ...(t.logs || []).filter((l) => l.action !== TASK_CREATED_ACTION)] } : t))
           );
         }
       }
