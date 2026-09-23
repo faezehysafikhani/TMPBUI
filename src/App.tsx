@@ -24,6 +24,7 @@ const TaskDetailModal = lazy(() => import('./components/TaskDetailModal').then(m
 const ProjectDetailModal = lazy(() => import('./components/ProjectDetailModal').then(m => ({ default: m.ProjectDetailModal })));
 const AttachmentPreviewModal = lazy(() => import('./components/AttachmentPreviewModal').then(m => ({ default: m.AttachmentPreviewModal })));
 const NotificationModal = lazy(() => import('./components/NotificationModal').then(m => ({ default: m.NotificationModal })));
+const UserGuideModal = lazy(() => import('./components/UserGuideModal').then(m => ({ default: m.UserGuideModal })));
 const SettingsModal = lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const ResetPasswordModal = lazy(() => import('./components/ResetPasswordModal').then(m => ({ default: m.ResetPasswordModal })));
 const FeatureListPdfModal = lazy(() => import('./components/FeatureListPdfModal').then(m => ({ default: m.FeatureListPdfModal })));
@@ -127,6 +128,8 @@ export default function App() {
   }, [activeTab]);
 
   const [showFilterBar, setShowFilterBar] = useState(false);
+  // The user guide opens only from the header's "?" button, never on its own.
+  const [isUserGuideOpen, setIsUserGuideOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
@@ -1211,6 +1214,7 @@ export default function App() {
         unreadNotificationsCount={unreadNotificationsCount}
         onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
         onOpenWelcomeModal={() => setIsWelcomeModalOpen(true)}
+        onOpenUserGuide={currentUser ? () => setIsUserGuideOpen(true) : undefined}
         isDesktopSidebarOpen={isDesktopSidebarOpen}
         onToggleDesktopSidebar={handleToggleDesktopSidebar}
       />
@@ -1511,6 +1515,10 @@ export default function App() {
         )}
 
         {/* Notifications & Alerts Modal */}
+        {isUserGuideOpen && (
+          <UserGuideModal isOpen={isUserGuideOpen} onClose={() => setIsUserGuideOpen(false)} currentUser={currentUser} />
+        )}
+
         {isNotificationModalOpen && (
           <NotificationModal
             isOpen={isNotificationModalOpen}

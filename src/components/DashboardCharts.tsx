@@ -1,17 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-  Legend
-} from 'recharts';
+import React, { useMemo, useRef, useState } from 'react';
+import { Doughnut, Bar } from 'react-chartjs-2';
+import type { ChartData, ChartOptions } from 'chart.js';
+import { CHART_FONT_FAMILY, barNameLabels, isDarkMode, persianIntegerTick, rtlTooltip } from '../utils/chartSetup';
 import { Task, PRIORITIES, Priority, STATUSES, User } from '../types';
 import { toPersianDigits, isOverdue, formatToJalali, getDaysDiff } from '../utils/helpers';
 import {
@@ -337,144 +327,131 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
     });
   }, [activeModalData]);
 
-  // Custom Tooltip for Pie Chart
-  const CustomPieTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-slate-900/95 text-white p-2.5 rounded-xl text-xs shadow-xl border border-slate-700 space-y-1">
-          <p className="font-bold flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: data.color }} />
-            {data.name}
-          </p>
-          <p className="text-slate-300">
-            تعداد: <span className="font-bold text-white">{toPersianDigits(data.value)}</span> فعالیت
-          </p>
-          <p className="text-slate-300">
-            درصد: <span className="font-bold text-indigo-300">٪{toPersianDigits(data.percentage)}</span>
-          </p>
-          <p className="text-[10px] text-amber-300 pt-0.5 border-t border-slate-800">
-            💡 جهت مشاهده موارد کلیک کنید
-          </p>
-        </div>
-      );
-    }
-    return null;
+  // Chart.js: the same two charts, data, colours, tooltips and click-through as before.
+  const setPointer = (event: { native: Event | null }, elements: unknown[]) => {
+    const target = event.native?.target as HTMLElement | undefined;
+    if (target) target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
   };
 
-  // Custom Tooltip for Bar Chart (تعداد بر اساس مسئول انجام)
-  const CustomBarTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-slate-900/95 text-white p-2.5 rounded-xl text-xs shadow-xl border border-slate-700 space-y-1 max-w-xs">
-          <p className="font-bold flex items-center gap-1.5 line-clamp-1">
-            <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: data.color }} />
-            <span>{data.id === 'myself' ? 'خودم' : (data.fullTitle || data.name)}</span>
-          </p>
-          <p className="text-slate-300">
-            تعداد فعالیت‌ها: <span className="font-bold text-emerald-300">{toPersianDigits(data.count)}</span>
-          </p>
-          <p className="text-[10px] text-amber-300 pt-0.5 border-t border-slate-800">
-            💡 جهت مشاهده لیست فعالیت‌ها کلیک کنید
-          </p>
-        </div>
-      );
-    }
-    return null;
+  const pieData: ChartData<'doughnut'> = {
+    labels: delayStatusData.map((d) => d.name),
+    datasets: [
+      {
+        data: delayStatusData.map((d) => d.value),
+        backgroundColor: delayStatusData.map((d) => d.color),
+        hoverBackgroundColor: delayStatusData.map((d) => `${d.color}cc`),
+        borderWidth: 0,
+        spacing: 4,
+      },
+    ],
   };
 
-  // Custom Bar Label: Name of the person INSIDE the bar if it fits, else VERTICAL ABOVE the bar
-  const renderCustomBarLabel = (props: any) => {
-    const { x, y, width, height, value, index } = props;
-    const item = assigneeBarData[index];
-    if (!item) return null;
+  const pieOptions: ChartOptions<'doughnut'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    radius: 80,
+    cutout: 48,
+    onClick: (_event, elements) => {
+      if (elements.length > 0) handlePieClick(delayStatusData[elements[0].index]);
+    },
+    onHover: setPointer,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        rtl: true,
+        textDirection: 'rtl',
+        // A legend entry opens the same list as its slice (instead of hiding the slice).
+        onClick: (_event, item) => {
+          if (item.index !== undefined) handlePieClick(delayStatusData[item.index]);
+        },
+        onHover: (event) => {
+          const target = event.native?.target as HTMLElement | undefined;
+          if (target) target.style.cursor = 'pointer';
+        },
+        labels: {
+          boxWidth: 10,
+          boxHeight: 10,
+          padding: 14,
+          color: isDarkMode() ? '#cbd5e1' : '#334155',
+          font: { family: CHART_FONT_FAMILY, size: 11, weight: 500 },
+        },
+      },
+      tooltip: {
+        ...rtlTooltip,
+        callbacks: {
+          label: (item) => `تعداد: ${toPersianDigits(delayStatusData[item.dataIndex].value)} فعالیت`,
+          afterLabel: (item) => `درصد: ٪${toPersianDigits(delayStatusData[item.dataIndex].percentage)}`,
+          footer: () => '💡 جهت مشاهده موارد کلیک کنید',
+        },
+      },
+    },
+  };
 
-    const rawName = item.id === 'myself' ? 'خودم' : item.name;
-    const cx = x + width / 2;
-    const cy = y + height / 2;
+  // The names drawn on the bars are read through a ref, so the plugin (created once) always
+  // draws the current ones.
+  const barNamesRef = useRef<string[]>([]);
+  barNamesRef.current = assigneeBarData.map((d) => (d.id === 'myself' ? 'خودم' : d.name));
+  const barLabelPlugin = useMemo(() => barNameLabels(() => barNamesRef.current), []);
+  const maxAssigneeCount = assigneeBarData.reduce((max, d) => Math.max(max, d.count), 0);
 
-    // Minimum height needed for the vertical name to comfortably fit inside the bar with padding
-    const namePixelHeight = rawName.length * 7.2 + 14;
-    const fitsInside = height >= namePixelHeight && height >= 44;
+  const barData: ChartData<'bar'> = {
+    labels: barNamesRef.current,
+    datasets: [
+      {
+        data: assigneeBarData.map((d) => d.count),
+        backgroundColor: assigneeBarData.map((d) => d.color),
+        hoverBackgroundColor: assigneeBarData.map((d) => `${d.color}d9`),
+        borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+        borderSkipped: false,
+        maxBarThickness: 46,
+        minBarLength: 22,
+      },
+    ],
+  };
 
-    const maxCharsInside = Math.max(3, Math.floor((height - 12) / 7));
-    const displayNameInside =
-      rawName.length > maxCharsInside ? `${rawName.slice(0, Math.max(2, maxCharsInside - 1))}…` : rawName;
-
-    // When above the bar: name is also vertical, with count number above it
-    const displayNameAbove =
-      rawName.length > 14 ? `${rawName.slice(0, 12)}…` : rawName;
-    const textPixelLenAbove = Math.max(18, displayNameAbove.length * 6.8);
-    const targetYAbove = y - 6 - textPixelLenAbove / 2;
-    const countYAbove = y - 6 - textPixelLenAbove - 6;
-
-    return (
-      <g onClick={() => handleBarClick(item)} className="cursor-pointer">
-        {fitsInside ? (
-          <>
-            {/* Count number right above the bar */}
-            <text
-              x={cx}
-              y={y - 6}
-              textAnchor="middle"
-              className="text-[11px] font-black fill-slate-700 dark:fill-slate-200 select-none"
-            >
-              {toPersianDigits(value)}
-            </text>
-
-            {/* Person's name INSIDE the bar (vertical, white font) */}
-            <g transform={`translate(${cx}, ${cy})`}>
-              <text
-                transform="rotate(-90)"
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="#ffffff"
-                dir="rtl"
-                className="text-[11px] font-bold select-none"
-                style={{
-                  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.65))',
-                  fontFamily: "'Vazirmatn', system-ui, -apple-system, sans-serif",
-                }}
-              >
-                <title>{rawName}</title>
-                {displayNameInside}
-              </text>
-            </g>
-          </>
-        ) : (
-          <>
-            {/* Count number placed above the vertical name */}
-            <text
-              x={cx}
-              y={countYAbove}
-              textAnchor="middle"
-              className="text-[11px] font-black fill-slate-700 dark:fill-slate-200 select-none"
-            >
-              {toPersianDigits(value)}
-            </text>
-
-            {/* Person's name ABOVE the bar (vertical, dark/high-contrast font) */}
-            <g transform={`translate(${cx}, ${targetYAbove})`}>
-              <text
-                transform="rotate(-90)"
-                textAnchor="middle"
-                dominantBaseline="central"
-                fill="#1e293b"
-                dir="rtl"
-                className="text-[11px] font-extrabold fill-slate-800 dark:fill-slate-100 select-none"
-                style={{
-                  fontFamily: "'Vazirmatn', system-ui, -apple-system, sans-serif",
-                }}
-              >
-                <title>{rawName}</title>
-                {displayNameAbove}
-              </text>
-            </g>
-          </>
-        )}
-      </g>
-    );
+  const barOptions: ChartOptions<'bar'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    layout: { padding: { top: 36, right: 15, bottom: 15, left: 4 } },
+    onClick: (_event, elements) => {
+      if (elements.length > 0) handleBarClick(assigneeBarData[elements[0].index]);
+    },
+    onHover: setPointer,
+    scales: {
+      x: {
+        ticks: { display: false },
+        grid: { display: false },
+        border: { color: '#94a3b8', width: 1.5 },
+      },
+      y: {
+        beginAtZero: true,
+        max: Math.max(maxAssigneeCount + 1.2, 3.5),
+        ticks: {
+          stepSize: 1,
+          callback: persianIntegerTick,
+          color: '#64748b',
+          font: { family: CHART_FONT_FAMILY, size: 11 },
+        },
+        grid: { color: 'rgba(51, 65, 85, 0.2)' },
+        border: { color: '#94a3b8', width: 1.5, dash: [3, 3] },
+      },
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        ...rtlTooltip,
+        callbacks: {
+          title: (items) => {
+            const data = assigneeBarData[items[0].dataIndex];
+            return data.id === 'myself' ? 'خودم' : data.fullTitle || data.name;
+          },
+          label: (item) => `تعداد فعالیت‌ها: ${toPersianDigits(assigneeBarData[item.dataIndex].count)}`,
+          footer: () => '💡 جهت مشاهده لیست فعالیت‌ها کلیک کنید',
+        },
+      },
+    },
   };
 
   return (
@@ -511,40 +488,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
 
           <div className="h-72 sm:h-80 w-full relative my-auto">
             {activeUserTasksCount > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={delayStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={48}
-                    outerRadius={80}
-                    paddingAngle={4}
-                    dataKey="value"
-                    isAnimationActive={false}
-                  >
-                    {delayStatusData.map((entry) => (
-                      <Cell
-                        key={`cell-${entry.id}`}
-                        fill={entry.color}
-                        stroke="none"
-                        className="cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => handlePieClick(entry)}
-                      />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomPieTooltip />} />
-                  <Legend
-                    verticalAlign="bottom"
-                    height={36}
-                    formatter={(value: string) => (
-                      <span className="text-[11px] text-slate-700 dark:text-slate-300 font-medium ml-2 cursor-pointer">
-                        {value}
-                      </span>
-                    )}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <Doughnut data={pieData} options={pieOptions} aria-label="نمودار وضعیت تاخیر فعالیت‌های جاری کاربر" />
             ) : (
               <div className="h-full flex items-center justify-center text-xs text-slate-400 dark:text-slate-500 font-medium text-center px-4">
                 هیچ فعالیت جاری (شروع‌نشده یا در حال اجرا) برای کاربر یافت نشد
@@ -599,45 +543,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
 
           <div className="h-72 sm:h-80 w-full relative my-auto">
             {assigneeBarData.some((d) => d.count > 0) ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={assigneeBarData} margin={{ top: 36, right: 15, left: -20, bottom: 15 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.2} />
-                  <XAxis
-                    dataKey="name"
-                    interval={0}
-                    height={12}
-                    axisLine={{ stroke: '#94a3b8', strokeWidth: 1.5 }}
-                    tickLine={false}
-                    tick={false}
-                  />
-                  <YAxis
-                    allowDecimals={false}
-                    domain={[0, (dataMax: number) => Math.max(dataMax + 1.2, 3.5)]}
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    axisLine={{ stroke: '#94a3b8', strokeWidth: 1.5 }}
-                    tickLine={false}
-                    tickFormatter={(val) => toPersianDigits(val)}
-                  />
-                  <Tooltip content={<CustomBarTooltip />} />
-                  <Bar
-                    dataKey="count"
-                    radius={[6, 6, 0, 0]}
-                    maxBarSize={46}
-                    minPointSize={22}
-                    label={renderCustomBarLabel}
-                    isAnimationActive={false}
-                  >
-                    {assigneeBarData.map((entry) => (
-                      <Cell
-                        key={`bar-${entry.id}`}
-                        fill={entry.color}
-                        className="cursor-pointer hover:opacity-85 transition-opacity"
-                        onClick={() => handleBarClick(entry)}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <Bar data={barData} options={barOptions} plugins={[barLabelPlugin]} aria-label="نمودار تعداد فعالیت‌ها بر اساس مسئول انجام" />
             ) : (
               <div className="h-full flex items-center justify-center text-xs text-slate-400 dark:text-slate-500 font-medium">
                 هیچ فعالیتی جهت نمایش یافت نشد

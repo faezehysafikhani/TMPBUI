@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, RefreshCw, Filter, LogIn, Bell, LayoutDashboard, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { Plus, RefreshCw, Filter, LogIn, Bell, LayoutDashboard, PanelRightClose, PanelRightOpen, CircleHelp } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { User as UserType, AppTheme, AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -21,6 +21,8 @@ interface NavbarProps {
   unreadNotificationsCount?: number;
   onOpenNotificationModal?: () => void;
   onOpenWelcomeModal?: () => void;
+  /** Opens the slide user guide (header "?" button). */
+  onOpenUserGuide?: () => void;
   isDesktopSidebarOpen?: boolean;
   onToggleDesktopSidebar?: () => void;
 }
@@ -40,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   unreadNotificationsCount = 0,
   onOpenNotificationModal,
   onOpenWelcomeModal,
+  onOpenUserGuide,
   isDesktopSidebarOpen = true,
   onToggleDesktopSidebar,
 }) => {
@@ -118,6 +121,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {toPersianDigits(unreadNotificationsCount)}
                   </span>
                 )}
+              </button>
+            )}
+
+            {/* User Guide Button (Icon Only) */}
+            {onOpenUserGuide && (
+              <button
+                type="button"
+                onClick={onOpenUserGuide}
+                title="راهنمای کاربری"
+                aria-label="راهنمای کاربری"
+                className="p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+              >
+                <CircleHelp className="w-4 h-4" />
               </button>
             )}
 
