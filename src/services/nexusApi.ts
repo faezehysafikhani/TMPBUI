@@ -33,6 +33,7 @@ import {
 import { iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { NETWORK_ERROR, TIMEOUT_ERROR, persianApiMessage } from '../utils/errorMessages';
+import type { ServerNotificationDto } from '../utils/serverNotifications';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -1413,6 +1414,23 @@ function updateSessionUser(user: UserDto): void {
  * Emails a reset link to the account with this username or mobile number (to its email address,
  * if it has one). The answer is the same whether or not such an account exists.
  */
+// ---------------------------------------------------------------------------
+// Notifications stored by the server (the caller's own, in their own tenant)
+// ---------------------------------------------------------------------------
+
+export async function fetchMyNotifications(): Promise<ServerNotificationDto[]> {
+  if (!readSession()) return [];
+  return request<ServerNotificationDto[]>('GET', '/api/notifications', { query: { pageSize: 50 } });
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await request('PUT', `/api/notifications/${requireGuid(id, 'اعلان')}/read`);
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  await request('PUT', '/api/notifications/read-all');
+}
+
 /**
  * Password recovery, step 1: the server sends a one-time code by SMS to the account's mobile
  * number. The answer is the same whether or not an account matches.

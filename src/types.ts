@@ -270,7 +270,8 @@ export const PRIORITIES: Record<Priority, PriorityConfig> = {
 
 export interface AppNotification {
   id: string;
-  type: 'comment' | 'task_log';
+  /** reminder: stored by the server (GET /api/notifications); the others are derived from tasks. */
+  type: 'comment' | 'task_log' | 'reminder';
   taskId: string;
   taskTitle: string;
   actorName: string;

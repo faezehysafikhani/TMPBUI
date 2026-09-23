@@ -478,3 +478,20 @@ export async function deletePersonalNotePB(id: string, userId: string): Promise<
     return;
 }
 
+// Notifications stored by the server (task reminders). Failures leave the bell as it was.
+export async function fetchServerNotificationsPB() {
+  try {
+    return await nexusApi.fetchMyNotifications();
+  } catch (err) {
+    console.warn('Could not load notifications from NexusCore:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export async function markServerNotificationReadPB(id: string): Promise<void> {
+  await nexusApi.markNotificationRead(id);
+}
+
+export async function markAllServerNotificationsReadPB(): Promise<void> {
+  await nexusApi.markAllNotificationsRead();
+}

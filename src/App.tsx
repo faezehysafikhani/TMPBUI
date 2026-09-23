@@ -47,8 +47,18 @@ import {
   fetchSystemNotificationSettingsPB,
   fetchUnreadMessageCountsPB,
   extractResetTokenFromURL,
-  ACTIVE_DATA_SERVER_URL
+  ACTIVE_DATA_SERVER_URL,
+  fetchServerNotificationsPB,
+  markServerNotificationReadPB,
+  markAllServerNotificationsReadPB
 } from './services/dataService';
+import {
+  ServerNotificationDto,
+  isServerNotificationId,
+  mergeNotifications,
+  serverNotificationKey,
+  toAppNotification,
+} from './utils/serverNotifications';
 import { Database, PanelRightOpen } from 'lucide-react';
 import { SESSION_ENDED_EVENT } from './services/nexusApi';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
@@ -930,9 +940,36 @@ export default function App() {
     return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [visibleTasks, currentUser, readNotificationIds]);
 
+  // Notifications stored by the server (task reminders): fetched on sign-in, every minute and
+  // when the window is focused again; their read state lives on the server.
+  const [serverNotifications, setServerNotifications] = useState<ServerNotificationDto[]>([]);
+  const loadServerNotifications = useCallback(async () => {
+    const list = await fetchServerNotificationsPB();
+    if (list) setServerNotifications(list);
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setServerNotifications([]);
+      return;
+    }
+    loadServerNotifications();
+    const timer = window.setInterval(loadServerNotifications, 60_000);
+    window.addEventListener('focus', loadServerNotifications);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', loadServerNotifications);
+    };
+  }, [currentUser?.id, loadServerNotifications]);
+
+  const allNotifications = useMemo(
+    () => mergeNotifications(appNotifications, serverNotifications.map((n) => toAppNotification(n, visibleTasks))),
+    [appNotifications, serverNotifications, visibleTasks]
+  );
+
   const unreadNotificationsCount = useMemo(
-    () => appNotifications.filter((n) => !n.isRead).length,
-    [appNotifications]
+    () => allNotifications.filter((n) => !n.isRead).length,
+    [allNotifications]
   );
 
   // Badge count limited strictly to overdue tasks per user request
@@ -1006,6 +1043,13 @@ export default function App() {
   }, [overdueCount]);
 
   const handleMarkNotificationAsRead = (notificationId: string) => {
+    if (isServerNotificationId(notificationId)) {
+      const key = serverNotificationKey(notificationId);
+      if (serverNotifications.some((n) => n.id === key && n.isRead)) return;
+      setServerNotifications((prev) => prev.map((n) => (n.id === key ? { ...n, isRead: true } : n)));
+      markServerNotificationReadPB(key).catch(() => loadServerNotifications());
+      return;
+    }
     setReadNotificationIds((prev) => {
       if (prev.includes(notificationId)) return prev;
       const updated = [...prev, notificationId];
@@ -1016,6 +1060,10 @@ export default function App() {
   };
 
   const handleMarkAllNotificationsAsRead = () => {
+    if (serverNotifications.some((n) => !n.isRead)) {
+      setServerNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      markAllServerNotificationsReadPB().catch(() => loadServerNotifications());
+    }
     const allIds = appNotifications.map((n) => n.id);
     setReadNotificationIds(allIds);
     const userKey = currentUser ? currentUser.id : 'guest';
@@ -1466,7 +1514,7 @@ export default function App() {
           <NotificationModal
             isOpen={isNotificationModalOpen}
             onClose={() => setIsNotificationModalOpen(false)}
-            notifications={appNotifications}
+            notifications={allNotifications}
             onMarkAsRead={handleMarkNotificationAsRead}
             onMarkAllAsRead={handleMarkAllNotificationsAsRead}
             onSelectTask={(taskId) => {

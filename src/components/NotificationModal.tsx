@@ -3,6 +3,7 @@ import { AppNotification, AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 import {
   Bell,
+  BellRing,
   X,
   MessageSquare,
   History,
@@ -178,6 +179,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                       <div className="w-9 h-9 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-xs font-bold">
                         {notification.type === 'comment' ? (
                           <MessageSquare className="w-4 h-4 text-indigo-500" />
+                        ) : notification.type === 'reminder' ? (
+                          <BellRing className="w-4 h-4 text-rose-500" />
                         ) : (
                           <History className="w-4 h-4 text-emerald-500" />
                         )}
@@ -194,6 +197,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                         className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
                           notification.type === 'comment'
                             ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                            : notification.type === 'reminder'
+                            ? 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
                             : notification.actionTitle.includes('ایجاد') || notification.actionTitle.includes('ثبت')
                             ? 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                             : notification.actionTitle.includes('واگذار')
@@ -203,6 +208,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                       >
                         {notification.type === 'comment'
                           ? 'دیدگاه جدید'
+                          : notification.type === 'reminder'
+                          ? 'یادآوری موعد'
                           : notification.actionTitle.includes('ایجاد') || notification.actionTitle.includes('ثبت')
                           ? 'فعالیت جدید'
                           : notification.actionTitle.includes('واگذار')
@@ -230,6 +237,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
                 {/* Actions Right */}
                 <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                  {/* A server notification without a task the user can open has nothing to show. */}
+                  {notification.taskId && (
                   <button
                     type="button"
                     onClick={() => {
@@ -242,6 +251,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                     <span>مشاهده فعالیت</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </button>
+                  )}
 
                   <button
                     type="button"
