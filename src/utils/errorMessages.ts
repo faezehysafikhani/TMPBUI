@@ -114,6 +114,8 @@ const KNOWN_MESSAGES: Record<string, string> = {
   'This task already has a recurrence schedule. Update it instead.': 'این فعالیت از قبل زمان‌بندی تکرار دارد. همان را ویرایش کنید.',
   'The assigned user does not exist in this tenant.': 'کاربر مسئول در این سازمان وجود ندارد.',
   'The assigned team does not exist in this tenant.': 'تیم انتخاب‌شده در این سازمان وجود ندارد.',
+  'Choose who is responsible for the task.': 'لطفاً مسئول اجرای فعالیت را انتخاب کنید.',
+  'The responsible user is not an active user of this organization.': 'مسئول اجرای انتخاب‌شده کاربر فعال این سازمان نیست.',
   'The owner of this task has not allowed the assignee to change its status.': 'مالک این فعالیت اجازه تغییر وضعیت را به مسئول آن نداده است.',
   'Only the owner of this task, or a user who manages all tasks, can do this.': 'این کار فقط توسط مالک فعالیت یا مدیر وظایف سازمان امکان‌پذیر است.',
   'The charter end date cannot be before its start date.': 'تاریخ پایان منشور پروژه نمی‌تواند قبل از تاریخ شروع آن باشد.',

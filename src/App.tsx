@@ -1200,7 +1200,7 @@ export default function App() {
         onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
         totalTasks={visibleTasks.length}
         completedTasks={completedCount}
-        onToggleFilterBar={() => setShowFilterBar((prev) => !prev)}
+        onToggleFilterBar={activeTab === 'kanban' ? () => setShowFilterBar((prev) => !prev) : undefined}
         isFilterBarOpen={showFilterBar}
         onRefreshData={() => loadTasks(true)}
         isSyncing={isSyncing}

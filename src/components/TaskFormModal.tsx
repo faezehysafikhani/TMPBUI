@@ -4,7 +4,7 @@ import { COLOR_PALETTES } from '../utils/theme';
 import { readFileAsDataUrl } from '../utils/storage';
 import { formatFileSize, toPersianDigits, computeAutoTaskStatus } from '../utils/helpers';
 import { JalaliDateTimePicker } from './JalaliDateTimePicker';
-import { getNowISO } from '../utils/jalali';
+import { getNowISO, iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
 import { fetchUserTeamsPB, fetchUserTeamsAsyncPB, fetchAllUsersPB } from '../services/dataService';
 import { generateRecurringOccurrences } from '../utils/recurring';
 import {
@@ -103,7 +103,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
   const [availableTeams, setAvailableTeams] = useState<WorkTeam[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [errors, setErrors] = useState<{ title?: string }>({});
+  const [errors, setErrors] = useState<{ title?: string; assignee?: string }>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tagDropdownRef = useRef<HTMLDivElement>(null);
@@ -314,6 +314,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
   // Auto update status if project or recurring or has subtasks
   const isAutoStatusTask = isProject || isRecurring || projectSubTasks.length > 0;
+  // A recurring task is scheduled by its own recurrence settings; its plain due date is not asked for.
+  const hideDueDate = !isProject && isRecurring;
 
   useEffect(() => {
     if (isAutoStatusTask) {
@@ -418,6 +420,12 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setErrors({ title: 'عنوان فعالیت الزامی است' });
       return;
     }
+    // Every new task needs someone responsible for doing it (the server enforces this too).
+    if (!taskToEdit && !assignedUserId) {
+      setErrors({ assignee: 'لطفاً مسئول اجرای فعالیت را انتخاب کنید.' });
+      assigneeDropdownRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
 
     const selectedTeam = availableTeams.find((t) => t.id === selectedTeamId);
     let finalTeamMemberIds: string[] = [];
@@ -488,6 +496,13 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       finalSubTasks = generateRecurringOccurrences(recurringConfig, finalSubTasks);
     }
 
+    // A recurring task's date is its schedule's first occurrence (start date at the start time),
+    // not the hidden due-date field.
+    const recurrenceStartDay = isoToIranDateTimeParts(recurringStartDate || dueDateISO || getNowISO())?.date;
+    const finalDueDate = finalIsRecurring
+      ? iranDateTimeToISO(recurrenceStartDay, recurringStartTime) || recurringStartDate || dueDateISO || getNowISO()
+      : dueDateISO || getNowISO();
+
     const finalStatus = (finalIsProject || finalIsRecurring || (finalSubTasks && finalSubTasks.length > 0))
       ? computeAutoTaskStatus(finalSubTasks)
       : status;
@@ -496,7 +511,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       {
         title: title.trim(),
         description: description.trim(),
-        dueDate: dueDateISO || getNowISO(),
+        dueDate: finalDueDate,
         priority,
         status: finalStatus,
         attachments,
@@ -618,15 +633,17 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           {/* Jalali Date Time Picker & Status Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
-            {/* Jalali Date & Time Picker */}
-            <div>
-              <JalaliDateTimePicker
-                valueISO={dueDateISO}
-                onChangeISO={(iso) => setDueDateISO(iso)}
-                label="موعد انجام (تاریخ و ساعت شمسی)"
-                disabled={isStatusOnlyEdit}
-              />
-            </div>
+            {/* Jalali Date & Time Picker (not for a recurring task: its schedule sets the dates) */}
+            {!hideDueDate && (
+              <div>
+                <JalaliDateTimePicker
+                  valueISO={dueDateISO}
+                  onChangeISO={(iso) => setDueDateISO(iso)}
+                  label="موعد انجام (تاریخ و ساعت شمسی)"
+                  disabled={isStatusOnlyEdit}
+                />
+              </div>
+            )}
 
             {/* Status Field */}
             <div>
@@ -736,7 +753,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                   }));
                 } else {
                   if (allRegisteredUsers && allRegisteredUsers.length > 0) {
-                    candidateUsers = allRegisteredUsers.map((u) => ({
+                    // Disabled accounts cannot be made responsible (the server refuses them too);
+                    // the one already assigned to a task being edited stays visible.
+                    candidateUsers = allRegisteredUsers.filter((u) => !u.disabled || u.id === assignedUserId).map((u) => ({
                       id: u.id,
                       name: u.name || u.username,
                       username: u.username,
@@ -744,7 +763,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       role: u.role === 'admin' ? 'مدیر کل' : u.role === 'manager' ? 'مدیر' : 'کاربر',
                       email: u.email || '',
                     }));
-                  } else if (currentUser) {
+                  }
+                  // The signed-in user can always take the task themselves, even when the user
+                  // list is not available to them (it needs users.view).
+                  if (currentUser && !currentUser.disabled && !candidateUsers.some((u) => u.id === currentUser.id)) {
                     candidateUsers = [
                       {
                         id: currentUser.id,
@@ -754,6 +776,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                         role: 'کاربر فعلی',
                         email: currentUser.email || '',
                       },
+                      ...candidateUsers,
                     ];
                   }
                 }
@@ -877,7 +900,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                         {/* Floating Dropdown Results */}
                         {isAssigneeDropdownOpen && (
                           <div className="absolute z-50 top-full mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                            {/* Option: No Assignee */}
+                            {/* Option: No Assignee (only for an existing task; a new one needs someone) */}
+                            {taskToEdit && (
                             <button
                               type="button"
                               onClick={() => {
@@ -899,6 +923,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                               </div>
                               {!assignedUserId && <Check className="w-4 h-4 text-indigo-600" />}
                             </button>
+                            )}
 
                             <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
 
@@ -926,6 +951,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                                       setAssignedUserId(user.id);
                                       setIsAssigneeDropdownOpen(false);
                                       setUserSearchQuery('');
+                                      setErrors((prev) => ({ ...prev, assignee: undefined }));
                                     }}
                                     className={`w-full flex items-center justify-between p-2 rounded-lg text-xs text-right transition-colors cursor-pointer ${
                                       isSelected
@@ -970,6 +996,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                           </div>
                         )}
                       </div>
+                    )}
+
+                    {errors.assignee && (
+                      <p className="text-xs text-red-500 font-medium">{errors.assignee}</p>
                     )}
 
                     {/* Checkbox for status update permission when assigned to a user */}

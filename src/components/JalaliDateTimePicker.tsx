@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   PERSIAN_MONTH_NAMES,
   PERSIAN_WEEK_DAYS_SHORT,
@@ -39,10 +40,12 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [popoverCoords, setPopoverCoords] = useState<{
     top?: number;
     left?: number;
     right?: number;
+    maxHeight?: number;
   }>({});
 
   // Selected date parts
@@ -63,7 +66,10 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
 
-    const calendarHeight = 350;
+    // The calendar's real height (it is taller than it looks: header, days, time and actions),
+    // capped to the window - past that it scrolls inside itself.
+    const maxHeight = windowHeight - 24;
+    const calendarHeight = Math.min(popoverRef.current?.offsetHeight || 440, maxHeight);
     const calendarWidth = Math.min(320, windowWidth - 24);
 
     const spaceBelow = windowHeight - rect.bottom;
@@ -90,17 +96,22 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
 
     const idealRight = windowWidth - rect.right;
     if (idealRight + calendarWidth <= windowWidth - 12 && idealRight >= 12) {
-      setPopoverCoords({ top: finalTop, right: idealRight });
+      setPopoverCoords({ top: finalTop, right: idealRight, maxHeight });
     } else {
       const calcLeft = Math.max(12, Math.min(rect.left, windowWidth - calendarWidth - 12));
-      setPopoverCoords({ top: finalTop, left: calcLeft });
+      setPopoverCoords({ top: finalTop, left: calcLeft, maxHeight });
     }
   };
 
-  useEffect(() => {
+  // Before paint, so the calendar never shows at a stale position. It follows its field when the
+  // form around it scrolls; scrolling inside the calendar itself does not move it.
+  useLayoutEffect(() => {
     if (isOpen) {
       updatePosition();
-      const handleScrollOrResize = () => updatePosition();
+      const handleScrollOrResize = (event: Event) => {
+        if (popoverRef.current && event.target instanceof Node && popoverRef.current.contains(event.target)) return;
+        updatePosition();
+      };
       window.addEventListener('scroll', handleScrollOrResize, true);
       window.addEventListener('resize', handleScrollOrResize);
       return () => {
@@ -237,17 +248,25 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
         <Clock className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
       </button>
 
-      {/* Date & Time Picker Modal / Dropdown */}
-      {isOpen && (
+      {/* Date & Time Picker Modal / Dropdown. Rendered on <body>: inside a dialog whose overlay
+          has a backdrop filter, position: fixed would be relative to that scrolling overlay
+          instead of the window - the calendar made the dialog scrollable and jumped around as
+          it was repositioned on every scroll. */}
+      {isOpen && createPortal(
         <>
           <div className="fixed inset-0 z-[9998] bg-black/10 backdrop-blur-[0.5px]" onClick={() => setIsOpen(false)} />
 
           <div
+            ref={popoverRef}
+            dir="rtl"
             style={{
               position: 'fixed',
               top: popoverCoords.top !== undefined ? `${popoverCoords.top}px` : undefined,
               left: popoverCoords.left !== undefined ? `${popoverCoords.left}px` : undefined,
               right: popoverCoords.right !== undefined ? `${popoverCoords.right}px` : undefined,
+              maxHeight: popoverCoords.maxHeight !== undefined ? `${popoverCoords.maxHeight}px` : undefined,
+              overflowY: 'auto',
+              overscrollBehavior: 'contain',
             }}
             className="z-[9999] w-[300px] sm:w-[320px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-4 animate-in fade-in zoom-in-95 text-slate-800 dark:text-slate-100"
           >
@@ -446,7 +465,8 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
             </div>
 
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

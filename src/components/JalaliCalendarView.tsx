@@ -334,9 +334,9 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
     onOpenCreateForDate(jalaliToISO(viewYear, viewMonth, day, cur.hour, cur.minute));
   };
 
+  // Clicking a day shows its activities; the new-activity form opens only from the day's + button.
   const handleSelectDay = (day: number) => {
     setSelectedDay(day);
-    openCreateForDay(day);
   };
 
   const handleGoToToday = () => {
@@ -580,10 +580,17 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
             const isRedDay = isThursdayOrFriday || holidayInfo.isHoliday;
 
             return (
-              <button
+              <div
                 key={`day-${dayNum}`}
-                type="button"
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSelectDay(dayNum)}
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    handleSelectDay(dayNum);
+                  }
+                }}
                 title={holidayInfo.isHoliday ? holidayInfo.title : undefined}
                 className={`relative h-14 sm:h-20 p-1 sm:p-2 rounded-2xl border transition-all duration-200 flex flex-col justify-between items-center cursor-pointer ${
                   isSelected
@@ -616,9 +623,33 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
                   >
                     {toPersianDigits(dayNum)}
                   </span>
-                  {isToday && !isSelected && (
-                    <span className={`w-1.5 h-1.5 rounded-full ${isRedDay ? 'bg-rose-600 dark:bg-rose-400' : 'bg-indigo-600 dark:bg-indigo-400'}`} />
-                  )}
+                  <span className="flex items-center gap-1">
+                    {isToday && !isSelected && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${isRedDay ? 'bg-rose-600 dark:bg-rose-400' : 'bg-indigo-600 dark:bg-indigo-400'}`} />
+                    )}
+                    {/* New activity on this day: the only way a day opens the form */}
+                    {onOpenCreateForDate && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDay(dayNum);
+                          openCreateForDay(dayNum);
+                        }}
+                        title="افزودن فعالیت در این روز"
+                        aria-label={`افزودن فعالیت در روز ${toPersianDigits(dayNum)}`}
+                        className={`w-4 h-4 sm:w-5 sm:h-5 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-white/20 hover:bg-white/35 text-white'
+                            : isRedDay
+                            ? 'text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60'
+                            : 'text-indigo-500 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
+                        }`}
+                      >
+                        <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                      </button>
+                    )}
+                  </span>
                 </div>
 
                 {/* Official Holiday Title Badge on Tile - removed per user request */}
@@ -641,7 +672,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
                     </span>
                   </div>
                 )}
-              </button>
+              </div>
             );
           })}
 

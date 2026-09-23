@@ -9,7 +9,8 @@ interface NavbarProps {
   onOpenCreateModal?: () => void;
   totalTasks: number;
   completedTasks: number;
-  onToggleFilterBar: () => void;
+  /** Only on the Kanban page, the one the filters apply to: the filter button is not shown elsewhere. */
+  onToggleFilterBar?: () => void;
   isFilterBarOpen: boolean;
   onRefreshData: () => void;
   isSyncing?: boolean;
@@ -136,19 +137,21 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Filter Toggle Button (Icon Only) */}
-            <button
-              type="button"
-              onClick={onToggleFilterBar}
-              title={isFilterBarOpen ? 'بستن فیلترها' : 'نمایش فیلترها'}
-              className={`p-2.5 rounded-xl border transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto ${
-                isFilterBarOpen
-                  ? `${palette.accentBg} text-white ${palette.accentBorder} shadow-xs`
-                  : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-slate-700/80'
-              }`}
-            >
-              <Filter className="w-4 h-4" />
-            </button>
+            {/* Filter Toggle Button (Icon Only) - Kanban only */}
+            {onToggleFilterBar && (
+              <button
+                type="button"
+                onClick={onToggleFilterBar}
+                title={isFilterBarOpen ? 'بستن فیلترها' : 'نمایش فیلترها'}
+                className={`p-2.5 rounded-xl border transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto ${
+                  isFilterBarOpen
+                    ? `${palette.accentBg} text-white ${palette.accentBorder} shadow-xs`
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-slate-700/80'
+                }`}
+              >
+                <Filter className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Refresh Data Button (Icon Only - Centered and Color Palette Styled) */}
             <button
