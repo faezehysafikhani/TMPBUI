@@ -174,6 +174,9 @@ interface TaskDto {
   modifiedAtUtc: string | null;
   /** Time of day on dueDate ("HH:mm:ss"); null when the task has only a date. */
   dueTime?: string | null;
+  /** Times of day on the charter dates, like dueTime. */
+  charterStartTime?: string | null;
+  charterEndTime?: string | null;
 }
 
 interface TaskListItemDto { id: string; }
@@ -752,8 +755,8 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
       ? {
           description: dto.charterDescription || undefined,
           projectManager: dto.charterProjectManager || undefined,
-          startDate: fromDateOnly(dto.charterStartDate),
-          endDate: fromDateOnly(dto.charterEndDate),
+          startDate: fromDateOnly(dto.charterStartDate, dto.charterStartTime),
+          endDate: fromDateOnly(dto.charterEndDate, dto.charterEndTime),
         }
       : undefined,
     projectSubTasks: [...(dto.subTasks || [])].sort((a, b) => a.sortOrder - b.sortOrder).map(mapSubTask),
@@ -1094,6 +1097,8 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
       charterProjectManager: taskData.projectCharter?.projectManager || null,
       charterStartDate: toDateOnly(taskData.projectCharter?.startDate),
       charterEndDate: toDateOnly(taskData.projectCharter?.endDate),
+      charterStartTime: toTimeOfDay(taskData.projectCharter?.startDate),
+      charterEndTime: toTimeOfDay(taskData.projectCharter?.endDate),
       subTasks: subTasks.map((s, i) => toSubTaskBody(s, i)),
       tags: (taskData.tags || []).filter((t) => t && t.trim()),
     },
@@ -1203,6 +1208,8 @@ export async function updateTask(
         charterProjectManager: charter !== undefined ? charter?.projectManager || null : current.charterProjectManager,
         charterStartDate: charter !== undefined ? toDateOnly(charter?.startDate) : current.charterStartDate,
         charterEndDate: charter !== undefined ? toDateOnly(charter?.endDate) : current.charterEndDate,
+        charterStartTime: charter !== undefined ? toTimeOfDay(charter?.startDate) : current.charterStartTime ?? null,
+        charterEndTime: charter !== undefined ? toTimeOfDay(charter?.endDate) : current.charterEndTime ?? null,
       },
     });
   }
