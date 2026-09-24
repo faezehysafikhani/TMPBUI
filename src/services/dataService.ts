@@ -89,11 +89,24 @@ export function logoutPB(): void {
     return;
 }
 
+function normalizeCachedTeams(value: unknown): WorkTeam[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter((team): team is WorkTeam => {
+    if (!team || typeof team !== 'object') return false;
+    const candidate = team as Partial<WorkTeam>;
+    return typeof candidate.id === 'string'
+      && nexusApi.isGuid(candidate.id)
+      && typeof candidate.name === 'string'
+      && Array.isArray(candidate.members);
+  });
+}
+
 export function fetchUserTeamsPB(userId: string): WorkTeam[] {
   if (!userId) return [];
   try {
     const raw = localStorage.getItem(LOCAL_TEAMS_PREFIX + userId);
-    return raw ? JSON.parse(raw) : [];
+    return raw ? normalizeCachedTeams(JSON.parse(raw)) : [];
   } catch {
     return [];
   }
