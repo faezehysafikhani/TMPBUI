@@ -36,30 +36,8 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
       setAllUsers(usersList);
 
       const existingTeams = await fetchUserTeamsAsyncPB(currentUser.id);
-      if (existingTeams.length === 0) {
-        // Create default team for current user if none exists
-        const defaultTeam: WorkTeam = {
-          id: 'team_' + Date.now(),
-          name: 'تیم کاری اصلی',
-          ownerId: currentUser.id,
-          members: [
-            {
-              userId: currentUser.id,
-              name: currentUser.name || currentUser.username,
-              username: currentUser.username,
-              avatar: currentUser.avatar,
-              role: 'مدیر تیم',
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        };
-        await saveUserTeamsPB(currentUser.id, [defaultTeam]);
-        setTeams([defaultTeam]);
-        setActiveTeamId(defaultTeam.id);
-      } else {
-        setTeams(existingTeams);
-        setActiveTeamId(existingTeams[0].id);
-      }
+      setTeams(existingTeams);
+      setActiveTeamId(existingTeams[0]?.id || '');
     } catch (err) {
       console.error('Error loading team management data:', err);
     } finally {
@@ -188,7 +166,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
 
     const updatedTeams = teams.filter((t) => t.id !== teamId);
     setTeams(updatedTeams);
-    setActiveTeamId(updatedTeams[0].id);
+    setActiveTeamId(updatedTeams[0]?.id || '');
     await saveUserTeamsPB(currentUser.id, updatedTeams);
     onTeamsUpdated?.(updatedTeams);
     setActionMsg({ type: 'success', text: 'تیم کاری حذف گردید.' });
@@ -235,22 +213,28 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
       {/* Team Tabs & Create Team Button */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          {teams.map((team) => (
-            <button
-              key={team.id}
-              type="button"
-              onClick={() => setActiveTeamId(team.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
-                activeTeam?.id === team.id
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>{team.name}</span>
-              <span className="text-[10px] opacity-80">({team.members.length})</span>
-            </button>
-          ))}
+          {teams.length === 0 ? (
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1">
+              شما هنوز عضو هیچ تیم کاری نیستید.
+            </span>
+          ) : (
+            teams.map((team) => (
+              <button
+                key={team.id}
+                type="button"
+                onClick={() => setActiveTeamId(team.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                  activeTeam?.id === team.id
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>{team.name}</span>
+                <span className="text-[10px] opacity-80">({team.members.length})</span>
+              </button>
+            ))
+          )}
         </div>
 
         <button
