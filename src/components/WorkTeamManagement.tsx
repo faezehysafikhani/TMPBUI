@@ -72,6 +72,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
   }, [currentUser.id]);
 
   const activeTeam = teams.find((t) => t.id === activeTeamId) || teams[0];
+  const canManageActiveTeam = !!activeTeam && activeTeam.ownerId === currentUser.id;
 
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,6 +106,10 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
 
   const handleAddMember = async (userToAdd: User) => {
     if (!activeTeam) return;
+    if (!canManageActiveTeam) {
+      setActionMsg({ type: 'error', text: 'شما فقط می‌توانید اعضای این تیم را مشاهده کنید.' });
+      return;
+    }
 
     // Check if user is already in active team
     if (activeTeam.members.some((m) => m.userId === userToAdd.id)) {
@@ -141,6 +146,10 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
 
   const handleRemoveMember = async (memberUserId: string) => {
     if (!activeTeam) return;
+    if (!canManageActiveTeam) {
+      setActionMsg({ type: 'error', text: 'شما فقط می‌توانید اعضای این تیم را مشاهده کنید.' });
+      return;
+    }
 
     if (memberUserId === currentUser.id) {
       setActionMsg({ type: 'error', text: 'امکان حذف سازنده تیم وجود ندارد.' });
@@ -164,6 +173,11 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
   };
 
   const handleDeleteTeam = async (teamId: string) => {
+    if (!canManageActiveTeam) {
+      setActionMsg({ type: 'error', text: 'شما فقط می‌توانید اعضای این تیم را مشاهده کنید.' });
+      return;
+    }
+
     if (teams.length <= 1) {
       setActionMsg({ type: 'error', text: 'حداقل یک تیم کاری باید وجود داشته باشد.' });
       return;
@@ -300,7 +314,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
                 </p>
               </div>
 
-              {teams.length > 1 && (
+              {teams.length > 1 && canManageActiveTeam && (
                 <button
                   type="button"
                   onClick={() => handleDeleteTeam(activeTeam.id)}
@@ -313,80 +327,88 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
               )}
             </div>
 
-            {/* Search for users to add */}
-            <div className="space-y-2">
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                جستجو و اضافه کردن کاربر به {activeTeam.name}:
-              </label>
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="نام یا نام کاربری همکار خود را جستجو کنید..."
-                  className="w-full pr-9 pl-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
-                />
+            {!canManageActiveTeam && (
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+                شما عضو این تیم هستید؛ اعضا را می‌توانید ببینید و در چت داخلی با آن‌ها گفتگو کنید. مدیریت اعضا فقط برای مدیر تیم یا ادمین انجام می‌شود.
               </div>
+            )}
 
-              {/* Instant Search Results Dropdown List */}
-              {searchTerm.trim().length > 0 && (
-                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 max-h-48 overflow-y-auto space-y-1 animate-in fade-in duration-150">
-                  {availableUsersToSearch.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-slate-500">
-                      کاربری با این مشخصات پیدا نشد یا قبلاً عضو تیم شده است.
-                    </div>
-                  ) : (
-                    availableUsersToSearch.map((user) => {
-                      const isAlreadyInTeam = activeTeam.members.some((m) => m.userId === user.id);
-                      return (
-                        <div
-                          key={user.id}
-                          className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
-                        >
-                          <div className="flex items-center gap-2.5">
-                            {user.avatar ? (
-                              <img
-                                src={user.avatar}
-                                alt={user.name}
-                                className="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                                {user.name ? user.name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase()}
-                              </div>
-                            )}
-
-                            <div>
-                              <p className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                                {user.name || user.username}
-                              </p>
-                              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                                @{user.username} {user.email ? `(${user.email})` : ''}
-                              </p>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            disabled={isAlreadyInTeam}
-                            onClick={() => handleAddMember(user)}
-                            className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                              isAlreadyInTeam
-                                ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
-                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                            }`}
-                          >
-                            <UserPlus className="w-3.5 h-3.5" />
-                            <span>{isAlreadyInTeam ? 'عضو تیم' : 'افزودن به تیم'}</span>
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
+            {/* Search for users to add */}
+            {canManageActiveTeam && (
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  جستجو و اضافه کردن کاربر به {activeTeam.name}:
+                </label>
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="نام یا نام کاربری همکار خود را جستجو کنید..."
+                    className="w-full pr-9 pl-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                  />
                 </div>
-              )}
-            </div>
+
+                {/* Instant Search Results Dropdown List */}
+                {searchTerm.trim().length > 0 && (
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 max-h-48 overflow-y-auto space-y-1 animate-in fade-in duration-150">
+                    {availableUsersToSearch.length === 0 ? (
+                      <div className="p-3 text-center text-xs text-slate-500">
+                        کاربری با این مشخصات پیدا نشد یا قبلاً عضو تیم شده است.
+                      </div>
+                    ) : (
+                      availableUsersToSearch.map((user) => {
+                        const isAlreadyInTeam = activeTeam.members.some((m) => m.userId === user.id);
+                        return (
+                          <div
+                            key={user.id}
+                            className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              {user.avatar ? (
+                                <img
+                                  src={user.avatar}
+                                  alt={user.name}
+                                  className="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                                  {user.name ? user.name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+
+                              <div>
+                                <p className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                                  {user.name || user.username}
+                                </p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  @{user.username} {user.email ? `(${user.email})` : ''}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={isAlreadyInTeam}
+                              onClick={() => handleAddMember(user)}
+                              className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                                isAlreadyInTeam
+                                  ? 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                              }`}
+                            >
+                              <UserPlus className="w-3.5 h-3.5" />
+                              <span>{isAlreadyInTeam ? 'عضو تیم' : 'افزودن به تیم'}</span>
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Current Team Members List */}
@@ -438,7 +460,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
                     </div>
                   </div>
 
-                  {member.userId !== currentUser.id && (
+                  {canManageActiveTeam && member.userId !== currentUser.id && (
                     <button
                       type="button"
                       onClick={() => handleRemoveMember(member.userId)}
