@@ -140,20 +140,28 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     if (!msg || msg.senderId !== currentUser?.id) return;
     if (!editingText.trim()) return;
     const newText = editingText.trim();
-    await updateDirectMessagePB(messageId, newText);
-    setMessages((prev) =>
-      prev.map((m) => (m.id === messageId ? { ...m, text: newText } : m))
-    );
-    setEditingMessageId(null);
-    setEditingText('');
+    try {
+      await updateDirectMessagePB(messageId, newText);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, text: newText } : m))
+      );
+      setEditingMessageId(null);
+      setEditingText('');
+    } catch (err) {
+      setSendError(userErrorMessage(err, 'ویرایش پیام انجام نشد. لطفاً دوباره تلاش کنید.'));
+    }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
     const msg = messages.find((m) => m.id === messageId);
     if (!msg || msg.senderId !== currentUser?.id) return;
     if (!window.confirm('آیا از حذف این پیام اطمینان دارید؟')) return;
-    await deleteDirectMessagePB(messageId);
-    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    try {
+      await deleteDirectMessagePB(messageId);
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    } catch (err) {
+      setSendError(userErrorMessage(err, 'حذف پیام انجام نشد. لطفاً دوباره تلاش کنید.'));
+    }
   };
 
   // ---- Scrolling: only the message list scrolls, never the page ----------------------------

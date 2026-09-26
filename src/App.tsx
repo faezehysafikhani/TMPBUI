@@ -11,6 +11,7 @@ import type { ThemeMode } from './components/SettingsModal';
 import { UserWelcomeModal } from './components/UserWelcomeModal';
 import { AuthModal } from './components/AuthModal';
 import { PageViewLoader } from './components/PageViewLoader';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Lazy loaded views & modals for secondary views
 const JalaliCalendarView = lazy(() => import('./components/JalaliCalendarView').then(m => ({ default: m.JalaliCalendarView })));
@@ -1331,15 +1332,17 @@ export default function App() {
             {/* Tab 4: Team Chat View */}
             {activeTab === 'chat' && (
               <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
-                <TeamChatView
-                  currentUser={currentUser}
-                  teams={allTeams}
-                  appColorPalette={appColorPalette}
-                  onConvertToTask={handleConvertToTask}
-                  // The same tasks the dashboard shows: chat is never a way around the task rule.
-                  tasks={visibleTasks}
-                  onViewTaskDetails={handleOpenTaskDetail}
-                />
+                <ErrorBoundary title="خطا در نمایش گفتگو">
+                  <TeamChatView
+                    currentUser={currentUser}
+                    teams={allTeams}
+                    appColorPalette={appColorPalette}
+                    onConvertToTask={handleConvertToTask}
+                    // The same tasks the dashboard shows: chat is never a way around the task rule.
+                    tasks={visibleTasks}
+                    onViewTaskDetails={handleOpenTaskDetail}
+                  />
+                </ErrorBoundary>
               </Suspense>
             )}
 
