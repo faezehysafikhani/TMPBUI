@@ -175,6 +175,12 @@ const FIELD_NAMES: Record<string, string> = {
 
 const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/too large|maximum size is/i, () => FILE_TOO_LARGE_ERROR],
+  // SMS templates (the key is shown as the panel shows it)
+  [/^Unknown SMS template '(.+)'\.?$/i, () => 'این متن پیامک در این سامانه قابل ویرایش نیست.'],
+  [/^The text of '(.+)' cannot be empty\.?$/i, (m) => `متن پیامک «${smsTitle(m[1])}» نمی‌تواند خالی باشد.`],
+  [/^The text of '(.+)' is longer than (\d+) characters\.?$/i, (m) => `متن پیامک «${smsTitle(m[1])}» نباید بیشتر از ${toFa(m[2])} کاراکتر باشد.`],
+  [/^The text of '(.+)' uses unknown placeholders: (.+?)\.?$/i, (m) => `متن پیامک «${smsTitle(m[1])}» عبارت ناشناخته دارد: ${m[2]}`],
+  [/^The text of '(.+)' must contain (.+?)\.?$/i, (m) => `متن پیامک «${smsTitle(m[1])}» باید ${m[2]} را داشته باشد.`],
   [/^You can only grant permissions you have yourself/i, () => 'فقط مجوزهایی را می‌توانید اعطا کنید که خودتان دارید.'],
   [/^You can only assign roles whose permissions you have yourself/i, () => 'فقط نقش‌هایی را می‌توانید تخصیص دهید که همه مجوزهای آن را خودتان دارید.'],
   [/^'(.+)' must not be empty\.?$/i, (m) => `وارد کردن «${field(m[1])}» الزامی است.`],
@@ -185,6 +191,18 @@ const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/^'(.+)' has a range of values which does not include/i, (m) => `مقدار «${field(m[1])}» معتبر نیست.`],
   [/^'(.+)' (must|is)/i, (m) => `مقدار «${field(m[1])}» معتبر نیست.`],
 ];
+
+/** The Persian name of an SMS template the server names by its key. */
+const SMS_TEMPLATE_TITLES: Record<string, string> = {
+  password_reset: 'کد بازیابی رمز عبور',
+  task_assigned: 'ارجاع فعالیت',
+  recurring_task_reminder: 'یادآوری فعالیت تکرارشونده',
+  task_due_changed: 'تغییر موعد فعالیت',
+};
+
+function smsTitle(key: string): string {
+  return SMS_TEMPLATE_TITLES[key] || key;
+}
 
 function field(name: string): string {
   return FIELD_NAMES[name] || name;

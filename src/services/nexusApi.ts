@@ -1713,7 +1713,17 @@ export interface SmsPanelSettings {
 
 export interface SmsProviderOption { key: string; displayName: string; defaultBaseUrl: string; }
 
-export interface SmsTemplate { key: string; title: string; text: string; placeholders: string[]; }
+export interface SmsTemplate {
+  key: string;
+  title: string;
+  text: string;
+  placeholders: string[];
+  /** When it is sent; from the server's template catalog. */
+  description?: string | null;
+  /** Placeholders the text must keep, e.g. {Code}. */
+  requiredPlaceholders?: string[] | null;
+  defaultText?: string | null;
+}
 
 export async function getSmsProviders(): Promise<SmsProviderOption[]> {
   return request<SmsProviderOption[]>('GET', `${CHANNELS}/providers`);

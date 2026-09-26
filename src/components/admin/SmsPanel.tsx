@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Save, Send, MessageSquareText, KeyRound } from 'lucide-react';
+import { Loader2, Save, Send, MessageSquareText, KeyRound, RotateCcw } from 'lucide-react';
 import {
   SmsPanelSettings, SmsProviderOption, SmsTemplate,
   getSmsPanelSettings, getSmsProviders, getSmsTemplates, saveSmsPanelSettings, saveSmsTemplates, sendTestSms,
 } from '../../services/nexusApi';
 import { AdminCard, Field, inputClass, Toggle, Notice, PrimaryButton, SecondaryButton, StatusBadge, toLatinDigits } from './AdminUi';
 import { userErrorMessage } from '../../utils/errorMessages';
+import { productSmsTemplates, validateSmsTemplate, SMS_TEMPLATE_MAX_LENGTH } from '../../utils/smsTemplates';
 
 /** The SMS panel (پنل پیامکی): provider settings, the system's SMS texts and a test message. */
 export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ canUpdate, canTest }) => {
@@ -20,7 +21,7 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
 
   useEffect(() => {
     Promise.all([getSmsProviders(), getSmsPanelSettings(), getSmsTemplates()])
-      .then(([p, s, t]) => { setProviders(p); setSettings(s); setTemplates(t); })
+      .then(([p, s, t]) => { setProviders(p); setSettings(s); setTemplates(productSmsTemplates(t)); })
       .catch((err) => setLoadError(userErrorMessage(err, 'دریافت تنظیمات پنل پیامکی ممکن نشد.')));
   }, []);
 
@@ -41,13 +42,15 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
       setMessage({ type: 'error', text: 'برای فعال کردن پنل پیامکی، کلید API را وارد کنید.' });
       return false;
     }
-    if (templates.some((t) => !t.text.trim())) {
-      setMessage({ type: 'error', text: 'متن هیچ‌کدام از پیامک‌ها نمی‌تواند خالی باشد.' });
+    const invalid = templates.map(validateSmsTemplate).find((error) => error !== null);
+    if (invalid) {
+      setMessage({ type: 'error', text: invalid });
       return false;
     }
     const saved = await saveSmsPanelSettings(settings);
     setSettings(saved);
-    setTemplates(await saveSmsTemplates(templates.map((t) => ({ key: t.key, text: t.text }))));
+    // Only this product's texts are sent; the answer is filtered the same way.
+    setTemplates(productSmsTemplates(await saveSmsTemplates(templates.map((t) => ({ key: t.key, text: t.text })))));
     return true;
   };
 
@@ -122,32 +125,58 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
           <MessageSquareText className="w-5 h-5 text-indigo-700 dark:text-indigo-400" />
           <h3 className="text-base font-extrabold text-slate-900 dark:text-white">متن پیامک‌ها</h3>
         </div>
-        <p className="text-xs text-slate-500 dark:text-slate-400">عبارت‌های داخل آکولاد هنگام ارسال با مقدار واقعی جایگزین می‌شوند.</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">عبارت‌های داخل آکولاد هنگام ارسال با مقدار واقعی جایگزین می‌شوند. عبارت‌های ستاره‌دار باید در متن بمانند.</p>
+        {templates.length === 0 && <p className="text-xs text-slate-400">متنی برای ویرایش وجود ندارد.</p>}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {templates.map((template, index) => (
-            <Field key={template.key} label={template.title}>
-              <textarea
-                className={`${inputClass} min-h-24 resize-y leading-relaxed`}
-                value={template.text}
-                maxLength={1000}
-                disabled={disabled}
-                onChange={(e) => setTemplates((list) => list.map((t, i) => (i === index ? { ...t, text: e.target.value } : t)))}
-              />
-              <span className="flex flex-wrap gap-1 mt-1.5">
-                {template.placeholders.map((ph) => (
-                  <button
-                    key={ph}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => setTemplates((list) => list.map((t, i) => (i === index ? { ...t, text: `${t.text}{${ph}}` } : t)))}
-                    className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300 hover:bg-indigo-50 cursor-pointer disabled:cursor-default"
-                  >
-                    {`{${ph}}`}
-                  </button>
-                ))}
-              </span>
-            </Field>
-          ))}
+          {templates.map((template, index) => {
+            const error = validateSmsTemplate(template);
+            const required = new Set((template.requiredPlaceholders ?? []).map((p) => p.toLowerCase()));
+            const update = (text: string) => setTemplates((list) => list.map((t, i) => (i === index ? { ...t, text } : t)));
+            return (
+              <div key={template.key} data-sms-template={template.key} className="space-y-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{template.title}</p>
+                    <p className="text-[11px] font-mono text-slate-400 dir-ltr text-right">{template.key}</p>
+                  </div>
+                  {template.defaultText && template.text !== template.defaultText && !disabled && (
+                    <button
+                      type="button"
+                      onClick={() => update(template.defaultText!)}
+                      className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 dark:text-indigo-400 hover:underline"
+                    >
+                      <RotateCcw className="w-3 h-3" /> متن پیش‌فرض
+                    </button>
+                  )}
+                </div>
+                {template.description && <p className="text-xs text-slate-500 dark:text-slate-400">{template.description}</p>}
+                <textarea
+                  className={`${inputClass} min-h-24 resize-y leading-relaxed`}
+                  value={template.text}
+                  maxLength={SMS_TEMPLATE_MAX_LENGTH}
+                  disabled={disabled}
+                  aria-label={template.title}
+                  aria-invalid={error ? true : undefined}
+                  onChange={(e) => update(e.target.value)}
+                />
+                <span className="flex flex-wrap gap-1">
+                  {template.placeholders.map((ph) => (
+                    <button
+                      key={ph}
+                      type="button"
+                      disabled={disabled}
+                      title={required.has(ph.toLowerCase()) ? 'الزامی' : undefined}
+                      onClick={() => update(`${template.text}{${ph}}`)}
+                      className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[11px] font-mono text-slate-600 dark:text-slate-300 hover:bg-indigo-50 cursor-pointer disabled:cursor-default"
+                    >
+                      {`{${ph}}`}{required.has(ph.toLowerCase()) && <span className="text-rose-500">*</span>}
+                    </button>
+                  ))}
+                </span>
+                {error && <p role="alert" className="text-xs text-rose-600 dark:text-rose-400">{error}</p>}
+              </div>
+            );
+          })}
         </div>
       </AdminCard>
 
