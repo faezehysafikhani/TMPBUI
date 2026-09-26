@@ -27,6 +27,7 @@ import {
   Lock
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
+import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
 
 interface JalaliCalendarViewProps {
   tasks: Task[];
@@ -266,13 +267,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
   const checkTaskPermissions = (task: Task) => {
     const isAdmin = isTaskAdmin(currentUser);
 
-    const isAssignee = !!(
-      currentUser &&
-      ((task.assignedUserId && task.assignedUserId === currentUser.id) ||
-        (task.assignedUserName &&
-          (task.assignedUserName.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase() ||
-            task.assignedUserName.trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase())))
-    );
+    const isAssignee = isResponsibleFor(task, currentUser);
 
     const isTeamMember = !!(
       currentUser &&
@@ -387,7 +382,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
             status: task.status,
             priority: task.priority,
             timeStr,
-            assignedUserName: task.assignedUserName,
+            assignedUserName: responsibleNamesOf(task) || undefined,
           });
         }
       }
@@ -433,7 +428,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
             status: st.completed ? 'completed' : 'todo',
             priority: (st.importance as any) || task.priority,
             timeStr,
-            assignedUserName: task.assignedUserName,
+            assignedUserName: responsibleNamesOf(task) || undefined,
           });
         }
       });

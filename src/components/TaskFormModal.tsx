@@ -29,6 +29,16 @@ import {
   ListChecks,
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
+import { isResponsibleFor, responsibleIdsOf } from '../utils/taskPeople';
+
+/** One person the responsible-people picker offers. */
+interface PersonOption {
+  id: string;
+  name: string;
+  username: string;
+  avatar?: string;
+  email?: string;
+}
 
 interface TaskFormModalProps {
   isOpen: boolean;
@@ -68,7 +78,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
-  const [assignedUserId, setAssignedUserId] = useState<string>('');
+  // Everyone responsible for doing the task (one or more); the first is sent as assignedUserId too.
+  const [responsibleIds, setResponsibleIds] = useState<string[]>([]);
   const [allowAssigneeStatusUpdate, setAllowAssigneeStatusUpdate] = useState<boolean>(true);
   const [allRegisteredUsers, setAllRegisteredUsers] = useState<User[]>(registeredUsers);
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
@@ -130,14 +141,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
   const isAdmin = isTaskAdmin(currentUser);
 
-  const isAssignee = !!(
-    taskToEdit &&
-    currentUser &&
-    ((taskToEdit.assignedUserId && taskToEdit.assignedUserId === currentUser.id) ||
-      (taskToEdit.assignedUserName &&
-        (taskToEdit.assignedUserName.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase() ||
-          taskToEdit.assignedUserName.trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase())))
-  );
+  const isAssignee = !!(taskToEdit && currentUser && isResponsibleFor(taskToEdit, currentUser));
 
   const isTeamMember = !!(
     taskToEdit &&
@@ -196,29 +200,22 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       .catch(() => {});
   }, [registeredUsers, isOpen]);
 
+  // The teams to choose from. Only the teams: the form's own selections are set once when it
+  // opens (below) and never reset here - the signed-in user object is replaced whenever the
+  // window regains focus, and that used to throw away what had been picked before saving.
+  const currentUserId = currentUser?.id;
   useEffect(() => {
-    if (currentUser) {
-      // First load synchronously from local cache
-      const cachedTeams = fetchUserTeamsPB(currentUser.id);
-      setAvailableTeams(cachedTeams);
+    if (!currentUserId) return;
+    // First load synchronously from local cache
+    setAvailableTeams(fetchUserTeamsPB(currentUserId));
 
-      // Then refresh from the server
-      fetchUserTeamsAsyncPB(currentUser.id).then((liveTeams) => {
-        if (liveTeams && liveTeams.length > 0) {
-          setAvailableTeams(liveTeams);
-        }
-      }).catch(() => {});
-
-      if (taskToEdit?.assignedTeamId) {
-        setSelectedTeamId(taskToEdit.assignedTeamId);
-        setSelectedMemberIds(taskToEdit.teamMemberIds || []);
-      } else {
-        // Default team mode to Personal Mode ("شخصی")
-        setSelectedTeamId('');
-        setSelectedMemberIds(currentUser ? [currentUser.id] : []);
+    // Then refresh from the server
+    fetchUserTeamsAsyncPB(currentUserId).then((liveTeams) => {
+      if (liveTeams && liveTeams.length > 0) {
+        setAvailableTeams(liveTeams);
       }
-    }
-  }, [currentUser, taskToEdit, isOpen]);
+    }).catch(() => {});
+  }, [currentUserId, isOpen]);
 
   useEffect(() => {
     if (taskToEdit) {
@@ -229,8 +226,11 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setStatus(taskToEdit.status || 'todo');
       setAttachments(taskToEdit.attachments || []);
       setSelectedTeamId(taskToEdit.assignedTeamId || '');
-      setSelectedMemberIds(taskToEdit.teamMemberIds || []);
-      setAssignedUserId(taskToEdit.assignedUserId || '');
+      // The access list as saved, without the responsible people (they have access anyway): so
+      // taking someone off the responsible list does not silently leave them with access.
+      const responsible = responsibleIdsOf(taskToEdit);
+      setResponsibleIds(responsible);
+      setSelectedMemberIds((taskToEdit.teamMemberIds || []).filter((id) => !responsible.includes(id)));
       setAllowAssigneeStatusUpdate(taskToEdit.allowAssigneeStatusUpdate !== false);
       setTags(taskToEdit.tags || []);
       setTagInput('');
@@ -284,7 +284,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setPriority('medium');
       setStatus(initialStatus);
       setAttachments([]);
-      setAssignedUserId('');
+      setResponsibleIds([]);
       setTags([]);
       setTagInput('');
       setIsProject(false);
@@ -421,7 +421,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       return;
     }
     // Every new task needs someone responsible for doing it (the server enforces this too).
-    if (!taskToEdit && !assignedUserId) {
+    if (!taskToEdit && responsibleIds.length === 0) {
       setErrors({ assignee: 'لطفاً مسئول اجرای فعالیت را انتخاب کنید.' });
       assigneeDropdownRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       return;
@@ -435,32 +435,21 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       finalTeamMemberIds = [currentUser.id];
     }
 
-    // Find assigned member details
-    let assignedName: string | undefined = taskToEdit?.assignedUserName;
-    let assignedAvatar: string | undefined = taskToEdit?.assignedUserAvatar;
-    if (assignedUserId) {
-      const allMembers = availableTeams.flatMap((t) => t.members);
-      const member = allMembers.find((m) => m.userId === assignedUserId);
-      const regUser = allRegisteredUsers.find((u) => u.id === assignedUserId);
-      if (member) {
-        assignedName = member.name;
-        assignedAvatar = member.avatar;
-      } else if (regUser) {
-        assignedName = regUser.name || regUser.username;
-        assignedAvatar = regUser.avatar;
-      } else if (currentUser && currentUser.id === assignedUserId) {
-        assignedName = currentUser.name || currentUser.username;
-        assignedAvatar = currentUser.avatar;
-      }
-
-      // If assigned to a user without team, ensure the assignee is included in memberIds
-      if (!finalTeamMemberIds.includes(assignedUserId)) {
-        finalTeamMemberIds = [...finalTeamMemberIds, assignedUserId];
-      }
-    } else {
-      assignedName = undefined;
-      assignedAvatar = undefined;
-    }
+    // Names of the responsible people, for display until the server's copy arrives. They are not
+    // added to the access list: responsible people have access anyway, and the server keeps it.
+    const allMembers = availableTeams.flatMap((t) => t.members);
+    const personOf = (id: string): { name?: string; avatar?: string } => {
+      const regUser = allRegisteredUsers.find((u) => u.id === id);
+      if (regUser) return { name: regUser.name || regUser.username, avatar: regUser.avatar };
+      const member = allMembers.find((m) => m.userId === id);
+      if (member) return { name: member.name, avatar: member.avatar };
+      if (currentUser && currentUser.id === id) return { name: currentUser.name || currentUser.username, avatar: currentUser.avatar };
+      const known = (taskToEdit?.responsibleUserIds || []).indexOf(id);
+      return { name: known >= 0 ? taskToEdit?.responsibleUserNames?.[known] : undefined };
+    };
+    const responsibleNames = responsibleIds.map((id) => personOf(id).name || 'کاربر');
+    const assignedName = responsibleIds.length > 0 ? responsibleNames[0] : undefined;
+    const assignedAvatar = responsibleIds.length > 0 ? personOf(responsibleIds[0]).avatar : undefined;
 
     const finalIsProject = isProject;
     const finalIsRecurring = !isProject && isRecurring;
@@ -519,13 +508,15 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         user: taskToEdit?.user || (currentUser ? currentUser.id : undefined),
         ownerName: taskToEdit?.ownerName || (currentUser ? currentUser.name || currentUser.username : undefined),
         ownerAvatar: taskToEdit?.ownerAvatar || (currentUser ? currentUser.avatar : undefined),
-        assignedUserId: assignedUserId || undefined,
+        assignedUserId: responsibleIds[0] || undefined,
+        responsibleUserIds: responsibleIds,
+        responsibleUserNames: responsibleNames,
         assignedUserName: assignedName,
         assignedUserAvatar: assignedAvatar,
         assignedTeamId: selectedTeam ? selectedTeam.id : undefined,
         assignedTeamName: selectedTeam ? selectedTeam.name : undefined,
         teamMemberIds: finalTeamMemberIds,
-        allowAssigneeStatusUpdate: assignedUserId ? allowAssigneeStatusUpdate : true,
+        allowAssigneeStatusUpdate: responsibleIds.length > 0 ? allowAssigneeStatusUpdate : true,
         isProject: finalIsProject,
         isRecurring: finalIsRecurring,
         recurringConfig,
@@ -695,8 +686,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 onChange={(e) => {
                   const teamId = e.target.value;
                   setSelectedTeamId(teamId);
-                  // When a work team is selected, do not pre-select all members by default
-                  setSelectedMemberIds([]);
+                  // A chosen team's members get access by default (as when the team itself gave it);
+                  // each can be taken off below. No team: the task stays with its people.
+                  const team = availableTeams.find((t) => t.id === teamId);
+                  setSelectedMemberIds(team ? team.members.map((m) => m.userId) : currentUser ? [currentUser.id] : []);
                 }}
                 className={`w-full px-3.5 py-2 bg-white dark:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all ${
                   isStatusOnlyEdit ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
@@ -713,163 +706,107 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               </select>
             </div>
 
-            {/* Assignee / Responsible Person Section */}
+            {/* Responsible people: one or more, from inside or outside the team */}
             <div className="pt-2.5 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2" ref={assigneeDropdownRef}>
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                   <UserIcon className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>مسئول اجرای فعالیت</span>
+                  <span>مسئولان اجرای فعالیت</span>
+                  {!taskToEdit && <span className="text-rose-500">*</span>}
                 </label>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                  {selectedTeamId ? (
-                    'انتخاب از اعضای تیم'
-                  ) : (
-                    `جستجو در میان تمام افراد (${toPersianDigits(allRegisteredUsers.length)} کاربر)`
-                  )}
+                  {responsibleIds.length > 0
+                    ? `${toPersianDigits(responsibleIds.length)} نفر انتخاب شده`
+                    : 'یک یا چند نفر را انتخاب کنید'}
                 </span>
               </div>
 
-              {/* Assignee Selection & Search Interface */}
               {(() => {
                 const currentTeamObj = availableTeams.find((t) => t.id === selectedTeamId);
-                
-                let candidateUsers: {
-                  id: string;
-                  name: string;
-                  username: string;
-                  avatar?: string;
-                  role?: string;
-                  email?: string;
-                }[] = [];
+                const teamIds = new Set((currentTeamObj?.members || []).map((m) => m.userId));
 
-                if (currentTeamObj) {
-                  candidateUsers = currentTeamObj.members.map((m) => ({
-                    id: m.userId,
-                    name: m.name,
-                    username: m.username || m.name,
-                    avatar: m.avatar,
-                    role: m.role || 'عضو تیم',
-                    email: '',
-                  }));
-                } else {
-                  if (allRegisteredUsers && allRegisteredUsers.length > 0) {
-                    // Disabled accounts cannot be made responsible (the server refuses them too);
-                    // the one already assigned to a task being edited stays visible.
-                    candidateUsers = allRegisteredUsers.filter((u) => !u.disabled || u.id === assignedUserId).map((u) => ({
-                      id: u.id,
-                      name: u.name || u.username,
-                      username: u.username,
-                      avatar: u.avatar,
-                      role: u.role === 'admin' ? 'مدیر کل' : u.role === 'manager' ? 'مدیر' : 'کاربر',
-                      email: u.email || '',
-                    }));
-                  }
-                  // The signed-in user can always take the task themselves, even when the user
-                  // list is not available to them (it needs users.view).
-                  if (currentUser && !currentUser.disabled && !candidateUsers.some((u) => u.id === currentUser.id)) {
-                    candidateUsers = [
-                      {
-                        id: currentUser.id,
-                        name: currentUser.name || currentUser.username,
-                        username: currentUser.username,
-                        avatar: currentUser.avatar,
-                        role: 'کاربر فعلی',
-                        email: currentUser.email || '',
-                      },
-                      ...candidateUsers,
-                    ];
+                // Every active user of the organization can be responsible - the team's members are
+                // listed first, but the team does not limit the choice. Disabled accounts cannot be
+                // picked (the server refuses them); one already responsible on an edited task stays.
+                const byId = new Map<string, PersonOption>();
+                for (const u of allRegisteredUsers) {
+                  if (u.disabled && !responsibleIds.includes(u.id)) continue;
+                  byId.set(u.id, { id: u.id, name: u.name || u.username, username: u.username, avatar: u.avatar, email: u.email || '' });
+                }
+                // The signed-in user can always take the task themselves, even without the user list.
+                if (currentUser && !currentUser.disabled && !byId.has(currentUser.id)) {
+                  byId.set(currentUser.id, { id: currentUser.id, name: currentUser.name || currentUser.username, username: currentUser.username, avatar: currentUser.avatar, email: currentUser.email || '' });
+                }
+                for (const m of currentTeamObj?.members || []) {
+                  if (!byId.has(m.userId) && !allRegisteredUsers.some((u) => u.id === m.userId && u.disabled)) {
+                    byId.set(m.userId, { id: m.userId, name: m.name, username: m.username || m.name, avatar: m.avatar, email: '' });
                   }
                 }
-
-                // Selected user details
-                const selectedUser =
-                  candidateUsers.find((u) => u.id === assignedUserId) ||
-                  allRegisteredUsers.find((u) => u.id === assignedUserId);
-
-                // Filtered candidate users for search
-                const query = userSearchQuery.trim().toLowerCase();
-                const filteredUsers = candidateUsers.filter((u) => {
-                  if (!query) return true;
-                  return (
-                    (u.name && u.name.toLowerCase().includes(query)) ||
-                    (u.username && u.username.toLowerCase().includes(query)) ||
-                    (u.email && u.email.toLowerCase().includes(query)) ||
-                    (u.role && u.role.toLowerCase().includes(query))
-                  );
+                // Names for people already responsible whom the list does not hold.
+                (taskToEdit?.responsibleUserIds || []).forEach((id, i) => {
+                  if (!byId.has(id) && responsibleIds.includes(id)) {
+                    byId.set(id, { id, name: taskToEdit?.responsibleUserNames?.[i] || 'کاربر', username: '', email: '' });
+                  }
                 });
+
+                const candidates = Array.from(byId.values()).sort((a, b) => {
+                  const rank = (p: PersonOption) => (p.id === currentUser?.id ? 0 : teamIds.has(p.id) ? 1 : 2);
+                  return rank(a) - rank(b) || a.name.localeCompare(b.name, 'fa');
+                });
+                const selected = responsibleIds.map((id) => byId.get(id)).filter((p): p is PersonOption => !!p);
+
+                const query = userSearchQuery.trim().toLowerCase();
+                const filtered = candidates.filter((u) =>
+                  !query ||
+                  u.name.toLowerCase().includes(query) ||
+                  (u.username || '').toLowerCase().includes(query) ||
+                  (u.email || '').toLowerCase().includes(query)
+                );
+
+                const toggle = (id: string) => {
+                  setResponsibleIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+                  setErrors((prev) => ({ ...prev, assignee: undefined }));
+                };
 
                 return (
                   <div className="space-y-2">
-                    {/* Active Assigned User Card (if any) */}
-                    {selectedUser ? (
-                      <div className="flex items-center justify-between p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/80">
-                        <div className="flex items-center gap-2.5">
-                          {selectedUser.avatar ? (
-                            <img
-                              src={selectedUser.avatar}
-                              alt={selectedUser.name}
-                              className="w-8 h-8 rounded-lg object-cover border border-indigo-200 dark:border-indigo-700 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
-                              {selectedUser.name ? selectedUser.name.charAt(0).toUpperCase() : 'U'}
-                            </div>
-                          )}
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                                {selectedUser.name}
-                              </span>
-                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">
-                                مسئول
-                              </span>
-                            </div>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                              @{selectedUser.username} {selectedUser.role ? `• ${selectedUser.role}` : ''}
-                            </p>
-                          </div>
-                        </div>
-
-                        {!isStatusOnlyEdit && (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsAssigneeDropdownOpen(true);
-                                setUserSearchQuery('');
-                              }}
-                              className="px-2 py-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg transition-colors cursor-pointer"
-                            >
-                              تغییر مسئول
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAssignedUserId('');
-                                setUserSearchQuery('');
-                              }}
-                              title="حذف مسئول"
-                              className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        )}
+                    {/* Chosen people */}
+                    {selected.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5" data-responsible-list>
+                        {selected.map((person) => (
+                          <span
+                            key={person.id}
+                            data-responsible={person.id}
+                            className="inline-flex items-center gap-1.5 pl-1 pr-1.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold text-indigo-900 dark:text-indigo-100"
+                          >
+                            <span className="w-5 h-5 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+                              {person.name.charAt(0).toUpperCase()}
+                            </span>
+                            <span>{person.id === currentUser?.id ? `${person.name} (من)` : person.name}</span>
+                            {teamIds.has(person.id) && <span className="text-[9px] text-indigo-500 dark:text-indigo-300">عضو تیم</span>}
+                            {!isStatusOnlyEdit && (
+                              <button
+                                type="button"
+                                aria-label={`حذف ${person.name} از مسئولان`}
+                                onClick={() => toggle(person.id)}
+                                className="p-0.5 rounded-md text-indigo-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </span>
+                        ))}
                       </div>
-                    ) : null}
+                    )}
 
-                    {/* Searchable Combobox Trigger / Input */}
-                    {(!selectedUser || isAssigneeDropdownOpen) && !isStatusOnlyEdit && (
+                    {/* Search and add */}
+                    {!isStatusOnlyEdit && (
                       <div className="relative">
                         <div className="relative flex items-center">
                           <Search className="w-4 h-4 absolute right-3 text-slate-400 pointer-events-none" />
                           <input
                             type="text"
-                            placeholder={
-                              selectedTeamId
-                                ? 'جستجو در اعضای تیم (نام، نقش)...'
-                                : `جستجو در میان تمام افراد موجود (${toPersianDigits(candidateUsers.length)} نفر)...`
-                            }
+                            placeholder={selected.length > 0 ? 'افزودن مسئول دیگر (جستجوی نام)...' : `جستجو در میان افراد (${toPersianDigits(candidates.length)} نفر)...`}
                             value={userSearchQuery}
                             onFocus={() => setIsAssigneeDropdownOpen(true)}
                             onChange={(e) => {
@@ -878,81 +815,35 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                             }}
                             className="w-full pl-9 pr-9 py-2 bg-white dark:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
                           />
-                          {userSearchQuery ? (
-                            <button
-                              type="button"
-                              onClick={() => setUserSearchQuery('')}
-                              className="absolute left-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setIsAssigneeDropdownOpen((prev) => !prev)}
-                              className="absolute left-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
-                            >
-                              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isAssigneeDropdownOpen ? 'rotate-180' : ''}`} />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            aria-label="نمایش فهرست افراد"
+                            onClick={() => setIsAssigneeDropdownOpen((prev) => !prev)}
+                            className="absolute left-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                          >
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isAssigneeDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
                         </div>
 
-                        {/* Floating Dropdown Results */}
                         {isAssigneeDropdownOpen && (
-                          <div className="absolute z-50 top-full mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                            {/* Option: No Assignee (only for an existing task; a new one needs someone) */}
-                            {taskToEdit && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAssignedUserId('');
-                                setIsAssigneeDropdownOpen(false);
-                                setUserSearchQuery('');
-                              }}
-                              className={`w-full flex items-center justify-between p-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                                !assignedUserId
-                                  ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold'
-                                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
-                                  <UserX className="w-4 h-4" />
-                                </div>
-                                <span>تعیین نشده (بدون مسئول مستقیم)</span>
-                              </div>
-                              {!assignedUserId && <Check className="w-4 h-4 text-indigo-600" />}
-                            </button>
-                            )}
-
-                            <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
-
-                            {/* Header / stats */}
+                          <div className="absolute z-50 top-full mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150" data-responsible-options>
                             <div className="px-2 py-1 text-[10px] text-slate-400 flex items-center justify-between">
-                              <span>
-                                {selectedTeamId ? 'اعضای تیم انتخابی:' : 'تمام افراد ثبت‌شده در سیستم:'}
-                              </span>
-                              <span>{toPersianDigits(filteredUsers.length)} فرد یافت شد</span>
+                              <span>{currentTeamObj ? 'اعضای تیم و سایر افراد:' : 'افراد سازمان:'}</span>
+                              <span>{toPersianDigits(filtered.length)} نفر</span>
                             </div>
-
-                            {/* Users list */}
-                            {filteredUsers.length === 0 ? (
-                              <div className="py-4 text-center text-xs text-slate-400">
-                                کاربری با این مشخصات یافت نشد.
-                              </div>
+                            {filtered.length === 0 ? (
+                              <div className="py-4 text-center text-xs text-slate-400">کاربری با این مشخصات یافت نشد.</div>
                             ) : (
-                              filteredUsers.map((user) => {
-                                const isSelected = assignedUserId === user.id;
+                              filtered.map((user) => {
+                                const isSelected = responsibleIds.includes(user.id);
                                 return (
                                   <button
                                     key={user.id}
                                     type="button"
-                                    onClick={() => {
-                                      setAssignedUserId(user.id);
-                                      setIsAssigneeDropdownOpen(false);
-                                      setUserSearchQuery('');
-                                      setErrors((prev) => ({ ...prev, assignee: undefined }));
-                                    }}
+                                    role="option"
+                                    aria-selected={isSelected}
+                                    data-option={user.id}
+                                    onClick={() => toggle(user.id)}
                                     className={`w-full flex items-center justify-between p-2 rounded-lg text-xs text-right transition-colors cursor-pointer ${
                                       isSelected
                                         ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-900 dark:text-indigo-100 border border-indigo-200 dark:border-indigo-800'
@@ -961,33 +852,26 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                                   >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                       {user.avatar ? (
-                                        <img
-                                          src={user.avatar}
-                                          alt={user.name}
-                                          className="w-7 h-7 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                                        />
+                                        <img src={user.avatar} alt={user.name} className="w-7 h-7 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
                                       ) : (
                                         <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-[11px] shrink-0">
-                                          {user.name ? user.name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase()}
+                                          {user.name.charAt(0).toUpperCase()}
                                         </div>
                                       )}
                                       <div className="truncate">
                                         <p className="font-bold text-xs truncate text-slate-800 dark:text-slate-100">
-                                          {user.name}
+                                          {user.id === currentUser?.id ? `${user.name} (من)` : user.name}
                                         </p>
-                                        <p className="text-[10px] text-slate-400 truncate">
-                                          @{user.username} {user.email ? `• ${user.email}` : ''}
-                                        </p>
+                                        {user.username && <p className="text-[10px] text-slate-400 truncate">@{user.username}</p>}
                                       </div>
                                     </div>
-
                                     <div className="flex items-center gap-2 shrink-0">
-                                      {user.role && (
-                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                                          {user.role}
-                                        </span>
-                                      )}
-                                      {isSelected && <Check className="w-4 h-4 text-indigo-600 shrink-0" />}
+                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                                        {teamIds.has(user.id) ? 'عضو تیم' : currentTeamObj ? 'خارج از تیم' : 'کاربر'}
+                                      </span>
+                                      <span className={`w-4 h-4 rounded border flex items-center justify-center ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600'}`}>
+                                        {isSelected && <Check className="w-3 h-3 text-white" />}
+                                      </span>
                                     </div>
                                   </button>
                                 );
@@ -1002,8 +886,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       <p className="text-xs text-red-500 font-medium">{errors.assignee}</p>
                     )}
 
-                    {/* Checkbox for status update permission when assigned to a user */}
-                    {assignedUserId && (
+                    {/* Checkbox for status update permission when someone is responsible */}
+                    {responsibleIds.length > 0 && (
                       <div className="mt-2.5 flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 transition-all animate-in fade-in">
                         <input
                           type="checkbox"
@@ -1019,7 +903,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                         >
                           <span>امکان بروزرسانی</span>
                           <span className="text-[10px] text-slate-500 dark:text-slate-400 font-normal">
-                            (اجازه بروزرسانی و تغییر وضعیت فعالیت توسط مسئول)
+                            (اجازه بروزرسانی و تغییر وضعیت فعالیت توسط مسئولان)
                           </span>
                         </label>
                       </div>
@@ -1029,7 +913,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               })()}
             </div>
 
-            {/* Team Members Checklist / Chips (Only if a specific team is selected) */}
+            {/* The team's members who may see the task (its access list). Responsible people always may. */}
             {selectedTeamId && (() => {
               const currentTeamObj = availableTeams.find((t) => t.id === selectedTeamId);
               if (!currentTeamObj || currentTeamObj.members.length === 0) return null;
@@ -1039,53 +923,53 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               const uniqueMembers: WorkTeamMember[] = Array.from(uniqueMembersMap.values());
 
               return (
-                <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2">
+                <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2" data-access-list>
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-700 dark:text-slate-300 text-[11px]">
-                      اعضای تیم در دسترس:
+                      اعضای تیم با دسترسی به این فعالیت:
                     </span>
-                    <div className="flex items-center gap-2 text-[10px]">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMemberIds(uniqueMembers.map((m) => m.userId))}
-                        className="text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer font-semibold"
-                      >
-                        انتخاب همه ({toPersianDigits(uniqueMembers.length)})
-                      </button>
-                      <span className="text-slate-300 dark:text-slate-600">|</span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMemberIds([])}
-                        className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:underline cursor-pointer"
-                      >
-                        هیچ‌کدام
-                      </button>
-                      <span className="text-slate-300 dark:text-slate-600">|</span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMemberIds(currentUser ? [currentUser.id] : [])}
-                        className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:underline cursor-pointer"
-                      >
-                        فقط من
-                      </button>
-                    </div>
+                    {!isStatusOnlyEdit && (
+                      <div className="flex items-center gap-2 text-[10px]">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMemberIds(uniqueMembers.map((m) => m.userId))}
+                          className="text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer font-semibold"
+                        >
+                          همه ({toPersianDigits(uniqueMembers.length)})
+                        </button>
+                        <span className="text-slate-300 dark:text-slate-600">|</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMemberIds([])}
+                          className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:underline cursor-pointer"
+                        >
+                          فقط مسئولان
+                        </button>
+                      </div>
+                    )}
                   </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    فقط اعضای انتخاب‌شده (و مسئولان اجرا) این فعالیت را می‌بینند.
+                  </p>
 
                   <div className="flex flex-wrap gap-1.5 pt-0.5">
                     {uniqueMembers.map((member) => {
-                      const isSelected = selectedMemberIds.includes(member.userId);
+                      const isResponsible = responsibleIds.includes(member.userId);
+                      const isSelected = isResponsible || selectedMemberIds.includes(member.userId);
                       return (
                         <button
                           key={member.userId}
                           type="button"
+                          data-access-member={member.userId}
+                          aria-pressed={isSelected}
+                          disabled={isStatusOnlyEdit || isResponsible}
+                          title={isResponsible ? 'مسئول اجرا همیشه به فعالیت دسترسی دارد' : undefined}
                           onClick={() => {
-                            if (isSelected) {
-                              setSelectedMemberIds((prev) => prev.filter((id) => id !== member.userId));
-                            } else {
-                              setSelectedMemberIds((prev) => [...prev, member.userId]);
-                            }
+                            setSelectedMemberIds((prev) =>
+                              prev.includes(member.userId) ? prev.filter((id) => id !== member.userId) : [...prev, member.userId]
+                            );
                           }}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer disabled:cursor-default ${
                             isSelected
                               ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
                               : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300'
@@ -1093,22 +977,14 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                         >
                           <div
                             className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${
-                              isSelected
-                                ? 'bg-white text-indigo-700'
-                                : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                              isSelected ? 'bg-white text-indigo-700' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
                             }`}
                           >
-                            {isSelected ? (
-                              <Check className="w-3 h-3 text-indigo-600" />
-                            ) : (
-                              member.name.charAt(0).toUpperCase()
-                            )}
+                            {isSelected ? <Check className="w-3 h-3 text-indigo-600" /> : member.name.charAt(0).toUpperCase()}
                           </div>
                           <span>{member.name}</span>
-                          {member.role && (
-                            <span className={`text-[9px] opacity-75 ${isSelected ? 'text-indigo-100' : 'text-slate-400'}`}>
-                              ({member.role})
-                            </span>
+                          {isResponsible && (
+                            <span className="text-[9px] text-indigo-100">(مسئول)</span>
                           )}
                         </button>
                       );

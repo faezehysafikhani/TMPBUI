@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, WorkTeam, WorkTeamMember } from '../types';
-import { fetchAllUsersPB, fetchUserTeamsAsyncPB, saveUserTeamsPB } from '../services/dataService';
+import { User, WorkTeam } from '../types';
+import { changeUserTeamPB, fetchAllUsersPB, fetchUserTeamsAsyncPB } from '../services/dataService';
+import { userErrorMessage } from '../utils/errorMessages';
 import {
   Users,
   UserPlus,
@@ -27,6 +28,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
   const [newTeamName, setNewTeamName] = useState<string>('');
   const [isCreatingTeam, setIsCreatingTeam] = useState<boolean>(false);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [saving, setSaving] = useState<boolean>(false);
 
   // Load users and teams
   const loadData = async () => {
@@ -52,34 +54,41 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
   const activeTeam = teams.find((t) => t.id === activeTeamId) || teams[0];
   const canManageActiveTeam = !!activeTeam && activeTeam.ownerId === currentUser.id;
 
+  /**
+   * Sends one change to the server and only then shows the result - the teams exactly as the
+   * server returns them (with its ids). On failure nothing changes on screen but the error.
+   */
+  const applyChange = async (
+    change: Parameters<typeof changeUserTeamPB>[1],
+    successText: string,
+  ): Promise<boolean> => {
+    if (saving) return false;
+    setSaving(true);
+    try {
+      const result = await changeUserTeamPB(currentUser.id, change);
+      setTeams(result.teams);
+      if (change.kind === 'delete') setActiveTeamId(result.teams[0]?.id || '');
+      else if (result.teamId) setActiveTeamId(result.teamId);
+      onTeamsUpdated?.(result.teams);
+      setActionMsg({ type: 'success', text: successText });
+      return true;
+    } catch (err) {
+      setActionMsg({ type: 'error', text: userErrorMessage(err, 'تغییر تیم کاری ذخیره نشد. لطفاً دوباره تلاش کنید.') });
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTeamName.trim()) return;
+    const name = newTeamName.trim();
+    if (!name) return;
 
-    const newTeam: WorkTeam = {
-      id: 'team_' + Date.now(),
-      name: newTeamName.trim(),
-      ownerId: currentUser.id,
-      members: [
-        {
-          userId: currentUser.id,
-          name: currentUser.name || currentUser.username,
-          username: currentUser.username,
-          avatar: currentUser.avatar,
-          role: 'مدیر تیم',
-        },
-      ],
-      createdAt: new Date().toISOString(),
-    };
-
-    const updatedTeams = [...teams, newTeam];
-    setTeams(updatedTeams);
-    setActiveTeamId(newTeam.id);
-    await saveUserTeamsPB(currentUser.id, updatedTeams);
-    onTeamsUpdated?.(updatedTeams);
-    setNewTeamName('');
-    setIsCreatingTeam(false);
-    setActionMsg({ type: 'success', text: `تیم کاری جدید «${newTeam.name}» با موفقیت ایجاد گردید 🎉` });
+    if (await applyChange({ kind: 'create', name }, `تیم کاری جدید «${name}» با موفقیت ایجاد گردید 🎉`)) {
+      setNewTeamName('');
+      setIsCreatingTeam(false);
+    }
   };
 
   const handleAddMember = async (userToAdd: User) => {
@@ -95,31 +104,10 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
       return;
     }
 
-    const newMember: WorkTeamMember = {
-      userId: userToAdd.id,
-      name: userToAdd.name || userToAdd.username,
-      username: userToAdd.username,
-      avatar: userToAdd.avatar,
-      role: 'عضو تیم',
-    };
-
-    const updatedTeams = teams.map((t) => {
-      if (t.id === activeTeam.id) {
-        return {
-          ...t,
-          members: [...t.members, newMember],
-        };
-      }
-      return t;
-    });
-
-    setTeams(updatedTeams);
-    await saveUserTeamsPB(currentUser.id, updatedTeams);
-    onTeamsUpdated?.(updatedTeams);
-    setActionMsg({
-      type: 'success',
-      text: `کاربر «${userToAdd.name || userToAdd.username}» به تیم ${activeTeam.name} اضافه شد.`,
-    });
+    await applyChange(
+      { kind: 'members', teamId: activeTeam.id, userIds: [...activeTeam.members.map((m) => m.userId), userToAdd.id] },
+      `کاربر «${userToAdd.name || userToAdd.username}» به تیم ${activeTeam.name} اضافه شد.`,
+    );
   };
 
   const handleRemoveMember = async (memberUserId: string) => {
@@ -134,20 +122,10 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
       return;
     }
 
-    const updatedTeams = teams.map((t) => {
-      if (t.id === activeTeam.id) {
-        return {
-          ...t,
-          members: t.members.filter((m) => m.userId !== memberUserId),
-        };
-      }
-      return t;
-    });
-
-    setTeams(updatedTeams);
-    await saveUserTeamsPB(currentUser.id, updatedTeams);
-    onTeamsUpdated?.(updatedTeams);
-    setActionMsg({ type: 'success', text: 'عضو موردنظر از تیم حذف گردید.' });
+    await applyChange(
+      { kind: 'members', teamId: activeTeam.id, userIds: activeTeam.members.map((m) => m.userId).filter((id) => id !== memberUserId) },
+      'عضو موردنظر از تیم حذف گردید.',
+    );
   };
 
   const handleDeleteTeam = async (teamId: string) => {
@@ -164,12 +142,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
     const targetTeam = teams.find((t) => t.id === teamId);
     if (!window.confirm(`آیا از حذف تیم کاری «${targetTeam?.name}» اطمینان دارید؟`)) return;
 
-    const updatedTeams = teams.filter((t) => t.id !== teamId);
-    setTeams(updatedTeams);
-    setActiveTeamId(updatedTeams[0]?.id || '');
-    await saveUserTeamsPB(currentUser.id, updatedTeams);
-    onTeamsUpdated?.(updatedTeams);
-    setActionMsg({ type: 'success', text: 'تیم کاری حذف گردید.' });
+    await applyChange({ kind: 'delete', teamId }, 'تیم کاری حذف گردید.');
   };
 
   // Filter users for search results (exclude members already in active team)
@@ -263,8 +236,10 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
           />
           <button
             type="submit"
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer shrink-0"
+            disabled={saving}
+            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-wait"
           >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin inline ml-1" />}
             ایجاد تیم
           </button>
           <button
@@ -374,7 +349,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
 
                             <button
                               type="button"
-                              disabled={isAlreadyInTeam}
+                              disabled={isAlreadyInTeam || saving}
                               onClick={() => handleAddMember(user)}
                               className={`flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
                                 isAlreadyInTeam
@@ -448,6 +423,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
                     <button
                       type="button"
                       onClick={() => handleRemoveMember(member.userId)}
+                      disabled={saving}
                       title="حذف از تیم"
                       className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded-xl transition-colors cursor-pointer flex items-center gap-1 text-xs"
                     >

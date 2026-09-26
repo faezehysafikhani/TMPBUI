@@ -139,6 +139,27 @@ export async function saveUserTeamsPB(userId: string, teams: WorkTeam[]): Promis
     return;
 }
 
+/**
+ * One change to one of the user's own teams, sent to the server right away (no list diff, no
+ * temporary ids). Resolves with the teams as the server now has them; throws on failure, so
+ * the caller shows nothing as saved that was not.
+ */
+export async function changeUserTeamPB(
+  userId: string,
+  change: { kind: 'create'; name: string } | { kind: 'members'; teamId: string; userIds: string[] } | { kind: 'delete'; teamId: string },
+): Promise<{ teams: WorkTeam[]; teamId?: string }> {
+  let teamId: string | undefined;
+  if (change.kind === 'create') teamId = (await nexusApi.createMyTeam(change.name)).id;
+  else if (change.kind === 'members') teamId = (await nexusApi.setMyTeamMembers(change.teamId, change.userIds)).id;
+  else await nexusApi.deleteMyTeam(change.teamId);
+
+  const teams = await nexusApi.fetchUserGroupsAsTeams();
+  try {
+    localStorage.setItem(LOCAL_TEAMS_PREFIX + userId, JSON.stringify(teams));
+  } catch {}
+  return { teams, teamId };
+}
+
 export async function fetchAllUsersPB(): Promise<User[]> {
   try {
       return await nexusApi.fetchUsers();
@@ -363,6 +384,33 @@ export async function updateDirectMessagePB(messageId: string, text: string): Pr
 export async function deleteDirectMessagePB(messageId: string): Promise<void> {
   await nexusApi.deleteDirectMessage(messageId);
     return;
+}
+
+// A team's one shared conversation (group chat)
+export async function fetchTeamMessagesPB(teamId: string): Promise<DirectMessage[]> {
+  return nexusApi.fetchTeamMessages(teamId);
+}
+
+export async function sendTeamMessagePB(teamId: string, msg: { text: string; attachmentUrl?: string; attachmentName?: string }): Promise<DirectMessage> {
+  return nexusApi.sendTeamMessage(teamId, msg);
+}
+
+export async function markTeamMessagesReadPB(teamId: string): Promise<void> {
+  return nexusApi.markTeamMessagesRead(teamId);
+}
+
+export async function fetchTeamUnreadCountsPB(): Promise<Record<string, number>> {
+  try {
+    return await nexusApi.fetchTeamUnreadCounts();
+  } catch (err) {
+    console.warn('Could not load team unread counts:', err instanceof Error ? err.message : err);
+    return {};
+  }
+}
+
+/** Live presence (online/offline) of these users; unknown ones are left out. */
+export async function fetchPresencePB(userIds: string[]): Promise<Record<string, boolean>> {
+  return nexusApi.fetchPresence(userIds);
 }
 
 export async function fetchUnreadMessageCountsPB(currentUserId: string): Promise<Record<string, number>> {

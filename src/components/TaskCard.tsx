@@ -29,6 +29,7 @@ import {
   GripVertical
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
+import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
 
 interface TaskCardProps {
   task: Task;
@@ -127,13 +128,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
 
   const isAdmin = isTaskAdmin(currentUser);
 
-  const isAssignee = !!(
-    currentUser &&
-    ((task.assignedUserId && task.assignedUserId === currentUser.id) ||
-      (task.assignedUserName &&
-        (task.assignedUserName.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase() ||
-          task.assignedUserName.trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase())))
-  );
+  const isAssignee = isResponsibleFor(task, currentUser);
 
   const isTeamMember = !!(
     currentUser &&
@@ -327,10 +322,10 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
 
           {/* NOTE: main work team tag (task.assignedTeamName) and status tags are excluded from card tags */}
 
-          {task.assignedUserName && (
+          {responsibleNamesOf(task) && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
               <UserIcon className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
-              <span>مسئول: {task.assignedUserName}</span>
+              <span>مسئول: {responsibleNamesOf(task)}</span>
             </span>
           )}
 

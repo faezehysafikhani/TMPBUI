@@ -149,12 +149,15 @@ export interface Task {
   user?: string; // id of the owner/creator
   ownerName?: string;
   ownerAvatar?: string;
-  assignedUserId?: string;
+  assignedUserId?: string; // the first of responsibleUserIds (kept for older code and tasks)
   assignedUserName?: string;
   assignedUserAvatar?: string;
-  assignedTeamId?: string;
+  /** Everyone responsible for doing the task (one or more); the first is assignedUserId. */
+  responsibleUserIds?: string[];
+  responsibleUserNames?: string[];
+  assignedTeamId?: string; // the task's team: its context, not who is responsible
   assignedTeamName?: string;
-  teamMemberIds?: string[];
+  teamMemberIds?: string[]; // the access list: who else may see and work on the task
   allowAssigneeStatusUpdate?: boolean; // آیا مسئول امکان بروزرسانی وضعیت را دارد یا خیر
   tags?: string[];
   isProject?: boolean;

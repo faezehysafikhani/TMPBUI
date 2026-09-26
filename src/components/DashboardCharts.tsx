@@ -16,6 +16,7 @@ import {
   User as UserIcon
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
+import { isResponsibleFor, responsibleIdsOf, responsibleNamesOf } from '../utils/taskPeople';
 
 interface DashboardChartsProps {
   tasks: Task[];
@@ -60,13 +61,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
   const checkTaskPermissions = (task: Task) => {
     const isAdmin = isTaskAdmin(currentUser);
 
-    const isAssignee = !!(
-      currentUser &&
-      ((task.assignedUserId && task.assignedUserId === currentUser.id) ||
-        (task.assignedUserName &&
-          (task.assignedUserName.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase() ||
-            task.assignedUserName.trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase())))
-    );
+    const isAssignee = isResponsibleFor(task, currentUser);
 
     const isTeamMember = !!(
       currentUser &&
@@ -99,11 +94,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
     const cUsername = (currentUser.username || '').trim().toLowerCase();
     const cId = currentUser.id;
 
-    const isAssigned =
-      (t.assignedUserId && t.assignedUserId === cId) ||
-      (t.assignedUserName &&
-        (t.assignedUserName.trim().toLowerCase() === cName ||
-          t.assignedUserName.trim().toLowerCase() === cUsername));
+    const isAssigned = isResponsibleFor(t, currentUser);
 
     const isOwner =
       (t.user && t.user === cId) ||
@@ -235,54 +226,46 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
         return;
       }
 
-      // Check if task is explicitly assigned to current user
-      const isAssignedToCurrentUser = !!(
-        currentUser &&
-        ((t.assignedUserId && t.assignedUserId === currentUser.id) ||
-          (t.assignedUserName &&
-            (t.assignedUserName.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase() ||
-              t.assignedUserName.trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase())))
-      );
+      // One bar per responsible person: a task with several counts once for each of them. The
+      // current user is labeled "خودم"; a task without anyone responsible is the team's or mine.
+      const responsibleIds = responsibleIdsOf(t);
+      const responsibleNames = t.responsibleUserNames && t.responsibleUserNames.length === responsibleIds.length
+        ? t.responsibleUserNames
+        : responsibleIds.map((rid, i) => (i === 0 ? t.assignedUserName || '' : ''));
+      const labels: { id: string; name: string }[] = responsibleIds.length > 0
+        ? responsibleIds.map((rid, i) =>
+            currentUser && rid === currentUser.id
+              ? { id: 'myself', name: 'خودم' }
+              : { id: rid, name: (responsibleNames[i] || 'کاربر').trim() })
+        : isResponsibleFor(t, currentUser)
+          ? [{ id: 'myself', name: 'خودم' }]
+          : t.assignedTeamName && t.assignedTeamName.trim()
+            ? [{ id: t.assignedTeamId || t.assignedTeamName, name: `تیم ${t.assignedTeamName.trim()}` }]
+            : [{ id: 'myself', name: 'خودم' }];
 
-      // Determine assignee label: unassigned or current user is labeled as "خودم"
-      let name = 'خودم';
-      let id = 'myself';
+      for (const { id, name } of labels) {
+        if (!map.has(id)) {
+          map.set(id, {
+            id,
+            name,
+            fullTitle: id === 'myself' ? 'فعالیت‌های من (خودم)' : `فعالیت‌های واگذار شده به ${name}`,
+            count: 0,
+            items: [],
+          });
+        }
 
-      if (isAssignedToCurrentUser) {
-        name = 'خودم';
-        id = 'myself';
-      } else if (t.assignedUserName && t.assignedUserName.trim()) {
-        name = t.assignedUserName.trim();
-        id = t.assignedUserId || name;
-      } else if (t.assignedTeamName && t.assignedTeamName.trim()) {
-        name = `تیم ${t.assignedTeamName.trim()}`;
-        id = t.assignedTeamId || name;
-      } else {
-        name = 'خودم';
-        id = 'myself';
-      }
-
-      if (!map.has(id)) {
-        map.set(id, {
-          id,
-          name,
-          fullTitle: id === 'myself' ? 'فعالیت‌های من (خودم)' : `فعالیت‌های واگذار شده به ${name}`,
-          count: 0,
-          items: [],
+        const entry = map.get(id)!;
+        entry.count += 1;
+        entry.items.push({
+          id: t.id,
+          title: t.title,
+          dueDate: t.dueDate,
+          priority: t.priority || 'medium',
+          parentTask: t,
+          isSubTask: false,
+          statusTitle: STATUSES[t.status]?.title || t.status,
         });
       }
-
-      const entry = map.get(id)!;
-      entry.count += 1;
-      entry.items.push({
-        id: t.id,
-        title: t.title,
-        dueDate: t.dueDate,
-        priority: t.priority || 'medium',
-        parentTask: t,
-        isSubTask: false,
-        statusTitle: STATUSES[t.status]?.title || t.status,
-      });
     });
 
     const list = Array.from(map.values()).sort((a, b) => {
@@ -632,7 +615,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
 
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800">
                               <UserIcon className="w-3 h-3 text-indigo-500" />
-                              <span>مسئول: {parent.assignedUserName ? parent.assignedUserName : 'خودم'}</span>
+                              <span>مسئول: {responsibleNamesOf(parent) || 'خودم'}</span>
                             </span>
 
                             <span

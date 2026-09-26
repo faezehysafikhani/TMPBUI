@@ -35,6 +35,7 @@ import {
   updateTaskInPB,
   deleteTaskFromPB,
   subscribeToTasksPB,
+  fetchTeamUnreadCountsPB,
   getCurrentUser,
   refreshCurrentUserPB,
   logoutPB,
@@ -64,6 +65,7 @@ import { Database, PanelRightOpen } from 'lucide-react';
 import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION } from './services/nexusApi';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
+import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -226,8 +228,9 @@ export default function App() {
       return;
     }
     const checkUnread = async () => {
-      const counts = await fetchUnreadMessageCountsPB(currentUser.id);
-      const sum = Object.values(counts).reduce((a, b) => a + b, 0);
+      // Direct conversations and team threads alike.
+      const [counts, teamCounts] = await Promise.all([fetchUnreadMessageCountsPB(currentUser.id), fetchTeamUnreadCountsPB()]);
+      const sum = [...Object.values(counts), ...Object.values(teamCounts)].reduce((a, b) => a + b, 0);
       setTotalUnreadChatCount(sum);
     };
     checkUnread();
@@ -393,10 +396,10 @@ export default function App() {
             const newD = taskData.dueDate ? formatToJalali(taskData.dueDate) : 'بدون مهلت';
             changes.push(`مهلت تحویل: از "${oldD}" به "${newD}"`);
           }
-          if (taskData.assignedUserName !== oldTask.assignedUserName) {
-            const newAssigned = taskData.assignedUserName || 'بدون مسئول';
-            const oldAssigned = oldTask.assignedUserName || 'بدون مسئول';
-            changes.push(`فرد مسئول: از "${oldAssigned}" به "${newAssigned}"`);
+          if (responsibleNamesOf(taskData) !== responsibleNamesOf(oldTask)) {
+            const newAssigned = responsibleNamesOf(taskData) || 'بدون مسئول';
+            const oldAssigned = responsibleNamesOf(oldTask) || 'بدون مسئول';
+            changes.push(`مسئولان اجرا: از "${oldAssigned}" به "${newAssigned}"`);
           }
           if (taskData.assignedTeamName !== oldTask.assignedTeamName) {
             const newTeam = taskData.assignedTeamName || 'بدون تیم';
@@ -447,7 +450,14 @@ export default function App() {
         if (selectedTaskForDetail && selectedTaskForDetail.id === taskId) {
           setSelectedTaskForDetail((prev) => (prev ? { ...prev, ...taskData } : null));
         }
-        await updateTaskInPB(taskId, taskData);
+        const saved = await updateTaskInPB(taskId, taskData);
+        // Show what the server saved (who is responsible, the access list...), not the form's copy.
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? { ...saved, comments: saved.comments ?? t.comments, logs: saved.logs ?? t.logs } : t))
+        );
+        if (selectedTaskForDetail && selectedTaskForDetail.id === taskId) {
+          setSelectedTaskForDetail((prev) => (prev ? { ...prev, ...saved } : null));
+        }
 
         // Log detailed edit action
         if (currentUser) {
@@ -473,7 +483,7 @@ export default function App() {
 
         // Log creation action for notifications (notifies assignee and team members)
         if (currentUser) {
-          const assigneeName = created.assignedUserName || taskData.assignedUserName;
+          const assigneeName = responsibleNamesOf(created) || responsibleNamesOf(taskData);
           const teamName = created.assignedTeamName || taskData.assignedTeamName;
           let detailsText = `فعالیت با عنوان "${created.title}" ایجاد شد.`;
           if (assigneeName || teamName) {
@@ -723,39 +733,11 @@ export default function App() {
     setIsFormModalOpen(true);
   }, []);
 
-  // Task Visibility Rule:
-  // "هر فعالیت را مالک، واگذار شده و اعضای تیم کاری آن فعالیت بتوانند مشاهده کنند"
+  // Task Visibility Rule: owner, responsible people and the task's access list - the same rule
+  // the server applies. Every view (dashboard, board, calendar, chat) shows only these tasks.
   const visibleTasks = useMemo(() => {
     if (!currentUser) return tasks;
-
-    const currentUserNameClean = (currentUser.name || '').trim().toLowerCase();
-    const currentUserUsernameClean = (currentUser.username || '').trim().toLowerCase();
-
-    return tasks.filter((task) => {
-      // 1. Task creator / owner by ID or name
-      if (!task.user || task.user === currentUser.id) return true;
-      if (
-        task.ownerName &&
-        (task.ownerName.trim().toLowerCase() === currentUserNameClean ||
-          task.ownerName.trim().toLowerCase() === currentUserUsernameClean)
-      ) return true;
-
-      // 2. Assignee (واگذار شده به) by ID or name
-      if (task.assignedUserId && task.assignedUserId === currentUser.id) return true;
-      if (
-        task.assignedUserName &&
-        (task.assignedUserName.trim().toLowerCase() === currentUserNameClean ||
-          task.assignedUserName.trim().toLowerCase() === currentUserUsernameClean)
-      ) return true;
-
-      // 3. Team member by user ID list
-      if (task.teamMemberIds && task.teamMemberIds.includes(currentUser.id)) return true;
-
-      // 4. User belongs to assigned team
-      if (task.assignedTeamId && currentUser.teams?.some((t) => t.id === task.assignedTeamId)) return true;
-
-      return false;
-    });
+    return tasks.filter((task) => isTaskVisibleTo(task, currentUser));
   }, [tasks, currentUser]);
 
   // Current User Team Members for Assignee Filter
@@ -805,8 +787,8 @@ export default function App() {
       // Assignee filter
       if (assigneeFilter !== 'all') {
         if (assigneeFilter === 'unassigned') {
-          if (task.assignedUserId) return false;
-        } else if (task.assignedUserId !== assigneeFilter) {
+          if (responsibleIdsOf(task).length > 0) return false;
+        } else if (!responsibleIdsOf(task).includes(assigneeFilter)) {
           return false;
         }
       }
@@ -1354,7 +1336,8 @@ export default function App() {
                   teams={allTeams}
                   appColorPalette={appColorPalette}
                   onConvertToTask={handleConvertToTask}
-                  tasks={tasks}
+                  // The same tasks the dashboard shows: chat is never a way around the task rule.
+                  tasks={visibleTasks}
                   onViewTaskDetails={handleOpenTaskDetail}
                 />
               </Suspense>
@@ -1422,7 +1405,7 @@ export default function App() {
             initialDescription={initialDescriptionForNewTask}
             appColorPalette={appColorPalette}
             currentUser={currentUser}
-            existingTasks={tasks}
+            existingTasks={visibleTasks}
             registeredUsers={allUsers}
           />
         )}

@@ -161,6 +161,8 @@ interface TaskDto {
   assignedUser: UserSummaryDto | null;
   assignedUserGroup: UserGroupSummaryDto | null;
   assignees: UserSummaryDto[];
+  /** Everyone responsible (servers before multi-responsible tasks leave it out). */
+  responsibleUsers?: UserSummaryDto[] | null;
   allowAssigneeStatusUpdate: boolean;
   charterDescription: string | null;
   charterProjectManager: string | null;
@@ -726,6 +728,12 @@ async function mapCommentWithFiles(c: TaskCommentDto): Promise<TaskComment> {
   return mapComment(c, await mapFiles(c.files || []));
 }
 
+/** The task's responsible people; an older server only knows the one assignedUser. */
+function responsibleOf(dto: TaskDto): UserSummaryDto[] {
+  if (dto.responsibleUsers && dto.responsibleUsers.length > 0) return dto.responsibleUsers;
+  return dto.assignedUser ? [dto.assignedUser] : [];
+}
+
 async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[]): Promise<Task> {
   const hasCharter =
     dto.charterDescription || dto.charterProjectManager || dto.charterStartDate || dto.charterEndDate;
@@ -743,6 +751,8 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     ownerName: dto.owner?.displayName,
     assignedUserId: dto.assignedUser?.id,
     assignedUserName: dto.assignedUser?.displayName,
+    responsibleUserIds: responsibleOf(dto).map((u) => u.id),
+    responsibleUserNames: responsibleOf(dto).map((u) => u.displayName),
     assignedTeamId: dto.assignedUserGroup?.id,
     assignedTeamName: dto.assignedUserGroup?.name,
     teamMemberIds: (dto.assignees || []).map((a) => a.id),
@@ -1015,6 +1025,21 @@ export async function saveMyTeams(teams: WorkTeam[]): Promise<WorkTeam[]> {
   return fetchUserGroupsAsTeams();
 }
 
+/** Creates one of the caller's own teams (the caller is its first member); the server's copy. */
+export async function createMyTeam(name: string): Promise<WorkTeam> {
+  return mapTeam(await request<UserGroupDto>('POST', MY_TEAMS, { body: { name } }));
+}
+
+/** Replaces the members of one of the caller's own teams (the owner always stays); the server's copy. */
+export async function setMyTeamMembers(teamId: string, userIds: string[]): Promise<WorkTeam> {
+  return mapTeam(await request<UserGroupDto>('PUT', `${MY_TEAMS}/${teamId}/members`, { body: { userIds } }));
+}
+
+/** Deletes one of the caller's own teams. */
+export async function deleteMyTeam(teamId: string): Promise<void> {
+  await request('DELETE', `${MY_TEAMS}/${teamId}`);
+}
+
 // ---------------------------------------------------------------------------
 // Tasks
 // ---------------------------------------------------------------------------
@@ -1087,6 +1112,12 @@ async function resolveTagId(name: string): Promise<string> {
   return created.id;
 }
 
+/** Who the caller wants responsible: responsibleUserIds, or the single assignedUserId of older code. */
+function responsibleIdsOf(taskData: Partial<Task>): string[] {
+  if (taskData.responsibleUserIds !== undefined) return Array.from(new Set(taskData.responsibleUserIds.filter(Boolean)));
+  return taskData.assignedUserId ? [taskData.assignedUserId] : [];
+}
+
 export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
   const subTasks = taskData.projectSubTasks || [];
   const dueDate = toDateOnly(taskData.dueDate);
@@ -1101,7 +1132,8 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
       priority: LEVEL_TO_API[taskData.priority] || 'Medium',
       description: taskData.description || null,
       isProject: !!taskData.isProject,
-      assignedUserId: requireGuid(taskData.assignedUserId, 'کاربر مسئول'),
+      assignedUserId: requireGuid(responsibleIdsOf(taskData)[0], 'کاربر مسئول'),
+      responsibleUserIds: responsibleIdsOf(taskData).map((id) => requireGuid(id, 'کاربر مسئول')),
       assignedUserGroupId: requireGuid(taskData.assignedTeamId, 'تیم'),
       assigneeUserIds: (taskData.teamMemberIds || []).map((id) => requireGuid(id, 'عضو تیم')),
       allowAssigneeStatusUpdate: taskData.allowAssigneeStatusUpdate ?? true,
@@ -1186,6 +1218,7 @@ export async function updateTask(
     taskData.priority,
     taskData.isProject,
     taskData.assignedUserId,
+    taskData.responsibleUserIds,
     taskData.assignedTeamId,
     taskData.teamMemberIds,
     taskData.allowAssigneeStatusUpdate,
@@ -1204,9 +1237,14 @@ export async function updateTask(
         description: taskData.description !== undefined ? taskData.description || null : current.description,
         isProject: taskData.isProject ?? current.isProject,
         assignedUserId:
-          taskData.assignedUserId !== undefined
-            ? requireGuid(taskData.assignedUserId, 'کاربر مسئول')
+          taskData.responsibleUserIds !== undefined || taskData.assignedUserId !== undefined
+            ? requireGuid(responsibleIdsOf(taskData)[0], 'کاربر مسئول')
             : current.assignedUser?.id ?? null,
+        // Sent only when the caller set it; otherwise the server keeps who is responsible.
+        responsibleUserIds:
+          taskData.responsibleUserIds !== undefined
+            ? responsibleIdsOf(taskData).map((id) => requireGuid(id, 'کاربر مسئول'))
+            : null,
         assignedUserGroupId:
           taskData.assignedTeamId !== undefined
             ? requireGuid(taskData.assignedTeamId, 'تیم')
@@ -1947,6 +1985,82 @@ export async function fetchUnreadMessageCounts(): Promise<Record<string, number>
   if (!readSession()) return {};
   const counts = await request<{ senderUserId: string; count: number }[]>('GET', `${CHAT}/direct/unread-counts`);
   return Object.fromEntries((counts || []).map((c) => [c.senderUserId, c.count]));
+}
+
+// ---- Team conversations: one shared thread per team -------------------------
+
+interface TeamMessageDto {
+  id: string;
+  conversationId: string;
+  teamId: string;
+  senderUserId: string;
+  senderDisplayName: string;
+  senderAvatarUrl: string | null;
+  text: string;
+  sentAtUtc: string;
+  editedAtUtc: string | null;
+  attachment: { fileName: string; contentType: string; sizeBytes: number } | null;
+}
+
+/** A team message in the same shape as a direct one; receiverId is the team's id. */
+async function mapTeamMessage(m: TeamMessageDto): Promise<DirectMessage> {
+  return {
+    id: m.id,
+    senderId: m.senderUserId,
+    senderName: m.senderDisplayName || 'کاربر',
+    senderAvatar: m.senderAvatarUrl || undefined,
+    receiverId: m.teamId,
+    text: m.text,
+    attachmentUrl: m.attachment ? (await attachmentUrlFor(m.id)) || undefined : undefined,
+    attachmentName: m.attachment?.fileName,
+    isRead: true,
+    createdAt: m.sentAtUtc,
+  };
+}
+
+export async function fetchTeamMessages(teamId: string): Promise<DirectMessage[]> {
+  if (!readSession() || !isGuid(teamId)) return [];
+  const messages = await request<TeamMessageDto[]>('GET', `${CHAT}/teams/${teamId}/messages`);
+  return Promise.all((messages || []).map(mapTeamMessage));
+}
+
+/** Sends to the team's shared thread; the sender is the signed-in user (from the token). */
+export async function sendTeamMessage(teamId: string, msg: { text: string; attachmentUrl?: string; attachmentName?: string }): Promise<DirectMessage> {
+  const form = new FormData();
+  form.append('text', msg.text || '');
+  if (msg.attachmentUrl) {
+    form.append('file', dataUrlToBlob(msg.attachmentUrl, 'application/octet-stream'), msg.attachmentName || 'attachment');
+  }
+  const sent = await request<TeamMessageDto>('POST', `${CHAT}/teams/${requireGuid(teamId, 'تیم')}/messages`, { form });
+  if (msg.attachmentUrl) attachmentUrls.set(sent.id, Promise.resolve(msg.attachmentUrl));
+  return mapTeamMessage(sent);
+}
+
+export async function markTeamMessagesRead(teamId: string): Promise<void> {
+  if (!readSession() || !isGuid(teamId)) return;
+  await request('POST', `${CHAT}/teams/${teamId}/read`);
+}
+
+/** Unread messages per team thread: { teamId: count }. */
+export async function fetchTeamUnreadCounts(): Promise<Record<string, number>> {
+  if (!readSession()) return {};
+  const counts = await request<{ teamId: string; count: number }[]>('GET', `${CHAT}/teams/unread-counts`);
+  return Object.fromEntries((counts || []).map((c) => [c.teamId, c.count]));
+}
+
+// ---- Presence ---------------------------------------------------------------
+
+/**
+ * Online (true) or offline (false) for users of the signed-in user's organization, from their
+ * live connections on the server. Users the server does not report (another organization) are
+ * left out - unknown, never shown as online.
+ */
+export async function fetchPresence(userIds: string[]): Promise<Record<string, boolean>> {
+  const ids = Array.from(new Set(userIds.filter((id) => isGuid(id)))).slice(0, 200);
+  if (!readSession() || ids.length === 0) return {};
+  const query = ids.map((id) => `userIds=${encodeURIComponent(id)}`).join('&');
+  const presence = await request<{ userId: string; isOnline: boolean }[]>('GET', `/api/identity/presence?${query}`);
+  return Object.fromEntries((presence || []).map((p) => [p.userId, p.isOnline]));
 }
 
 // ---------------------------------------------------------------------------

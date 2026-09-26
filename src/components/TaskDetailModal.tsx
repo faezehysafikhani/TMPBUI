@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { userErrorMessage } from '../utils/errorMessages';
+import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -132,13 +133,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const isAdmin = isTaskAdmin(currentUser);
 
-  const isAssignee = !!(
-    currentUser &&
-    ((task.assignedUserId && task.assignedUserId === currentUser.id) ||
-      (task.assignedUserName &&
-        (task.assignedUserName.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase() ||
-          task.assignedUserName.trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase())))
-  );
+  const isAssignee = isResponsibleFor(task, currentUser);
 
   const isTeamMember = !!(
     currentUser &&
@@ -492,7 +487,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             {task.assignedUserId && (
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-slate-500 dark:text-slate-400 font-medium">مسئول اجرا:</span>
-                <span className="font-bold text-slate-800 dark:text-slate-100">{task.assignedUserName || 'مشخص شده'}</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100">{responsibleNamesOf(task) || 'مشخص شده'}</span>
                 {allowStatusUpdateForAssignee ? (
                   <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold border border-emerald-200 dark:border-emerald-800">
                     امکان بروزرسانی فعال
@@ -682,7 +677,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             <div className="px-3 py-1.5 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 rounded-xl flex items-center gap-2 text-[11px] text-indigo-700 dark:text-indigo-300 font-medium">
               <Users className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
               <span>
-                گفتگوهای این فعالیت برای تمامی افراد شامل مالک ({task.ownerName || 'سازنده'})، واگذار شده ({task.assignedUserName || task.assignedTeamName || 'بدون مسئول'}) و اعضای تیم قابل مشاهده است.
+                گفتگوهای این فعالیت برای تمامی افراد شامل مالک ({task.ownerName || 'سازنده'})، مسئولان ({responsibleNamesOf(task) || 'بدون مسئول'}) و اعضای تیم قابل مشاهده است.
               </span>
             </div>
 

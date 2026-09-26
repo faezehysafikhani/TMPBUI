@@ -4,6 +4,7 @@ import { isOverdue, toPersianDigits, formatToJalali, getDaysDiff } from '../util
 import { parseDateSafely } from '../utils/jalali';
 import { AlertCircle, AlertTriangle, CheckCircle2, Calendar, MessageSquare, Edit2, Trash2, ArrowDownUp } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
+import { isResponsibleFor } from '../utils/taskPeople';
 
 interface OverdueTasksViewProps {
   tasks: Task[];
@@ -410,13 +411,7 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
   const checkTaskPermissions = (task: Task) => {
     const isAdmin = isTaskAdmin(currentUser);
 
-    const isAssignee = !!(
-      currentUser &&
-      ((task.assignedUserId && task.assignedUserId === currentUser.id) ||
-        (task.assignedUserName &&
-          (task.assignedUserName.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase() ||
-            task.assignedUserName.trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase())))
-    );
+    const isAssignee = isResponsibleFor(task, currentUser);
 
     const isTeamMember = !!(
       currentUser &&
