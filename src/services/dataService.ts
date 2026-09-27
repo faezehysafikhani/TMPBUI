@@ -171,6 +171,17 @@ export async function fetchAllUsersPB(): Promise<User[]> {
     }
 }
 
+/** Everyone chat lets you start a direct conversation with - never needs users.view. */
+export async function fetchChatDirectoryPB(): Promise<User[]> {
+  try {
+    const contacts = await nexusApi.fetchChatDirectory();
+    return contacts.map((c) => ({ id: c.id, username: '', email: '', name: c.name, avatar: c.avatar }));
+  } catch (err) {
+    console.warn('Could not load the chat directory from NexusCore:', err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
 export async function updateUserThemePB(settings: { theme?: AppTheme; colorPalette?: AppColorPalette; themeMode?: 'light' | 'dark' }): Promise<void> {
   try {
       await nexusApi.updateMyPreferences(settings);

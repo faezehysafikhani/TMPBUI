@@ -196,11 +196,18 @@ export default function App() {
   const [initialDescriptionForNewTask, setInitialDescriptionForNewTask] = useState<string>('');
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
 
-  // Load all users and teams for AI Assistant context and team views
+  // Load all users and teams for AI Assistant context and team views. The organization-wide
+  // user list needs users.view - a restricted user (a plain task assignee/team member) does
+  // not have it, so this only asks for it when the user actually holds the permission, instead
+  // of firing a request that is bound to 403 on every Dashboard/Home load.
   const loadUsersAndTeams = useCallback(async () => {
     try {
-      const usersList = await fetchAllUsersPB();
-      setAllUsers(usersList);
+      if (can(currentUser, 'users.view')) {
+        const usersList = await fetchAllUsersPB();
+        setAllUsers(usersList);
+      } else if (currentUser) {
+        setAllUsers([currentUser]);
+      }
       if (currentUser) {
         const teamsList = await fetchUserTeamsAsyncPB(currentUser.id);
         setAllTeams(teamsList);

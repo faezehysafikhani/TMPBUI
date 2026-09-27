@@ -956,6 +956,19 @@ export async function fetchUsers(): Promise<User[]> {
   return users.map(mapUserDto);
 }
 
+/** Chat's own, permission-light directory: everyone in your tenant you may start a direct chat with. */
+export interface ChatContactDto {
+  id: string;
+  name: string;
+  avatar?: string;
+}
+
+export async function fetchChatDirectory(): Promise<ChatContactDto[]> {
+  if (!readSession()) return [];
+  const contacts = await request<{ id: string; displayName: string; avatarUrl?: string | null }[]>('GET', '/api/chat/direct/directory');
+  return (contacts || []).map((c) => ({ id: c.id, name: c.displayName, avatar: c.avatarUrl || undefined }));
+}
+
 export async function deleteUser(userId: string): Promise<void> {
   await request<void>('DELETE', `/api/identity/users/${requireGuid(userId, 'کاربر')}`);
 }

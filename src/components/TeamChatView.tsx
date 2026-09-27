@@ -30,7 +30,7 @@ import {
   sendDirectMessagePB,
   markDirectMessagesAsReadPB,
   fetchUnreadMessageCountsPB,
-  fetchAllUsersPB,
+  fetchChatDirectoryPB,
   updateDirectMessagePB,
   deleteDirectMessagePB,
   fetchTeamMessagesPB,
@@ -225,7 +225,9 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
       console.warn('Failed to parse local users cache in chat view:', e);
     }
 
-    fetchAllUsersPB().then((users) => {
+    // Chat's own directory - every active user of the tenant, reachable for direct chat
+    // regardless of whether they hold users.view (an administrative permission chat does not need).
+    fetchChatDirectoryPB().then((users) => {
       if (isMounted) {
         setAllSystemUsers(users);
       }
