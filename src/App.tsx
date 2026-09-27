@@ -605,10 +605,6 @@ export default function App() {
       return;
     }
 
-    const oldStatus = targetTask.status;
-    const oldStatusTitle = oldStatus ? (STATUSES[oldStatus]?.title || oldStatus) : '';
-    const newStatusTitle = STATUSES[newStatus]?.title || newStatus;
-
     let actualCompletionDate = targetTask.actualCompletionDate;
     if (newStatus === 'completed') {
       actualCompletionDate = actualCompletionDate || new Date().toISOString();
@@ -624,21 +620,10 @@ export default function App() {
       prev && prev.id === taskId ? { ...prev, status: newStatus, actualCompletionDate } : prev
     );
     try {
+      // The server's own status-change endpoint already records a clear "Status changed" log
+      // entry with the before/after status; logging it again here only duplicated it.
       await updateTaskInPB(taskId, { status: newStatus, actualCompletionDate });
       setPbError(null);
-
-      if (currentUser) {
-        await createTaskLogPB({
-          taskId,
-          userId: currentUser.id,
-          userName: currentUser.name || currentUser.username,
-          userAvatar: currentUser.avatar,
-          action: 'تغییر وضعیت فعالیت',
-          details: oldStatusTitle
-            ? `تغییر وضعیت از "${oldStatusTitle}" به "${newStatusTitle}"`
-            : `وضعیت به "${newStatusTitle}" تغییر یافت.`,
-        });
-      }
     } catch (err: any) {
       console.error('Error updating task status:', err);
       const errMsg = userErrorMessage(err, 'خطا در تغییر وضعیت.');
@@ -878,6 +863,9 @@ export default function App() {
               (c.userName.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase() ||
                 c.userName.trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase()));
 
+          // The author of a comment never gets a notification for their own comment.
+          if (isOwnComment) return;
+
           items.push({
             id: notifId,
             type: 'comment',
@@ -887,7 +875,7 @@ export default function App() {
             actorAvatar: c.userAvatar,
             actionTitle: c.text,
             createdAt: c.createdAt,
-            isRead: isOwnComment ? true : readNotificationIds.includes(notifId),
+            isRead: readNotificationIds.includes(notifId),
           });
         });
       }
@@ -907,6 +895,9 @@ export default function App() {
                 (l.userName.trim().toLowerCase() === (currentUser.name || '').trim().toLowerCase() ||
                   l.userName.trim().toLowerCase() === (currentUser.username || '').trim().toLowerCase()));
 
+            // The person who made the change never gets a notification for their own change.
+            if (isOwnLog) return;
+
             items.push({
               id: notifId,
               type: 'task_log',
@@ -917,7 +908,7 @@ export default function App() {
               actionTitle: l.action,
               details: l.details,
               createdAt: l.createdAt,
-              isRead: isOwnLog ? true : readNotificationIds.includes(notifId),
+              isRead: readNotificationIds.includes(notifId),
             });
           }
         });

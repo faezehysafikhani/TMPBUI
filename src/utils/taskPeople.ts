@@ -2,6 +2,7 @@
 // (responsibleUserIds - the first is also assignedUserId) and an access list (teamMemberIds).
 // Everything that asks "is this user responsible?" uses these helpers, never only the first one.
 import type { Task, User } from '../types';
+import { isTaskAdmin } from './permissions';
 
 /** Everyone responsible for the task, each once; tasks from before hold only assignedUserId. */
 export function responsibleIdsOf(task: Pick<Task, 'responsibleUserIds' | 'assignedUserId'>): string[] {
@@ -34,11 +35,13 @@ export function isResponsibleFor(
 
 /**
  * The dashboard's rule, and the only one the rest of the app (chat included) uses: a task is
- * shown to its owner, its responsible people and those on its access list. The server applies
- * the same rule to what it returns; a task's team alone gives nobody the task.
+ * shown to its owner, its responsible people and those on its access list - or to anyone with
+ * Tasks.ManageAll (the server already returns every task of the organization to them; this must
+ * not re-hide what the server already allowed). A task's team alone gives nobody the task.
  */
 export function isTaskVisibleTo(task: Task, user: User | null | undefined): boolean {
   if (!user) return false;
+  if (isTaskAdmin(user)) return true;
   if (!task.user || task.user === user.id) return true;
   if (isResponsibleFor(task, user)) return true;
   return !!task.teamMemberIds && task.teamMemberIds.includes(user.id);

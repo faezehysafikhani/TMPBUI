@@ -289,7 +289,9 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
 
     const isTaskOwner = isTaskCreator || isOwnerByDetails;
     const allowStatusUpdateForAssignee = task.allowAssigneeStatusUpdate !== false;
-    const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee) || isTeamMember) && can(currentUser, PERMISSIONS.tasksEdit);
+    // A team member who is not also an assignee may never change status - matches the server's
+    // own resource-level rule (Nexus.TaskManagement CanChangeStatus).
+    const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee)) && can(currentUser, PERMISSIONS.tasksEdit);
 
     const isOwnerOrTaskAdmin = isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails;
     const canEditTask = isOwnerOrTaskAdmin && can(currentUser, PERMISSIONS.tasksEdit);

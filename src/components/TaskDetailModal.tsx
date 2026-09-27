@@ -7,8 +7,7 @@ import {
   createTaskCommentPB,
   deleteTaskCommentPB,
   updateTaskCommentPB,
-  fetchTaskLogsPB,
-  createTaskLogPB
+  fetchTaskLogsPB
 } from '../services/dataService';
 import {
   X,
@@ -165,8 +164,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const currentComputedStatus = isAutoStatusTask ? computeAutoTaskStatus(task.projectSubTasks) : task.status;
 
   // Permissions:
-  // Status Change: Allowed for Admin, Task Owner, Assignee (if allowStatusUpdateForAssignee is true), or Team Member (ONLY if not auto-calculated)
-  const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee) || isTeamMember) && !isAutoStatusTask && can(currentUser, PERMISSIONS.tasksEdit);
+  // Status Change: allowed for the admin/ManageAll, the task's real owner, or its assignee (when
+  // allowStatusUpdateForAssignee is true) - never a team member who is not also an assignee, to
+  // match the server's own resource-level rule (Nexus.TaskManagement CanChangeStatus).
+  const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee)) && !isAutoStatusTask && can(currentUser, PERMISSIONS.tasksEdit);
 
   // Edit / Delete: STRICTLY for System Admin or Task Creator / Real Owner.
   // Assignees and Team Members who are NOT the original creator/admin can NEVER edit or delete!
@@ -177,22 +178,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const statusCfg = STATUSES[currentComputedStatus] || STATUSES.todo;
 
-  const handleSelectStatus = async (newStatus: TaskStatus) => {
+  const handleSelectStatus = (newStatus: TaskStatus) => {
     if (!onStatusChange || newStatus === task.status) return;
+    // onStatusChange already goes through the server's status-change endpoint, which records
+    // its own clear "Status changed" log entry - logging it again here only duplicated it.
     onStatusChange(task.id, newStatus);
     setShowStatusMenu(false);
-
-    // Log status change
-    const newStatusTitle = STATUSES[newStatus]?.title || newStatus;
-    const logObj = await createTaskLogPB({
-      taskId: task.id,
-      userId: currentUser.id,
-      userName: currentUser.name || currentUser.username,
-      userAvatar: currentUser.avatar,
-      action: `تغییر وضعیت به "${newStatusTitle}"`,
-      details: `وضعیت فعالیت توسط ${currentUser.name || currentUser.username} تغییر یافت.`,
-    });
-    setLogsList((prev) => [logObj, ...prev]);
   };
 
   const handleCommentFileUpload = async (files: FileList | null) => {

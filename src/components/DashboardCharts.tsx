@@ -80,7 +80,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       !isAssignee
     );
 
-    const canEditTask = (isAdmin || isTaskCreator || isAssignee || isTeamMember || isOwnerByDetails) && can(currentUser, PERMISSIONS.tasksEdit);
+    // Editing general fields is for the task's real owner or the admin/ManageAll only - an
+    // assignee or team member may see and comment on the task, never edit it, matching the
+    // server's own resource-level rule (Nexus.TaskManagement TaskAccessScope.CanManage) and the
+    // same check the task detail/card/calendar views already use.
+    const canEditTask = (isAdmin || isTaskCreator || isOwnerByDetails) && can(currentUser, PERMISSIONS.tasksEdit);
     const canDeleteTask = (isAdmin || isTaskCreator || isOwnerByDetails) && can(currentUser, PERMISSIONS.tasksDelete);
 
     return { canEditTask, canDeleteTask };

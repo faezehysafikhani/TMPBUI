@@ -156,8 +156,10 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
   const allowStatusUpdateForAssignee = task.allowAssigneeStatusUpdate !== false;
 
   // Permissions:
-  // Status Change: Allowed for Admin, Task Owner, Assignee (if allowStatusUpdateForAssignee is true), or Team Member
-  const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee) || isTeamMember) && can(currentUser, PERMISSIONS.tasksEdit);
+  // Status Change: allowed for the admin/ManageAll, the task's real owner, or its assignee (when
+  // allowStatusUpdateForAssignee is true) - never a team member who is not also an assignee, to
+  // match the server's own resource-level rule (Nexus.TaskManagement CanChangeStatus).
+  const canChangeStatus = (isAdmin || isTaskOwner || (isAssignee && allowStatusUpdateForAssignee)) && can(currentUser, PERMISSIONS.tasksEdit);
 
   // Edit Button: Allowed for Admin, Creator/Owner, OR Assignee with status update permission
   // Full edit and delete: owner or task administrator only (the server enforces the same).
