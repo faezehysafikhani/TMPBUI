@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import type { ChartData, ChartOptions } from 'chart.js';
-import { CHART_FONT_FAMILY, barNameLabels, isDarkMode, persianIntegerTick, rtlTooltip } from '../utils/chartSetup';
+import { CHART_FONT_FAMILY, barNameLabels, doughnutCenterText, isDarkMode, persianIntegerTick, rtlTooltip } from '../utils/chartSetup';
 import { Task, PRIORITIES, Priority, STATUSES, User } from '../types';
 import { toPersianDigits, isOverdue, formatToJalali, getDaysDiff } from '../utils/helpers';
 import {
@@ -375,6 +375,11 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
     },
   };
 
+  // Read through a ref so the plugin (created once) always draws the current total.
+  const pieCenterRef = useRef({ value: '', label: 'مجموع فعالیت‌ها' });
+  pieCenterRef.current = { value: toPersianDigits(activeUserTasksCount), label: 'مجموع فعالیت‌ها' };
+  const pieCenterPlugin = useMemo(() => doughnutCenterText(() => pieCenterRef.current), []);
+
   // The names drawn on the bars are read through a ref, so the plugin (created once) always
   // draws the current ones.
   const barNamesRef = useRef<string[]>([]);
@@ -475,7 +480,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
 
           <div className="h-72 sm:h-80 w-full relative my-auto">
             {activeUserTasksCount > 0 ? (
-              <Doughnut data={pieData} options={pieOptions} aria-label="نمودار وضعیت تاخیر فعالیت‌های جاری کاربر" />
+              <Doughnut data={pieData} options={pieOptions} plugins={[pieCenterPlugin]} aria-label="نمودار وضعیت تاخیر فعالیت‌های جاری کاربر" />
             ) : (
               <div className="h-full flex items-center justify-center text-xs text-slate-400 dark:text-slate-500 font-medium text-center px-4">
                 هیچ فعالیت جاری (شروع‌نشده یا در حال اجرا) برای کاربر یافت نشد

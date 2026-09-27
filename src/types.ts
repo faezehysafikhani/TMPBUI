@@ -199,24 +199,24 @@ export const STATUSES: Record<TaskStatus, StatusConfig> = {
     title: 'شروع نشده',
     shortTitle: 'شروع نشده',
     description: 'فعالیت‌های آماده جهت شروع',
-    color: 'slate',
-    bgLight: 'bg-slate-50/80 border-slate-200',
-    badgeBg: 'bg-slate-100',
-    badgeText: 'text-slate-700 border-slate-300',
-    borderColor: 'border-slate-400',
-    iconName: 'Circle'
+    color: 'blue',
+    bgLight: 'bg-blue-50/80 border-blue-200',
+    badgeBg: 'bg-blue-100',
+    badgeText: 'text-blue-700 border-blue-300',
+    borderColor: 'border-blue-400',
+    iconName: 'Play'
   },
   in_progress: {
     id: 'in_progress',
     title: 'درحال اجرا',
     shortTitle: 'درحال اجرا',
     description: 'فعالیتهای جاری',
-    color: 'blue',
-    bgLight: 'bg-blue-50/80 border-blue-200',
-    badgeBg: 'bg-blue-100',
-    badgeText: 'text-blue-700 border-blue-300',
-    borderColor: 'border-blue-500',
-    iconName: 'Clock'
+    color: 'violet',
+    bgLight: 'bg-violet-50/80 border-violet-200',
+    badgeBg: 'bg-violet-100',
+    badgeText: 'text-violet-700 border-violet-300',
+    borderColor: 'border-violet-500',
+    iconName: 'Zap'
   },
   paused: {
     id: 'paused',
@@ -228,7 +228,7 @@ export const STATUSES: Record<TaskStatus, StatusConfig> = {
     badgeBg: 'bg-amber-100',
     badgeText: 'text-amber-800 border-amber-300',
     borderColor: 'border-amber-500',
-    iconName: 'PauseCircle'
+    iconName: 'Pause'
   },
   completed: {
     id: 'completed',
@@ -240,7 +240,7 @@ export const STATUSES: Record<TaskStatus, StatusConfig> = {
     badgeBg: 'bg-emerald-100',
     badgeText: 'text-emerald-800 border-emerald-300',
     borderColor: 'border-emerald-500',
-    iconName: 'CheckCircle2'
+    iconName: 'Check'
   }
 };
 

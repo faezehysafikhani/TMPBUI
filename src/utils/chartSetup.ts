@@ -109,3 +109,31 @@ export const barNameLabels = (names: () => string[]): Plugin<'bar'> => ({
     ctx.restore();
   },
 });
+
+/**
+ * Draws the total, and a short label under it, in the hole of a doughnut chart - at the ring's
+ * actual center, so it stays correct whatever height the legend below it takes.
+ */
+export const doughnutCenterText = (getText: () => { value: string; label: string }): Plugin<'doughnut'> => ({
+  id: 'doughnutCenterText',
+  afterDatasetsDraw(chart) {
+    const meta = chart.getDatasetMeta(0);
+    const arc = meta?.data?.[0] as unknown as { x: number; y: number } | undefined;
+    if (!arc) return;
+
+    const { ctx } = chart;
+    const { value, label } = getText();
+    const dark = isDarkMode();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = dark ? '#f1f5f9' : '#0f172a';
+    ctx.font = `800 26px ${CHART_FONT_FAMILY}`;
+    ctx.fillText(value, arc.x, arc.y - 10);
+    ctx.fillStyle = dark ? '#94a3b8' : '#64748b';
+    ctx.font = `600 11px ${CHART_FONT_FAMILY}`;
+    ctx.fillText(label, arc.x, arc.y + 14);
+    ctx.restore();
+  },
+});

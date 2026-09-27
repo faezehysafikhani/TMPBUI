@@ -2,8 +2,24 @@ import React, { useState } from 'react';
 import { Task, TaskStatus, STATUSES, Attachment, User } from '../types';
 import { TaskCard } from './TaskCard';
 import { toPersianDigits } from '../utils/helpers';
-import { Plus, Minus, Move } from 'lucide-react';
+import { Plus, Move, Play, Zap, Pause, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { can, PERMISSIONS } from '../utils/permissions';
+
+// One friendly, solid-colored icon per status, so every column reads at a glance - not just
+// "شروع نشده" and "متوقف".
+const STATUS_ICONS: Record<TaskStatus, React.ComponentType<{ className?: string }>> = {
+  todo: Play,
+  in_progress: Zap,
+  paused: Pause,
+  completed: Check,
+};
+
+const STATUS_ICON_BG: Record<TaskStatus, string> = {
+  todo: 'bg-blue-500',
+  in_progress: 'bg-violet-500',
+  paused: 'bg-amber-500',
+  completed: 'bg-emerald-500',
+};
 
 interface KanbanColumnProps {
   status: TaskStatus;
@@ -37,6 +53,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
 
   const cfg = STATUSES[status];
+  const StatusIcon = STATUS_ICONS[status];
 
   const dragHighlightStyles: Record<TaskStatus, string> = {
     todo: 'border-indigo-500 ring-4 ring-indigo-400/50 bg-indigo-50/70 dark:bg-indigo-950/50 shadow-xl scale-[1.01]',
@@ -73,46 +90,61 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
       {/* Column Accordion Header */}
       <div
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="flex items-center justify-between p-3.5 sm:p-4 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-700/50 rounded-3xl transition-colors select-none"
+        className="relative overflow-hidden flex items-center justify-between gap-3 p-3.5 sm:p-4 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-700/50 rounded-3xl transition-colors select-none"
       >
-        <div className="flex items-center gap-2.5">
-          {/* Collapse/Expand Toggle Icon (+ / -) */}
+        {/* Soft ambient glow behind the status icon, in the status color */}
+        <div className={`pointer-events-none absolute -left-8 -bottom-10 w-32 h-32 rounded-full blur-2xl opacity-[0.15] ${STATUS_ICON_BG[status]}`} />
+
+        <div className="relative flex items-center gap-3 min-w-0">
+          {/* Status Icon: one friendly, solid-colored badge per status */}
+          <div className={`w-10 h-10 sm:w-11 sm:h-11 shrink-0 rounded-2xl flex items-center justify-center shadow-md text-white ${STATUS_ICON_BG[status]}`}>
+            <StatusIcon className="w-5 h-5" />
+          </div>
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                {cfg.title}
+              </h2>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${cfg.badgeBg} ${cfg.badgeText}`}>
+                {toPersianDigits(tasks.length)} مورد
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block mt-0.5">{cfg.description}</p>
+          </div>
+        </div>
+
+        <div className="relative shrink-0 flex items-center gap-1.5">
+          {isDragOver && (
+            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-600 text-white animate-pulse">
+              رها کنید
+            </span>
+          )}
+          {can(currentUser, PERMISSIONS.tasksCreate) && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenCreateForStatus(status);
+              }}
+              className="w-8 h-8 rounded-xl flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:text-indigo-600 hover:border-indigo-300 dark:hover:text-indigo-400 shadow-sm transition-colors"
+              title="ثبت فعالیت جدید"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               setIsCollapsed(!isCollapsed);
             }}
-            className={`w-7 h-7 rounded-xl flex items-center justify-center font-bold text-sm transition-all ${
-              isCollapsed
-                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900'
-                : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600'
-            }`}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             title={isCollapsed ? 'باز کردن گروه‌بندی' : 'بستن گروه‌بندی'}
           >
-            {isCollapsed ? <Plus className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+            {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
           </button>
-
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              {cfg.title}
-            </h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">{cfg.description}</p>
-          </div>
         </div>
-
-        {/* Count Badge on the far left with word "مورد" */}
-        <div className="shrink-0 flex items-center gap-2">
-          {isDragOver && (
-            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-600 text-white animate-pulse">
-              رها کنید
-            </span>
-          )}
-          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${cfg.badgeBg} ${cfg.badgeText}`}>
-            {toPersianDigits(tasks.length)} مورد
-          </span>
-        </div>
-
       </div>
 
       {/* Drop Indicator Header if Collapsed */}
