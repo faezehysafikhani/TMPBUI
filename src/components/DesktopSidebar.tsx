@@ -48,7 +48,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   }
 
   return (
-    <aside className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm h-fit sticky top-20 animate-in fade-in slide-in-from-right-4 duration-300">
+    <aside className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm lg:min-h-[calc(100vh-6rem)] sticky top-20 animate-in fade-in slide-in-from-right-4 duration-300">
       
       {onOpenCreateModal && (
         <button

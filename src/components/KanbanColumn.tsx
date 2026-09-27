@@ -21,6 +21,27 @@ const STATUS_ICON_BG: Record<TaskStatus, string> = {
   completed: 'bg-emerald-500',
 };
 
+// The actual hex behind each icon color, for the header's soft wave background.
+const STATUS_WAVE_COLOR: Record<TaskStatus, string> = {
+  todo: '#3b82f6',
+  in_progress: '#8b5cf6',
+  paused: '#f59e0b',
+  completed: '#10b981',
+};
+
+/** Two soft, overlapping waves in the status color - the header's decorative backdrop. */
+const HeaderWaves: React.FC<{ color: string }> = ({ color }) => (
+  <svg
+    className="pointer-events-none absolute inset-0 w-full h-full"
+    viewBox="0 0 400 120"
+    preserveAspectRatio="none"
+    aria-hidden="true"
+  >
+    <path d="M0,85 C110,45 290,115 400,55 L400,120 L0,120 Z" fill={color} opacity="0.08" />
+    <path d="M0,100 C130,65 270,125 400,85 L400,120 L0,120 Z" fill={color} opacity="0.14" />
+  </svg>
+);
+
 interface KanbanColumnProps {
   status: TaskStatus;
   tasks: Task[];
@@ -92,8 +113,8 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="relative overflow-hidden flex items-center justify-between gap-3 p-3.5 sm:p-4 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-700/50 rounded-3xl transition-colors select-none"
       >
-        {/* Soft ambient glow behind the status icon, in the status color */}
-        <div className={`pointer-events-none absolute -left-8 -bottom-10 w-32 h-32 rounded-full blur-2xl opacity-[0.15] ${STATUS_ICON_BG[status]}`} />
+        {/* Soft wave backdrop in the status color */}
+        <HeaderWaves color={STATUS_WAVE_COLOR[status]} />
 
         <div className="relative flex items-center gap-3 min-w-0">
           {/* Status Icon: one friendly, solid-colored badge per status */}

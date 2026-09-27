@@ -1165,7 +1165,7 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans pb-24 transition-colors duration-200`}>
+    <div className={`min-h-screen bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}>
       
       {/* Startup Summary Welcome Modal (Priority 1 Overlay) */}
       {isWelcomeModalOpen && (
@@ -1214,8 +1214,8 @@ export default function App() {
       )}
 
       {/* Main Container with Right Desktop Sidebar */}
-      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 sm:pt-6 pb-24 lg:pb-12">
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
+      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 sm:pt-6">
+        <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-stretch">
           
           {/* Desktop Sidebar (Renders on Right Side in RTL) */}
           <DesktopSidebar
@@ -1379,18 +1379,18 @@ export default function App() {
           </>
         )}
 
-          {/* Footer Card Box styled like header */}
-          <footer className="mt-16 mb-20 md:mb-6">
-            <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
-              <span className="font-bold tracking-tight text-white/95">
-                تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
-              </span>
-            </div>
-          </footer>
-
           </main>
         </div>
       </div>
+
+      {/* Footer: a full-width bar at the true bottom of the page, not tucked under the content column */}
+      <footer className="mt-auto pt-10 pb-20 lg:pb-6 px-2 sm:px-3">
+        <div className="w-full max-w-[1920px] mx-auto bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
+          <span className="font-bold tracking-tight text-white/95">
+            تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
+          </span>
+        </div>
+      </footer>
 
       <Suspense fallback={null}>
         {/* Form Modal for Add/Edit Task */}

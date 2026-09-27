@@ -337,8 +337,8 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
     responsive: true,
     maintainAspectRatio: false,
     animation: false,
-    radius: 80,
-    cutout: 48,
+    radius: '90%',
+    cutout: '62%',
     onClick: (_event, elements) => {
       if (elements.length > 0) handlePieClick(delayStatusData[elements[0].index]);
     },

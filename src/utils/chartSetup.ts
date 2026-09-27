@@ -118,22 +118,34 @@ export const doughnutCenterText = (getText: () => { value: string; label: string
   id: 'doughnutCenterText',
   afterDatasetsDraw(chart) {
     const meta = chart.getDatasetMeta(0);
-    const arc = meta?.data?.[0] as unknown as { x: number; y: number } | undefined;
+    const arc = meta?.data?.[0] as unknown as { x: number; y: number; innerRadius?: number } | undefined;
     if (!arc) return;
 
     const { ctx } = chart;
     const { value, label } = getText();
     const dark = isDarkMode();
 
+    // Scale off the hole's real radius, not a fixed size, so the text always fits inside it -
+    // whatever the chart's rendered size ends up being.
+    const holeRadius = Math.max(arc.innerRadius ?? 0, 28);
+    const valueSize = Math.round(Math.min(holeRadius * 0.62, 30));
+    const labelSize = Math.round(Math.min(holeRadius * 0.26, 12));
+    const maxLabelWidth = holeRadius * 1.7;
+
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = dark ? '#f1f5f9' : '#0f172a';
-    ctx.font = `800 26px ${CHART_FONT_FAMILY}`;
-    ctx.fillText(value, arc.x, arc.y - 10);
+    ctx.font = `800 ${valueSize}px ${CHART_FONT_FAMILY}`;
+    ctx.fillText(value, arc.x, arc.y - valueSize * 0.42);
+
     ctx.fillStyle = dark ? '#94a3b8' : '#64748b';
-    ctx.font = `600 11px ${CHART_FONT_FAMILY}`;
-    ctx.fillText(label, arc.x, arc.y + 14);
+    ctx.font = `600 ${labelSize}px ${CHART_FONT_FAMILY}`;
+    let shortLabel = label;
+    while (shortLabel.length > 2 && ctx.measureText(shortLabel).width > maxLabelWidth) {
+      shortLabel = `${shortLabel.slice(0, -2)}…`;
+    }
+    ctx.fillText(shortLabel, arc.x, arc.y + valueSize * 0.55);
     ctx.restore();
   },
 });
