@@ -281,7 +281,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto dir-rtl">
-      <div className="relative w-full max-w-3xl my-auto bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-3xl my-auto bg-white dark:bg-slate-900 rounded-[18px] shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
           <div className="flex items-center gap-3">
@@ -305,7 +305,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-[10px] hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -315,7 +315,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
         <div className="flex items-center gap-2 px-4 pt-3 pb-2 bg-slate-100/60 dark:bg-slate-800/40 border-b border-slate-200/80 dark:border-slate-800 overflow-x-auto shrink-0">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'dashboard'
                 ? `${palette.accentBg} text-white shadow-md shadow-slate-900/10`
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
@@ -327,7 +327,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
           <button
             onClick={() => setActiveTab('charter')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-xs sm:text-sm font-bold transition-all cursor-pointer whitespace-nowrap ${
               activeTab === 'charter'
                 ? `${palette.accentBg} text-white shadow-md shadow-slate-900/10`
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800'
@@ -343,7 +343,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
           {/* TAB 1: منشور پروژه */}
           {activeTab === 'charter' && (
             <form onSubmit={handleSaveCharter} className="space-y-5 animate-in fade-in duration-150">
-              <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 rounded-2xl p-3.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+              <div className="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 rounded-[14px] p-3.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
                 <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-bold">منشور پروژه:</span> اهداف، کلیات، مدیر پروژه و بازه زمانی اصلی پروژه
@@ -361,7 +361,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                   value={charterDesc}
                   onChange={(e) => setCharterDesc(e.target.value)}
                   placeholder="توضیحات جامع پروژه، اهداف کلیدی و خروجی‌های مدنظر..."
-                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400 leading-relaxed"
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400 leading-relaxed"
                 />
               </div>
 
@@ -376,7 +376,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                   value={projectManager}
                   onChange={(e) => setProjectManager(e.target.value)}
                   placeholder="نام و نام خانوادگی مدیر پروژه..."
-                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -411,7 +411,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
                 <button
                   type="submit"
-                  className={`px-5 py-2.5 rounded-xl ${palette.accentBg} text-white font-bold text-xs sm:text-sm shadow-md hover:opacity-95 transition-all flex items-center gap-2 cursor-pointer`}
+                  className={`px-5 py-2.5 rounded-[10px] ${palette.accentBg} text-white font-bold text-xs sm:text-sm shadow-md hover:opacity-95 transition-all flex items-center gap-2 cursor-pointer`}
                 >
                   <Save className="w-4 h-4" />
                   <span>ذخیره منشور پروژه</span>
@@ -424,7 +424,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
           {activeTab === 'dashboard' && (
             <div className="space-y-6 animate-in fade-in duration-150">
               {/* Main Progress Metric Banner */}
-              <div className="p-5 sm:p-6 bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 text-white rounded-3xl shadow-xl relative overflow-hidden">
+              <div className="p-5 sm:p-6 bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 text-white rounded-[14px] shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-indigo-400 to-purple-400" />
 
                 <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -468,21 +468,21 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
                   {/* 3 Metric Cards inside Banner */}
                   <div className="grid grid-cols-3 gap-2 shrink-0 w-full sm:w-auto">
-                    <div className="flex flex-col items-center justify-center p-3 bg-white/10 dark:bg-black/30 backdrop-blur-md rounded-2xl border border-white/15">
+                    <div className="flex flex-col items-center justify-center p-3 bg-white/10 dark:bg-black/30 backdrop-blur-md rounded-[14px] border border-white/15">
                       <span className="text-[10px] text-emerald-300 font-bold mb-0.5">پیشرفت واقعی</span>
                       <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight">
                         {toPersianDigits(completionPercent)}٪
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-center justify-center p-3 bg-white/10 dark:bg-black/30 backdrop-blur-md rounded-2xl border border-white/15">
+                    <div className="flex flex-col items-center justify-center p-3 bg-white/10 dark:bg-black/30 backdrop-blur-md rounded-[14px] border border-white/15">
                       <span className="text-[10px] text-indigo-300 font-bold mb-0.5">برنامه‌ای تا‌کنون</span>
                       <div className="text-2xl sm:text-3xl font-black text-indigo-300 tracking-tight">
                         {toPersianDigits(plannedPercent)}٪
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-center justify-center p-3 bg-white/10 dark:bg-black/30 backdrop-blur-md rounded-2xl border border-white/15">
+                    <div className="flex flex-col items-center justify-center p-3 bg-white/10 dark:bg-black/30 backdrop-blur-md rounded-[14px] border border-white/15">
                       <span className="text-[10px] text-slate-300 font-bold mb-0.5">انحراف</span>
                       <div className={`text-2xl sm:text-3xl font-black tracking-tight ${
                         variancePercent > 0 ? 'text-emerald-400' : variancePercent === 0 ? 'text-indigo-300' : 'text-rose-400'
@@ -533,7 +533,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
               {/* Metric Cards Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-[14px] border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
                   <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">
                     پیشرفت واقعی (کارهای تکمیل شده)
                   </span>
@@ -547,7 +547,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                   </div>
                 </div>
 
-                <div className="p-3.5 bg-indigo-50/60 dark:bg-indigo-950/30 rounded-2xl border border-indigo-200/80 dark:border-indigo-800/50 flex flex-col justify-between">
+                <div className="p-3.5 bg-indigo-50/60 dark:bg-indigo-950/30 rounded-[14px] border border-indigo-200/80 dark:border-indigo-800/50 flex flex-col justify-between">
                   <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-400 block mb-1">
                     پیشرفت برنامه‌ای تا امروز
                   </span>
@@ -556,7 +556,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                   </span>
                 </div>
 
-                <div className={`p-3.5 rounded-2xl border flex flex-col justify-between ${
+                <div className={`p-3.5 rounded-[14px] border flex flex-col justify-between ${
                   variancePercent > 0
                     ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-200/80 dark:border-emerald-800/50'
                     : variancePercent === 0
@@ -594,7 +594,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                   </div>
                 </div>
 
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+                <div className="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-[14px] border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
                   <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block mb-1">
                     مجموع وزن‌ها
                   </span>
@@ -607,7 +607,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
               {/* Chart & Importance Breakdown Grid */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                 {/* Recharts Pie Visualization */}
-                <div className="md:col-span-5 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl flex flex-col justify-between">
+                <div className="md:col-span-5 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[14px] flex flex-col justify-between">
                   <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mb-2">
                     <TrendingUp className="w-4 h-4 text-emerald-500" />
                     <span>نسبت سهم وزن‌های تکمیل‌شده</span>
@@ -665,7 +665,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 </div>
 
                 {/* Breakdown by Importance Levels */}
-                <div className="md:col-span-7 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-3">
+                <div className="md:col-span-7 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[14px] space-y-3">
                   <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     <BarChart3 className="w-4 h-4 text-indigo-500" />
                     <span>تفکیک پیشرفت بر اساس درجه اهمیت زیرفعالیت‌ها</span>
@@ -680,7 +680,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                       return (
                         <div
                           key={impKey}
-                          className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-2xl space-y-2"
+                          className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 rounded-[14px] space-y-2"
                         >
                           <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-2">
@@ -724,7 +724,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                 {/* Form to add or edit subtask */}
                 <form
                   onSubmit={handleSaveSubTask}
-                  className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-3.5"
+                  className="bg-slate-50 dark:bg-slate-800/60 p-4 rounded-[14px] border border-slate-200 dark:border-slate-700/80 space-y-3.5"
                 >
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
@@ -749,7 +749,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                     value={subTitle}
                     onChange={(e) => setSubTitle(e.target.value)}
                     placeholder="عنوان زیرفعالیت جدید را وارد کنید..."
-                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs sm:text-sm text-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
                   />
 
                   {/* Subtask Importance Selection */}
@@ -766,7 +766,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                             key={impKey}
                             type="button"
                             onClick={() => setSubImportance(impKey)}
-                            className={`px-3 py-2 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            className={`px-3 py-2 rounded-[10px] text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                               isSelected
                                 ? `${cfg.bg} ${cfg.border} ${cfg.text} ring-2 ring-indigo-500/50 shadow-xs`
                                 : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
@@ -797,7 +797,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                     <button
                       type="submit"
                       disabled={!subTitle.trim()}
-                      className={`px-4 py-2 rounded-xl ${palette.accentBg} text-white font-bold text-xs shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
+                      className={`px-4 py-2 rounded-[10px] ${palette.accentBg} text-white font-bold text-xs shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
                     >
                       <Plus className="w-4 h-4" />
                       <span>{editingSubId ? 'بروزرسانی زیرفعالیت' : 'افزودن زیرفعالیت'}</span>
@@ -815,7 +815,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                   </h4>
 
                   {subTasks.length === 0 ? (
-                    <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+                    <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/30 rounded-[14px] border border-dashed border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
                       هنوز زیرفعالیتی برای این پروژه تعریف نشده است.
                     </div>
                   ) : (
@@ -825,7 +825,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                         return (
                           <div
                             key={st.id}
-                            className={`p-3 rounded-2xl border flex items-center justify-between gap-3 transition-all ${
+                            className={`p-3 rounded-[14px] border flex items-center justify-between gap-3 transition-all ${
                               st.completed
                                 ? 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-80'
                                 : 'bg-white dark:bg-slate-900 border-slate-200/90 dark:border-slate-800 shadow-2xs'

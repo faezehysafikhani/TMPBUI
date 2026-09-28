@@ -159,7 +159,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
       {/* Alert Banner */}
       {actionMsg && (
         <div
-          className={`p-3 rounded-2xl text-xs font-semibold flex items-center justify-between ${
+          className={`p-3 rounded-[14px] text-xs font-semibold flex items-center justify-between ${
             actionMsg.type === 'success'
               ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
               : 'bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
@@ -184,7 +184,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
       )}
 
       {/* Team Tabs & Create Team Button */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-800/80 p-3 rounded-[14px] border border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           {teams.length === 0 ? (
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1">
@@ -196,7 +196,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
                 key={team.id}
                 type="button"
                 onClick={() => setActiveTeamId(team.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                   activeTeam?.id === team.id
                     ? 'bg-indigo-600 text-white shadow-xs'
                     : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
@@ -213,7 +213,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
         <button
           type="button"
           onClick={() => setIsCreatingTeam(!isCreatingTeam)}
-          className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold rounded-xl text-xs border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer shrink-0"
+          className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold rounded-[10px] text-xs border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>ساخت تیم کاری جدید</span>
@@ -224,7 +224,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
       {isCreatingTeam && (
         <form
           onSubmit={handleCreateTeam}
-          className="p-3 bg-indigo-50/50 dark:bg-indigo-950/40 rounded-2xl border border-indigo-200 dark:border-indigo-800 flex items-center gap-2 animate-in fade-in duration-200"
+          className="p-3 bg-indigo-50/50 dark:bg-indigo-950/40 rounded-[14px] border border-indigo-200 dark:border-indigo-800 flex items-center gap-2 animate-in fade-in duration-200"
         >
           <input
             type="text"
@@ -232,12 +232,12 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
             value={newTeamName}
             onChange={(e) => setNewTeamName(e.target.value)}
             placeholder="نام تیم کاری (مثلاً: تیم پروژه طراحی UI)"
-            className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+            className="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
           />
           <button
             type="submit"
             disabled={saving}
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-wait"
+            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-[10px] text-xs cursor-pointer shrink-0 disabled:opacity-60 disabled:cursor-wait"
           >
             {saving && <Loader2 className="w-3.5 h-3.5 animate-spin inline ml-1" />}
             ایجاد تیم
@@ -245,7 +245,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
           <button
             type="button"
             onClick={() => setIsCreatingTeam(false)}
-            className="p-1.5 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
+            className="p-1.5 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-[10px] cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -261,7 +261,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
         <div className="space-y-4">
           
           {/* Active Team Header Info & Search Members Section */}
-          <div className="bg-white dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+          <div className="bg-white dark:bg-slate-800/80 p-4 rounded-[14px] border border-slate-200 dark:border-slate-700 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/80 pb-3">
               <div>
                 <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-2">
@@ -278,7 +278,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
                   type="button"
                   onClick={() => handleDeleteTeam(activeTeam.id)}
                   title="حذف این تیم"
-                  className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded-xl transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                  className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded-[10px] transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>حذف تیم</span>
@@ -287,7 +287,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
             </div>
 
             {!canManageActiveTeam && (
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+              <div className="p-3 rounded-[14px] bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                 شما عضو این تیم هستید؛ اعضا را می‌توانید ببینید و در چت داخلی با آن‌ها گفتگو کنید. مدیریت اعضا فقط برای مدیر تیم یا ادمین انجام می‌شود.
               </div>
             )}
@@ -305,13 +305,13 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="نام یا نام کاربری همکار خود را جستجو کنید..."
-                    className="w-full pr-9 pl-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                    className="w-full pr-9 pl-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 {/* Instant Search Results Dropdown List */}
                 {searchTerm.trim().length > 0 && (
-                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 max-h-48 overflow-y-auto space-y-1 animate-in fade-in duration-150">
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-[14px] p-2 max-h-48 overflow-y-auto space-y-1 animate-in fade-in duration-150">
                     {availableUsersToSearch.length === 0 ? (
                       <div className="p-3 text-center text-xs text-slate-500">
                         کاربری با این مشخصات پیدا نشد یا قبلاً عضو تیم شده است.
@@ -322,7 +322,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
                         return (
                           <div
                             key={user.id}
-                            className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+                            className="flex items-center justify-between p-2 rounded-[14px] bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
                           >
                             <div className="flex items-center gap-2.5">
                               {user.avatar ? (
@@ -383,7 +383,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
               {activeTeam.members.map((member) => (
                 <div
                   key={member.userId}
-                  className="flex items-center justify-between p-3 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/80"
+                  className="flex items-center justify-between p-3 bg-white dark:bg-slate-800/80 rounded-[14px] border border-slate-200 dark:border-slate-700/80"
                 >
                   <div className="flex items-center gap-3">
                     {member.avatar ? (
@@ -425,7 +425,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
                       onClick={() => handleRemoveMember(member.userId)}
                       disabled={saving}
                       title="حذف از تیم"
-                      className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded-xl transition-colors cursor-pointer flex items-center gap-1 text-xs"
+                      className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60 rounded-[10px] transition-colors cursor-pointer flex items-center gap-1 text-xs"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">حذف</span>

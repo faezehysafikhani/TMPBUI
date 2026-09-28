@@ -240,7 +240,7 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && (isOpen ? setIsOpen(false) : handleOpen())}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 text-xs border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-800 dark:text-slate-100 ${
+        className={`w-full flex items-center justify-between px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 text-xs border border-slate-200 dark:border-slate-700 rounded-[10px] focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-slate-800 dark:text-slate-100 ${
           disabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-slate-100/80 dark:hover:bg-slate-800 cursor-pointer'
         }`}
       >
@@ -268,7 +268,7 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
               overflowY: 'auto',
               overscrollBehavior: 'contain',
             }}
-            className="z-[9999] w-[300px] sm:w-[320px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-4 animate-in fade-in zoom-in-95 text-slate-800 dark:text-slate-100"
+            className="z-[9999] w-[300px] sm:w-[320px] bg-white dark:bg-slate-800 rounded-[14px] shadow-2xl border border-slate-200 dark:border-slate-700 p-4 animate-in fade-in zoom-in-95 text-slate-800 dark:text-slate-100"
           >
             
             {/* Header / Month Year Navigation */}
@@ -365,7 +365,7 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
                     key={day}
                     onClick={() => handleSelectDay(day)}
                     title={tooltipText}
-                    className={`h-8 w-8 mx-auto rounded-xl flex items-center justify-center text-xs font-semibold transition-all cursor-pointer relative ${
+                    className={`h-8 w-8 mx-auto rounded-[10px] flex items-center justify-center text-xs font-semibold transition-all cursor-pointer relative ${
                       isSelected
                         ? isRedDay
                           ? 'bg-rose-600 text-white shadow-xs font-bold'
@@ -396,7 +396,7 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
                 </span>
               </div>
 
-              <div className="flex items-center justify-center gap-3 bg-slate-50 dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-700">
+              <div className="flex items-center justify-center gap-3 bg-slate-50 dark:bg-slate-900 p-2 rounded-[14px] border border-slate-100 dark:border-slate-700">
                 {/* Minute Picker (راست: دقیقه) */}
                 <div className="flex items-center gap-1">
                   <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">دقیقه:</span>
@@ -456,7 +456,7 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
                 <button
                   type="button"
                   onClick={handleConfirm}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[10px] text-xs font-bold shadow-xs cursor-pointer"
                 >
                   <Check className="w-3.5 h-3.5" />
                   <span>تأیید</span>

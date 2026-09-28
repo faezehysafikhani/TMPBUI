@@ -217,7 +217,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     searchQuery !== '';
 
   return (
-    <div className="bg-white dark:bg-slate-800/90 p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs mb-6">
+    <div className="bg-white dark:bg-slate-800/90 p-3.5 sm:p-4 rounded-[14px] border border-slate-200 dark:border-slate-700 shadow-xs mb-6">
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
         
         {/* Controls Row - 1 Search input + 4 Icon Dropdowns + 1 Saved Filters Dropdown */}
@@ -231,7 +231,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="جستجو..."
-              className="w-full pr-8 pl-7 sm:pr-9 sm:pl-8 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="w-full pr-8 pl-7 sm:pr-9 sm:pl-8 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-900 focus:bg-white dark:focus:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-[10px] focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
             {searchQuery && (
               <button
@@ -249,7 +249,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <button
               type="button"
               onClick={() => toggleDropdown('status')}
-              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-800 active:bg-slate-200 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer"
+              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-800 active:bg-slate-200 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-[10px] border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer"
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
@@ -265,7 +265,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             {activeDropdown === 'status' && (
               <>
                 <div className="fixed inset-0 z-20" onClick={closeDropdowns} />
-                <div className="absolute right-0 top-full mt-1.5 z-30 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 text-xs overflow-hidden animate-in fade-in zoom-in-95">
+                <div className="absolute right-0 top-full mt-1.5 z-30 w-48 bg-white dark:bg-slate-800 rounded-[14px] shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 text-xs overflow-hidden animate-in fade-in zoom-in-95">
                   <button
                     type="button"
                     onClick={() => {
@@ -314,7 +314,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <button
               type="button"
               onClick={() => toggleDropdown('priority')}
-              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-800 active:bg-slate-200 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer"
+              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-800 active:bg-slate-200 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-[10px] border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer"
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
@@ -330,7 +330,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             {activeDropdown === 'priority' && (
               <>
                 <div className="fixed inset-0 z-20" onClick={closeDropdowns} />
-                <div className="absolute right-0 top-full mt-1.5 z-30 w-44 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 text-xs overflow-hidden animate-in fade-in zoom-in-95">
+                <div className="absolute right-0 top-full mt-1.5 z-30 w-44 bg-white dark:bg-slate-800 rounded-[14px] shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 text-xs overflow-hidden animate-in fade-in zoom-in-95">
                   <button
                     type="button"
                     onClick={() => {
@@ -379,7 +379,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <button
               type="button"
               onClick={() => toggleDropdown('assignee')}
-              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-800 active:bg-slate-200 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer"
+              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-800 active:bg-slate-200 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-[10px] border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer"
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 <UserCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -395,7 +395,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             {activeDropdown === 'assignee' && (
               <>
                 <div className="fixed inset-0 z-20" onClick={closeDropdowns} />
-                <div className="absolute right-0 top-full mt-1.5 z-30 w-52 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 text-xs overflow-hidden animate-in fade-in zoom-in-95 max-h-60 overflow-y-auto">
+                <div className="absolute right-0 top-full mt-1.5 z-30 w-52 bg-white dark:bg-slate-800 rounded-[14px] shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 text-xs overflow-hidden animate-in fade-in zoom-in-95 max-h-60 overflow-y-auto">
                   <button
                     type="button"
                     onClick={() => {
@@ -459,7 +459,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <button
               type="button"
               onClick={() => toggleDropdown('tag')}
-              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-800 active:bg-slate-200 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer"
+              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100/80 dark:hover:bg-slate-800 active:bg-slate-200 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-[10px] border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer"
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 <Tag className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -475,7 +475,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             {activeDropdown === 'tag' && (
               <>
                 <div className="fixed inset-0 z-20" onClick={closeDropdowns} />
-                <div className="absolute right-0 top-full mt-1.5 z-30 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 text-xs overflow-hidden animate-in fade-in zoom-in-95 max-h-60 overflow-y-auto">
+                <div className="absolute right-0 top-full mt-1.5 z-30 w-48 bg-white dark:bg-slate-800 rounded-[14px] shadow-xl border border-slate-200 dark:border-slate-700 py-1.5 text-xs overflow-hidden animate-in fade-in zoom-in-95 max-h-60 overflow-y-auto">
                   <button
                     type="button"
                     onClick={() => {
@@ -564,7 +564,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             <button
               type="button"
               onClick={() => toggleDropdown('saved')}
-              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-xl border border-purple-200 dark:border-purple-800/60 shadow-2xs transition-all cursor-pointer"
+              className="w-full flex items-center justify-between gap-1 px-2.5 py-2 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 hover:from-purple-500/20 hover:to-indigo-500/20 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-[10px] border border-purple-200 dark:border-purple-800/60 shadow-2xs transition-all cursor-pointer"
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 <Bookmark className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0 fill-purple-600/20" />
@@ -578,7 +578,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             {activeDropdown === 'saved' && (
               <>
                 <div className="fixed inset-0 z-20" onClick={closeDropdowns} />
-                <div className="absolute left-0 sm:left-auto right-0 top-full mt-1.5 z-30 w-72 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-2.5 text-xs overflow-hidden animate-in fade-in zoom-in-95 max-h-80 overflow-y-auto space-y-2">
+                <div className="absolute left-0 sm:left-auto right-0 top-full mt-1.5 z-30 w-72 bg-white dark:bg-slate-800 rounded-[14px] shadow-2xl border border-slate-200 dark:border-slate-700 p-2.5 text-xs overflow-hidden animate-in fade-in zoom-in-95 max-h-80 overflow-y-auto space-y-2">
                   <div className="flex items-center justify-between px-1 pb-1.5 border-b border-slate-100 dark:border-slate-700">
                     <span className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1">
                       <Bookmark className="w-3.5 h-3.5 text-purple-500" />
@@ -591,7 +591,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
                   {/* Save current filter button / form */}
                   {isFiltered && (
-                    <div className="p-2 rounded-xl bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/60 space-y-2">
+                    <div className="p-2 rounded-[14px] bg-purple-50/70 dark:bg-purple-950/40 border border-purple-200/80 dark:border-purple-800/60 space-y-2">
                       {!isSavingNewFilter ? (
                         <button
                           type="button"
@@ -678,7 +678,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                         <div
                           key={sf.id}
                           onClick={() => handleApplySavedFilter(sf)}
-                          className={`group p-2 rounded-xl border transition-all cursor-pointer flex flex-col gap-1 ${
+                          className={`group p-2 rounded-[14px] border transition-all cursor-pointer flex flex-col gap-1 ${
                             isActiveMatch
                               ? 'bg-purple-50 dark:bg-purple-950/60 border-purple-300 dark:border-purple-700 shadow-xs'
                               : 'bg-slate-50/80 dark:bg-slate-900/50 border-slate-200/80 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-700/80'

@@ -49,7 +49,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 my-auto text-slate-800 dark:text-slate-100 flex flex-col max-h-[85vh]">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[18px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 my-auto text-slate-800 dark:text-slate-100 flex flex-col max-h-[85vh]">
         
         {/* Header Bar */}
         <div className="flex items-center justify-between px-5 py-4 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800 shrink-0">
@@ -149,7 +149,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
         <div className="p-4 overflow-y-auto space-y-2.5 flex-1">
           {filteredNotifications.length === 0 ? (
             <div className="py-12 px-4 text-center space-y-3">
-              <div className="w-14 h-14 mx-auto rounded-3xl bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center">
+              <div className="w-14 h-14 mx-auto rounded-[14px] bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 flex items-center justify-center">
                 <Inbox className="w-7 h-7" />
               </div>
               <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
@@ -160,7 +160,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
             filteredNotifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                className={`p-3.5 rounded-[14px] border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
                   notification.isRead
                     ? 'bg-slate-50/60 dark:bg-slate-800/30 border-slate-200/70 dark:border-slate-800 opacity-80'
                     : 'bg-white dark:bg-slate-800/90 border-indigo-200 dark:border-indigo-900/60 shadow-xs'

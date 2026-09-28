@@ -8,8 +8,8 @@ interface PageViewLoaderProps {
 
 const paletteColors: Record<AppColorPalette, { primary: string; glow: string }> = {
   indigo: {
-    primary: '#6366f1',
-    glow: 'rgba(99, 102, 241, 0.3)',
+    primary: '#4939F1',
+    glow: 'rgba(73, 57, 241, 0.3)',
   },
   emerald: {
     primary: '#10b981',

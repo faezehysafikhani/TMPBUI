@@ -5,7 +5,7 @@ import { toPersianDigits } from '../../utils/helpers';
 /** Shared building blocks of the administration screens (Settings), in one visual language. */
 
 export const AdminCard: React.FC<{ className?: string; children: React.ReactNode }> = ({ className = '', children }) => (
-  <div className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.04)] ${className}`}>
+  <div className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] shadow-[0_1px_3px_rgba(15,23,42,0.04)] ${className}`}>
     {children}
   </div>
 );
@@ -19,7 +19,7 @@ export interface TabItem<T extends string> {
 /** The main navigation of a settings page: a soft track with the active tab raised. */
 export function SegmentedTabs<T extends string>({ tabs, active, onChange }: { tabs: TabItem<T>[]; active: T; onChange: (id: T) => void }) {
   return (
-    <div className="flex gap-1 p-1.5 bg-slate-100/80 dark:bg-slate-800/70 rounded-2xl overflow-x-auto" role="tablist">
+    <div className="flex gap-1 p-1.5 bg-slate-100/80 dark:bg-slate-800/70 rounded-[14px] overflow-x-auto" role="tablist">
       {tabs.map(({ id, label, icon: Icon }) => {
         const selected = id === active;
         return (
@@ -29,7 +29,7 @@ export function SegmentedTabs<T extends string>({ tabs, active, onChange }: { ta
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               selected
                 ? 'bg-white dark:bg-slate-900 text-indigo-800 dark:text-indigo-300 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -57,7 +57,7 @@ export function PillTabs<T extends string>({ tabs, active, onChange }: { tabs: T
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold border transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-sm font-bold border transition-all cursor-pointer ${
               selected
                 ? 'bg-indigo-800 border-indigo-800 text-white shadow-sm dark:bg-indigo-600 dark:border-indigo-600'
                 : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-indigo-300'
@@ -80,7 +80,7 @@ export const SearchBox: React.FC<{ value: string; onChange: (value: string) => v
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="w-full pr-10 pl-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
+      className="w-full pr-10 pl-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
     />
   </div>
 );
@@ -175,10 +175,10 @@ export const Field: React.FC<{ label: string; hint?: string; required?: boolean;
 );
 
 export const inputClass =
-  'w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400 dark:disabled:bg-slate-800/50';
+  'w-full px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 disabled:bg-slate-50 disabled:text-slate-400 dark:disabled:bg-slate-800/50';
 
 export const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; label: string; description?: string; disabled?: boolean }> = ({ checked, onChange, label, description, disabled }) => (
-  <label className={`flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 ${disabled ? 'opacity-60' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60'}`}>
+  <label className={`flex items-center justify-between gap-3 p-3 rounded-[14px] border border-slate-200 dark:border-slate-700 ${disabled ? 'opacity-60' : 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60'}`}>
     <span>
       <span className="block text-sm font-bold text-slate-800 dark:text-slate-100">{label}</span>
       {description && <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{description}</span>}
@@ -198,7 +198,7 @@ export const Notice: React.FC<{ type: 'success' | 'error' | 'info'; children: Re
   };
   const Icon = type === 'success' ? CheckCircle2 : AlertCircle;
   return (
-    <div role={type === 'error' ? 'alert' : 'status'} className={`flex items-start gap-2 p-3 rounded-xl border text-sm ${styles[type]}`}>
+    <div role={type === 'error' ? 'alert' : 'status'} className={`flex items-start gap-2 p-3 rounded-[14px] border text-sm ${styles[type]}`}>
       <Icon className="w-4 h-4 shrink-0 mt-0.5" />
       <div className="flex-1 leading-relaxed">{children}</div>
       {onClose && (
@@ -213,7 +213,7 @@ export const Notice: React.FC<{ type: 'success' | 'error' | 'info'; children: Re
 /** A modal dialog for the administration forms. */
 export const AdminDialog: React.FC<{ title: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode; wide?: boolean }> = ({ title, onClose, children, footer, wide }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs" onClick={(e) => e.target === e.currentTarget && onClose()}>
-    <div role="dialog" aria-modal="true" aria-label={title} className={`w-full ${wide ? 'max-w-3xl' : 'max-w-xl'} max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800`}>
+    <div role="dialog" aria-modal="true" aria-label={title} className={`w-full ${wide ? 'max-w-3xl' : 'max-w-xl'} max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-[18px] shadow-2xl border border-slate-200 dark:border-slate-800`}>
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
         <h3 className="text-base font-extrabold text-slate-900 dark:text-white">{title}</h3>
         <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" aria-label="بستن">
@@ -229,14 +229,14 @@ export const AdminDialog: React.FC<{ title: string; onClose: () => void; childre
 export const PrimaryButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = ({ className = '', ...props }) => (
   <button
     {...props}
-    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-800 hover:bg-indigo-900 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-sm font-bold shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-[10px] bg-indigo-800 hover:bg-indigo-900 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-sm font-bold shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
   />
 );
 
 export const SecondaryButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = ({ className = '', ...props }) => (
   <button
     {...props}
-    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-[10px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
   />
 );
 

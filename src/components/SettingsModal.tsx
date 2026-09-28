@@ -161,7 +161,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         onClick={onClose}
       />
 
-      <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-[18px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden z-10 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 shrink-0">
@@ -172,7 +172,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-[10px] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -183,7 +183,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Accordion Group 0: User Profile & Avatar Selection */}
           {currentUser && (
-            <div className="border border-indigo-200 dark:border-indigo-900/60 rounded-2xl overflow-hidden bg-indigo-50/30 dark:bg-indigo-950/20">
+            <div className="border border-indigo-200 dark:border-indigo-900/60 rounded-[14px] overflow-hidden bg-indigo-50/30 dark:bg-indigo-950/20">
               <button
                 type="button"
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -206,7 +206,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   
                   {/* Message Alert */}
                   {profileMsg && (
-                    <div className={`p-3 rounded-xl text-xs font-semibold ${
+                    <div className={`p-3 rounded-[14px] text-xs font-semibold ${
                       profileMsg.type === 'success'
                         ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                         : 'bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
@@ -217,7 +217,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                   <form onSubmit={handleSaveProfileSubmit} className="space-y-4">
                     {/* Current Avatar Preview & Upload */}
-                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-white dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-white dark:bg-slate-800/80 p-3.5 rounded-[14px] border border-slate-200 dark:border-slate-700">
                       <div className="relative shrink-0">
                         {selectedAvatar ? (
                           <img
@@ -233,7 +233,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="absolute -bottom-1 -right-1 p-1.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-colors shadow-xs cursor-pointer"
+                          className="absolute -bottom-1 -right-1 p-1.5 bg-indigo-600 text-white rounded-[10px] hover:bg-indigo-500 transition-colors shadow-xs cursor-pointer"
                           title="بارگذاری تصویر شخصی"
                         >
                           <Camera className="w-3.5 h-3.5" />
@@ -249,7 +249,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
 
                         {/* Acceptable file size & format notice before upload */}
-                        <div className="p-2.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 text-right space-y-1">
+                        <div className="p-2.5 rounded-[14px] bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 text-right space-y-1">
                           <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-900 dark:text-indigo-200">
                             <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400 shrink-0" />
                             <span>حجم قابل قبول: <strong>حداکثر ۲۰۰ کیلوبایت (200 KB)</strong></span>
@@ -270,7 +270,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
                           title="حجم مجاز: حداکثر ۲۰۰ کیلوبایت (فرمت‌های JPG, PNG, WEBP)"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[10px] text-xs font-bold transition-colors cursor-pointer shadow-xs"
                         >
                           <Upload className="w-3.5 h-3.5" />
                           <span>بارگذاری تصویر شخصی (حداکثر ۲۰۰ KB)</span>
@@ -294,7 +294,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                                 setSelectedAvatar(avatar.url);
                                 setProfileMsg(null);
                               }}
-                              className={`relative p-1 rounded-2xl border-2 transition-all cursor-pointer aspect-square flex items-center justify-center bg-white dark:bg-slate-800 hover:scale-105 ${
+                              className={`relative p-1 rounded-[10px] border-2 transition-all cursor-pointer aspect-square flex items-center justify-center bg-white dark:bg-slate-800 hover:scale-105 ${
                                 isSelected
                                   ? 'border-indigo-600 ring-2 ring-indigo-400/40 shadow-md scale-105'
                                   : 'border-slate-200 dark:border-slate-700 opacity-80 hover:opacity-100'
@@ -325,7 +325,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           onChange={(e) => setProfileName(e.target.value)}
                           placeholder="مثلاً: علی محمدی"
                           required
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                       </div>
 
@@ -338,7 +338,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           value={profileUsername}
                           onChange={(e) => setProfileUsername(e.target.value)}
                           placeholder="username"
-                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right"
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right"
                         />
                       </div>
                     </div>
@@ -362,7 +362,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                             value={profilePhoneNumber}
                             onChange={(e) => setProfilePhoneNumber(e.target.value)}
                             placeholder="09121234567"
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right"
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right"
                           />
                         </div>
 
@@ -371,7 +371,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       {/* Notification Toggles */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                         {/* SMS Toggle Option */}
-                        <label className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                        <label className={`flex items-center justify-between p-2.5 rounded-[14px] border transition-all cursor-pointer select-none ${
                           notifySms
                             ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200'
                             : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
@@ -396,7 +396,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       <button
                         type="submit"
                         disabled={isSavingProfile}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-[10px] transition-all shadow-md cursor-pointer flex items-center gap-2 disabled:opacity-50"
                       >
                         {isSavingProfile ? (
                           <>
@@ -420,7 +420,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Work Team Management Accordion (For All Users) */}
           {currentUser && (
-            <div className="border border-indigo-200 dark:border-indigo-900/60 rounded-2xl overflow-hidden bg-indigo-50/20 dark:bg-indigo-950/20">
+            <div className="border border-indigo-200 dark:border-indigo-900/60 rounded-[14px] overflow-hidden bg-indigo-50/20 dark:bg-indigo-950/20">
               <button
                 type="button"
                 onClick={() => setIsTeamMgmtOpen(!isTeamMgmtOpen)}
@@ -447,7 +447,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           )}
 
           {/* Accordion Group 1: Light / Dark Mode */}
-          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-slate-800/30">
+          <div className="border border-slate-200 dark:border-slate-800 rounded-[14px] overflow-hidden bg-slate-50/50 dark:bg-slate-800/30">
             <button
               type="button"
               onClick={() => setIsThemeModeOpen(!isThemeModeOpen)}
@@ -471,7 +471,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setThemeMode('light')}
-                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border transition-all cursor-pointer font-bold text-xs ${
+                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-[10px] border transition-all cursor-pointer font-bold text-xs ${
                       themeMode === 'light'
                         ? 'bg-indigo-50 border-indigo-500 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-400 dark:text-indigo-300 shadow-xs'
                         : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60'
@@ -485,7 +485,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setThemeMode('dark')}
-                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border transition-all cursor-pointer font-bold text-xs ${
+                    className={`flex items-center justify-center gap-2 py-3 px-4 rounded-[10px] border transition-all cursor-pointer font-bold text-xs ${
                       themeMode === 'dark'
                         ? 'bg-indigo-50 border-indigo-500 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-400 dark:text-indigo-300 shadow-xs'
                         : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/60'
@@ -501,7 +501,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Accordion Group 2: Color Palette Selector */}
-          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-slate-800/30">
+          <div className="border border-slate-200 dark:border-slate-800 rounded-[14px] overflow-hidden bg-slate-50/50 dark:bg-slate-800/30">
             <button
               type="button"
               onClick={() => setIsPaletteOpen(!isPaletteOpen)}
@@ -531,7 +531,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         key={key}
                         type="button"
                         onClick={() => setAppColorPalette(key)}
-                        className={`p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col items-start gap-1.5 overflow-hidden ${
+                        className={`p-2.5 rounded-[10px] border transition-all cursor-pointer flex flex-col items-start gap-1.5 overflow-hidden ${
                           isSelected
                             ? 'border-indigo-600 ring-2 ring-indigo-500/30 bg-indigo-50/50 dark:bg-indigo-950/50 shadow-xs'
                             : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/80'
@@ -556,7 +556,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
 
           {/* Accordion Group 3: Pattern Theme Selector */}
-          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-slate-800/30">
+          <div className="border border-slate-200 dark:border-slate-800 rounded-[14px] overflow-hidden bg-slate-50/50 dark:bg-slate-800/30">
             <button
               type="button"
               onClick={() => setIsPatternOpen(!isPatternOpen)}
@@ -585,7 +585,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         key={scheme.id}
                         type="button"
                         onClick={() => setAppColorTheme(scheme.id)}
-                        className={`relative p-2.5 rounded-2xl border transition-all cursor-pointer flex flex-col items-start gap-1.5 overflow-hidden ${
+                        className={`relative p-2.5 rounded-[10px] border transition-all cursor-pointer flex flex-col items-start gap-1.5 overflow-hidden ${
                           isSelected
                             ? 'border-indigo-600 ring-2 ring-indigo-500/30 bg-indigo-50/50 dark:bg-indigo-950/50 shadow-xs'
                             : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/80'
@@ -617,7 +617,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* Accordion Group 4: Feature Catalog & PDF Handbook (Collapsible, closed by default) */}
           {onOpenPdfCatalog && (
-            <div className="border border-emerald-200 dark:border-emerald-900/60 rounded-2xl overflow-hidden bg-emerald-50/30 dark:bg-emerald-950/20">
+            <div className="border border-emerald-200 dark:border-emerald-900/60 rounded-[14px] overflow-hidden bg-emerald-50/30 dark:bg-emerald-950/20">
               <button
                 type="button"
                 onClick={() => setIsCatalogOpen(!isCatalogOpen)}
@@ -646,7 +646,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onClose();
                       onOpenPdfCatalog();
                     }}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-[10px] shadow-xs transition-all cursor-pointer active:scale-95"
                   >
                     <Printer className="w-4 h-4" />
                     <span>مشاهده و چاپ کاتالوگ امکانات (PDF)</span>
@@ -659,7 +659,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* User Account & Logout Section */}
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800">
             {currentUser ? (
-              <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
+              <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 p-3 rounded-[14px] border border-slate-200/80 dark:border-slate-700/80">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
                     {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : <UserIcon className="w-4 h-4" />}
@@ -673,19 +673,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 dark:text-rose-300 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-rose-200 dark:border-rose-800"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 dark:text-rose-300 rounded-[10px] text-xs font-bold transition-colors cursor-pointer border border-rose-200 dark:border-rose-800"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>خروج</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-between bg-indigo-50/50 dark:bg-indigo-950/40 p-3 rounded-2xl border border-indigo-100 dark:border-indigo-900/50">
+              <div className="flex items-center justify-between bg-indigo-50/50 dark:bg-indigo-950/40 p-3 rounded-[14px] border border-indigo-100 dark:border-indigo-900/50">
                 <span className="text-xs text-slate-600 dark:text-slate-300">وارد حساب کاربری نشده‌اید</span>
                 <button
                   type="button"
                   onClick={onOpenAuthModal}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[10px] text-xs font-bold transition-colors cursor-pointer"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>ورود به سیستم</span>
@@ -701,7 +701,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-xs"
+            className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-[10px] transition-colors cursor-pointer shadow-xs"
           >
             تایید و بستن
           </button>

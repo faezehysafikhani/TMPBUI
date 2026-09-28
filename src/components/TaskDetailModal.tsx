@@ -346,7 +346,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 my-auto text-slate-800 dark:text-slate-100">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[18px] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 my-auto text-slate-800 dark:text-slate-100">
         
         {/* Header Bar */}
         <div className="flex items-center justify-between px-5 py-4 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800">
@@ -374,7 +374,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     onOpenProjectDetails(task);
                   }
                 }}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-[10px] text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                 title="مشاهده منشور، زیرفعالیت‌ها و داشبورد پروژه"
               >
                 <FolderKanban className="w-4 h-4" />
@@ -390,7 +390,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   onClose();
                   onEditTask(task);
                 }}
-                className="p-2 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
+                className="p-2 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700/60 rounded-[10px] transition-colors cursor-pointer"
                 title="ویرایش کامل فعالیت"
               >
                 <Edit2 className="w-4 h-4" />
@@ -405,7 +405,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   onClose();
                   onDeleteTask(task.id);
                 }}
-                className="p-2 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
+                className="p-2 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/60 rounded-[10px] transition-colors cursor-pointer"
                 title="حذف فعالیت"
               >
                 <Trash2 className="w-4 h-4" />
@@ -414,7 +414,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
+              className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-[10px] transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -425,7 +425,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
 
           {/* Status & Permission Control Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-[14px] bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400">وضعیت فعالیت:</span>
               {canChangeStatus ? (
@@ -433,14 +433,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowStatusMenu(!showStatusMenu)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer border ${statusCfg.badgeBg} ${statusCfg.badgeText} ${statusCfg.borderColor}`}
+                    className={`px-3 py-1.5 rounded-[10px] text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer border ${statusCfg.badgeBg} ${statusCfg.badgeText} ${statusCfg.borderColor}`}
                   >
                     <span>{statusCfg.title}</span>
                     <ChevronDown className="w-3.5 h-3.5" />
                   </button>
 
                   {showStatusMenu && (
-                    <div className="absolute right-0 mt-1.5 w-44 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 py-1 z-30 animate-in fade-in zoom-in-95">
+                    <div className="absolute right-0 mt-1.5 w-44 bg-white dark:bg-slate-900 rounded-[14px] shadow-xl border border-slate-200 dark:border-slate-800 py-1 z-30 animate-in fade-in zoom-in-95">
                       {(Object.keys(STATUSES) as TaskStatus[]).map((stKey) => {
                         const cfg = STATUSES[stKey];
                         return (
@@ -493,7 +493,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
 
           {/* Task Description Section (توضیحات فعالیت) */}
-          <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-slate-800/80 border border-indigo-100 dark:border-slate-700/80 space-y-2.5 shadow-2xs">
+          <div className="p-4 rounded-[14px] bg-indigo-50/50 dark:bg-slate-800/80 border border-indigo-100 dark:border-slate-700/80 space-y-2.5 shadow-2xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-slate-100">
                 <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
@@ -544,11 +544,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
 
             {task.description && task.description.trim() ? (
-              <div className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap bg-white dark:bg-slate-900/90 p-3.5 rounded-xl border border-slate-200/70 dark:border-slate-700/60 select-text">
+              <div className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap bg-white dark:bg-slate-900/90 p-3.5 rounded-[14px] border border-slate-200/70 dark:border-slate-700/60 select-text">
                 {task.description}
               </div>
             ) : (
-              <div className="text-xs text-slate-400 dark:text-slate-500 italic bg-white/50 dark:bg-slate-900/40 p-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+              <div className="text-xs text-slate-400 dark:text-slate-500 italic bg-white/50 dark:bg-slate-900/40 p-3 rounded-[14px] border border-dashed border-slate-200 dark:border-slate-700">
                 توضیحاتی برای این فعالیت ثبت نشده است.
               </div>
             )}
@@ -585,7 +585,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       key={att.id}
                       type="button"
                       onClick={() => onPreviewAttachment(att)}
-                      className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-200 dark:border-slate-700 transition-colors text-right cursor-pointer"
+                      className="flex items-center gap-2.5 p-2.5 rounded-[10px] bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-200 dark:border-slate-700 transition-colors text-right cursor-pointer"
                     >
                       {isImage ? (
                         <ImageIcon className="w-4 h-4 text-indigo-500 shrink-0" />
@@ -622,7 +622,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     <div
                       key={st.id}
                       onClick={() => handleToggleSubTaskInModal(st.id)}
-                      className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all cursor-pointer ${
+                      className={`flex items-center justify-between p-2.5 rounded-[14px] border text-xs transition-all cursor-pointer ${
                         isDone
                           ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 line-through'
                           : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:border-purple-300'
@@ -665,7 +665,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
 
             {/* Discussion Visibility Banner */}
-            <div className="px-3 py-1.5 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 rounded-xl flex items-center gap-2 text-[11px] text-indigo-700 dark:text-indigo-300 font-medium">
+            <div className="px-3 py-1.5 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 rounded-[14px] flex items-center gap-2 text-[11px] text-indigo-700 dark:text-indigo-300 font-medium">
               <Users className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
               <span>
                 گفتگوهای این فعالیت برای تمامی افراد شامل مالک ({task.ownerName || 'سازنده'})، مسئولان ({responsibleNamesOf(task) || 'بدون مسئول'}) و اعضای تیم قابل مشاهده است.
@@ -674,7 +674,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
             {/* Comments List */}
             {commentsList.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+              <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-[14px] border border-dashed border-slate-200 dark:border-slate-700">
                 هنوز هیچ نظری برای این فعالیت ثبت نشده است. اولین پیام یا نظر را بنویسید!
               </div>
             ) : (
@@ -687,7 +687,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   return (
                     <div
                       key={cmt.id}
-                      className={`p-3 rounded-2xl border text-xs space-y-2 transition-all ${
+                      className={`p-3 rounded-[14px] border text-xs space-y-2 transition-all ${
                         isMyComment
                           ? 'mr-6 sm:mr-10 bg-indigo-50/90 dark:bg-indigo-950/70 border-indigo-200 dark:border-indigo-800/80 shadow-2xs'
                           : 'ml-6 sm:ml-10 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700/80 shadow-2xs'
@@ -734,7 +734,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             value={editingCommentText}
                             onChange={(e) => setEditingCommentText(e.target.value)}
                             placeholder="متن نظر یا پیام..."
-                            className="w-full p-2 bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-xl text-xs focus:outline-none text-slate-800 dark:text-slate-100"
+                            className="w-full p-2 bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-[10px] text-xs focus:outline-none text-slate-800 dark:text-slate-100"
                           />
 
                           {/* Existing/Edited Comment Attachments */}
@@ -835,7 +835,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                   <div
                                     key={att.id}
                                     onClick={() => onPreviewAttachment(att)}
-                                    className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-900/90 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-200/80 dark:border-slate-700 transition-colors cursor-pointer group text-right overflow-hidden shadow-2xs"
+                                    className="flex items-center gap-2.5 p-2 rounded-[14px] bg-white dark:bg-slate-900/90 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 border border-slate-200/80 dark:border-slate-700 transition-colors cursor-pointer group text-right overflow-hidden shadow-2xs"
                                     title={`مشاهده فایل: ${att.name}`}
                                   >
                                     {isImg ? (
@@ -884,7 +884,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                               title="تبدیل این نظر به یک وظیفه جدید"
                             >
                               <CheckSquare className="w-3 h-3" />
-                              <span>تبدیل به وظیفه</span>
+                              <span>تبدیل به فعالیت</span>
                             </button>
                           )}
 
@@ -939,7 +939,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 setIsDraggingOverComment(false);
                 handleCommentFileUpload(e.dataTransfer.files);
               }}
-              className={`p-2.5 rounded-2xl border transition-all ${
+              className={`p-2.5 rounded-[14px] border transition-all ${
                 isDraggingOverComment
                   ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40 ring-2 ring-indigo-400/40'
                   : 'border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60'
@@ -956,7 +956,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               {/* Pending Attachments List */}
               {commentAttachments.length > 0 && (
-                <div className="mb-2 p-2 bg-white dark:bg-slate-900/90 rounded-xl border border-indigo-100 dark:border-indigo-900/60 space-y-1.5">
+                <div className="mb-2 p-2 bg-white dark:bg-slate-900/90 rounded-[14px] border border-indigo-100 dark:border-indigo-900/60 space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] text-indigo-700 dark:text-indigo-300 font-bold">
                     <span className="flex items-center gap-1">
                       <Paperclip className="w-3.5 h-3.5 text-indigo-500" />
@@ -1025,7 +1025,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   type="button"
                   onClick={() => commentFileInputRef.current?.click()}
                   disabled={isUploadingCommentFiles}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors cursor-pointer disabled:opacity-40 shrink-0"
+                  className="w-8 h-8 flex items-center justify-center rounded-[10px] text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors cursor-pointer disabled:opacity-40 shrink-0"
                   title="ضمیمه فایل"
                 >
                   {isUploadingCommentFiles ? (
@@ -1038,7 +1038,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 <button
                   type="submit"
                   disabled={(!newCommentText.trim() && commentAttachments.length === 0) || isUploadingCommentFiles}
-                  className="w-8 h-8 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl transition-all cursor-pointer shadow-xs shrink-0"
+                  className="w-8 h-8 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-[10px] transition-all cursor-pointer shadow-xs shrink-0"
                   title="ارسال"
                 >
                   <Send className="w-4 h-4 rotate-180" />
@@ -1064,7 +1064,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
 
             {logsList.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+              <div className="p-4 text-center text-xs text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 rounded-[14px] border border-dashed border-slate-200 dark:border-slate-700">
                 هنوز هیچ لاگ رویداد یا تغییری ثبت نشده است.
               </div>
             ) : (
@@ -1072,7 +1072,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 {logsList.map((log) => (
                   <div
                     key={log.id}
-                    className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl text-xs flex items-start justify-between gap-2"
+                    className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-[14px] text-xs flex items-start justify-between gap-2"
                   >
                     <div className="space-y-0.5 overflow-hidden">
                       <div className="flex items-center gap-1.5 flex-wrap">

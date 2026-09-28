@@ -84,7 +84,7 @@ const Tile: React.FC<{ icon: React.ComponentType<{ className?: string }>; title:
     sky: 'bg-sky-50 text-sky-600 dark:bg-sky-950/60 dark:text-sky-300',
   };
   return (
-    <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
+    <div className="flex items-start gap-2.5 p-3 rounded-[14px] bg-white dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700">
       <span className={`p-2 rounded-xl shrink-0 ${tones[tone] || tones.indigo}`}><Icon className="w-4 h-4" /></span>
       <div className="min-w-0">
         <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{title}</p>
@@ -97,7 +97,7 @@ const Tile: React.FC<{ icon: React.ComponentType<{ className?: string }>; title:
 /** A slide: an illustration panel and a short explanation beside it (stacked on phones). */
 const SlideLayout: React.FC<{ visual: React.ReactNode; children: React.ReactNode }> = ({ visual, children }) => (
   <div className="grid md:grid-cols-2 gap-4 md:gap-6 items-start">
-    <div className="rounded-3xl bg-gradient-to-br from-indigo-50 via-white to-sky-50 dark:from-slate-800 dark:via-slate-900 dark:to-indigo-950/60 border border-indigo-100 dark:border-slate-700 p-4" aria-hidden="true">
+    <div className="rounded-[14px] bg-gradient-to-br from-indigo-50 via-white to-sky-50 dark:from-slate-800 dark:via-slate-900 dark:to-indigo-950/60 border border-indigo-100 dark:border-slate-700 p-4" aria-hidden="true">
       {visual}
     </div>
     <div className="space-y-3">{children}</div>
@@ -147,7 +147,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {sections.map((s) => (
-                  <div key={s.tab} className="p-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
+                  <div key={s.tab} className="p-2.5 rounded-[14px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
                     <s.icon className="w-5 h-5 mx-auto text-indigo-600 dark:text-indigo-400" />
                     <p className="text-[11px] font-bold mt-1 text-slate-800 dark:text-slate-100">{s.title}</p>
                   </div>
@@ -177,7 +177,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
       body: (
         <SlideLayout
           visual={
-            <div className="rounded-2xl overflow-hidden border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-[10px]">
+            <div className="rounded-[14px] overflow-hidden border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-[10px]">
               <div className="flex items-center justify-between px-2.5 py-2 bg-slate-800 text-white">
                 <span className="font-bold">مدیریت وظایف</span>
                 <span className="flex items-center gap-1.5">
@@ -211,7 +211,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
             <Step n={2} title="منوی بخش‌ها">در رایانه در کنار صفحه و در گوشی در نوار پایین؛ بین کانبان، تقویم، موعد گذشته و بقیه جابه‌جا شوید.</Step>
             {canCreate && <Step n={3} title="دکمه افزودن فعالیت">فرم ثبت فعالیت جدید را باز می‌کند.</Step>}
           </ol>
-          <div className="flex items-center gap-2 p-3 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-900 text-xs text-sky-800 dark:text-sky-200">
+          <div className="flex items-center gap-2 p-3 rounded-[14px] bg-sky-50 dark:bg-sky-950/40 border border-sky-100 dark:border-sky-900 text-xs text-sky-800 dark:text-sky-200">
             <Smartphone className="w-4 h-4 shrink-0" />
             <span>سامانه روی گوشی هم قابل استفاده است.</span>
           </div>
@@ -229,7 +229,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
         body: (
           <SlideLayout
             visual={
-              <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 space-y-2 text-[11px]">
+              <div className="rounded-[14px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 space-y-2 text-[11px]">
                 <div className="h-7 rounded-lg border border-slate-200 dark:border-slate-700 px-2 flex items-center text-slate-400">عنوان فعالیت…</div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="h-7 rounded-lg border border-slate-200 dark:border-slate-700 px-2 flex items-center gap-1 text-slate-500"><Clock className="w-3 h-3" />موعد انجام</div>
@@ -267,21 +267,21 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
         icon: ListChecks,
         body: (
           <div className="grid md:grid-cols-3 gap-3">
-            <div className="p-4 rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 space-y-2">
+            <div className="p-4 rounded-[14px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70 space-y-2">
               <span className="inline-flex p-2 rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300"><CheckCircle2 className="w-5 h-5" /></span>
               <p className="font-extrabold text-sm text-slate-800 dark:text-slate-100">فعالیت عادی</p>
               <p className="text-xs leading-6 text-slate-500 dark:text-slate-400">یک کار با یک موعد انجام مشخص.</p>
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500"><Clock className="w-3.5 h-3.5" />موعد: ۱۴۰۵/۰۷/۱۵ - ۱۰:۰۰</div>
             </div>
             {canRecurring && (
-              <div className="p-4 rounded-3xl border border-purple-200 dark:border-purple-900 bg-purple-50/60 dark:bg-purple-950/30 space-y-2">
+              <div className="p-4 rounded-[14px] border border-purple-200 dark:border-purple-900 bg-purple-50/60 dark:bg-purple-950/30 space-y-2">
                 <span className="inline-flex p-2 rounded-xl bg-purple-100 text-purple-600 dark:bg-purple-900/60 dark:text-purple-300"><Repeat className="w-5 h-5" /></span>
                 <p className="font-extrabold text-sm text-slate-800 dark:text-slate-100">فعالیت تکرارشونده</p>
                 <p className="text-xs leading-6 text-slate-500 dark:text-slate-400">با گزینه «تکرارشونده» زمان‌بندی را تعیین کنید: روزانه، هفتگی یا ماهانه؛ در این حالت فیلد موعد انجام لازم نیست.</p>
                 <div className="flex items-center gap-1.5 text-[11px] text-purple-700 dark:text-purple-300"><Bell className="w-3.5 h-3.5" />در هر نوبت، به مسئول انجام یادآوری می‌شود.</div>
               </div>
             )}
-            <div className="p-4 rounded-3xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50/60 dark:bg-emerald-950/30 space-y-2">
+            <div className="p-4 rounded-[14px] border border-emerald-200 dark:border-emerald-900 bg-emerald-50/60 dark:bg-emerald-950/30 space-y-2">
               <span className="inline-flex p-2 rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-300"><FolderKanban className="w-5 h-5" /></span>
               <p className="font-extrabold text-sm text-slate-800 dark:text-slate-100">پروژه</p>
               <p className="text-xs leading-6 text-slate-500 dark:text-slate-400">با گزینه «پروژه است» زیرفعالیت‌ها و منشور پروژه (شرح، مدیر، تاریخ شروع و پایان) را وارد کنید.</p>
@@ -318,7 +318,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                   <Chip className="bg-emerald-50 dark:bg-emerald-950/60 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300">خاتمه یافته</Chip>
                 </div>
                 <div className="flex items-center justify-center"><Chip className="bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">متوقف</Chip></div>
-                <div className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 flex items-center gap-2 shadow-sm">
+                <div className="rounded-[14px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2.5 flex items-center gap-2 shadow-sm">
                   <GripVertical className="w-4 h-4 text-slate-400" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">تهیه گزارش هفتگی</p>
@@ -370,7 +370,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                   })}
                 </div>
                 {canOpenTab(currentUser, 'overdue') && (
-                  <div className="rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 p-2.5 text-[11px] text-rose-700 dark:text-rose-300 flex items-center gap-2">
+                  <div className="rounded-[14px] bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 p-2.5 text-[11px] text-rose-700 dark:text-rose-300 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4" />بازبینی قرارداد — ۳ روز تاخیر
                   </div>
                 )}
@@ -403,7 +403,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                   { icon: History, text: 'تغییر در فعالیت' },
                   { icon: Clock, text: 'یادآوری موعد' },
                 ].map((s) => (
-                  <div key={s.text} className="flex items-center gap-2 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                  <div key={s.text} className="flex items-center gap-2 p-2 rounded-[14px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-700 dark:text-slate-200">
                     <s.icon className="w-3.5 h-3.5 text-indigo-500" />{s.text}
                   </div>
                 ))}
@@ -471,7 +471,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                       { on: true, label: 'ایجاد فعالیت', badge: 'دسترسی مستقیم', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800' },
                       { on: false, label: 'مشاهده کاربران', badge: 'غیرفعال برای این کاربر', cls: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800' },
                     ].map((r) => (
-                      <div key={r.label} className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                      <div key={r.label} className="flex items-center justify-between gap-2 p-2 rounded-[14px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                         <span className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 dark:text-slate-200">
                           <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${r.on ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 dark:border-slate-600'}`}>{r.on && <CheckCircle2 className="w-2.5 h-2.5" />}</span>
                           {r.label}
@@ -483,7 +483,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {admin.map((a) => (
-                      <div key={a.title} className="p-2.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
+                      <div key={a.title} className="p-2.5 rounded-[14px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
                         <a.icon className="w-5 h-5 mx-auto text-indigo-600 dark:text-indigo-400" />
                         <p className="text-[11px] font-bold mt-1 text-slate-800 dark:text-slate-100">{a.title}</p>
                       </div>
@@ -580,7 +580,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
         tabIndex={-1}
         dir="rtl"
         onKeyDown={onKeyDown}
-        className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col h-[min(640px,calc(100dvh-1rem))] sm:h-[min(640px,calc(100dvh-2rem))] outline-hidden text-slate-800 dark:text-slate-100"
+        className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-[18px] shadow-2xl border border-slate-100 dark:border-slate-800 flex flex-col h-[min(640px,calc(100dvh-1rem))] sm:h-[min(640px,calc(100dvh-2rem))] outline-hidden text-slate-800 dark:text-slate-100"
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 border-b border-slate-100 dark:border-slate-800 shrink-0">
@@ -592,7 +592,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{current.subtitle}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="بستن راهنما" title="بستن (Esc)" className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer shrink-0">
+          <button type="button" onClick={onClose} aria-label="بستن راهنما" title="بستن (Esc)" className="p-2 rounded-[10px] text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer shrink-0">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -609,7 +609,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
 
         {/* Navigation */}
         <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 shrink-0">
-          <button type="button" onClick={prev} disabled={isFirst} className="flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+          <button type="button" onClick={prev} disabled={isFirst} className="flex items-center gap-1 px-3 py-2 rounded-[10px] text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
             <ChevronRight className="w-4 h-4" />
             <span>قبلی</span>
           </button>
@@ -627,12 +627,12 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose,
             ))}
           </div>
           {isLast ? (
-            <button type="button" onClick={onClose} className="flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer">
+            <button type="button" onClick={onClose} className="flex items-center gap-1 px-4 py-2 rounded-[10px] text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer">
               <span>شروع کار</span>
               <CheckCircle2 className="w-4 h-4" />
             </button>
           ) : (
-            <button type="button" onClick={next} className="flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer">
+            <button type="button" onClick={next} className="flex items-center gap-1 px-4 py-2 rounded-[10px] text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer">
               <span>بعدی</span>
               <ChevronLeft className="w-4 h-4" />
             </button>

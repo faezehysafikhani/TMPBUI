@@ -164,11 +164,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   return (
     <SystemAdministration currentUserId={currentUser?.id} general={
     <div className="w-full space-y-6 animate-in fade-in duration-200">
+      {/* design.md section 20: settings are organized into Account / Team / Appearance / Help. */}
+      <h2 className="px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        حساب کاربری
+      </h2>
       {currentUser && <ChangePasswordCard />}
 
       {/* Section 2: User Profile & Avatar Form */}
       {currentUser && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
           <button
             type="button"
             onClick={() => toggleSection('profile')}
@@ -186,7 +190,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {openSections.profile && (
             <div className="space-y-5 animate-in fade-in duration-200">
               {profileMsg && (
-                <div className={`p-3.5 rounded-2xl text-xs font-semibold ${
+                <div className={`p-3.5 rounded-[14px] text-xs font-semibold ${
                   profileMsg.type === 'success'
                     ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                     : 'bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
@@ -197,7 +201,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
               <form onSubmit={handleSaveProfileSubmit} className="space-y-5">
                 {/* Current Avatar & File Upload */}
-                <div className="flex flex-col sm:flex-row items-center gap-5 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
+                <div className="flex flex-col sm:flex-row items-center gap-5 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-[14px] border border-slate-200/80 dark:border-slate-700/80">
                   <div className="relative shrink-0">
                     {selectedAvatar ? (
                       <img
@@ -213,7 +217,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="absolute -bottom-1 -right-1 p-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-colors shadow-xs cursor-pointer"
+                      className="absolute -bottom-1 -right-1 p-2 bg-indigo-600 text-white rounded-[10px] hover:bg-indigo-500 transition-colors shadow-xs cursor-pointer"
                       title="بارگذاری تصویر شخصی"
                     >
                       <Camera className="w-4 h-4" />
@@ -229,7 +233,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </div>
 
                     {/* Acceptable file size & format notice before upload */}
-                    <div className="p-3 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 text-right space-y-1">
+                    <div className="p-3 rounded-[14px] bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200/80 dark:border-indigo-800/60 text-right space-y-1">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-900 dark:text-indigo-200">
                         <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400 shrink-0" />
                         <span>حجم قابل قبول: <strong>حداکثر ۲۰۰ کیلوبایت (200 KB)</strong></span>
@@ -250,7 +254,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       title="حجم مجاز: حداکثر ۲۰۰ کیلوبایت (فرمت‌های JPG, PNG, WEBP)"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold transition-colors cursor-pointer shadow-xs"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[10px] text-xs sm:text-sm font-bold transition-colors cursor-pointer shadow-xs"
                     >
                       <Upload className="w-4 h-4" />
                       <span>بارگذاری تصویر شخصی (حداکثر ۲۰۰ KB)</span>
@@ -274,7 +278,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                             setSelectedAvatar(avatar.url);
                             setProfileMsg(null);
                           }}
-                          className={`relative p-1 rounded-2xl border-2 transition-all cursor-pointer aspect-square flex items-center justify-center bg-white dark:bg-slate-800 hover:scale-105 ${
+                          className={`relative p-1 rounded-[10px] border-2 transition-all cursor-pointer aspect-square flex items-center justify-center bg-white dark:bg-slate-800 hover:scale-105 ${
                             isSelected
                               ? 'border-indigo-600 ring-2 ring-indigo-400/40 shadow-md scale-105'
                               : 'border-slate-200 dark:border-slate-700 opacity-80 hover:opacity-100'
@@ -305,7 +309,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       onChange={(e) => setProfileName(e.target.value)}
                       placeholder="مثلاً: علی محمدی"
                       required
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
@@ -318,7 +322,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       value={profileUsername}
                       readOnly
                       title="نام کاربری (کد ملی) فقط توسط مدیر سامانه قابل تغییر است."
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right font-mono"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right font-mono"
                     />
                   </div>
                 </div>
@@ -341,13 +345,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         value={profilePhoneNumber}
                         onChange={(e) => setProfilePhoneNumber(e.target.value)}
                         placeholder="09121234567"
-                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right font-mono"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right font-mono"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <label className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer select-none ${
+                    <label className={`flex items-center justify-between p-3 rounded-[14px] border transition-all cursor-pointer select-none ${
                       notifySms
                         ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-900 dark:text-indigo-200'
                         : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
@@ -371,7 +375,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   <button
                     type="submit"
                     disabled={isSavingProfile}
-                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-2 disabled:opacity-50 active:scale-98"
+                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-[10px] transition-all shadow-md cursor-pointer flex items-center gap-2 disabled:opacity-50 active:scale-98"
                   >
                     {isSavingProfile ? (
                       <>
@@ -392,9 +396,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
+      <h2 className="px-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        تیم
+      </h2>
       {/* Section 3: Work Team Management Card */}
       {currentUser && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
           <button
             type="button"
             onClick={() => toggleSection('team')}
@@ -417,8 +424,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
+      <h2 className="px-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        ظاهر برنامه
+      </h2>
       {/* Section 4: Light / Dark Mode Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('themeMode')}
@@ -438,7 +448,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <button
               type="button"
               onClick={() => setThemeMode('light')}
-              className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer font-bold text-xs ${
+              className={`flex items-center justify-between p-4 rounded-[10px] border transition-all cursor-pointer font-bold text-xs ${
                 themeMode === 'light'
                   ? 'bg-indigo-50 border-indigo-500 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-400 dark:text-indigo-300 shadow-xs'
                   : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -454,7 +464,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <button
               type="button"
               onClick={() => setThemeMode('dark')}
-              className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer font-bold text-xs ${
+              className={`flex items-center justify-between p-4 rounded-[10px] border transition-all cursor-pointer font-bold text-xs ${
                 themeMode === 'dark'
                   ? 'bg-indigo-50 border-indigo-500 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-400 dark:text-indigo-300 shadow-xs'
                   : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -471,7 +481,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Section 5: Color Palette Selector Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('colorPalette')}
@@ -501,7 +511,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     key={key}
                     type="button"
                     onClick={() => setAppColorPalette(key)}
-                    className={`p-3 rounded-2xl border transition-all cursor-pointer flex flex-col items-start gap-2 overflow-hidden ${
+                    className={`p-3 rounded-[10px] border transition-all cursor-pointer flex flex-col items-start gap-2 overflow-hidden ${
                       isSelected
                         ? 'border-indigo-600 ring-2 ring-indigo-500/30 bg-indigo-50/50 dark:bg-indigo-950/50 shadow-xs'
                         : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-50 dark:bg-slate-800/80'
@@ -526,7 +536,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Section 6: Background Pattern Theme Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('patternBg')}
@@ -555,7 +565,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     key={scheme.id}
                     type="button"
                     onClick={() => setAppColorTheme(scheme.id)}
-                    className={`relative p-3 rounded-2xl border transition-all cursor-pointer flex flex-col items-start gap-2 overflow-hidden ${
+                    className={`relative p-3 rounded-[10px] border transition-all cursor-pointer flex flex-col items-start gap-2 overflow-hidden ${
                       isSelected
                         ? 'border-indigo-600 ring-2 ring-indigo-500/30 bg-indigo-50/50 dark:bg-indigo-950/50 shadow-xs'
                         : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-50 dark:bg-slate-800/80'
@@ -584,9 +594,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         )}
       </div>
 
+      <h2 className="px-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        راهنما
+      </h2>
       {/* Section 7: Feature Catalog & PDF Handbook (Collapsible, closed by default) */}
       {onOpenPdfCatalog && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
           <button
             type="button"
             onClick={() => toggleSection('catalog')}
@@ -606,7 +619,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
           {openSections.catalog && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="p-4 sm:p-5 rounded-[14px] bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-200 dark:border-emerald-800/60 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="flex items-center gap-3 text-right">
                   <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-xs shrink-0">
                     <FileText className="w-6 h-6" />
@@ -624,7 +637,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <button
                   type="button"
                   onClick={onOpenPdfCatalog}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-[10px] shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
                 >
                   <Printer className="w-4 h-4" />
                   <span>مشاهده و چاپ کاتالوگ (PDF)</span>
@@ -635,8 +648,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
+      <h2 className="px-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        حساب کاربری
+      </h2>
       {/* Section 8: User Account Status & Logout Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('account')}
@@ -668,7 +684,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <button
                   type="button"
                   onClick={onLogout}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 dark:text-rose-300 rounded-xl text-xs font-bold transition-all cursor-pointer border border-rose-200 dark:border-rose-800 shrink-0 active:scale-95"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 dark:text-rose-300 rounded-[10px] text-xs font-bold transition-all cursor-pointer border border-rose-200 dark:border-rose-800 shrink-0 active:scale-95"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>خروج از حساب کاربری</span>
@@ -680,7 +696,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <button
                   type="button"
                   onClick={onOpenAuthModal}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[10px] text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
                 >
                   <LogIn className="w-4 h-4" />
                   <span>ورود به حساب کاربری</span>

@@ -30,6 +30,61 @@
   --color-soft-white: #FAFBFF;
 }
 
+/*
+ * design.md section 27 reference tokens (radius, shadow, semantic colors), exposed as plain
+ * CSS variables for the places that read them directly (inline styles, non-Tailwind CSS)
+ * rather than via a Tailwind utility class.
+ */
+:root {
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-dialog: 18px;
+  --radius-pill: 999px;
+
+  --shadow-raised: 0 8px 24px rgba(11, 12, 30, 0.10);
+  --shadow-dialog: 0 20px 48px rgba(11, 12, 30, 0.22);
+
+  --color-success: #16856B;
+  --color-success-bg: #E8F6F1;
+  --color-warning: #A76700;
+  --color-warning-bg: #FFF4D8;
+  --color-danger: #C43D55;
+  --color-danger-bg: #FCECEF;
+  --color-info: #3267C8;
+  --color-info-bg: #EAF1FF;
+}
+
+/* design.md section 26: dark mode is a designed theme, not a color inversion. */
+:root.dark {
+  --color-page: #0B0C1E;
+  --color-surface: #15172D;
+  --color-surface-subtle: #1B1D38;
+  --color-surface-selected: #252468;
+  --color-border: #30334E;
+  --color-border-strong: #434764;
+  --color-text-primary: #FAFBFF;
+  --color-text-secondary: #C7CCE0;
+  --color-text-muted: #969DB5;
+}
+
+/* design.md section 24/25: motion explains state change, it never overrides an explicit
+   request for less of it. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* design.md section 25: a visible keyboard-focus state on every interactive element, as a
+   floor under whatever explicit focus ring a component already sets. */
+:focus-visible {
+  outline: 2px solid #4939F1;
+  outline-offset: 2px;
+}
+
 * {
   font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
 }

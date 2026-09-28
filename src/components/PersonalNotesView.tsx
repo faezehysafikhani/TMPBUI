@@ -648,7 +648,7 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
                 title="تبدیل این یادداشت به یک وظیفه جدید"
               >
                 <CheckSquare className="w-3 h-3" />
-                <span>تبدیل به وظیفه</span>
+                <span>تبدیل به فعالیت</span>
               </button>
             )}
           </div>

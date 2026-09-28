@@ -287,7 +287,7 @@ const UserFormDialog: React.FC<{
             <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">نقش‌ها</span>
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => (
-                <label key={role.id} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm cursor-pointer">
+                <label key={role.id} className="flex items-center gap-2 px-3 py-2 rounded-[14px] border border-slate-200 dark:border-slate-700 text-sm cursor-pointer">
                   <input type="checkbox" checked={roleIds.includes(role.id)} onChange={(e) => setRoleIds((ids) => e.target.checked ? [...ids, role.id] : ids.filter((id) => id !== role.id))} />
                   <span>{roleTitle(role.name)}</span>
                 </label>
@@ -403,7 +403,7 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
             <h4 className="text-sm font-extrabold text-slate-800 dark:text-slate-100 mb-2">نقش‌ها</h4>
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => (
-                <label key={role.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm ${rights.assignRoles ? 'cursor-pointer' : 'opacity-60'} ${roleIds.includes(role.id) ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-700' : 'border-slate-200 dark:border-slate-700'}`}>
+                <label key={role.id} className={`flex items-center gap-2 px-3 py-2 rounded-[14px] border text-sm ${rights.assignRoles ? 'cursor-pointer' : 'opacity-60'} ${roleIds.includes(role.id) ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-700' : 'border-slate-200 dark:border-slate-700'}`}>
                   <input type="checkbox" disabled={!rights.assignRoles} checked={roleIds.includes(role.id)} onChange={(e) => setRoleIds((ids) => e.target.checked ? [...ids, role.id] : ids.filter((id) => id !== role.id))} />
                   <span className="font-bold">{roleTitle(role.name)}</span>
                   <span className="text-xs text-slate-400">({toPersianDigits(role.permissions.length)} مجوز)</span>
@@ -422,7 +422,7 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
             </p>
             <div className="space-y-3">
               {modules.map(([module, entries]) => (
-                <div key={module} className="rounded-xl border border-slate-200 dark:border-slate-700">
+                <div key={module} className="rounded-[14px] border border-slate-200 dark:border-slate-700">
                   <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-t-xl text-xs font-extrabold text-slate-600 dark:text-slate-300">{moduleTitle(module)}</div>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {entries.map((entry) => (

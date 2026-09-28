@@ -1075,7 +1075,7 @@ export default function App() {
         </div>
 
         {/* Ambient App Title Card in Background */}
-        <div className="relative z-10 text-center max-w-sm mx-auto space-y-4 p-8 rounded-3xl bg-white/10 dark:bg-slate-900/50 border border-white/10 shadow-2xl backdrop-blur-md">
+        <div className="relative z-10 text-center max-w-sm mx-auto space-y-4 p-8 rounded-[18px] bg-white/10 dark:bg-slate-900/50 border border-white/10 shadow-2xl backdrop-blur-md">
           <img 
             src="/icon.svg" 
             alt="لوگو" 
@@ -1244,7 +1244,7 @@ export default function App() {
         
         {/* Error Alert */}
         {pbError && (
-          <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 text-amber-900 dark:text-amber-200 shadow-xs">
+          <div className="mb-6 p-4 rounded-[14px] bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 text-amber-900 dark:text-amber-200 shadow-xs">
             <div className="flex items-start gap-3">
               <Database className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div className="space-y-1 text-xs">
@@ -1325,6 +1325,7 @@ export default function App() {
                   onPreviewAttachment={setPreviewAttachment}
                   onViewDetails={handleOpenTaskDetail}
                   onToggleSubTask={handleToggleSubTask}
+                  onNavigateToKanban={() => handleNavigateTab('kanban')}
                 />
               </Suspense>
             )}
@@ -1387,7 +1388,7 @@ export default function App() {
 
       {/* Footer: a full-width bar at the true bottom of the page, not tucked under the content column */}
       <footer className="mt-auto pt-10 pb-20 lg:pb-6 px-2 sm:px-3">
-        <div className="w-full max-w-[1920px] mx-auto bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
+        <div className="w-full max-w-[1920px] mx-auto bg-slate-900 text-white rounded-[14px] p-4 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
           <span className="font-bold tracking-tight text-white/95">
             تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
           </span>

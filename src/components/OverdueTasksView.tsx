@@ -15,6 +15,8 @@ interface OverdueTasksViewProps {
   onPreviewAttachment: (attachment: Attachment) => void;
   onViewDetails?: (task: Task) => void;
   onToggleSubTask?: (taskId: string, subTaskId: string) => void;
+  /** "مشاهده فعالیت‌های پیش رو" on the calm, no-overdue-items state. */
+  onNavigateToKanban?: () => void;
 }
 
 interface OverdueTaskItem {
@@ -308,6 +310,7 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
   onStatusChange,
   onViewDetails,
   onToggleSubTask,
+  onNavigateToKanban,
 }) => {
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
   
@@ -458,11 +461,13 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
 
   return (
     <div className="space-y-6">
-      
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-rose-500 via-rose-600 to-amber-600 rounded-3xl p-5 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+
+      {/* Header Banner: only while there is something to warn about - never alongside the
+          calm success state (design.md section 18). */}
+      {overdueItems.length > 0 && (
+      <div className="bg-gradient-to-r from-rose-500 via-rose-600 to-amber-600 rounded-[14px] p-5 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 mt-0.5">
+          <div className="w-10 h-10 rounded-[10px] bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 mt-0.5">
             <AlertCircle className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -471,11 +476,11 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
               لیست فعالیت‌هایی که تاریخ موعد آن‌ها سپری شده اما هنوز تکمیل نشده‌اند
             </p>
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              <div className="inline-flex items-center gap-1.5 text-[11px] text-amber-100 bg-black/20 px-2.5 py-1 rounded-xl font-medium border border-white/10">
+              <div className="inline-flex items-center gap-1.5 text-[11px] text-amber-100 bg-black/20 px-2.5 py-1 rounded-[10px] font-medium border border-white/10">
                 <ArrowDownUp className="w-3.5 h-3.5 shrink-0 text-amber-300" />
                 <span>مرتب‌شده بر اساس **بیشترین تاخیر** و **اولویت بالاتر**</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-100 bg-emerald-900/40 px-2.5 py-1 rounded-xl font-medium border border-emerald-400/20">
+              <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-100 bg-emerald-900/40 px-2.5 py-1 rounded-[10px] font-medium border border-emerald-400/20">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
                 <span>با **درگ به سمت چپ**، فعالیت به «خاتمه یافته» تغییر می‌یابد</span>
               </div>
@@ -483,14 +488,15 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
           </div>
         </div>
 
-        <div className="px-3.5 py-1.5 rounded-2xl bg-white/20 backdrop-blur-md text-xs font-bold border border-white/30 shrink-0 self-end sm:self-auto">
+        <div className="px-3.5 py-1.5 rounded-[10px] bg-white/20 backdrop-blur-md text-xs font-bold border border-white/30 shrink-0 self-end sm:self-auto">
           {toPersianDigits(overdueItems.length)} مورد معوقه
         </div>
       </div>
+      )}
 
       {/* Overdue Task List (جدول / لیست) */}
       {overdueItems.length > 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 rounded-[14px] border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
           {/* Table Header */}
           <div className="grid grid-cols-12 gap-3 px-5 py-3.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400">
             <div className="col-span-1 text-center">ردیف</div>
@@ -516,7 +522,7 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700 p-12 text-center shadow-xs">
+        <div className="bg-white dark:bg-slate-800/90 rounded-[14px] border border-slate-200 dark:border-slate-700 p-12 text-center shadow-xs">
           <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
             <CheckCircle2 className="w-8 h-8" />
           </div>
@@ -526,13 +532,22 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
             تمام فعالیت‌های زمان‌بندی شده شما به‌موقع در حال پیگیری یا تکمیل هستند.
           </p>
+          {onNavigateToKanban && (
+            <button
+              type="button"
+              onClick={onNavigateToKanban}
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-[10px] bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-sm transition-colors cursor-pointer"
+            >
+              مشاهده فعالیت‌های پیش رو
+            </button>
+          )}
         </div>
       )}
 
       {/* Delete Confirmation Modal */}
       {deletingTaskId && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full border border-rose-200 dark:border-rose-900 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white dark:bg-slate-900 rounded-[18px] p-6 max-w-sm w-full border border-rose-200 dark:border-rose-900 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
               <AlertCircle className="w-6 h-6" />
             </div>

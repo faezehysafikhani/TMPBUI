@@ -581,7 +581,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
   if (!currentUser) {
     return (
-      <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-8 text-center border border-slate-200 dark:border-slate-700 shadow-sm my-auto">
+      <div className="bg-white dark:bg-slate-800/90 rounded-[14px] p-8 text-center border border-slate-200 dark:border-slate-700 shadow-sm my-auto">
         <ShieldAlert className="w-12 h-12 text-rose-500 mx-auto mb-3" />
         <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">جهت استفاده از گفتگوهای تیمی وارد حساب کاربری خود شوید</h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">با ورود به سیستم می‌توانید با سایر اعضای تیم خود به صورت مستقیم گفتگو کنید.</p>
@@ -596,7 +596,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     userId === currentUser.id ? 'شما' : contacts.find((c) => c.userId === userId)?.name || fallback;
 
   return (
-    <div className="bg-white dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden flex flex-col md:flex-row h-[75vh] min-h-[480px] relative" data-chat-root>
+    <div className="bg-white dark:bg-slate-800/90 rounded-[14px] border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden flex flex-col md:flex-row h-[75vh] min-h-[480px] relative" data-chat-root>
 
       {/* RIGHT SIDEBAR (RTL): team threads and people */}
       <div
@@ -613,7 +613,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
             <button
               type="button"
               onClick={() => setShowTaskDrawer(!showTaskDrawer)}
-              className={`p-1.5 rounded-xl border text-xs transition-colors cursor-pointer flex items-center gap-1 ${
+              className={`p-1.5 rounded-[10px] border text-xs transition-colors cursor-pointer flex items-center gap-1 ${
                 showTaskDrawer
                   ? 'bg-indigo-600 text-white border-indigo-600'
                   : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100'
@@ -633,7 +633,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
               onChange={(e) => setMemberSearch(e.target.value)}
               placeholder="جستجوی تیم یا فرد..."
               aria-label="جستجوی تیم یا فرد"
-              className="w-full pr-9 pl-3 py-1.5 bg-slate-100 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-700/80 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+              className="w-full pr-9 pl-3 py-1.5 bg-slate-100 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 rounded-[10px] border border-slate-200 dark:border-slate-700/80 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
             />
           </div>
         </div>
@@ -770,7 +770,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowTaskDrawer(!showTaskDrawer)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] text-xs font-bold transition-all border cursor-pointer shrink-0 ${
                   showTaskDrawer
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                     : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60'
@@ -826,7 +826,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                           </div>
                         )}
                         <div
-                          className={`max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-2xs space-y-1.5 ${
+                          className={`max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 rounded-[14px] text-xs sm:text-sm leading-relaxed shadow-2xs space-y-1.5 ${
                             isMine
                               ? `${palette.accentBg} text-white rounded-br-md`
                               : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700/80 rounded-bl-md'
@@ -845,7 +845,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                               <textarea
                                 value={editingText}
                                 onChange={(e) => setEditingText(e.target.value)}
-                                className={`w-full p-2 text-xs sm:text-sm rounded-xl border focus:outline-none resize-none ${
+                                className={`w-full p-2 text-xs sm:text-sm rounded-[10px] border focus:outline-none resize-none ${
                                   isMine
                                     ? 'bg-white/20 text-white border-white/40 placeholder:text-white/60 focus:ring-1 focus:ring-white'
                                     : 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700 focus:ring-1 focus:ring-indigo-500'
@@ -883,7 +883,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                           {/* File Attachment */}
                           {msg.attachmentUrl && (
                             <div
-                              className={`p-2 rounded-xl flex items-center gap-2 border ${
+                              className={`p-2 rounded-[14px] flex items-center gap-2 border ${
                                 isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                               }`}
                             >
@@ -992,7 +992,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
             >
               <label
                 title="افزودن فایل پیوست"
-                className="p-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-xl cursor-pointer transition-colors shrink-0"
+                className="p-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-[10px] cursor-pointer transition-colors shrink-0"
               >
                 <Paperclip className="w-5 h-5" />
                 <input type="file" className="hidden" onChange={handleFileUpload} />
@@ -1012,13 +1012,13 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 dir="auto"
                 aria-label="متن پیام"
                 placeholder={isGroup ? `پیام به تیم ${conversationTitle}...` : `پیام به ${conversationTitle}...`}
-                className="flex-1 min-w-0 resize-none max-h-32 bg-slate-100 dark:bg-slate-900 text-xs sm:text-sm text-slate-900 dark:text-slate-100 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+                className="flex-1 min-w-0 resize-none max-h-32 bg-slate-100 dark:bg-slate-900 text-xs sm:text-sm text-slate-900 dark:text-slate-100 px-4 py-2.5 rounded-[10px] border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
               />
 
               <button
                 type="submit"
                 disabled={(!inputMessage.trim() && !attachedFile) || isSending}
-                className={`h-10 px-3 sm:px-4 ${palette.accentBg} ${palette.accentHover} disabled:opacity-40 text-white rounded-2xl shadow-sm transition-all cursor-pointer shrink-0 flex items-center gap-1.5 text-xs font-bold`}
+                className={`h-10 px-3 sm:px-4 ${palette.accentBg} ${palette.accentHover} disabled:opacity-40 text-white rounded-[10px] shadow-sm transition-all cursor-pointer shrink-0 flex items-center gap-1.5 text-xs font-bold`}
                 title="ارسال پیام"
                 aria-label="ارسال پیام"
               >
@@ -1060,7 +1060,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
             <button
               type="button"
               onClick={() => setShowTaskDrawer(false)}
-              className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
+              className="p-1.5 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-[10px] transition-colors cursor-pointer"
               title="بستن پنل توضیحات"
             >
               <X className="w-5 h-5" />
@@ -1069,7 +1069,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
           {/* Scope Filters */}
           <div className="p-3 border-b border-slate-200 dark:border-slate-700/80 space-y-2.5 bg-white dark:bg-slate-800/60">
-            <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl text-xs font-bold">
+            <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-900 p-1 rounded-[14px] text-xs font-bold">
               {activePartner && (
                 <button
                   type="button"
@@ -1116,7 +1116,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 value={taskSearchQuery}
                 onChange={(e) => setTaskSearchQuery(e.target.value)}
                 placeholder="جستجو در عنوان یا متن توضیحات..."
-                className="w-full pr-8 pl-3 py-1.5 bg-slate-100 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 placeholder:text-slate-400"
+                className="w-full pr-8 pl-3 py-1.5 bg-slate-100 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-200 rounded-[10px] border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 placeholder:text-slate-400"
               />
               {taskSearchQuery && (
                 <button
@@ -1180,7 +1180,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 return (
                   <div
                     key={t.id}
-                    className="p-3.5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2.5 shadow-2xs hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+                    className="p-3.5 rounded-[14px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2.5 shadow-2xs hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
                   >
                     {/* Header: Title & Status */}
                     <div className="flex items-start justify-between gap-2">
@@ -1224,7 +1224,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                         <span>توضیحات فعالیت:</span>
                       </div>
                       {hasDesc ? (
-                        <div className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap bg-slate-50 dark:bg-slate-900/80 p-2.5 rounded-xl border border-slate-200/70 dark:border-slate-700/60 max-h-48 overflow-y-auto select-text font-normal">
+                        <div className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap bg-slate-50 dark:bg-slate-900/80 p-2.5 rounded-[14px] border border-slate-200/70 dark:border-slate-700/60 max-h-48 overflow-y-auto select-text font-normal">
                           {t.description}
                         </div>
                       ) : (

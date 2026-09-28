@@ -70,7 +70,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 w-full max-w-md shadow-2xl relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[18px] p-6 w-full max-w-md shadow-2xl relative overflow-hidden">
         {/* Header decoration */}
         <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
 
@@ -91,14 +91,14 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-[10px] hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-2xl text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2 animate-in fade-in">
+          <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 rounded-[14px] text-xs text-rose-700 dark:text-rose-300 flex items-start gap-2 animate-in fade-in">
             <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
             <span className="leading-relaxed font-medium">{errorMsg}</span>
           </div>
@@ -124,7 +124,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
                 onClose();
                 if (onSuccessLogin) onSuccessLogin();
               }}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-[10px] shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
             >
               <ShieldCheck className="w-4 h-4" />
               <span>ورود به حساب کاربری</span>
@@ -142,7 +142,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
                   value={token}
                   onChange={(e) => setToken(e.target.value)}
                   placeholder="توکن بازیابی رمز عبور"
-                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono dir-ltr"
+                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono dir-ltr"
                   required
                 />
               </div>
@@ -158,7 +158,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
+                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
                   required
                   minLength={8}
                 />
@@ -183,7 +183,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
                   value={passwordConfirm}
                   onChange={(e) => setPasswordConfirm(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
+                  className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all dir-ltr text-right"
                   required
                   minLength={8}
                 />
@@ -194,7 +194,7 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+              className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-bold rounded-[10px] shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
             >
               {isLoading ? (
                 <>

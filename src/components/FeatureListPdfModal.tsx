@@ -90,7 +90,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+      <div className="bg-white dark:bg-slate-900 rounded-[18px] shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
         
         {/* Modal Header Actions */}
         <div className="p-4 sm:p-5 bg-slate-900 text-white flex items-center justify-center text-center border-b border-slate-800 shrink-0">
@@ -113,7 +113,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
         <div className="flex-1 overflow-y-auto p-3 sm:p-8 bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
           <div
             id="pdf-report-content"
-            className="bg-white text-slate-900 p-6 sm:p-10 rounded-2xl shadow-sm border border-slate-200 max-w-3xl mx-auto font-sans leading-relaxed text-right space-y-8 dir-rtl"
+            className="bg-white text-slate-900 p-6 sm:p-10 rounded-[14px] shadow-sm border border-slate-200 max-w-3xl mx-auto font-sans leading-relaxed text-right space-y-8 dir-rtl"
             style={{ direction: 'rtl' }}
           >
             {/* Document Header */}
@@ -131,7 +131,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
                 </p>
               </div>
 
-              <div className="text-left text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-1 shrink-0">
+              <div className="text-left text-xs text-slate-500 bg-slate-50 p-3 rounded-[14px] border border-slate-200 space-y-1 shrink-0">
                 <div>
                   <strong>تاریخ انتشار:</strong> {toPersianDigits(currentDateJalali)}
                 </div>
@@ -379,7 +379,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
             <button
               type="button"
               onClick={openCatalogPrintWindow}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl transition-all cursor-pointer shadow-md active:scale-95"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-[10px] transition-all cursor-pointer shadow-md active:scale-95"
               title="چاپ یا ذخیره نسخه PDF"
             >
               <Printer className="w-4 h-4" />
@@ -388,7 +388,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 sm:flex-initial px-4 py-2.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-xl transition-all cursor-pointer active:scale-95"
+              className="flex-1 sm:flex-initial px-4 py-2.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold rounded-[10px] transition-all cursor-pointer active:scale-95"
             >
               بستن صفحه
             </button>

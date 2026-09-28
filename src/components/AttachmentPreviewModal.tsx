@@ -84,7 +84,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 my-auto">
+      <div className="relative w-full max-w-3xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 rounded-[18px] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 my-auto">
         
         {/* Header - Top download button removed per user request */}
         <div className="flex items-center justify-between px-5 py-4 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800">
@@ -108,7 +108,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-xl transition-colors cursor-pointer"
+              className="p-1.5 text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700 rounded-[10px] transition-colors cursor-pointer"
               title="بستن"
             >
               <X className="w-5 h-5" />
@@ -120,7 +120,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
         <div className="p-4 sm:p-6 flex flex-col items-center justify-center max-h-[75vh] overflow-y-auto bg-slate-900/5 dark:bg-slate-950/40">
           {isImage ? (
             <div className="w-full flex flex-col items-center space-y-4">
-              <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm max-h-[55vh] flex items-center justify-center p-2">
+              <div className="rounded-[14px] overflow-hidden border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm max-h-[55vh] flex items-center justify-center p-2">
                 <img
                   src={attachment.dataUrl}
                   alt={attachment.name}
@@ -131,7 +131,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
                 <button
                   type="button"
                   onClick={handleDownload}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-[10px] shadow-md transition-all cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
                   <span>دانلود مستقیم تصویر</span>
@@ -139,7 +139,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
                 <button
                   type="button"
                   onClick={handleOpenInNewTab}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-[10px] transition-all cursor-pointer"
                 >
                   <ExternalLink className="w-4 h-4" />
                   <span>باز کردن در صفحه جدید</span>
@@ -147,7 +147,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 px-6 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs max-w-md w-full space-y-4">
+            <div className="text-center py-8 px-6 bg-white dark:bg-slate-800 rounded-[14px] border border-slate-200 dark:border-slate-700 shadow-xs max-w-md w-full space-y-4">
               <FileText className="w-16 h-16 text-amber-500 dark:text-amber-400 mx-auto opacity-80" />
               <div>
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">{attachment.name}</p>
@@ -159,7 +159,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
                 <button
                   type="button"
                   onClick={handleDownload}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xs font-bold rounded-[10px] shadow-md transition-all cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
                   <span>دانلود فایل ضمیمه</span>
@@ -167,7 +167,7 @@ export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
                 <button
                   type="button"
                   onClick={handleOpenInNewTab}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-[10px] transition-all cursor-pointer"
                 >
                   <ExternalLink className="w-4 h-4" />
                   <span>باز کردن در پنجره جدید</span>

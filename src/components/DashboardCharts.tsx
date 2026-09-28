@@ -202,7 +202,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
   // 3. Bar Data based on Assignee (تعداد فعالیت‌ها بر اساس مسئول انجام)
   const assigneeBarData = useMemo(() => {
     const ASSIGNEE_PALETTE = [
-      '#6366f1', // Indigo
+      '#4939F1', // Indigo (brand)
       '#0ea5e9', // Sky
       '#10b981', // Emerald
       '#f59e0b', // Amber
@@ -283,7 +283,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
 
     return list.map((item, idx) => ({
       ...item,
-      color: item.id === 'myself' ? '#6366f1' : ASSIGNEE_PALETTE[idx % ASSIGNEE_PALETTE.length],
+      color: item.id === 'myself' ? '#4939F1' : ASSIGNEE_PALETTE[idx % ASSIGNEE_PALETTE.length],
     }));
   }, [tasks, assigneeScope, currentUser]);
 

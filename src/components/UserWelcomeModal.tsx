@@ -131,13 +131,13 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
         <div className="absolute bottom-[35%] left-[20%] w-48 h-48 rounded-full bg-cyan-500/10 blur-2xl" />
       </div>
 
-      <div className="relative w-full max-w-2xl bg-slate-900/35 text-white rounded-3xl border border-white/30 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] backdrop-blur-xl overflow-hidden z-10 my-auto animate-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-2xl bg-slate-900/35 text-white rounded-[18px] border border-white/30 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] backdrop-blur-xl overflow-hidden z-10 my-auto animate-in zoom-in-95 duration-200">
         
         {/* Top Header Banner */}
         <div className="relative p-6 bg-white/10 dark:bg-white/5 backdrop-blur-md border-b border-white/15">
           <button
             onClick={onClose}
-            className="absolute top-4 left-4 p-2 rounded-2xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all cursor-pointer backdrop-blur-md border border-white/15"
+            className="absolute top-4 left-4 p-2 rounded-[10px] bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-all cursor-pointer backdrop-blur-md border border-white/15"
             title="بستن"
             aria-label="بستن"
           >
@@ -184,7 +184,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
           {/* Main 4 Metric Cards Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {/* 1. Total Assigned Tasks */}
-            <div className="p-4 rounded-2xl bg-white/10 dark:bg-white/5 backdrop-blur-md border border-white/20 flex flex-col justify-between space-y-2 hover:bg-white/15 hover:border-white/30 transition-all shadow-sm">
+            <div className="p-4 rounded-[14px] bg-white/10 dark:bg-white/5 backdrop-blur-md border border-white/20 flex flex-col justify-between space-y-2 hover:bg-white/15 hover:border-white/30 transition-all shadow-sm">
               <div className="flex items-center justify-between text-slate-300">
                 <span className="text-[11px] font-bold">کل فعالیت‌ها</span>
                 <ListTodo className="w-4 h-4 text-indigo-400" />
@@ -201,7 +201,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
                 onClose();
                 onNavigateToTab?.('overdue');
               }}
-              className={`p-4 rounded-2xl backdrop-blur-md border flex flex-col justify-between space-y-2 transition-all cursor-pointer shadow-sm ${
+              className={`p-4 rounded-[14px] backdrop-blur-md border flex flex-col justify-between space-y-2 transition-all cursor-pointer shadow-sm ${
                 overdueCount > 0
                   ? 'bg-rose-950/35 border-rose-500/40 text-rose-200 hover:bg-rose-900/45 hover:border-rose-400/60'
                   : 'bg-white/10 dark:bg-white/5 border-white/20 hover:bg-white/15 hover:border-white/30'
@@ -222,7 +222,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
             </div>
 
             {/* 3. Completed & Success Rate */}
-            <div className="p-4 rounded-2xl bg-emerald-950/35 backdrop-blur-md border border-emerald-500/40 flex flex-col justify-between space-y-2 hover:bg-emerald-900/45 hover:border-emerald-400/60 transition-all shadow-sm">
+            <div className="p-4 rounded-[14px] bg-emerald-950/35 backdrop-blur-md border border-emerald-500/40 flex flex-col justify-between space-y-2 hover:bg-emerald-900/45 hover:border-emerald-400/60 transition-all shadow-sm">
               <div className="flex items-center justify-between text-emerald-300">
                 <span className="text-[11px] font-bold">خاتمه یافته</span>
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -239,7 +239,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
             </div>
 
             {/* 4. Active Projects */}
-            <div className="p-4 rounded-2xl bg-purple-950/35 backdrop-blur-md border border-purple-500/40 flex flex-col justify-between space-y-2 hover:bg-purple-900/45 hover:border-purple-400/60 transition-all shadow-sm">
+            <div className="p-4 rounded-[14px] bg-purple-950/35 backdrop-blur-md border border-purple-500/40 flex flex-col justify-between space-y-2 hover:bg-purple-900/45 hover:border-purple-400/60 transition-all shadow-sm">
               <div className="flex items-center justify-between text-purple-300">
                 <span className="text-[11px] font-bold">پروژه‌ها</span>
                 <FolderKanban className="w-4 h-4 text-purple-400" />
@@ -252,7 +252,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
           </div>
 
           {/* Quick Status Bar */}
-          <div className="p-4 rounded-2xl bg-white/10 dark:bg-white/5 backdrop-blur-md border border-white/20 space-y-3 shadow-sm">
+          <div className="p-4 rounded-[14px] bg-white/10 dark:bg-white/5 backdrop-blur-md border border-white/20 space-y-3 shadow-sm">
             <div className="flex items-center justify-between text-xs font-bold text-slate-200">
               <span className="flex items-center gap-1.5">
                 <BarChart2 className="w-4 h-4 text-indigo-400" />
@@ -281,7 +281,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
           </div>
 
           {/* Smart Operational Insight */}
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-900/35 via-purple-900/35 to-indigo-900/35 backdrop-blur-md border border-indigo-400/40 flex items-start gap-3 shadow-sm">
+          <div className="p-4 rounded-[14px] bg-gradient-to-r from-indigo-900/35 via-purple-900/35 to-indigo-900/35 backdrop-blur-md border border-indigo-400/40 flex items-start gap-3 shadow-sm">
             <div className="p-2 rounded-xl bg-indigo-500/30 text-indigo-300 border border-indigo-400/40 shrink-0 mt-0.5 backdrop-blur-md">
               <Zap className="w-5 h-5 text-indigo-300" />
             </div>
@@ -309,7 +309,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-950/60 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 border border-white/20"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-[10px] bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-950/60 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 border border-white/20"
           >
             <span>مشاهده داشبورد و ورود به برنامه</span>
             <ArrowLeft className="w-4 h-4" />
