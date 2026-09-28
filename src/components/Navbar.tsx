@@ -1,18 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, RefreshCw, LogIn, Bell, LayoutDashboard, PanelRightClose, PanelRightOpen, CircleHelp, Settings, LogOut, ChevronDown } from 'lucide-react';
+import { Plus, LogIn, Bell, LayoutDashboard, CircleHelp, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
-import { User as UserType, AppTheme, AppColorPalette } from '../types';
+import { User as UserType, AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 
 interface NavbarProps {
   /** Omitted when the user may not create tasks: the add button is not shown. */
   onOpenCreateModal?: () => void;
-  totalTasks: number;
-  completedTasks: number;
-  onRefreshData: () => void;
-  isSyncing?: boolean;
   currentUser: UserType | null;
-  currentTheme: AppTheme;
   appColorPalette?: AppColorPalette;
   onOpenAuthModal: () => void;
   unreadNotificationsCount?: number;
@@ -20,8 +15,6 @@ interface NavbarProps {
   onOpenWelcomeModal?: () => void;
   /** Opens the slide user guide (header "?" button). */
   onOpenUserGuide?: () => void;
-  isDesktopSidebarOpen?: boolean;
-  onToggleDesktopSidebar?: () => void;
   /** Account menu: settings/profile and logout live here (design system section 8.1/20). */
   onOpenSettings?: () => void;
   onLogout?: () => void;
@@ -29,20 +22,13 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   onOpenCreateModal,
-  totalTasks,
-  completedTasks,
-  onRefreshData,
-  isSyncing = false,
   currentUser,
-  currentTheme,
   appColorPalette = 'indigo',
   onOpenAuthModal,
   unreadNotificationsCount = 0,
   onOpenNotificationModal,
   onOpenWelcomeModal,
   onOpenUserGuide,
-  isDesktopSidebarOpen = true,
-  onToggleDesktopSidebar,
   onOpenSettings,
   onLogout,
 }) => {
@@ -74,7 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       className="sticky top-0 z-30 backdrop-blur-md border-b border-indigo-950/60 shadow-md text-white transition-colors duration-300"
       style={{ background: 'linear-gradient(135deg, #252468 0%, #0F132C 100%)' }}
     >
-      <div className="w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 py-3 sm:py-3.5">
+      <div className="w-full max-w-[1760px] mx-auto px-3 sm:px-5 lg:px-6 py-3">
         <div className="flex items-center justify-between gap-3">
           
           {/* Logo & Title */}
@@ -82,11 +68,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             <img 
               src="/icon.svg" 
               alt="لوگوی مدیریت وظایف (TM)" 
-              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl shadow-md shrink-0 object-cover border border-white/20 cursor-pointer hover:opacity-90 transition-opacity" 
+              className="w-11 h-11 rounded-[10px] shrink-0 object-cover border border-white/20 cursor-pointer hover:opacity-90 transition-opacity"
               onClick={onOpenWelcomeModal}
             />
             <div>
-              <h1 className="text-base sm:text-lg lg:text-xl font-bold text-white tracking-tight flex items-center gap-2 whitespace-nowrap">
+              <h1 className="text-base sm:text-lg font-bold text-white flex items-center gap-2 whitespace-nowrap">
                 مدیریت وظایف (TM)
               </h1>
               {currentUser ? (
@@ -106,8 +92,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                         className="w-4.5 h-4.5 rounded-full object-cover border border-white/30 shrink-0"
                       />
                     ) : null}
-                    <p className="text-xs text-indigo-200/90 font-medium truncate">
-                      کاربر: {currentUser.name}
+                    <p className="text-sm text-indigo-100 font-medium truncate">
+                      {currentUser.name}
                     </p>
                     <ChevronDown className={`w-3 h-3 text-indigo-300/80 transition-transform ${isAccountMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
@@ -182,7 +168,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onOpenNotificationModal}
                 title="اطلاعیه‌ها و هشدارها"
-                className="relative p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-[10px] border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+                aria-label="اطلاعیه‌ها و هشدارها"
+                className="relative min-w-11 min-h-11 p-2.5 text-slate-200 hover:text-white bg-white/5 hover:bg-white/10 rounded-[10px] border border-white/10 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
               >
                 <Bell className={`w-4 h-4 ${unreadNotificationsCount > 0 ? palette.accentText : ''}`} />
                 {unreadNotificationsCount > 0 && (
@@ -200,41 +187,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={onOpenUserGuide}
                 title="راهنمای کاربری"
                 aria-label="راهنمای کاربری"
-                className="p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-[10px] border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+                className="min-w-11 min-h-11 p-2.5 text-slate-200 hover:text-white bg-white/5 hover:bg-white/10 rounded-[10px] border border-white/10 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
               >
                 <CircleHelp className="w-4 h-4" />
               </button>
             )}
-
-            {/* Desktop Sidebar Toggle Button (Hides/Shows Right Sidebar) */}
-            {onToggleDesktopSidebar && (
-              <button
-                type="button"
-                onClick={onToggleDesktopSidebar}
-                title={isDesktopSidebarOpen ? 'مخفی کردن منوی راست' : 'نمایش منوی راست'}
-                className={`hidden lg:flex p-2.5 rounded-[10px] border transition-all shrink-0 cursor-pointer items-center justify-center my-auto ${
-                  !isDesktopSidebarOpen
-                    ? `${palette.accentBg} text-white ${palette.accentBorder} shadow-xs ring-2 ring-indigo-400/50`
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-slate-700/80'
-                }`}
-              >
-                {isDesktopSidebarOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-              </button>
-            )}
-
-            {/* Refresh Data Button (Icon Only - Centered and Color Palette Styled) */}
-            <button
-              type="button"
-              onClick={onRefreshData}
-              title="به‌روزرسانی داده‌ها"
-              className="p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-[10px] border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${palette.accentText} ${
-                  isSyncing ? 'animate-spin' : 'hover:scale-110 transition-transform'
-                }`}
-              />
-            </button>
 
             {/* If not logged in, show simple login button */}
             {!currentUser && (
@@ -248,16 +205,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Add Task Button: the sidebar already has "افزودن فعالیت" once it's open on
-                desktop, so this stays hidden there and only fills in when the sidebar is
-                collapsed or not yet rendered (tablet width). */}
+            {/* On desktop the page and sidebar already expose the primary action. */}
             {onOpenCreateModal && (
             <button
               type="button"
               onClick={onOpenCreateModal}
               title="افزودن فعالیت جدید"
               aria-label="افزودن فعالیت جدید"
-              className={`hidden sm:flex items-center justify-center p-2.5 bg-gradient-to-tr ${palette.gradientFromTo} text-white rounded-[10px] shadow-sm transition-all shrink-0 cursor-pointer hover:opacity-90 active:scale-98 my-auto ${isDesktopSidebarOpen ? 'lg:hidden' : ''}`}
+              className="hidden sm:flex lg:hidden min-w-11 min-h-11 items-center justify-center p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[10px] shadow-sm transition-colors shrink-0 cursor-pointer my-auto"
             >
               <Plus className="w-4 h-4" />
             </button>

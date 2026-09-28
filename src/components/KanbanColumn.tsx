@@ -15,32 +15,11 @@ const STATUS_ICONS: Record<TaskStatus, React.ComponentType<{ className?: string 
 };
 
 const STATUS_ICON_BG: Record<TaskStatus, string> = {
-  todo: 'bg-blue-500',
-  in_progress: 'bg-violet-500',
-  paused: 'bg-amber-500',
-  completed: 'bg-emerald-500',
+  todo: 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300',
+  in_progress: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300',
+  paused: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+  completed: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
 };
-
-// The actual hex behind each icon color, for the header's soft wave background.
-const STATUS_WAVE_COLOR: Record<TaskStatus, string> = {
-  todo: '#3b82f6',
-  in_progress: '#8b5cf6',
-  paused: '#f59e0b',
-  completed: '#10b981',
-};
-
-/** Two soft, overlapping waves in the status color - the header's decorative backdrop. */
-const HeaderWaves: React.FC<{ color: string }> = ({ color }) => (
-  <svg
-    className="pointer-events-none absolute inset-0 w-full h-full"
-    viewBox="0 0 400 120"
-    preserveAspectRatio="none"
-    aria-hidden="true"
-  >
-    <path d="M0,85 C110,45 290,115 400,55 L400,120 L0,120 Z" fill={color} opacity="0.08" />
-    <path d="M0,100 C130,65 270,125 400,85 L400,120 L0,120 Z" fill={color} opacity="0.14" />
-  </svg>
-);
 
 interface KanbanColumnProps {
   status: TaskStatus;
@@ -69,8 +48,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
   onOpenProjectDetails,
   onToggleSubTask,
 }) => {
-  // Default state is COLLAPSED by user request
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
 
   const cfg = STATUSES[status];
@@ -103,38 +81,35 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
           onStatusChange(taskId, status);
         }
       }}
-      className={`w-full max-w-full overflow-hidden flex flex-col rounded-[14px] border transition-all duration-300 bg-white/90 dark:bg-slate-900/80 shadow-2xs ${
+      className={`w-full max-w-full overflow-hidden flex flex-col rounded-[14px] border transition-all duration-200 bg-white dark:bg-[#15172D] ${
         isDragOver ? dragHighlightStyle : `${cfg.borderColor} dark:border-slate-800`
       }`}
     >
       {/* Column Accordion Header */}
       <div
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="relative overflow-hidden flex items-center justify-between gap-3 p-3.5 sm:p-4 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-700/50 rounded-[14px] transition-colors select-none"
+        className="relative flex items-center justify-between gap-3 p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 rounded-[14px] transition-colors select-none"
       >
-        {/* Soft wave backdrop in the status color */}
-        <HeaderWaves color={STATUS_WAVE_COLOR[status]} />
-
-        <div className="relative flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           {/* Status Icon: one friendly, solid-colored badge per status */}
-          <div className={`w-10 h-10 sm:w-11 sm:h-11 shrink-0 rounded-2xl flex items-center justify-center shadow-md text-white ${STATUS_ICON_BG[status]}`}>
+          <div className={`w-10 h-10 shrink-0 rounded-[10px] flex items-center justify-center ${STATUS_ICON_BG[status]}`}>
             <StatusIcon className="w-5 h-5" />
           </div>
 
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                 {cfg.title}
               </h2>
               <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${cfg.badgeBg} ${cfg.badgeText}`}>
                 {toPersianDigits(tasks.length)} مورد
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block mt-0.5">{cfg.description}</p>
+            <p className="text-xs leading-5 text-slate-500 dark:text-slate-400 hidden sm:block mt-0.5">{cfg.description}</p>
           </div>
         </div>
 
-        <div className="relative shrink-0 flex items-center gap-1.5">
+        <div className="shrink-0 flex items-center gap-1.5">
           {isDragOver && (
             <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-600 text-white animate-pulse">
               رها کنید
@@ -147,7 +122,8 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
                 e.stopPropagation();
                 onOpenCreateForStatus(status);
               }}
-              className="w-8 h-8 rounded-[10px] flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:text-indigo-600 hover:border-indigo-300 dark:hover:text-indigo-400 shadow-sm transition-colors"
+              aria-label={`ثبت فعالیت جدید در ستون ${cfg.title}`}
+              className="w-10 h-10 rounded-[10px] flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:text-indigo-600 hover:border-indigo-300 dark:hover:text-indigo-400 transition-colors"
               title="ثبت فعالیت جدید"
             >
               <Plus className="w-4 h-4" />
@@ -159,7 +135,8 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
               e.stopPropagation();
               setIsCollapsed(!isCollapsed);
             }}
-            className="w-8 h-8 rounded-[10px] flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            aria-label={isCollapsed ? `باز کردن ستون ${cfg.title}` : `بستن ستون ${cfg.title}`}
+            className="w-10 h-10 rounded-[10px] flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors"
             title={isCollapsed ? 'باز کردن گروه‌بندی' : 'بستن گروه‌بندی'}
           >
             {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
@@ -187,8 +164,8 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
 
           <div className="space-y-3 mt-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5 pl-0.5">
             {tasks.length === 0 ? (
-              <div className="h-28 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-center">
-                <p className="text-xs text-slate-400 dark:text-slate-500 font-medium mb-2">
+              <div className="h-32 flex flex-col items-center justify-center border border-dashed border-slate-300 dark:border-slate-700 rounded-[14px] bg-slate-50/60 dark:bg-slate-900/30 p-4 text-center">
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-2">
                   هیچ فعالیتی در این بخش وجود ندارد
                 </p>
                 {can(currentUser, PERMISSIONS.tasksCreate) && (

@@ -1,7 +1,8 @@
-import React, { lazy, Suspense, useMemo } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { Task, TaskStatus, Attachment, User } from '../types';
 import { KanbanColumn } from './KanbanColumn';
 import { getTaskLastModifiedTime } from '../utils/helpers';
+import { X } from 'lucide-react';
 
 const DashboardCharts = lazy(() => import('./DashboardCharts').then(m => ({ default: m.DashboardCharts })));
 
@@ -32,6 +33,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onOpenProjectDetails,
   onToggleSubTask,
 }) => {
+  const [showDragGuide, setShowDragGuide] = useState(() => localStorage.getItem('tm_drag_guide_seen') !== 'true');
+
+  const dismissDragGuide = () => {
+    localStorage.setItem('tm_drag_guide_seen', 'true');
+    setShowDragGuide(false);
+  };
+
   // Group tasks by status in a single pass, then sort each column by last
   // modification time (newest first). Every status gets a column, even an empty one - an
   // empty column is still a valid drop target (design.md section 12.1), and hiding it would
@@ -54,13 +62,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <div className="w-full space-y-6">
-      {/* Desktop Drag and Drop Quick Guidance */}
-      <div className="hidden sm:flex items-center justify-between px-4 py-2.5 bg-indigo-50/80 dark:bg-indigo-950/40 rounded-[14px] border border-indigo-200/80 dark:border-indigo-900/60 text-indigo-900 dark:text-indigo-200 text-xs font-medium shadow-2xs">
+      {/* First-use guidance stays dismissible instead of becoming permanent page content. */}
+      {showDragGuide && <div className="hidden sm:flex items-center justify-between gap-4 px-4 py-3 bg-white dark:bg-[#15172D] rounded-[14px] border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 text-sm">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
-          <span>قابلیت کشیدن و رها کردن (Drag & Drop): کارت هر فعالیت را می‌توانید به ستون دلخواه بکشید تا وضعیت آن بروزرسانی شود.</span>
+          <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+          <span>برای تغییر وضعیت، کارت فعالیت را روی ستون مقصد رها کنید.</span>
         </div>
-      </div>
+        <button type="button" onClick={dismissDragGuide} aria-label="بستن راهنمای جابه‌جایی" className="min-w-10 min-h-10 rounded-[10px] inline-flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+          <X className="w-4 h-4" />
+        </button>
+      </div>}
 
       {/* Every status gets a column, empty ones included - an empty column is still a valid
           drop target (design.md section 12.1). */}

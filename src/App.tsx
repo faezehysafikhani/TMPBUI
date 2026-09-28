@@ -62,11 +62,19 @@ import {
   serverNotificationKey,
   toAppNotification,
 } from './utils/serverNotifications';
-import { Database, PanelRightOpen, Filter } from 'lucide-react';
+import { Database, Filter } from 'lucide-react';
 import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION } from './services/nexusApi';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
 import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
+
+const localDayKey = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
+const shouldShowDailySummary = (user: User | null) =>
+  !!user && localStorage.getItem(`tm_daily_summary_${user.id}`) !== localDayKey();
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -87,7 +95,7 @@ export default function App() {
     });
   };
 
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [, setIsSyncing] = useState<boolean>(false);
 
   // User Auth & Theme States
   const [currentUser, setCurrentUser] = useState<User | null>(() => getCurrentUser());
@@ -103,7 +111,13 @@ export default function App() {
 
   // Modals - Automatically open auth modal on startup if not logged in
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => !getCurrentUser());
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(() => !!getCurrentUser());
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(() => shouldShowDailySummary(getCurrentUser()));
+
+  useEffect(() => {
+    if (isWelcomeModalOpen && currentUser) {
+      localStorage.setItem(`tm_daily_summary_${currentUser.id}`, localDayKey());
+    }
+  }, [isWelcomeModalOpen, currentUser]);
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState<boolean>(false);
 
@@ -119,6 +133,15 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('kanban');
   const [isPageTransitioning, setIsPageTransitioning] = useState<boolean>(false);
+
+  const pageMeta = useMemo<Record<ActiveTab, { title: string; description: string }>>(() => ({
+    kanban: { title: 'فضای کاری فعالیت‌ها', description: 'فعالیت‌های جاری را بر اساس وضعیت دنبال و مدیریت کنید.' },
+    calendar: { title: 'تقویم فعالیت‌ها', description: 'موعدها و برنامه روزانه را در تقویم شمسی مرور کنید.' },
+    chat: { title: 'گفتگوی تیمی', description: 'گفتگوها و فعالیت‌های مرتبط با هر تیم را یک‌جا ببینید.' },
+    notes: { title: 'یادداشت‌های شخصی', description: 'یادداشت‌ها را ثبت، مرتب و در صورت نیاز به فعالیت تبدیل کنید.' },
+    overdue: { title: 'فعالیت‌های عقب‌افتاده', description: 'موارد نیازمند اقدام را اولویت‌بندی و به جریان کار بازگردانید.' },
+    settings: { title: 'تنظیمات و پروفایل', description: 'حساب، تیم، ظاهر برنامه و راهنما را مدیریت کنید.' },
+  }), []);
 
   const handleNavigateTab = useCallback((nextTab: ActiveTab) => {
     if (nextTab === activeTab) return;
@@ -138,6 +161,14 @@ export default function App() {
   const [priorityFilter, setPriorityFilter] = useState<Priority | 'all'>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
+
+  const activeFilterCount = useMemo(() => [
+    searchQuery.trim() !== '',
+    statusFilter !== 'all',
+    priorityFilter !== 'all',
+    assigneeFilter !== 'all',
+    tagFilter !== 'all',
+  ].filter(Boolean).length, [searchQuery, statusFilter, priorityFilter, assigneeFilter, tagFilter]);
 
   // Theme & Color Palette States
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
@@ -361,7 +392,7 @@ export default function App() {
     }
     setIsAuthModalOpen(false);
     setIsSettingsOpen(false);
-    setIsWelcomeModalOpen(true);
+    setIsWelcomeModalOpen(shouldShowDailySummary(user));
     setActiveTab('kanban');
     loadTasks(true);
   };
@@ -1165,7 +1196,7 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}>
+    <div className={`min-h-[100dvh] bg-[#F5F7FC] dark:bg-[#0B0C1E] palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}>
       
       {/* Startup Summary Welcome Modal (Priority 1 Overlay) */}
       {isWelcomeModalOpen && (
@@ -1182,40 +1213,20 @@ export default function App() {
       {/* Top Navbar */}
       <Navbar
         onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
-        totalTasks={visibleTasks.length}
-        completedTasks={completedCount}
-        onRefreshData={() => loadTasks(true)}
-        isSyncing={isSyncing}
         currentUser={currentUser}
-        currentTheme={appColorTheme}
         appColorPalette={appColorPalette}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         unreadNotificationsCount={unreadNotificationsCount}
         onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
         onOpenWelcomeModal={() => setIsWelcomeModalOpen(true)}
         onOpenUserGuide={currentUser ? () => setIsUserGuideOpen(true) : undefined}
-        isDesktopSidebarOpen={isDesktopSidebarOpen}
-        onToggleDesktopSidebar={handleToggleDesktopSidebar}
         onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
         onLogout={currentUser ? handleLogout : undefined}
       />
 
-      {/* Floating Restore Button for Desktop Sidebar when Collapsed */}
-      {!isDesktopSidebarOpen && (
-        <button
-          type="button"
-          onClick={handleToggleDesktopSidebar}
-          className="hidden lg:flex items-center gap-2 fixed right-0 top-24 z-20 px-3.5 py-2.5 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 border border-r-0 border-slate-200/90 dark:border-slate-800 rounded-l-2xl shadow-xl hover:bg-indigo-50 dark:hover:bg-slate-800 transition-all cursor-pointer group animate-in fade-in duration-200"
-          title="نمایش منوی سمت راست"
-        >
-          <PanelRightOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">منوی راست</span>
-        </button>
-      )}
-
       {/* Main Container with Right Desktop Sidebar */}
-      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 sm:pt-6">
-        <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-stretch">
+      <div className="flex-1 w-full max-w-[1760px] mx-auto px-3 sm:px-5 lg:px-6 pt-5 sm:pt-7">
+        <div className="flex flex-col lg:flex-row gap-5 xl:gap-7 items-start lg:items-stretch">
           
           {/* Desktop Sidebar (Renders on Right Side in RTL) */}
           <DesktopSidebar
@@ -1223,22 +1234,30 @@ export default function App() {
             setActiveTab={handleNavigateTab}
             onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
             canOpenTab={(tab) => canOpenTab(currentUser, tab)}
-            onOpenSettings={() => handleNavigateTab('settings')}
-            onOpenPdfCatalog={() => setIsPdfCatalogOpen(true)}
-            onLogout={handleLogout}
             overdueCount={overdueCount}
             unreadChatCount={totalUnreadChatCount}
             appColorPalette={appColorPalette}
             totalTasks={visibleTasks.length}
             completedTasks={completedCount}
-            currentUser={currentUser}
             isOpen={isDesktopSidebarOpen}
             onToggleOpen={handleToggleDesktopSidebar}
           />
 
 
           {/* Main Content Workspace */}
-          <main className="flex-1 w-full min-w-0">
+          <main className="flex-1 w-full min-w-0 space-y-5">
+
+        <section className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-[14px] border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#15172D] px-5 py-4 sm:px-6 sm:py-5">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300 mb-1">مدیریت وظایف</p>
+            <h1 className="text-xl sm:text-2xl font-bold leading-9 text-slate-900 dark:text-slate-50">
+              {pageMeta[activeTab].title}
+            </h1>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {pageMeta[activeTab].description}
+            </p>
+          </div>
+        </section>
         
         {/* Error Alert */}
         {pbError && (
@@ -1258,14 +1277,20 @@ export default function App() {
           <button
             type="button"
             onClick={() => setShowFilterBar((prev) => !prev)}
-            className={`flex items-center gap-2 px-3.5 py-2 rounded-[10px] border text-xs font-bold transition-all cursor-pointer ${
+            aria-expanded={showFilterBar}
+            className={`min-h-11 flex items-center gap-2 px-3.5 py-2 rounded-[10px] border text-sm font-semibold transition-all cursor-pointer ${
               showFilterBar
                 ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                 : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300'
             }`}
           >
             <Filter className="w-4 h-4" />
-            <span>{showFilterBar ? 'بستن فیلترها' : 'نمایش فیلترها'}</span>
+            <span>{showFilterBar ? 'بستن فیلترها' : 'فیلتر فعالیت‌ها'}</span>
+            {activeFilterCount > 0 && (
+              <span className={`min-w-5 h-5 px-1.5 rounded-full inline-flex items-center justify-center text-[11px] font-bold ${showFilterBar ? 'bg-white text-indigo-700' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-200'}`}>
+                {toPersianDigits(activeFilterCount)}
+              </span>
+            )}
           </button>
         )}
 
@@ -1285,6 +1310,7 @@ export default function App() {
             teamMembers={currentUserTeamMembers}
             availableTags={currentUserTags}
             currentUser={currentUser}
+            resultCount={filteredTasks.length}
           />
         )}
 
@@ -1401,9 +1427,9 @@ export default function App() {
       </div>
 
       {/* Footer: a full-width bar at the true bottom of the page, not tucked under the content column */}
-      <footer className="mt-auto pt-10 pb-20 lg:pb-6 px-2 sm:px-3">
-        <div className="w-full max-w-[1920px] mx-auto bg-slate-900 text-white rounded-[14px] p-4 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
-          <span className="font-bold tracking-tight text-white/95">
+      <footer className="mt-auto pt-10 pb-20 lg:pb-6 px-3 sm:px-5 lg:px-6">
+        <div className="w-full max-w-[1760px] mx-auto border-t border-slate-200 dark:border-slate-800 py-5 flex items-center justify-center text-center text-xs text-slate-500 dark:text-slate-400 select-none">
+          <span className="font-medium">
             تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
           </span>
         </div>

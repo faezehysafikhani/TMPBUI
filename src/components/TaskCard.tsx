@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Task, TaskStatus, Priority, PRIORITIES, Attachment, User } from '../types';
 import {
   formatToJalali,
@@ -26,7 +26,8 @@ import {
   FolderKanban,
   Repeat,
   Tag,
-  GripVertical
+  GripVertical,
+  MoreVertical
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
@@ -57,6 +58,24 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showSubTasks, setShowSubTasks] = useState(false);
   const [isDraggingCard, setIsDraggingCard] = useState(false);
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isActionsOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) setIsActionsOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsActionsOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isActionsOpen]);
 
   // Swipe Left to Complete State & Handlers
   const [dragOffset, setDragOffset] = useState(0);
@@ -169,15 +188,15 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
   const commentCount = task.comments?.length || 0;
 
   const priorityBorderShadowMap: Record<Priority, string> = {
-    high: 'border-r-[5px] border-r-rose-500 shadow-[4px_0_12px_-2px_rgba(244,63,94,0.35)] dark:shadow-[4px_0_14px_-2px_rgba(244,63,94,0.45)]',
-    medium: 'border-r-[5px] border-r-amber-400 dark:border-r-amber-500 shadow-[4px_0_12px_-2px_rgba(251,191,36,0.35)] dark:shadow-[4px_0_14px_-2px_rgba(245,158,11,0.45)]',
-    low: 'border-r-[5px] border-r-emerald-500 shadow-[4px_0_12px_-2px_rgba(16,185,129,0.35)] dark:shadow-[4px_0_14px_-2px_rgba(16,185,129,0.45)]',
+    high: 'border-r-[3px] border-r-rose-500',
+    medium: 'border-r-[3px] border-r-amber-500',
+    low: 'border-r-[3px] border-r-emerald-600',
   };
 
   const priorityStyle = priorityBorderShadowMap[task.priority || 'medium'];
 
   return (
-    <div className="relative overflow-hidden rounded-[14px] select-none">
+    <div className="relative overflow-visible rounded-[14px] select-none">
       {/* Revealed Action Layer on Drag (Left or Right) */}
       <div
         className={`absolute inset-y-0 inset-x-0 ${
@@ -225,15 +244,15 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
           transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0, 0, 1)',
           touchAction: 'pan-y',
         }}
-        className={`group relative rounded-[14px] border transition-all duration-200 hover:shadow-md ${
+        className={`tm-task-card group relative rounded-[14px] border transition-all duration-200 hover:border-indigo-300 dark:hover:border-indigo-700 ${
           canChangeStatus ? 'cursor-grab active:cursor-grabbing' : ''
         } ${
           isDraggingCard
             ? 'opacity-30 scale-95 border-dashed border-indigo-500 shadow-2xl ring-2 ring-indigo-500/80 bg-indigo-50 dark:bg-indigo-950'
             : overdue && task.status !== 'completed'
             ? 'border-slate-200 dark:border-slate-700 bg-rose-50/40 dark:bg-rose-950/40'
-            : 'border-slate-200/90 dark:border-slate-700/80 hover:border-indigo-400 dark:hover:border-indigo-500/60 bg-white/85 dark:bg-slate-800/85 backdrop-blur-xs'
-        } ${priorityStyle} p-4 sm:p-4.5 flex flex-col justify-between overflow-hidden`}
+            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+        } ${priorityStyle} p-4 flex flex-col justify-between overflow-visible`}
       >
       {/* Top Section: Title & Actions First, then Tags below */}
       <div>
@@ -251,7 +270,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             <h3
               onClick={() => onViewDetails && onViewDetails(task)}
               title={canChangeStatus ? 'امکان کشیدن و رها کردن (Drag & Drop) یا کلیک جهت جزئیات' : 'مشاهده جزئیات'}
-              className={`text-[11px] sm:text-xs font-bold leading-snug cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-1 break-words ${
+              className={`text-sm font-semibold leading-6 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-1 break-words ${
                 task.status === 'completed' || task.status === 'paused'
                   ? 'line-through text-slate-400 dark:text-slate-500'
                   : 'text-slate-900 dark:text-slate-100'
@@ -262,46 +281,39 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
           </div>
 
           {/* Card Action Buttons (Horizontal layout) */}
-          <div className="flex flex-row items-center gap-1 opacity-90 sm:opacity-70 group-hover:opacity-100 transition-opacity shrink-0 flex-nowrap pt-0.5">
+          <div className="flex flex-row items-center gap-1 shrink-0 flex-nowrap" ref={actionsRef}>
             {/* View Details / Discussion Button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 if (onViewDetails) onViewDetails(task);
               }}
-              className="p-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700/80 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-0.5 text-[10px] font-bold"
+              aria-label="مشاهده جزئیات و گفتگو"
+              className="min-w-10 min-h-10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700/80 rounded-[10px] transition-colors cursor-pointer flex items-center justify-center gap-0.5 text-xs font-semibold"
               title="مشاهده جزئیات و گفتگو"
             >
               <MessageSquare className="w-3.5 h-3.5" />
               {commentCount > 0 && <span>{toPersianDigits(commentCount)}</span>}
             </button>
 
-            {/* Edit Button - STRICTLY allowed ONLY for Owner/Admin */}
-            {canEditTask && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(task);
-                }}
-                className="p-1 text-slate-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700/80 rounded-lg transition-colors cursor-pointer"
-                title="ویرایش کامل فعالیت (مالک)"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {/* Delete Button - Strictly Owner/Admin */}
-            {canDeleteTask && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowConfirmDelete(true);
-                }}
-                className="p-1 text-slate-400 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/80 rounded-lg transition-colors cursor-pointer"
-                title="حذف فعالیت"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+            {(canEditTask || canDeleteTask) && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setIsActionsOpen((open) => !open); }}
+                  aria-label="اقدامات بیشتر فعالیت"
+                  aria-expanded={isActionsOpen}
+                  className="min-w-10 min-h-10 inline-flex items-center justify-center text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-[10px] transition-colors"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+                {isActionsOpen && (
+                  <div className="absolute left-0 top-full z-30 mt-1 w-40 overflow-hidden rounded-[14px] border border-slate-200 bg-white p-1.5 shadow-[var(--shadow-raised)] dark:border-slate-700 dark:bg-slate-900">
+                    {canEditTask && <button type="button" onClick={(e) => { e.stopPropagation(); setIsActionsOpen(false); onEdit(task); }} className="w-full min-h-10 flex items-center gap-2 rounded-[10px] px-3 text-right text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"><Edit2 className="w-4 h-4" />ویرایش</button>}
+                    {canDeleteTask && <button type="button" onClick={(e) => { e.stopPropagation(); setIsActionsOpen(false); setShowConfirmDelete(true); }} className="w-full min-h-10 flex items-center gap-2 rounded-[10px] px-3 text-right text-sm text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"><Trash2 className="w-4 h-4" />حذف فعالیت</button>}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -309,7 +321,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
         {/* Tags Row - Rendered BELOW Title */}
         <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
           {overdue && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 animate-pulse">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
               <AlertCircle className="w-2.5 h-2.5" />
               عقب افتاده
             </span>
@@ -359,7 +371,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
 
         {/* Description */}
         {task.description && (
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-3 line-clamp-3 whitespace-pre-line bg-slate-50/60 dark:bg-slate-900/50 p-2 rounded-xl border border-slate-100 dark:border-slate-700/60">
+          <p className="text-sm text-slate-600 dark:text-slate-300 leading-6 mb-3 line-clamp-3 whitespace-pre-line">
             {task.description}
           </p>
         )}

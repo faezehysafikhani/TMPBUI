@@ -36,6 +36,18 @@
  * rather than via a Tailwind utility class.
  */
 :root {
+  color-scheme: light;
+
+  --color-page: #F5F7FC;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F8F9FD;
+  --color-surface-selected: #F1EFFF;
+  --color-border: #DDE2EC;
+  --color-border-strong: #C7CEDC;
+  --color-text-primary: #1B2235;
+  --color-text-secondary: #596174;
+  --color-text-muted: #788196;
+
   --radius-control: 10px;
   --radius-card: 14px;
   --radius-dialog: 18px;
@@ -86,12 +98,103 @@
 }
 
 * {
-  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  font-family: 'Dana', 'Vazirmatn', system-ui, -apple-system, sans-serif !important;
+  letter-spacing: 0;
+  box-sizing: border-box;
 }
 
 @layer base {
+  html {
+    direction: rtl;
+    min-width: 320px;
+    background: var(--color-page);
+    scroll-behavior: smooth;
+  }
+
   body {
-    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100dvh;
+    margin: 0;
+    overflow-x: hidden;
+    font-family: 'Dana', 'Vazirmatn', system-ui, -apple-system, sans-serif;
+    color: var(--color-text-primary);
+    background: var(--color-page);
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  button, input, select, textarea {
+    font: inherit;
+  }
+
+  button:not(:disabled), [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+
+  button:disabled, input:disabled, select:disabled, textarea:disabled {
+    cursor: not-allowed;
+  }
+
+  ::selection {
+    color: #fff;
+    background: #4939F1;
+  }
+}
+
+.dark body {
+  color: var(--color-text-primary);
+  background: var(--color-page);
+}
+
+/* Core task information must remain readable; 12px is reserved for metadata only. */
+.tm-task-card button {
+  touch-action: manipulation;
+}
+
+.tm-sidebar button {
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tm-task-card [class*='text-[9px]'],
+.tm-task-card [class*='text-[10px]'] {
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.tm-task-form label,
+.tm-task-form input,
+.tm-task-form textarea,
+.tm-task-form select,
+.tm-task-form button {
+  font-size: 14px;
+}
+
+.tm-task-form input:not([type='checkbox']):not([type='radio']),
+.tm-task-form select,
+.tm-task-form textarea {
+  min-height: 44px;
+  background-color: #E8F0FD;
+}
+
+.dark .tm-task-form input:not([type='checkbox']):not([type='radio']),
+.dark .tm-task-form select,
+.dark .tm-task-form textarea {
+  background-color: #1B1D38;
+}
+
+@media (max-width: 640px) {
+  .tm-task-form {
+    width: 100%;
+    max-height: 100dvh;
+    min-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .tm-task-form input,
+  .tm-task-form textarea,
+  .tm-task-form select {
+    font-size: 16px;
   }
 }
 

@@ -76,6 +76,7 @@ interface FilterBarProps {
   teamMembers: { id: string; name: string }[];
   availableTags: string[];
   currentUser?: User | null;
+  resultCount: number;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -92,6 +93,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   teamMembers,
   availableTags,
   currentUser,
+  resultCount,
 }) => {
   const [activeDropdown, setActiveDropdown] = useState<
     'status' | 'priority' | 'assignee' | 'tag' | 'saved' | null
@@ -730,7 +732,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
         </div>
 
-        {/* Clear Filters Button */}
+        <div className="flex items-center justify-between lg:justify-end gap-3 self-stretch lg:self-center shrink-0">
+          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">
+            {resultCount.toLocaleString('fa-IR')} نتیجه
+          </span>
         {isFiltered && (
           <button
             type="button"
@@ -741,11 +746,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               setTagFilter('all');
               setSearchQuery('');
             }}
-            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline px-2 py-1 self-end lg:self-center shrink-0 cursor-pointer"
+            className="min-h-10 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 px-2 py-1 shrink-0 cursor-pointer"
           >
-            حذف فیلترها
+            پاک‌کردن همه
           </button>
         )}
+        </div>
 
       </div>
     </div>
