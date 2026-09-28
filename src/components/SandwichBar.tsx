@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Kanban, Calendar, Plus, AlertCircle, Settings, MessageSquare, FileText, Layers, X } from 'lucide-react';
+import { Kanban, Calendar, Plus, AlertCircle, Settings, MessageSquare, FileText, MoreHorizontal, X } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -19,146 +19,70 @@ interface SandwichBarProps {
   appColorPalette?: AppColorPalette;
 }
 
+/**
+ * Mobile's bottom navigation. Team Chat is a direct tab (it's a daily-use module, per the UX
+ * review it must never be effectively hidden on mobile) - Settings is not, since the header's
+ * account menu already reaches it on every viewport, so it would be a second, harder-to-find
+ * path to the same place. Notes and Settings sit behind a plainly-labeled "بیشتر" (not an
+ * unexplained icon) so they stay one tap away without crowding the five primary destinations.
+ */
 export const SandwichBar: React.FC<SandwichBarProps> = ({
   activeTab,
   setActiveTab,
   onOpenCreateModal,
-  onOpenSettings,
   overdueCount,
   unreadChatCount = 0,
   appColorPalette = 'indigo',
   canOpenTab = (_tab: ActiveTab) => true,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
-  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const isInMoreMenu = activeTab === 'notes' || activeTab === 'settings';
 
   return (
     <>
-      {/* Global Backdrop when speed dial is open */}
-      {isToolsMenuOpen && (
+      {/* Backdrop when the "بیشتر" menu is open */}
+      {isMoreMenuOpen && (
         <div
           className="lg:hidden fixed inset-0 z-30 bg-black/25 backdrop-blur-[2px] transition-opacity"
-          onClick={() => setIsToolsMenuOpen(false)}
+          onClick={() => setIsMoreMenuOpen(false)}
         />
       )}
 
-      {/* Main Bottom Sandwich Bar */}
+      {/* Main Bottom Navigation Bar */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/90 shadow-2xl py-2 px-3 sm:px-6">
-        <div className="w-full max-w-xl mx-auto flex items-center justify-around sm:justify-center gap-2 sm:gap-6">
-          
-          {/* 1. Kanban / Card View Button + Floating "More Items" Menu directly above and aligned with it */}
-          <div className="relative flex flex-col items-center">
-            
-            {/* Speed Dial Menu Stack - Anchored directly above the Card View icon */}
-            <div className="absolute bottom-full mb-6 flex flex-col items-center gap-2.5 z-50">
-              
-              {/* Floating action icons (stacked vertically above the trigger) */}
-              {isToolsMenuOpen && (
-                <div className="flex flex-col items-center gap-2.5 mb-1 animate-in fade-in slide-in-from-bottom-4 duration-250 ease-out">
-                  
-                  {/* 1. Team Chat Icon Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsToolsMenuOpen(false);
-                      setActiveTab('chat');
-                    }}
-                    className={`relative w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-200 ${
-                      activeTab === 'chat'
-                        ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
-                        : 'bg-slate-800 hover:bg-slate-700 text-indigo-400'
-                    }`}
-                    title="گفتگوی تیمی"
-                    aria-label="گفتگوی تیمی"
-                  >
-                    <MessageSquare className="w-5.5 h-5.5" />
-                    {unreadChatCount > 0 && (
-                      <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-black text-[10px] animate-pulse border border-slate-900">
-                        {toPersianDigits(unreadChatCount)}
-                      </span>
-                    )}
-                  </button>
+        <div className="w-full max-w-xl mx-auto flex items-center justify-around sm:justify-center gap-1 sm:gap-4">
 
-                  {/* 2. Personal Notes Icon Button */}
-                  {canOpenTab('notes') && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsToolsMenuOpen(false);
-                      setActiveTab('notes');
-                    }}
-                    className={`w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-150 ${
-                      activeTab === 'notes'
-                        ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
-                        : 'bg-slate-800 hover:bg-slate-700 text-emerald-400'
-                    }`}
-                    title="یادداشت‌های شخصی"
-                    aria-label="یادداشت‌های شخصی"
-                  >
-                    <FileText className="w-5.5 h-5.5" />
-                  </button>
-                  )}
-
-                </div>
-              )}
-
-              {/* Main "More Items" (موارد بیشتر) Trigger Button */}
-              <button
-                type="button"
-                onClick={() => setIsToolsMenuOpen((prev) => !prev)}
-                className={`relative z-50 w-11 h-11 rounded-full flex items-center justify-center shadow-2xl transition-all cursor-pointer active:scale-95 border border-slate-700/80 ${
-                  isToolsMenuOpen
-                    ? 'bg-rose-600 text-white rotate-90 ring-4 ring-rose-950/40'
-                    : 'bg-slate-800/95 hover:bg-slate-700 text-slate-200 ring-2 ring-slate-900'
-                }`}
-                title="موارد بیشتر"
-                aria-label="موارد بیشتر"
-              >
-                {isToolsMenuOpen ? (
-                  <X className="w-5.5 h-5.5" />
-                ) : (
-                  <Layers className="w-5.5 h-5.5 text-amber-300" />
-                )}
-                {!isToolsMenuOpen && unreadChatCount > 0 && (
-                  <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-black text-[10px] animate-pulse border border-slate-900">
-                    {toPersianDigits(unreadChatCount)}
-                  </span>
-                )}
-              </button>
-
-            </div>
-
-            {/* Kanban / Card View Button */}
-            {canOpenTab('kanban') && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('kanban')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all cursor-pointer ${
-                activeTab === 'kanban'
-                  ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
-                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
-              }`}
-              title="بورد کانبان (نمای کارت)"
-            >
-              <Kanban className="w-7 h-7 shrink-0" />
-              <span className="text-xs hidden sm:inline">کانبان</span>
-            </button>
-            )}
-          </div>
+          {/* 1. Kanban / Card View Button */}
+          {canOpenTab('kanban') && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('kanban')}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-full transition-all cursor-pointer ${
+              activeTab === 'kanban'
+                ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
+                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
+            }`}
+            title="بورد کانبان (نمای کارت)"
+          >
+            <Kanban className="w-6.5 h-6.5 shrink-0" />
+            <span className="text-xs hidden sm:inline">کانبان</span>
+          </button>
+          )}
 
           {/* 2. Calendar View Button */}
           {canOpenTab('calendar') && (
           <button
             type="button"
             onClick={() => setActiveTab('calendar')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-full transition-all cursor-pointer ${
               activeTab === 'calendar'
                 ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
                 : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
             }`}
             title="نمای تقویم"
           >
-            <Calendar className="w-7 h-7 shrink-0" />
+            <Calendar className="w-6.5 h-6.5 shrink-0" />
             <span className="text-xs hidden sm:inline">تقویم</span>
           </button>
           )}
@@ -181,14 +105,14 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('overdue')}
-            className={`relative flex items-center gap-1.5 px-3 py-2 rounded-full transition-all cursor-pointer ${
+            className={`relative flex items-center gap-1.5 px-2.5 py-2 rounded-full transition-all cursor-pointer ${
               activeTab === 'overdue'
                 ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-950 ring-2 ring-white/20'
                 : 'text-slate-400 hover:text-rose-400 hover:bg-rose-950/40'
             }`}
             title="فعالیت‌های از موعد گذشته"
           >
-            <AlertCircle className="w-7 h-7 shrink-0" />
+            <AlertCircle className="w-6.5 h-6.5 shrink-0" />
             <span className="text-xs hidden sm:inline">موعد گذشته</span>
             {overdueCount > 0 && (
               <span
@@ -204,20 +128,77 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           </button>
           )}
 
-          {/* 5. Settings Tab Button */}
+          {/* 5. Team Chat: a real daily-use module, so it gets a direct tab like the others -
+              not tucked behind another menu. */}
           <button
             type="button"
-            onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all cursor-pointer ${
-              activeTab === 'settings'
+            onClick={() => setActiveTab('chat')}
+            className={`relative flex items-center gap-1.5 px-2.5 py-2 rounded-full transition-all cursor-pointer ${
+              activeTab === 'chat'
                 ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
                 : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
             }`}
-            title="تنظیمات و پروفایل"
+            title="گفتگوی تیمی"
           >
-            <Settings className="w-7 h-7 shrink-0" />
-            <span className="text-xs hidden sm:inline">تنظیمات</span>
+            <MessageSquare className="w-6.5 h-6.5 shrink-0" />
+            <span className="text-xs hidden sm:inline">گفتگو</span>
+            {unreadChatCount > 0 && (
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-black text-[10px] animate-pulse border border-slate-900">
+                {toPersianDigits(unreadChatCount)}
+              </span>
+            )}
           </button>
+
+          {/* 6. "بیشتر": Notes and Settings, plainly labeled instead of an unexplained icon */}
+          <div className="relative flex flex-col items-center">
+            {isMoreMenuOpen && (
+              <div className="absolute bottom-full left-0 mb-3 flex flex-col items-stretch gap-1 z-50 w-40 bg-slate-800 rounded-[14px] shadow-2xl border border-slate-700/80 p-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                {canOpenTab('notes') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      setActiveTab('notes');
+                    }}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-xs font-bold transition-colors cursor-pointer ${
+                      activeTab === 'notes' ? 'bg-indigo-600 text-white' : 'text-slate-200 hover:bg-slate-700'
+                    }`}
+                  >
+                    <FileText className="w-4.5 h-4.5 shrink-0" />
+                    <span>یادداشت شخصی</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    setActiveTab('settings');
+                  }}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-xs font-bold transition-colors cursor-pointer ${
+                    activeTab === 'settings' ? 'bg-indigo-600 text-white' : 'text-slate-200 hover:bg-slate-700'
+                  }`}
+                >
+                  <Settings className="w-4.5 h-4.5 shrink-0" />
+                  <span>تنظیمات و پروفایل</span>
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-full transition-all cursor-pointer ${
+                isMoreMenuOpen || isInMoreMenu
+                  ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
+              }`}
+              title="بیشتر: یادداشت شخصی و تنظیمات"
+              aria-expanded={isMoreMenuOpen}
+            >
+              {isMoreMenuOpen ? <X className="w-6.5 h-6.5 shrink-0" /> : <MoreHorizontal className="w-6.5 h-6.5 shrink-0" />}
+              <span className="text-xs hidden sm:inline">بیشتر</span>
+            </button>
+          </div>
 
         </div>
       </div>

@@ -300,27 +300,34 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
     return { canEditTask, canDeleteTask, canChangeStatus };
   };
 
+  // The selected day and the daily agenda shown for it must always refer to the same date - so
+  // navigating to a month with fewer days moves the selection onto the nearest real day in it
+  // instead of leaving it pointing at a day number the new month doesn't have.
+  const gotoMonth = (year: number, month: number) => {
+    setViewYear(year);
+    setViewMonth(month);
+    setSelectedDay((day) => Math.min(day, getJalaliMonthDays(year, month)));
+  };
+
   // Month navigation
   const handlePrevMonth = () => {
     if (viewMonth === 1) {
-      setViewMonth(12);
-      setViewYear(viewYear - 1);
+      gotoMonth(viewYear - 1, 12);
     } else {
-      setViewMonth(viewMonth - 1);
+      gotoMonth(viewYear, viewMonth - 1);
     }
   };
 
   const handleNextMonth = () => {
     if (viewMonth === 12) {
-      setViewMonth(1);
-      setViewYear(viewYear + 1);
+      gotoMonth(viewYear + 1, 1);
     } else {
-      setViewMonth(viewMonth + 1);
+      gotoMonth(viewYear, viewMonth + 1);
     }
   };
 
-  const handlePrevYear = () => setViewYear(viewYear - 1);
-  const handleNextYear = () => setViewYear(viewYear + 1);
+  const handlePrevYear = () => gotoMonth(viewYear - 1, viewMonth);
+  const handleNextYear = () => gotoMonth(viewYear + 1, viewMonth);
 
   // Opens the new-activity form for a day of the month on view. The date is built from the
   // Jalali year/month/day that was clicked (in Iran time, like every date in the app), with the

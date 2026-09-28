@@ -62,7 +62,7 @@ import {
   serverNotificationKey,
   toAppNotification,
 } from './utils/serverNotifications';
-import { Database, PanelRightOpen } from 'lucide-react';
+import { Database, PanelRightOpen, Filter } from 'lucide-react';
 import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION } from './services/nexusApi';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
@@ -1184,8 +1184,6 @@ export default function App() {
         onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
         totalTasks={visibleTasks.length}
         completedTasks={completedCount}
-        onToggleFilterBar={activeTab === 'kanban' ? () => setShowFilterBar((prev) => !prev) : undefined}
-        isFilterBarOpen={showFilterBar}
         onRefreshData={() => loadTasks(true)}
         isSyncing={isSyncing}
         currentUser={currentUser}
@@ -1253,6 +1251,22 @@ export default function App() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Kanban filter toggle: lives above the board it filters, not in the global toolbar. */}
+        {activeTab === 'kanban' && !isPageTransitioning && (
+          <button
+            type="button"
+            onClick={() => setShowFilterBar((prev) => !prev)}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-[10px] border text-xs font-bold transition-all cursor-pointer ${
+              showFilterBar
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-300'
+            }`}
+          >
+            <Filter className="w-4 h-4" />
+            <span>{showFilterBar ? 'بستن فیلترها' : 'نمایش فیلترها'}</span>
+          </button>
         )}
 
         {/* FilterBar (Toggleable) */}

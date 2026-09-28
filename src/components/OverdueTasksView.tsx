@@ -478,11 +478,11 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <div className="inline-flex items-center gap-1.5 text-[11px] text-amber-100 bg-black/20 px-2.5 py-1 rounded-[10px] font-medium border border-white/10">
                 <ArrowDownUp className="w-3.5 h-3.5 shrink-0 text-amber-300" />
-                <span>مرتب‌شده بر اساس **بیشترین تاخیر** و **اولویت بالاتر**</span>
+                <span>مرتب‌شده بر اساس <strong className="font-extrabold">بیشترین تاخیر</strong> و <strong className="font-extrabold">اولویت بالاتر</strong></span>
               </div>
               <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-100 bg-emerald-900/40 px-2.5 py-1 rounded-[10px] font-medium border border-emerald-400/20">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
-                <span>با **درگ به سمت چپ**، فعالیت به «خاتمه یافته» تغییر می‌یابد</span>
+                <span>با <strong className="font-extrabold">درگ به سمت چپ</strong>، فعالیت به «خاتمه یافته» تغییر می‌یابد</span>
               </div>
             </div>
           </div>

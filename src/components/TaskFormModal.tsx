@@ -4,7 +4,7 @@ import { COLOR_PALETTES } from '../utils/theme';
 import { readFileAsDataUrl } from '../utils/storage';
 import { formatFileSize, toPersianDigits, computeAutoTaskStatus } from '../utils/helpers';
 import { JalaliDateTimePicker } from './JalaliDateTimePicker';
-import { getNowISO, iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
+import { getNowISO, iranDateTimeToISO, isoToIranDateTimeParts, gregorianToJalali, PERSIAN_MONTH_NAMES } from '../utils/jalali';
 import { fetchUserTeamsPB, fetchUserTeamsAsyncPB, fetchAllUsersPB } from '../services/dataService';
 import { generateRecurringOccurrences } from '../utils/recurring';
 import {
@@ -38,6 +38,80 @@ interface PersonOption {
   username: string;
   avatar?: string;
   email?: string;
+}
+
+const WEEKDAY_NAMES = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه'];
+const NTH_OCCURRENCE_LABELS: Record<OccurrenceNth, string> = {
+  first: 'اول',
+  second: 'دوم',
+  third: 'سوم',
+  fourth: 'چهارم',
+  last: 'آخرین',
+};
+
+/** "روز ماه" (day + Persian month name) for an ISO/YYYY-MM-DD value, or null if it's empty. */
+function jalaliDayMonth(value: string | undefined): string | null {
+  if (!value) return null;
+  const parts = isoToIranDateTimeParts(value);
+  if (!parts) return null;
+  const [gy, gm, gd] = parts.date.split('-').map(Number);
+  const { jm, jd } = gregorianToJalali(gy, gm, gd);
+  return `${toPersianDigits(jd)} ${PERSIAN_MONTH_NAMES[jm - 1]}`;
+}
+
+/**
+ * A one-line, human-readable recurrence summary shown before submitting a recurring task -
+ * e.g. "هر روز، از ساعت ۹ تا ۱۰، از ۲۵ شهریور تا تاریخ انتخاب‌شده" - so the configured
+ * pattern is understandable at a glance instead of only as raw field values.
+ */
+function buildRecurrenceSummary(config: {
+  frequency: RecurringFrequency;
+  intervalWeeks: number;
+  startTime: string;
+  endTime: string;
+  weeklyDays: number[];
+  monthlyDays: number[];
+  nthOccurrence: OccurrenceNth;
+  nthWeekday: number;
+  startDate: string;
+  endDate: string;
+}): string {
+  const { frequency, intervalWeeks, startTime, endTime, weeklyDays, monthlyDays, nthOccurrence, nthWeekday, startDate, endDate } = config;
+
+  let pattern: string;
+  switch (frequency) {
+    case 'daily':
+      pattern = 'هر روز';
+      break;
+    case 'weekly': {
+      const days = [...weeklyDays].sort((a, b) => a - b).map((d) => WEEKDAY_NAMES[d]).join('، ');
+      pattern = intervalWeeks > 1
+        ? `هر ${toPersianDigits(intervalWeeks)} هفته یک‌بار، روزهای ${days}`
+        : `هر هفته، روزهای ${days}`;
+      break;
+    }
+    case 'monthly_day': {
+      const days = [...monthlyDays].sort((a, b) => a - b).map(toPersianDigits).join('، ');
+      pattern = `هر ماه، روز ${days}`;
+      break;
+    }
+    case 'monthly_nth_weekday':
+      pattern = `${NTH_OCCURRENCE_LABELS[nthOccurrence]} ${WEEKDAY_NAMES[nthWeekday]} هر ماه`;
+      break;
+    default:
+      pattern = 'هر روز';
+  }
+
+  const timeRange = startTime && endTime ? `از ساعت ${toPersianDigits(startTime)} تا ${toPersianDigits(endTime)}` : '';
+  const start = jalaliDayMonth(startDate);
+  const end = jalaliDayMonth(endDate);
+  const range = start
+    ? end
+      ? `از ${start} تا ${end}`
+      : `از ${start} تا تاریخ انتخاب‌شده`
+    : '';
+
+  return [pattern, timeRange, range].filter(Boolean).join('، ');
 }
 
 interface TaskFormModalProps {
@@ -1613,6 +1687,25 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* Human-readable summary of the configured pattern, before submitting. */}
+                <div className="flex items-start gap-2 p-3 rounded-[10px] bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 text-xs text-purple-900 dark:text-purple-200">
+                  <Repeat className="w-4 h-4 shrink-0 mt-0.5 text-purple-500" />
+                  <span className="font-semibold leading-relaxed">
+                    {buildRecurrenceSummary({
+                      frequency: recurringFrequency,
+                      intervalWeeks: recurringIntervalWeeks,
+                      startTime: recurringStartTime,
+                      endTime: recurringEndTime,
+                      weeklyDays: recurringWeeklyDays,
+                      monthlyDays: recurringMonthlyDays,
+                      nthOccurrence: recurringNthOccurrence,
+                      nthWeekday: recurringNthWeekday,
+                      startDate: recurringStartDate,
+                      endDate: recurringEndDate,
+                    })}
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -1745,7 +1838,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               className={`px-5 py-2.5 rounded-[10px] ${palette.accentBg} ${palette.accentHover} text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
-              <span>{taskToEdit ? 'ذخیره تغییرات' : 'ثبت فعالیت جدید'}</span>
+              <span>{taskToEdit ? 'ذخیره تغییرات' : 'ثبت فعالیت'}</span>
             </button>
           </div>
 
