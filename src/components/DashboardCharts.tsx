@@ -461,7 +461,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         
         {/* Chart 1: Pie Chart (وضعیت تاخیر فعالیت‌های کاربر - شروع نشده و در حال اجرا) */}
-        <div className="bg-white dark:bg-slate-900/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between md:col-span-5 lg:col-span-4">
+        <div className="bg-white dark:bg-slate-900/90 rounded-[14px] p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between md:col-span-5 lg:col-span-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-rose-50 dark:bg-rose-950/60 rounded-xl text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900">
@@ -490,7 +490,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
         </div>
 
         {/* Chart 2: Bar Chart (تعداد بر اساس مسئول انجام) - Takes wider space on desktop */}
-        <div className="bg-white dark:bg-slate-900/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between md:col-span-7 lg:col-span-8">
+        <div className="bg-white dark:bg-slate-900/90 rounded-[14px] p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between md:col-span-7 lg:col-span-8">
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900">
@@ -549,7 +549,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       {/* Pop-up Modal for Chart Click Details */}
       {activeModalData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+          <div className="bg-white dark:bg-slate-900 rounded-[18px] max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/40">
@@ -722,7 +722,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       {/* Delete Confirmation Modal */}
       {deletingTaskId && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-[18px] max-w-md w-full border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
               <div className="p-2.5 bg-rose-50 dark:bg-rose-950/80 rounded-2xl border border-rose-100 dark:border-rose-900">
                 <AlertCircle className="w-6 h-6" />

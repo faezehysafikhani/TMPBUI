@@ -177,14 +177,14 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
   const priorityStyle = priorityBorderShadowMap[task.priority || 'medium'];
 
   return (
-    <div className="relative overflow-hidden rounded-2xl select-none">
+    <div className="relative overflow-hidden rounded-[14px] select-none">
       {/* Revealed Action Layer on Drag (Left or Right) */}
       <div
         className={`absolute inset-y-0 inset-x-0 ${
           canChangeStatus ? 'bg-emerald-600 dark:bg-emerald-700' : 'bg-rose-600 dark:bg-rose-700'
         } flex items-center ${
           dragOffset > 0 ? 'justify-start pl-4' : 'justify-end pr-4'
-        } text-white font-bold text-xs transition-opacity rounded-2xl ${
+        } text-white font-bold text-xs transition-opacity rounded-[14px] ${
           Math.abs(dragOffset) > 8 ? 'opacity-100' : 'opacity-0'
         }`}
       >
@@ -225,7 +225,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
           transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0, 0, 1)',
           touchAction: 'pan-y',
         }}
-        className={`group relative rounded-2xl border transition-all duration-200 hover:shadow-md ${
+        className={`group relative rounded-[14px] border transition-all duration-200 hover:shadow-md ${
           canChangeStatus ? 'cursor-grab active:cursor-grabbing' : ''
         } ${
           isDraggingCard
@@ -572,7 +572,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
 
       {/* Delete Confirmation Modal Overlay inside card context or confirm popover */}
       {showConfirmDelete && (
-        <div className="absolute inset-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-2xl p-4 flex flex-col justify-center items-center text-center border border-rose-200 dark:border-rose-900 animate-in fade-in">
+        <div className="absolute inset-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xs rounded-[14px] p-4 flex flex-col justify-center items-center text-center border border-rose-200 dark:border-rose-900 animate-in fade-in">
           <AlertCircle className="w-8 h-8 text-rose-500 mb-2" />
           <p className="text-xs font-bold text-slate-800 dark:text-slate-100 mb-1">
             آیا از حذف این فعالیت اطمینان دارید؟

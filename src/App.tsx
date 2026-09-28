@@ -1198,6 +1198,8 @@ export default function App() {
         onOpenUserGuide={currentUser ? () => setIsUserGuideOpen(true) : undefined}
         isDesktopSidebarOpen={isDesktopSidebarOpen}
         onToggleDesktopSidebar={handleToggleDesktopSidebar}
+        onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
+        onLogout={currentUser ? handleLogout : undefined}
       />
 
       {/* Floating Restore Button for Desktop Sidebar when Collapsed */}

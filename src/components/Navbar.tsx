@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, RefreshCw, Filter, LogIn, Bell, LayoutDashboard, PanelRightClose, PanelRightOpen, CircleHelp } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Plus, RefreshCw, Filter, LogIn, Bell, LayoutDashboard, PanelRightClose, PanelRightOpen, CircleHelp, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { User as UserType, AppTheme, AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -25,6 +25,9 @@ interface NavbarProps {
   onOpenUserGuide?: () => void;
   isDesktopSidebarOpen?: boolean;
   onToggleDesktopSidebar?: () => void;
+  /** Account menu: settings/profile and logout live here (design system section 8.1/20). */
+  onOpenSettings?: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -45,11 +48,37 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenUserGuide,
   isDesktopSidebarOpen = true,
   onToggleDesktopSidebar,
+  onOpenSettings,
+  onLogout,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsAccountMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [isAccountMenuOpen]);
+
   return (
-    <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md text-white transition-colors duration-300">
+    <header
+      className="sticky top-0 z-30 backdrop-blur-md border-b border-indigo-950/60 shadow-md text-white transition-colors duration-300"
+      style={{ background: 'linear-gradient(135deg, #252468 0%, #0F132C 100%)' }}
+    >
       <div className="w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 py-3 sm:py-3.5">
         <div className="flex items-center justify-between gap-3">
           
@@ -66,23 +95,81 @@ export const Navbar: React.FC<NavbarProps> = ({
                 مدیریت وظایف (TM)
               </h1>
               {currentUser ? (
-                <button 
-                  type="button" 
-                  onClick={onOpenWelcomeModal}
-                  className="flex items-center gap-1.5 mt-0.5 hover:text-indigo-300 transition-colors cursor-pointer text-right"
-                  title="نمایش خلاصه وضعیت کاربری"
-                >
-                  {currentUser.avatar ? (
-                    <img
-                      src={currentUser.avatar}
-                      alt={currentUser.name || 'آواتار کاربر'}
-                      className="w-4.5 h-4.5 rounded-full object-cover border border-white/30 shrink-0"
-                    />
-                  ) : null}
-                  <p className="text-xs text-indigo-200/90 font-medium truncate">
-                    کاربر: {currentUser.name}
-                  </p>
-                </button>
+                <div className="relative" ref={accountMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountMenuOpen((open) => !open)}
+                    className="flex items-center gap-1.5 mt-0.5 hover:text-indigo-300 transition-colors cursor-pointer text-right"
+                    title="حساب کاربری"
+                    aria-haspopup="menu"
+                    aria-expanded={isAccountMenuOpen}
+                  >
+                    {currentUser.avatar ? (
+                      <img
+                        src={currentUser.avatar}
+                        alt={currentUser.name || 'آواتار کاربر'}
+                        className="w-4.5 h-4.5 rounded-full object-cover border border-white/30 shrink-0"
+                      />
+                    ) : null}
+                    <p className="text-xs text-indigo-200/90 font-medium truncate">
+                      کاربر: {currentUser.name}
+                    </p>
+                    <ChevronDown className={`w-3 h-3 text-indigo-300/80 transition-transform ${isAccountMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isAccountMenuOpen && (
+                    <div
+                      role="menu"
+                      className="absolute top-full right-0 mt-2 w-56 rounded-[14px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-[0_20px_48px_rgba(11,12,30,0.22)] py-1.5 text-right animate-in fade-in slide-in-from-top-2 duration-150 z-40"
+                    >
+                      {onOpenWelcomeModal && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setIsAccountMenuOpen(false);
+                            onOpenWelcomeModal();
+                          }}
+                          className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          <LayoutDashboard className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span>خلاصه وضعیت</span>
+                        </button>
+                      )}
+                      {onOpenSettings && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setIsAccountMenuOpen(false);
+                            onOpenSettings();
+                          }}
+                          className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          <Settings className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span>تنظیمات و پروفایل</span>
+                        </button>
+                      )}
+                      {onLogout && (
+                        <>
+                          <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setIsAccountMenuOpen(false);
+                              onLogout();
+                            }}
+                            className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                          >
+                            <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
+                            <span>خروج از حساب</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               ) : (
                 <p className="text-xs text-slate-300/80 hidden sm:block mt-0.5">
                   سامانه مدیریت فعالیت‌ها و کانبان بورد
@@ -93,19 +180,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Quick Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5">
-            {/* Dashboard Executive Summary Button */}
-            {currentUser && onOpenWelcomeModal && (
-              <button
-                type="button"
-                onClick={onOpenWelcomeModal}
-                title="داشبورد خلاصه وضعیت"
-                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/80 hover:bg-slate-800 text-indigo-300 hover:text-white rounded-xl text-xs font-semibold border border-indigo-500/30 transition-all shrink-0 cursor-pointer"
-              >
-                <LayoutDashboard className="w-4 h-4 text-indigo-400" />
-                <span className="hidden md:inline">خلاصه وضعیت</span>
-              </button>
-            )}
-
 
             {/* Notification Bell Button */}
             {onOpenNotificationModal && (
@@ -113,7 +187,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onOpenNotificationModal}
                 title="اطلاعیه‌ها و هشدارها"
-                className="relative p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+                className="relative p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-[10px] border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
               >
                 <Bell className={`w-4 h-4 ${unreadNotificationsCount > 0 ? palette.accentText : ''}`} />
                 {unreadNotificationsCount > 0 && (
@@ -131,7 +205,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={onOpenUserGuide}
                 title="راهنمای کاربری"
                 aria-label="راهنمای کاربری"
-                className="p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+                className="p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-[10px] border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
               >
                 <CircleHelp className="w-4 h-4" />
               </button>
@@ -143,7 +217,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onToggleDesktopSidebar}
                 title={isDesktopSidebarOpen ? 'مخفی کردن منوی راست' : 'نمایش منوی راست'}
-                className={`hidden lg:flex p-2.5 rounded-xl border transition-all shrink-0 cursor-pointer items-center justify-center my-auto ${
+                className={`hidden lg:flex p-2.5 rounded-[10px] border transition-all shrink-0 cursor-pointer items-center justify-center my-auto ${
                   !isDesktopSidebarOpen
                     ? `${palette.accentBg} text-white ${palette.accentBorder} shadow-xs ring-2 ring-indigo-400/50`
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-slate-700/80'
@@ -159,7 +233,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onToggleFilterBar}
                 title={isFilterBarOpen ? 'بستن فیلترها' : 'نمایش فیلترها'}
-                className={`p-2.5 rounded-xl border transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto ${
+                className={`p-2.5 rounded-[10px] border transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto ${
                   isFilterBarOpen
                     ? `${palette.accentBg} text-white ${palette.accentBorder} shadow-xs`
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-slate-700/80'
@@ -174,7 +248,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={onRefreshData}
               title="به‌روزرسانی داده‌ها"
-              className="p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+              className="p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-[10px] border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
             >
               <RefreshCw
                 className={`w-4 h-4 ${palette.accentText} ${
@@ -188,20 +262,23 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onOpenAuthModal}
-                className={`flex items-center gap-1.5 px-3 py-2 ${palette.accentBg} ${palette.accentHover} text-white rounded-xl text-xs font-semibold shadow-sm transition-colors cursor-pointer my-auto`}
+                className={`flex items-center gap-1.5 px-3 py-2 ${palette.accentBg} ${palette.accentHover} text-white rounded-[10px] text-xs font-semibold shadow-sm transition-colors cursor-pointer my-auto`}
               >
                 <LogIn className="w-4 h-4" />
                 <span>ورود</span>
               </button>
             )}
 
-            {/* Add Task Button (Icon Only on Desktop Header) */}
+            {/* Add Task Button: the sidebar already has "افزودن فعالیت" once it's open on
+                desktop, so this stays hidden there and only fills in when the sidebar is
+                collapsed or not yet rendered (tablet width). */}
             {onOpenCreateModal && (
             <button
               type="button"
               onClick={onOpenCreateModal}
               title="افزودن فعالیت جدید"
-              className={`hidden sm:flex items-center justify-center p-2.5 bg-gradient-to-tr ${palette.gradientFromTo} text-white rounded-xl shadow-sm transition-all shrink-0 cursor-pointer hover:opacity-90 active:scale-98 my-auto`}
+              aria-label="افزودن فعالیت جدید"
+              className={`hidden sm:flex items-center justify-center p-2.5 bg-gradient-to-tr ${palette.gradientFromTo} text-white rounded-[10px] shadow-sm transition-all shrink-0 cursor-pointer hover:opacity-90 active:scale-98 my-auto ${isDesktopSidebarOpen ? 'lg:hidden' : ''}`}
             >
               <Plus className="w-4 h-4" />
             </button>

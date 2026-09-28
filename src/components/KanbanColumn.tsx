@@ -76,12 +76,11 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
   const cfg = STATUSES[status];
   const StatusIcon = STATUS_ICONS[status];
 
-  const dragHighlightStyles: Record<TaskStatus, string> = {
-    todo: 'border-indigo-500 ring-4 ring-indigo-400/50 bg-indigo-50/70 dark:bg-indigo-950/50 shadow-xl scale-[1.01]',
-    in_progress: 'border-blue-500 ring-4 ring-blue-400/50 bg-blue-50/70 dark:bg-blue-950/50 shadow-xl scale-[1.01]',
-    paused: 'border-amber-500 ring-4 ring-amber-400/50 bg-amber-50/70 dark:bg-amber-950/50 shadow-xl scale-[1.01]',
-    completed: 'border-emerald-500 ring-4 ring-emerald-400/50 bg-emerald-50/70 dark:bg-emerald-950/50 shadow-xl scale-[1.01]',
-  };
+  // A valid drop target always reads the same way, whatever status it is: pale lavender with
+  // an indigo border - the drag-state meaning belongs to "valid destination", not the column's
+  // own color.
+  const dragHighlightStyle =
+    'border-indigo-500 ring-4 ring-indigo-300/60 bg-indigo-50/80 dark:bg-indigo-950/50 shadow-xl scale-[1.01]';
 
   return (
     <div
@@ -104,14 +103,14 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
           onStatusChange(taskId, status);
         }
       }}
-      className={`w-full max-w-full overflow-hidden flex flex-col rounded-3xl border transition-all duration-300 bg-white/90 dark:bg-slate-900/80 shadow-2xs ${
-        isDragOver ? dragHighlightStyles[status] : `${cfg.borderColor} dark:border-slate-800`
+      className={`w-full max-w-full overflow-hidden flex flex-col rounded-[14px] border transition-all duration-300 bg-white/90 dark:bg-slate-900/80 shadow-2xs ${
+        isDragOver ? dragHighlightStyle : `${cfg.borderColor} dark:border-slate-800`
       }`}
     >
       {/* Column Accordion Header */}
       <div
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="relative overflow-hidden flex items-center justify-between gap-3 p-3.5 sm:p-4 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-700/50 rounded-3xl transition-colors select-none"
+        className="relative overflow-hidden flex items-center justify-between gap-3 p-3.5 sm:p-4 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-700/50 rounded-[14px] transition-colors select-none"
       >
         {/* Soft wave backdrop in the status color */}
         <HeaderWaves color={STATUS_WAVE_COLOR[status]} />
@@ -148,7 +147,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
                 e.stopPropagation();
                 onOpenCreateForStatus(status);
               }}
-              className="w-8 h-8 rounded-xl flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:text-indigo-600 hover:border-indigo-300 dark:hover:text-indigo-400 shadow-sm transition-colors"
+              className="w-8 h-8 rounded-[10px] flex items-center justify-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:text-indigo-600 hover:border-indigo-300 dark:hover:text-indigo-400 shadow-sm transition-colors"
               title="ثبت فعالیت جدید"
             >
               <Plus className="w-4 h-4" />
@@ -160,7 +159,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
               e.stopPropagation();
               setIsCollapsed(!isCollapsed);
             }}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            className="w-8 h-8 rounded-[10px] flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             title={isCollapsed ? 'باز کردن گروه‌بندی' : 'بستن گروه‌بندی'}
           >
             {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}

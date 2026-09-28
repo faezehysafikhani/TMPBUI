@@ -2,6 +2,34 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/*
+ * Design system brand palette (design.md section 3/27). Overriding Tailwind's own indigo
+ * scale - rather than adding new color names - means every existing `bg-indigo-600`,
+ * `text-indigo-400`, `focus:ring-indigo-500`, etc. across the app (the default accent palette)
+ * picks up the exact brand colors automatically, with no per-component changes. The 6-shade
+ * "پالت رنگی" feature (emerald/rose/amber/cyan/slate) is a real, separate customization users
+ * already rely on, so those Tailwind scales are left untouched.
+ */
+@theme {
+  --color-indigo-50: #F1EFFF;
+  --color-indigo-100: #E6E2FE;
+  --color-indigo-200: #CDC5FD;
+  --color-indigo-300: #A59DF3;
+  --color-indigo-400: #8577F0;
+  --color-indigo-500: #5B4FF3;
+  --color-indigo-600: #4939F1;
+  --color-indigo-700: #3B2DC2;
+  --color-indigo-800: #252468;
+  --color-indigo-900: #191856;
+  --color-indigo-950: #0F132C;
+
+  /* Reference tokens from design.md section 27, for places that need the exact named value
+     rather than a Tailwind utility (e.g. the header gradient). */
+  --color-midnight: #0B0C1E;
+  --color-ink: #1B2235;
+  --color-soft-white: #FAFBFF;
+}
+
 * {
   font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
 }
