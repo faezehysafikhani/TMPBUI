@@ -597,8 +597,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     </div>
   );
 
-  // "تنظیمات عمومی" now holds only what's left after Account/Team/Appearance became their own
-  // tabs - the help/catalog section - and is only offered as a tab when there's something in it.
+  // What's left after Account/Team/Appearance became their own tabs is just the help/catalog
+  // section - labeled "راهنما" in SystemAdministration to match, not the old "تنظیمات عمومی".
+  // Only offered as a tab when there's actually something in it.
   const generalContent = onOpenPdfCatalog ? (
     <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 7: Feature Catalog & PDF Handbook (Collapsible, closed by default) */}

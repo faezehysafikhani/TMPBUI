@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings2, MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette } from 'lucide-react';
+import { FileText, MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette } from 'lucide-react';
 import { getMyPermissions, changeMyPassword } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
@@ -114,8 +114,10 @@ export const ChangePasswordCard: React.FC = () => {
 /**
  * «تنظیمات سامانه»: the header card with the main tabs. `account`/`team`/`appearance` are
  * always-present personal-settings tabs (design.md section 20's Account / Team / Appearance);
- * `general` is only shown while it actually has content (e.g. the help/catalog section) - an
- * empty tab is worse than no tab. SMS panel and user management appear by permission, as before.
+ * `general` is only shown while it actually has content. Right now that's just the help/catalog
+ * card, so the tab is labeled and iconed for what it actually holds ("راهنما") rather than a
+ * generic "تنظیمات عمومی" that would read as empty/pointless once it's down to one small card.
+ * SMS panel and user management appear by permission, as before.
  */
 export const SystemAdministration: React.FC<{
   currentUserId?: string;
@@ -129,7 +131,7 @@ export const SystemAdministration: React.FC<{
   const [active, setActive] = useState<MainTab>('account');
 
   const tabs: TabItem<MainTab>[] = [
-    ...(general ? [{ id: 'general' as const, label: 'تنظیمات عمومی', icon: Settings2 }] : []),
+    ...(general ? [{ id: 'general' as const, label: 'راهنما', icon: FileText }] : []),
     { id: 'account', label: 'حساب کاربری', icon: UserIcon },
     { id: 'team', label: 'تیم کاری', icon: Users },
     { id: 'appearance', label: 'ظاهر سامانه', icon: Palette },

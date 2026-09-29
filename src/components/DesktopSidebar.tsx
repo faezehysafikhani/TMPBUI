@@ -41,9 +41,12 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
+  // svh (not dvh): dvh's value can be recomputed as the page scrolls, which visibly jittered
+  // this sticky sidebar's height on every scroll tick. svh is the viewport height assuming the
+  // browser's UI chrome is fully expanded - it's fixed once and never recalculates on scroll.
   if (!isOpen) {
     return (
-      <aside className="tm-sidebar hidden lg:flex w-16 shrink-0 flex-col items-center rounded-[14px] border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#15172D] lg:h-[calc(100dvh-7rem)] lg:overflow-y-auto sticky top-24">
+      <aside className="tm-sidebar hidden lg:flex w-16 shrink-0 flex-col items-center rounded-[14px] border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#15172D] lg:h-[calc(100svh-7rem)] lg:overflow-y-auto sticky top-24">
         <button
           type="button"
           onClick={onToggleOpen}
@@ -101,7 +104,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   }
 
   return (
-    <aside className="tm-sidebar hidden lg:flex flex-col w-60 shrink-0 gap-4 p-3 bg-white dark:bg-[#15172D] border border-slate-200 dark:border-slate-800 rounded-[14px] lg:h-[calc(100dvh-7rem)] lg:overflow-y-auto sticky top-24 animate-in fade-in slide-in-from-right-4 duration-200">
+    <aside className="tm-sidebar hidden lg:flex flex-col w-60 shrink-0 gap-4 p-3 bg-white dark:bg-[#15172D] border border-slate-200 dark:border-slate-800 rounded-[14px] lg:h-[calc(100svh-7rem)] lg:overflow-y-auto sticky top-24 animate-in fade-in slide-in-from-right-4 duration-200">
       
       {onOpenCreateModal && (
         <button
