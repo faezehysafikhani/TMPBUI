@@ -1167,7 +1167,7 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans pb-24 transition-colors duration-200`}>
+    <div className={`min-h-screen bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans pb-24 lg:pb-0 transition-colors duration-200`}>
       
       {/* Startup Summary Welcome Modal (Priority 1 Overlay) */}
       {isWelcomeModalOpen && (

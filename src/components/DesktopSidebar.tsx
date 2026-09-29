@@ -53,7 +53,12 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   return (
-    <aside className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm sticky top-20 h-[calc(100vh-6rem)] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300">
+    // Sticky, pinned within the viewport: top offset matches the sticky `top`, and the height is
+    // derived from the viewport (100dvh, not 100vh, so mobile browser chrome can't make it
+    // overflow) minus that same top offset again for a matching gap at the bottom. Anything the
+    // sidebar's own content can't fit in that height scrolls internally (overflow-y-auto), never
+    // the page itself.
+    <aside className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm sticky top-20 h-[calc(100dvh-5rem-5rem)] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300">
 
       {onOpenCreateModal && (
         <button
