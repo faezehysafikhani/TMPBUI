@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Kanban, Calendar, AlertCircle, Settings, LogOut, MessageSquare, FileText, PanelRightClose, Plus } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette, User as UserType } from '../types';
@@ -43,62 +43,23 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
+  if (!isOpen) {
+    return null;
+  }
+
   const progressRatio = totalTasks > 0 ? Math.min(1, completedTasks / totalTasks) : 0;
   const progressPercent = Math.round(progressRatio * 100);
   const RADIUS = 40;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-  // `position: sticky` unsticks once it runs out of room inside its own flex row - which, right
-  // before the footer, is exactly where a user would notice it detach and start scrolling with
-  // the page. `fixed` has no such edge case: it stays pinned to the viewport for the entire
-  // scroll range - but being outside the flow, its height no longer depends on the page's real
-  // content, so on a page short enough that the footer lands within that fixed height, the two
-  // would visually overlap. TOP_OFFSET_PX (matches `top-20`) is the fixed top/bottom gap in the
-  // normal case; footerBottomOffsetPx grows past it only when the footer's own top edge has
-  // scrolled up into that gap, keeping the sidebar's bottom just above the footer instead.
-  const TOP_OFFSET_PX = 80; // 5rem, matches `top-20` below
-  const FOOTER_CLEARANCE_PX = 16;
-  const [bottomOffsetPx, setBottomOffsetPx] = useState(TOP_OFFSET_PX);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const recompute = () => {
-      const footer = document.querySelector('footer');
-      if (!footer) {
-        setBottomOffsetPx(TOP_OFFSET_PX);
-        return;
-      }
-      const footerTop = footer.getBoundingClientRect().top;
-      const neededBottom = window.innerHeight - footerTop + FOOTER_CLEARANCE_PX;
-      setBottomOffsetPx(Math.max(TOP_OFFSET_PX, neededBottom));
-    };
-
-    recompute();
-    window.addEventListener('scroll', recompute, { passive: true });
-    window.addEventListener('resize', recompute);
-
-    // Content below (chat messages, task lists, ...) can change the footer's position without a
-    // scroll or resize event ever firing; watch the document for that too.
-    const resizeObserver = new ResizeObserver(recompute);
-    resizeObserver.observe(document.body);
-
-    return () => {
-      window.removeEventListener('scroll', recompute);
-      window.removeEventListener('resize', recompute);
-      resizeObserver.disconnect();
-    };
-  }, [isOpen]);
-
-  if (!isOpen) {
-    return null;
-  }
-
-  // Right offset replicates where the sticky flex item used to sit (the ".../mx-auto .../px-3"
-  // main container from App.tsx, right-most child in this RTL row): the page's own side padding,
-  // plus, once the centered max-w-[1920px] container has margins of its own, that margin too.
-  // The spacer div below keeps the fixed sidebar's width reserved in the row so the main content
-  // doesn't shift into the space it used to occupy.
+  // Fixed, constant size and position, always: pinned top:5rem / bottom:5rem within the
+  // viewport (same gap on both sides), never sticky (which unsticks near the end of its
+  // container) and never recomputed from page content, so it never grows or shrinks as the
+  // page/content changes. Right offset replicates where this used to sit as a flex item (the
+  // ".../mx-auto .../px-3" main container from App.tsx, right-most child in this RTL row): the
+  // page's own side padding, plus, once the centered max-w-[1920px] container has margins of its
+  // own, that margin too. The spacer div below keeps the width reserved in the flex row so the
+  // main content doesn't shift into the space this now-fixed element used to occupy.
   const fixedRight = 'max(0.75rem, calc((100vw - 1920px) / 2 + 0.75rem))';
 
   return (
@@ -106,8 +67,8 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     {/* Reserves the sidebar's width/gap in the flex row; the sidebar itself is fixed (out of flow). */}
     <div className="hidden lg:block w-48 shrink-0" aria-hidden="true" />
     <aside
-      className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm fixed z-20 top-20 overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300"
-      style={{ right: fixedRight, bottom: bottomOffsetPx }}
+      className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm fixed z-20 top-20 h-[calc(100dvh-5rem-5rem)] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300"
+      style={{ right: fixedRight }}
     >
 
       {onOpenCreateModal && (
