@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Kanban, Calendar, Plus, AlertCircle, MessageSquare, FileText, MoreHorizontal, X } from 'lucide-react';
+import { Kanban, Calendar, Plus, AlertCircle, MessageSquare, FileText, MoreHorizontal, X, Settings, LogOut } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -16,14 +16,18 @@ interface SandwichBarProps {
   overdueCount: number;
   unreadChatCount?: number;
   appColorPalette?: AppColorPalette;
+  /** Settings entry inside "بیشتر"; omitted when the user isn't signed in. */
+  onOpenSettings?: () => void;
+  /** Logout entry inside "بیشتر", last in the list; omitted when the user isn't signed in. */
+  onLogout?: () => void;
 }
 
 /**
  * Mobile's bottom navigation. Team Chat is a direct tab (it's a daily-use module, per the UX
- * review it must never be effectively hidden on mobile) - Settings is not, since the header's
- * account menu already reaches it on every viewport, so it would be a second, harder-to-find
- * path to the same place. Notes and Settings sit behind a plainly-labeled "بیشتر" (not an
- * unexplained icon) so they stay one tap away without crowding the five primary destinations.
+ * review it must never be effectively hidden on mobile). Notes, Settings and Logout sit behind a
+ * plainly-labeled "بیشتر" (not an unexplained icon) so they stay one tap away without crowding
+ * the five primary destinations - this is mobile's only path to Settings/Logout, since the
+ * desktop-only sidebar isn't reachable here and the header account menu no longer carries them.
  */
 export const SandwichBar: React.FC<SandwichBarProps> = ({
   activeTab,
@@ -33,10 +37,12 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
   unreadChatCount = 0,
   appColorPalette = 'indigo',
   canOpenTab = (_tab: ActiveTab) => true,
+  onOpenSettings,
+  onLogout,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-  const isInMoreMenu = activeTab === 'notes';
+  const isInMoreMenu = activeTab === 'notes' || activeTab === 'settings';
 
   return (
     <>
@@ -156,7 +162,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
             )}
           </button>
 
-          {/* 6. "بیشتر": the remaining content module. Settings stay in the account menu. */}
+          {/* 6. "بیشتر": Notes, Settings and Logout - mobile's only path to the latter two. */}
           <div className="relative flex flex-col items-center">
             {isMoreMenuOpen && (
               <div className="absolute bottom-full left-0 mb-3 flex flex-col items-stretch gap-1 z-50 w-40 bg-slate-800 rounded-[14px] shadow-2xl border border-slate-700/80 p-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
@@ -175,6 +181,37 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                     <span>یادداشت شخصی</span>
                   </button>
                 )}
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      onOpenSettings();
+                    }}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-xs font-bold transition-colors cursor-pointer ${
+                      activeTab === 'settings' ? 'bg-indigo-600 text-white' : 'text-slate-200 hover:bg-slate-700'
+                    }`}
+                  >
+                    <Settings className="w-4.5 h-4.5 shrink-0" />
+                    <span>تنظیمات و پروفایل</span>
+                  </button>
+                )}
+                {onLogout && (
+                  <>
+                    <div className="my-1 border-t border-slate-700/80" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onLogout();
+                      }}
+                      className="flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-xs font-bold text-rose-400 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                    >
+                      <LogOut className="w-4.5 h-4.5 shrink-0" />
+                      <span>خروج از حساب</span>
+                    </button>
+                  </>
+                )}
               </div>
             )}
 
@@ -186,8 +223,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                   ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
                   : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
               }`}
-              title="بیشتر: یادداشت شخصی"
-              aria-label="بیشتر: یادداشت شخصی"
+              title="بیشتر"
+              aria-label="بیشتر: یادداشت شخصی، تنظیمات و خروج از حساب"
               aria-expanded={isMoreMenuOpen}
             >
               {isMoreMenuOpen ? <X className="w-6.5 h-6.5 shrink-0" /> : <MoreHorizontal className="w-6.5 h-6.5 shrink-0" />}

@@ -1022,7 +1022,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 title="ارسال پیام"
                 aria-label="ارسال پیام"
               >
-                <Send className="w-4 h-4 rotate-180" />
+                <Send className="w-4 h-4" />
                 <span className="hidden sm:inline">ارسال</span>
               </button>
             </form>

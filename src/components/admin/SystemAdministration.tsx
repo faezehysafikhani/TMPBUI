@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings2, MessageSquare, Users, History, Network, KeyRound, Loader2, Save } from 'lucide-react';
+import { Settings2, MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette } from 'lucide-react';
 import { getMyPermissions, changeMyPassword } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
@@ -8,7 +8,7 @@ import { LdapPanel } from './LdapPanel';
 import { SmsPanel } from './SmsPanel';
 import { userErrorMessage } from '../../utils/errorMessages';
 
-type MainTab = 'general' | 'sms' | 'users';
+type MainTab = 'general' | 'account' | 'team' | 'appearance' | 'sms' | 'users';
 type UsersTab = 'list' | 'history' | 'ldap';
 
 /** Permission names the signed-in user holds. The server re-checks every call. */
@@ -112,21 +112,32 @@ export const ChangePasswordCard: React.FC = () => {
 };
 
 /**
- * «تنظیمات سامانه»: the header card with the main tabs. The general tab shows `general`
- * (the personal settings); the SMS panel and user management appear by permission.
+ * «تنظیمات سامانه»: the header card with the main tabs. `account`/`team`/`appearance` are
+ * always-present personal-settings tabs (design.md section 20's Account / Team / Appearance);
+ * `general` is only shown while it actually has content (e.g. the help/catalog section) - an
+ * empty tab is worse than no tab. SMS panel and user management appear by permission, as before.
  */
-export const SystemAdministration: React.FC<{ currentUserId?: string; general: React.ReactNode }> = ({ currentUserId, general }) => {
+export const SystemAdministration: React.FC<{
+  currentUserId?: string;
+  general?: React.ReactNode;
+  account: React.ReactNode;
+  team: React.ReactNode;
+  appearance: React.ReactNode;
+}> = ({ currentUserId, general, account, team, appearance }) => {
   const permissions = useMyPermissions(currentUserId);
   const can = (p: string) => !!permissions?.has(p);
-  const [active, setActive] = useState<MainTab>('general');
+  const [active, setActive] = useState<MainTab>('account');
 
   const tabs: TabItem<MainTab>[] = [
-    { id: 'general', label: 'تنظیمات عمومی', icon: Settings2 },
+    ...(general ? [{ id: 'general' as const, label: 'تنظیمات عمومی', icon: Settings2 }] : []),
+    { id: 'account', label: 'حساب کاربری', icon: UserIcon },
+    { id: 'team', label: 'تیم کاری', icon: Users },
+    { id: 'appearance', label: 'ظاهر سامانه', icon: Palette },
     ...(can('sms_settings.view') ? [{ id: 'sms' as const, label: 'پنل پیامکی', icon: MessageSquare }] : []),
     ...(can('users.view') || can('audit_logs.view') || can('ldap_settings.view')
       ? [{ id: 'users' as const, label: 'مدیریت کاربران', icon: Users }] : []),
   ];
-  const current = tabs.some((t) => t.id === active) ? active : 'general';
+  const current = tabs.some((t) => t.id === active) ? active : (tabs[0]?.id ?? 'account');
 
   return (
     <div className="w-full space-y-5" dir="rtl">
@@ -139,6 +150,9 @@ export const SystemAdministration: React.FC<{ currentUserId?: string; general: R
       </AdminCard>
 
       {current === 'general' && general}
+      {current === 'account' && account}
+      {current === 'team' && team}
+      {current === 'appearance' && appearance}
       {current === 'sms' && <SmsPanel canUpdate={can('sms_settings.update')} canTest={can('sms_settings.test')} />}
       {current === 'users' && currentUserId && <UserManagementSection currentUserId={currentUserId} can={can} />}
     </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Kanban, Calendar, AlertCircle, CheckSquare, MessageSquare, FileText, PanelRightClose, PanelRightOpen, Plus } from 'lucide-react';
+import { Kanban, Calendar, AlertCircle, CheckSquare, MessageSquare, FileText, PanelRightClose, PanelRightOpen, Plus, Settings, LogOut } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -18,6 +18,10 @@ interface DesktopSidebarProps {
   onToggleOpen?: () => void;
   /** Whether a section is available to the user (permissions); all are when omitted. */
   canOpenTab?: (tab: ActiveTab) => boolean;
+  /** Settings nav item at the bottom of the sidebar; omitted when the user isn't signed in. */
+  onOpenSettings?: () => void;
+  /** Logout, at the very bottom of the sidebar; omitted when the user isn't signed in. */
+  onLogout?: () => void;
 }
 
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
@@ -32,12 +36,14 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   isOpen = true,
   onToggleOpen,
   canOpenTab = (_tab: ActiveTab) => true,
+  onOpenSettings,
+  onLogout,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
   if (!isOpen) {
     return (
-      <aside className="tm-sidebar hidden lg:flex w-16 shrink-0 flex-col items-center rounded-[14px] border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#15172D] lg:min-h-[calc(100vh-7rem)] sticky top-24">
+      <aside className="tm-sidebar hidden lg:flex w-16 shrink-0 flex-col items-center rounded-[14px] border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#15172D] lg:h-[calc(100dvh-7rem)] lg:overflow-y-auto sticky top-24">
         <button
           type="button"
           onClick={onToggleOpen}
@@ -58,12 +64,44 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             <Plus className="h-5 w-5" />
           </button>
         )}
+
+        {(onOpenSettings || onLogout) && (
+          <div className="mt-auto flex flex-col items-center gap-1 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+            {onOpenSettings && (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                aria-current={activeTab === 'settings' ? 'page' : undefined}
+                title="تنظیمات و پروفایل"
+                aria-label="تنظیمات و پروفایل"
+                className={`flex min-h-11 min-w-11 items-center justify-center rounded-[10px] transition-colors ${
+                  activeTab === 'settings'
+                    ? `${palette.accentBg} text-white`
+                    : 'text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Settings className="h-5 w-5" />
+              </button>
+            )}
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                title="خروج از حساب"
+                aria-label="خروج از حساب"
+                className="flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-rose-600 dark:text-rose-400 transition-colors hover:bg-rose-50 dark:hover:bg-rose-950/40"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        )}
       </aside>
     );
   }
 
   return (
-    <aside className="tm-sidebar hidden lg:flex flex-col w-60 shrink-0 gap-4 p-3 bg-white dark:bg-[#15172D] border border-slate-200 dark:border-slate-800 rounded-[14px] lg:min-h-[calc(100vh-7rem)] sticky top-24 animate-in fade-in slide-in-from-right-4 duration-200">
+    <aside className="tm-sidebar hidden lg:flex flex-col w-60 shrink-0 gap-4 p-3 bg-white dark:bg-[#15172D] border border-slate-200 dark:border-slate-800 rounded-[14px] lg:h-[calc(100dvh-7rem)] lg:overflow-y-auto sticky top-24 animate-in fade-in slide-in-from-right-4 duration-200">
       
       {onOpenCreateModal && (
         <button
@@ -203,20 +241,52 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         )}
       </div>
 
-      {/* Progress Summary Widget */}
-      {totalTasks > 0 && (
-        <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800/80">
-          <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-[10px] flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-            <CheckSquare className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <div>
-              <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200">
-                وضعیت پیشرفت
-              </div>
-              <div className="mt-0.5 text-[9px]">
-                {toPersianDigits(completedTasks)} از {toPersianDigits(totalTasks)} فعالیت
+      {/* Bottom section: progress summary, then Settings, then Logout last of all */}
+      {(totalTasks > 0 || onOpenSettings || onLogout) && (
+        <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-1">
+          {totalTasks > 0 && (
+            <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-[10px] flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+              <CheckSquare className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <div>
+                <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200">
+                  وضعیت پیشرفت
+                </div>
+                <div className="mt-0.5 text-[9px]">
+                  {toPersianDigits(completedTasks)} از {toPersianDigits(totalTasks)} فعالیت
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              aria-current={activeTab === 'settings' ? 'page' : undefined}
+              className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[10px] text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'settings'
+                  ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
+                  : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+              }`}
+            >
+              <Settings className="w-4 h-4 shrink-0" />
+              <span className="truncate">تنظیمات و پروفایل</span>
+            </button>
+          )}
+
+          {onLogout && (
+            <>
+              <div className="border-t border-slate-100 dark:border-slate-800" />
+              <button
+                type="button"
+                onClick={onLogout}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[10px] text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4 shrink-0 text-rose-500" />
+                <span className="truncate">خروج از حساب</span>
+              </button>
+            </>
+          )}
         </div>
       )}
     </aside>

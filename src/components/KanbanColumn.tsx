@@ -105,7 +105,9 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
                 {toPersianDigits(tasks.length)} مورد
               </span>
             </div>
-            <p className="text-xs leading-5 text-slate-500 dark:text-slate-400 hidden sm:block mt-0.5">{cfg.description}</p>
+            {/* Reserved height for exactly 2 lines, whatever the actual description length, so
+                every collapsed status card reads at the same height regardless of wrap. */}
+            <p className="text-xs leading-5 text-slate-500 dark:text-slate-400 hidden sm:line-clamp-2 sm:min-h-[2.5rem] mt-0.5">{cfg.description}</p>
           </div>
         </div>
 

@@ -161,13 +161,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
-  return (
-    <SystemAdministration currentUserId={currentUser?.id} general={
+  // design.md section 20: settings are organized into Account / Team / Appearance / Help - each
+  // now its own top-level tab (design system's SegmentedTabs) instead of one long page of
+  // Section/Accordion blocks. Each card keeps its own open/close toggle exactly as before; only
+  // which tab it lives under changed.
+  const accountContent = (
     <div className="w-full space-y-6 animate-in fade-in duration-200">
-      {/* design.md section 20: settings are organized into Account / Team / Appearance / Help. */}
-      <h2 className="px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-        حساب کاربری
-      </h2>
       {currentUser && <ChangePasswordCard />}
 
       {/* Section 2: User Profile & Avatar Form */}
@@ -395,10 +394,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       )}
+    </div>
+  );
 
-      <h2 className="px-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-        تیم
-      </h2>
+  const teamContent = (
+    <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 3: Work Team Management Card */}
       {currentUser && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
@@ -423,10 +423,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       )}
+    </div>
+  );
 
-      <h2 className="px-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-        ظاهر برنامه
-      </h2>
+  const appearanceContent = (
+    <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 4: Light / Dark Mode Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
         <button
@@ -593,10 +594,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         )}
       </div>
+    </div>
+  );
 
-      <h2 className="px-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-        راهنما
-      </h2>
+  // "تنظیمات عمومی" now holds only what's left after Account/Team/Appearance became their own
+  // tabs - the help/catalog section - and is only offered as a tab when there's something in it.
+  const generalContent = onOpenPdfCatalog ? (
+    <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 7: Feature Catalog & PDF Handbook (Collapsible, closed by default) */}
       {onOpenPdfCatalog && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
@@ -647,12 +651,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       )}
+    </div>
+  ) : undefined;
 
-      <h2 className="px-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-        حساب کاربری
-      </h2>
-      {/* Section 8: User Account Status & Logout Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
+  // Section 8: User Account Status & Logout Card - stays part of the "حساب کاربری" tab,
+  // alongside the password/profile cards above.
+  const accountStatusContent = (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[14px] p-5 sm:p-6 shadow-xs space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('account')}
@@ -706,8 +711,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         )}
       </div>
+  );
 
-    </div>
-    } />
+  return (
+    <SystemAdministration
+      currentUserId={currentUser?.id}
+      general={generalContent}
+      account={<>{accountContent}{accountStatusContent}</>}
+      team={teamContent}
+      appearance={appearanceContent}
+    />
   );
 };

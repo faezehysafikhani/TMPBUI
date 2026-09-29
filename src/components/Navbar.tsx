@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Plus, LogIn, Bell, LayoutDashboard, CircleHelp, Settings, LogOut, ChevronDown } from 'lucide-react';
+import React from 'react';
+import { Plus, LogIn, Bell, LayoutDashboard, CircleHelp } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { User as UserType, AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -12,12 +12,10 @@ interface NavbarProps {
   onOpenAuthModal: () => void;
   unreadNotificationsCount?: number;
   onOpenNotificationModal?: () => void;
+  /** Opens the "خلاصه وضعیت" (status summary) view - also exposed here as its own header button. */
   onOpenWelcomeModal?: () => void;
   /** Opens the slide user guide (header "?" button). */
   onOpenUserGuide?: () => void;
-  /** Account menu: settings/profile and logout live here (design system section 8.1/20). */
-  onOpenSettings?: () => void;
-  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -29,31 +27,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotificationModal,
   onOpenWelcomeModal,
   onOpenUserGuide,
-  onOpenSettings,
-  onLogout,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
-
-  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const accountMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isAccountMenuOpen) return;
-    const onClickOutside = (e: MouseEvent) => {
-      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
-        setIsAccountMenuOpen(false);
-      }
-    };
-    const onEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsAccountMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    document.addEventListener('keydown', onEscape);
-    return () => {
-      document.removeEventListener('mousedown', onClickOutside);
-      document.removeEventListener('keydown', onEscape);
-    };
-  }, [isAccountMenuOpen]);
 
   return (
     <header
@@ -76,80 +51,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 مدیریت وظایف (TM)
               </h1>
               {currentUser ? (
-                <div className="relative" ref={accountMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => setIsAccountMenuOpen((open) => !open)}
-                    className="flex items-center gap-1.5 mt-0.5 hover:text-indigo-300 transition-colors cursor-pointer text-right"
-                    title="حساب کاربری"
-                    aria-haspopup="menu"
-                    aria-expanded={isAccountMenuOpen}
-                  >
-                    {currentUser.avatar ? (
-                      <img
-                        src={currentUser.avatar}
-                        alt={currentUser.name || 'آواتار کاربر'}
-                        className="w-4.5 h-4.5 rounded-full object-cover border border-white/30 shrink-0"
-                      />
-                    ) : null}
-                    <p className="text-sm text-indigo-100 font-medium truncate">
-                      {currentUser.name}
-                    </p>
-                    <ChevronDown className={`w-3 h-3 text-indigo-300/80 transition-transform ${isAccountMenuOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {isAccountMenuOpen && (
-                    <div
-                      role="menu"
-                      className="absolute top-full right-0 mt-2 w-56 rounded-[14px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-[0_20px_48px_rgba(11,12,30,0.22)] py-1.5 text-right animate-in fade-in slide-in-from-top-2 duration-150 z-40"
-                    >
-                      {onOpenWelcomeModal && (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setIsAccountMenuOpen(false);
-                            onOpenWelcomeModal();
-                          }}
-                          className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                        >
-                          <LayoutDashboard className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span>خلاصه وضعیت</span>
-                        </button>
-                      )}
-                      {onOpenSettings && (
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            setIsAccountMenuOpen(false);
-                            onOpenSettings();
-                          }}
-                          className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                        >
-                          <Settings className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span>تنظیمات و پروفایل</span>
-                        </button>
-                      )}
-                      {onLogout && (
-                        <>
-                          <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setIsAccountMenuOpen(false);
-                              onLogout();
-                            }}
-                            className="w-full flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                          >
-                            <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
-                            <span>خروج از حساب</span>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
+                <div className="flex items-center gap-1.5 mt-0.5" title="حساب کاربری">
+                  {currentUser.avatar ? (
+                    <img
+                      src={currentUser.avatar}
+                      alt={currentUser.name || 'آواتار کاربر'}
+                      className="w-4.5 h-4.5 rounded-full object-cover border border-white/30 shrink-0"
+                    />
+                  ) : null}
+                  <p className="text-sm text-indigo-100 font-medium truncate">
+                    {currentUser.name}
+                  </p>
                 </div>
               ) : (
                 <p className="text-xs text-slate-300/80 hidden sm:block mt-0.5">
@@ -177,6 +89,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {toPersianDigits(unreadNotificationsCount)}
                   </span>
                 )}
+              </button>
+            )}
+
+            {/* Status Summary Button (Icon Only) - moved here from the account dropdown */}
+            {currentUser && onOpenWelcomeModal && (
+              <button
+                type="button"
+                onClick={onOpenWelcomeModal}
+                title="خلاصه وضعیت"
+                aria-label="خلاصه وضعیت"
+                className="min-w-11 min-h-11 p-2.5 text-slate-200 hover:text-white bg-white/5 hover:bg-white/10 rounded-[10px] border border-white/10 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+              >
+                <LayoutDashboard className="w-4 h-4" />
               </button>
             )}
 

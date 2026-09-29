@@ -1220,13 +1220,11 @@ export default function App() {
         onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
         onOpenWelcomeModal={() => setIsWelcomeModalOpen(true)}
         onOpenUserGuide={currentUser ? () => setIsUserGuideOpen(true) : undefined}
-        onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
-        onLogout={currentUser ? handleLogout : undefined}
       />
 
       {/* Main Container with Right Desktop Sidebar */}
       <div className="flex-1 w-full max-w-[1760px] mx-auto px-3 sm:px-5 lg:px-6 pt-5 sm:pt-7">
-        <div className="flex flex-col lg:flex-row gap-5 xl:gap-7 items-start lg:items-stretch">
+        <div className="flex flex-col lg:flex-row gap-5 xl:gap-7 items-start">
           
           {/* Desktop Sidebar (Renders on Right Side in RTL) */}
           <DesktopSidebar
@@ -1241,6 +1239,8 @@ export default function App() {
             completedTasks={completedCount}
             isOpen={isDesktopSidebarOpen}
             onToggleOpen={handleToggleDesktopSidebar}
+            onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
+            onLogout={currentUser ? handleLogout : undefined}
           />
 
 
@@ -1578,7 +1578,8 @@ export default function App() {
         setActiveTab={handleNavigateTab}
         onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
         canOpenTab={(tab) => canOpenTab(currentUser, tab)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
+        onLogout={currentUser ? handleLogout : undefined}
         overdueCount={overdueCount}
         unreadChatCount={totalUnreadChatCount}
         appColorPalette={appColorPalette}
