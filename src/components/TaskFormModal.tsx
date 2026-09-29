@@ -606,7 +606,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[18px] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 my-auto text-slate-800 dark:text-slate-100 max-h-[90vh] flex flex-col">
+      <div className="tm-task-form relative w-full max-w-2xl bg-white dark:bg-[#15172D] rounded-[18px] shadow-[var(--shadow-dialog)] border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in zoom-in-95 my-auto text-slate-800 dark:text-slate-100 max-h-[92dvh] flex flex-col">
         
         <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[90vh] overflow-hidden">
           {/* Header */}
@@ -1201,10 +1201,16 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </div>
 
           {/* Special Options: Project and Recurring Checkboxes */}
-          <div className="p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-[14px] border border-slate-200 dark:border-slate-700/80 space-y-2">
-            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              ویژگی‌های تکمیلی فعالیت
-            </h4>
+          <details open={isProject || isRecurring} className="group p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-[14px] border border-slate-200 dark:border-slate-700/80">
+            <summary className="min-h-11 flex items-center justify-between gap-3 list-none cursor-pointer text-sm font-semibold text-slate-800 dark:text-slate-100">
+              <span>
+                تنظیمات پیشرفته
+                <span className="block text-xs font-normal leading-5 text-slate-500 dark:text-slate-400">تکرار، تبدیل به پروژه و نقاط عطف</span>
+              </span>
+              <ChevronDown className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-180" />
+            </summary>
+
+            <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-700">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               {/* Checkbox: Project */}
@@ -1708,7 +1714,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 </div>
               </div>
             )}
-          </div>
+            </div>
+          </details>
 
           {/* File Attachments Area (امکان اضافه کردن فایل ضمیمه) */}
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800">

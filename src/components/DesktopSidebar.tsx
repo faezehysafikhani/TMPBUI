@@ -1,7 +1,7 @@
 import React from 'react';
-import { Kanban, Calendar, AlertCircle, Settings, CheckSquare, LogOut, MessageSquare, FileText, PanelRightClose, Plus } from 'lucide-react';
+import { Kanban, Calendar, AlertCircle, CheckSquare, MessageSquare, FileText, PanelRightClose, PanelRightOpen, Plus } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
-import { AppColorPalette, User as UserType } from '../types';
+import { AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 import { ActiveTab } from './SandwichBar';
 
@@ -9,15 +9,11 @@ interface DesktopSidebarProps {
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   onOpenCreateModal?: () => void;
-  onOpenSettings: () => void;
-  onOpenPdfCatalog?: () => void;
-  onLogout?: () => void;
   overdueCount: number;
   unreadChatCount?: number;
   appColorPalette?: AppColorPalette;
   totalTasks?: number;
   completedTasks?: number;
-  currentUser?: UserType | null;
   isOpen?: boolean;
   onToggleOpen?: () => void;
   /** Whether a section is available to the user (permissions); all are when omitted. */
@@ -28,15 +24,11 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   activeTab,
   setActiveTab,
   onOpenCreateModal,
-  onOpenSettings,
-  onOpenPdfCatalog,
-  onLogout,
   overdueCount,
   unreadChatCount = 0,
   appColorPalette = 'indigo',
   totalTasks = 0,
   completedTasks = 0,
-  currentUser,
   isOpen = true,
   onToggleOpen,
   canOpenTab = (_tab: ActiveTab) => true,
@@ -44,17 +36,40 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
   if (!isOpen) {
-    return null;
+    return (
+      <aside className="tm-sidebar hidden lg:flex w-16 shrink-0 flex-col items-center rounded-[14px] border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-[#15172D] lg:min-h-[calc(100vh-7rem)] sticky top-24">
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          title="نمایش منوی اصلی"
+          aria-label="نمایش منوی اصلی"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-[10px] text-indigo-600 transition-colors hover:bg-indigo-50 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300 dark:hover:bg-indigo-950/60"
+        >
+          <PanelRightOpen className="h-5 w-5" />
+        </button>
+        {onOpenCreateModal && (
+          <button
+            type="button"
+            onClick={onOpenCreateModal}
+            title="افزودن فعالیت"
+            aria-label="افزودن فعالیت"
+            className="mt-2 flex min-h-11 min-w-11 items-center justify-center rounded-[10px] bg-indigo-600 text-white transition-colors hover:bg-indigo-700"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        )}
+      </aside>
+    );
   }
 
   return (
-    <aside className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-[14px] shadow-sm lg:min-h-[calc(100vh-6rem)] sticky top-20 animate-in fade-in slide-in-from-right-4 duration-300">
+    <aside className="tm-sidebar hidden lg:flex flex-col w-60 shrink-0 gap-4 p-3 bg-white dark:bg-[#15172D] border border-slate-200 dark:border-slate-800 rounded-[14px] lg:min-h-[calc(100vh-7rem)] sticky top-24 animate-in fade-in slide-in-from-right-4 duration-200">
       
       {onOpenCreateModal && (
         <button
           type="button"
           onClick={onOpenCreateModal}
-          className={`w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-tr ${palette.gradientFromTo} text-white font-bold text-xs rounded-[10px] shadow-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer`}
+          className="w-full min-h-11 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold text-sm rounded-[10px] shadow-sm transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4 shrink-0" />
           <span>افزودن فعالیت</span>
@@ -63,16 +78,17 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 
       {/* Navigation Section */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between px-2 py-0.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+        <div className="flex items-center justify-between px-2 py-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
           <span>منوی دسترسی</span>
           {onToggleOpen && (
             <button
               type="button"
               onClick={onToggleOpen}
               title="مخفی‌سازی منوی سمت راست"
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center"
+              aria-label="مخفی‌سازی منوی اصلی"
+              className="min-h-10 min-w-10 rounded-[10px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center"
             >
-              <PanelRightClose className="w-3.5 h-3.5" />
+              <PanelRightClose className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -82,6 +98,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('kanban')}
+          aria-current={activeTab === 'kanban' ? 'page' : undefined}
           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-[10px] text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'kanban'
               ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
@@ -100,6 +117,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('calendar')}
+          aria-current={activeTab === 'calendar' ? 'page' : undefined}
           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-[10px] text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'calendar'
               ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
@@ -117,6 +135,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('chat')}
+          aria-current={activeTab === 'chat' ? 'page' : undefined}
           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-[10px] text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'chat'
               ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
@@ -139,6 +158,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('notes')}
+          aria-current={activeTab === 'notes' ? 'page' : undefined}
           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-[10px] text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'notes'
               ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
@@ -157,6 +177,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         <button
           type="button"
           onClick={() => setActiveTab('overdue')}
+          aria-current={activeTab === 'overdue' ? 'page' : undefined}
           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-[10px] text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'overdue'
               ? 'bg-rose-600 text-white shadow-md shadow-rose-950/20'
@@ -179,40 +200,6 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
             </span>
           )}
         </button>
-        )}
-      </div>
-
-
-      <div className="border-t border-slate-100 dark:border-slate-800/80 my-0.5" />
-
-      {/* System & Settings Section */}
-      <div className="space-y-1">
-        <div className="px-2 py-0.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-          تنظیمات برنامه
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('settings')}
-          className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[10px] text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'settings'
-              ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <Settings className={`w-4 h-4 shrink-0 ${activeTab === 'settings' ? 'text-white' : 'text-slate-400'}`} />
-          <span className="truncate">تنظیمات و پروفایل</span>
-        </button>
-
-        {currentUser && onLogout && (
-          <button
-            type="button"
-            onClick={onLogout}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[10px] text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all cursor-pointer"
-          >
-            <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
-            <span className="truncate">خروج از حساب</span>
-          </button>
         )}
       </div>
 

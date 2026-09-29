@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Kanban, Calendar, Plus, AlertCircle, Settings, MessageSquare, FileText, MoreHorizontal, X } from 'lucide-react';
+import { Kanban, Calendar, Plus, AlertCircle, MessageSquare, FileText, MoreHorizontal, X } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -11,7 +11,6 @@ interface SandwichBarProps {
   setActiveTab: (tab: ActiveTab) => void;
   /** Omitted when the user may not create tasks: the add button is not shown. */
   onOpenCreateModal?: () => void;
-  onOpenSettings?: () => void;
   /** Whether a section is available to the user (permissions); all are when omitted. */
   canOpenTab?: (tab: ActiveTab) => boolean;
   overdueCount: number;
@@ -37,7 +36,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-  const isInMoreMenu = activeTab === 'notes' || activeTab === 'settings';
+  const isInMoreMenu = activeTab === 'notes';
 
   return (
     <>
@@ -50,7 +49,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
       )}
 
       {/* Main Bottom Navigation Bar */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/90 shadow-2xl py-2 px-3 sm:px-6">
+      <nav aria-label="ناوبری اصلی موبایل" className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800/90 shadow-2xl pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] px-3 sm:px-6">
         <div className="w-full max-w-xl mx-auto flex items-center justify-around sm:justify-center gap-1 sm:gap-4">
 
           {/* 1. Kanban / Card View Button */}
@@ -58,6 +57,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('kanban')}
+            aria-label="بورد کانبان"
+            aria-current={activeTab === 'kanban' ? 'page' : undefined}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-full transition-all cursor-pointer ${
               activeTab === 'kanban'
                 ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
@@ -75,6 +76,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('calendar')}
+            aria-label="نمای تقویم"
+            aria-current={activeTab === 'calendar' ? 'page' : undefined}
             className={`flex items-center gap-1.5 px-2.5 py-2 rounded-full transition-all cursor-pointer ${
               activeTab === 'calendar'
                 ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
@@ -105,6 +108,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('overdue')}
+            aria-label="فعالیت‌های از موعد گذشته"
+            aria-current={activeTab === 'overdue' ? 'page' : undefined}
             className={`relative flex items-center gap-1.5 px-2.5 py-2 rounded-full transition-all cursor-pointer ${
               activeTab === 'overdue'
                 ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-950 ring-2 ring-white/20'
@@ -119,7 +124,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                 className={`absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold border ${
                   activeTab === 'overdue'
                     ? 'bg-white text-rose-700 border-rose-200'
-                    : 'bg-rose-600 text-white border-slate-900 animate-pulse'
+                    : 'bg-rose-600 text-white border-slate-900'
                 }`}
               >
                 {toPersianDigits(overdueCount)}
@@ -133,6 +138,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('chat')}
+            aria-label="گفتگوی تیمی"
+            aria-current={activeTab === 'chat' ? 'page' : undefined}
             className={`relative flex items-center gap-1.5 px-2.5 py-2 rounded-full transition-all cursor-pointer ${
               activeTab === 'chat'
                 ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
@@ -143,13 +150,13 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
             <MessageSquare className="w-6.5 h-6.5 shrink-0" />
             <span className="text-xs hidden sm:inline">گفتگو</span>
             {unreadChatCount > 0 && (
-              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-black text-[10px] animate-pulse border border-slate-900">
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-black text-[10px] border border-slate-900">
                 {toPersianDigits(unreadChatCount)}
               </span>
             )}
           </button>
 
-          {/* 6. "بیشتر": Notes and Settings, plainly labeled instead of an unexplained icon */}
+          {/* 6. "بیشتر": the remaining content module. Settings stay in the account menu. */}
           <div className="relative flex flex-col items-center">
             {isMoreMenuOpen && (
               <div className="absolute bottom-full left-0 mb-3 flex flex-col items-stretch gap-1 z-50 w-40 bg-slate-800 rounded-[14px] shadow-2xl border border-slate-700/80 p-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
@@ -168,19 +175,6 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                     <span>یادداشت شخصی</span>
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMoreMenuOpen(false);
-                    setActiveTab('settings');
-                  }}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-[10px] text-xs font-bold transition-colors cursor-pointer ${
-                    activeTab === 'settings' ? 'bg-indigo-600 text-white' : 'text-slate-200 hover:bg-slate-700'
-                  }`}
-                >
-                  <Settings className="w-4.5 h-4.5 shrink-0" />
-                  <span>تنظیمات و پروفایل</span>
-                </button>
               </div>
             )}
 
@@ -192,7 +186,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                   ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
                   : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
               }`}
-              title="بیشتر: یادداشت شخصی و تنظیمات"
+              title="بیشتر: یادداشت شخصی"
+              aria-label="بیشتر: یادداشت شخصی"
               aria-expanded={isMoreMenuOpen}
             >
               {isMoreMenuOpen ? <X className="w-6.5 h-6.5 shrink-0" /> : <MoreHorizontal className="w-6.5 h-6.5 shrink-0" />}
@@ -201,7 +196,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           </div>
 
         </div>
-      </div>
+      </nav>
     </>
   );
 };

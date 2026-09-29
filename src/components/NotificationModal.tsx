@@ -9,7 +9,6 @@ import {
   History,
   CheckCheck,
   Check,
-  ExternalLink,
   Inbox
 } from 'lucide-react';
 import { formatToJalali, toPersianDigits } from '../utils/helpers';
@@ -57,7 +56,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
             <div className={`w-10 h-10 rounded-2xl ${palette.accentBg} text-white flex items-center justify-center shadow-xs relative shrink-0`}>
               <Bell className="w-5 h-5" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-xs animate-pulse">
+                <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-xs">
                   {toPersianDigits(unreadCount)}
                 </span>
               )}
@@ -81,7 +80,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                 title="علامت‌گذاری همه به عنوان خوانده‌شده"
               >
                 <CheckCheck className="w-4 h-4" />
-                <span>خوانده‌شدن همه</span>
+                <span>علامت‌گذاری همه به‌عنوان خوانده‌شده</span>
               </button>
             )}
             <button
@@ -140,7 +139,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
               onClick={onMarkAllAsRead}
               className="sm:hidden text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer whitespace-nowrap"
             >
-              خوانده‌شدن همه
+              علامت‌گذاری همه به‌عنوان خوانده‌شده
             </button>
           )}
         </div>
@@ -160,7 +159,23 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
             filteredNotifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-3.5 rounded-[14px] border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                role={notification.taskId ? 'button' : undefined}
+                tabIndex={notification.taskId ? 0 : undefined}
+                onClick={() => {
+                  if (!notification.taskId) return;
+                  onMarkAsRead(notification.id);
+                  onSelectTask(notification.taskId);
+                  onClose();
+                }}
+                onKeyDown={(event) => {
+                  if (notification.taskId && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    onMarkAsRead(notification.id);
+                    onSelectTask(notification.taskId);
+                    onClose();
+                  }
+                }}
+                className={`p-3.5 rounded-[14px] border transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${notification.taskId ? 'cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700' : ''} ${
                   notification.isRead
                     ? 'bg-slate-50/60 dark:bg-slate-800/30 border-slate-200/70 dark:border-slate-800 opacity-80'
                     : 'bg-white dark:bg-slate-800/90 border-indigo-200 dark:border-indigo-900/60 shadow-xs'
@@ -237,26 +252,11 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
                 {/* Actions Right */}
                 <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                  {/* A server notification without a task the user can open has nothing to show. */}
-                  {notification.taskId && (
                   <button
                     type="button"
-                    onClick={() => {
-                      onMarkAsRead(notification.id);
-                      onSelectTask(notification.taskId);
-                      onClose();
-                    }}
-                    className={`flex items-center gap-1 px-3 py-1.5 ${palette.accentBg} ${palette.accentHover} text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs`}
-                  >
-                    <span>مشاهده فعالیت</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </button>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => onMarkAsRead(notification.id)}
+                    onClick={(event) => { event.stopPropagation(); onMarkAsRead(notification.id); }}
                     title={notification.isRead ? 'علامت به‌عنوان خوانده‌نشده' : 'علامت به‌عنوان خوانده‌شده'}
+                    aria-label={notification.isRead ? 'علامت به‌عنوان خوانده‌نشده' : 'علامت به‌عنوان خوانده‌شده'}
                     className={`p-1.5 rounded-xl border transition-colors cursor-pointer ${
                       notification.isRead
                         ? 'text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
