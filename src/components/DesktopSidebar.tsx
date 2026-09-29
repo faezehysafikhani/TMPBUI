@@ -52,23 +52,26 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   const RADIUS = 40;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-  // Fixed, constant size and position, always: pinned top:5rem / bottom:5rem within the
-  // viewport (same gap on both sides), never sticky (which unsticks near the end of its
-  // container) and never recomputed from page content, so it never grows or shrinks as the
-  // page/content changes. Right offset replicates where this used to sit as a flex item (the
-  // ".../mx-auto .../px-3" main container from App.tsx, right-most child in this RTL row): the
-  // page's own side padding, plus, once the centered max-w-[1920px] container has margins of its
-  // own, that margin too. The spacer div below keeps the width reserved in the flex row so the
-  // main content doesn't shift into the space this now-fixed element used to occupy.
+  // Fixed to the viewport on every page, same size everywhere: 15px below the sticky header and
+  // 15px above the bottom of the screen. Never sticky (which unsticks near the end of its
+  // container) and never measured from page content, so it doesn't move or resize.
+  // Right offset replicates where this used to sit as a flex item (the ".../mx-auto .../px-3"
+  // main container from App.tsx, right-most child in this RTL row): the page's own side padding,
+  // plus, once the centered max-w-[1920px] container has margins of its own, that margin too.
+  // The spacer div below keeps the width reserved in the flex row so the main content doesn't
+  // shift into the space this now-fixed element used to occupy.
   const fixedRight = 'max(0.75rem, calc((100vw - 1920px) / 2 + 0.75rem))';
+  // Navbar at lg+: py-3.5 (2 x 14px) + 48px logo + 1px bottom border.
+  const HEADER_HEIGHT_PX = 77;
+  const EDGE_GAP_PX = 15;
 
   return (
     <>
     {/* Reserves the sidebar's width/gap in the flex row; the sidebar itself is fixed (out of flow). */}
     <div className="hidden lg:block w-48 shrink-0" aria-hidden="true" />
     <aside
-      className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm fixed z-20 top-20 h-[calc(100dvh-5rem-5rem)] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300"
-      style={{ right: fixedRight }}
+      className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm fixed z-20 overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300"
+      style={{ right: fixedRight, top: HEADER_HEIGHT_PX + EDGE_GAP_PX, bottom: EDGE_GAP_PX }}
     >
 
       {onOpenCreateModal && (
