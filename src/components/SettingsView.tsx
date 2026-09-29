@@ -161,8 +161,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
-  return (
-    <SystemAdministration currentUserId={currentUser?.id} general={
+  // Profile / Team / Appearance / Help are now separate top-level tabs (SystemAdministration's
+  // SegmentedTabs) instead of one long page of Section/Accordion blocks. Each card keeps its own
+  // open/close toggle exactly as before; only which tab it lives under changed.
+  const profileContent = (
     <div className="w-full space-y-6 animate-in fade-in duration-200">
       {currentUser && <ChangePasswordCard />}
 
@@ -391,7 +393,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       )}
+    </div>
+  );
 
+  const teamContent = (
+    <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 3: Work Team Management Card */}
       {currentUser && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
@@ -416,7 +422,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       )}
+    </div>
+  );
 
+  const appearanceContent = (
+    <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 4: Light / Dark Mode Card */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
         <button
@@ -583,7 +593,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         )}
       </div>
+    </div>
+  );
 
+  const helpContent = (
+    <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 7: Feature Catalog & PDF Handbook (Collapsible, closed by default) */}
       {onOpenPdfCatalog && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
@@ -634,9 +648,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       )}
+    </div>
+  );
 
-      {/* Section 8: User Account Status & Logout Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+  // Section 8: User Account Status & Logout Card - stays part of the "پروفایل" tab, alongside
+  // the password/profile cards above.
+  const accountStatusContent = (
+    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('account')}
@@ -690,8 +708,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         )}
       </div>
+  );
 
-    </div>
-    } />
+  return (
+    <SystemAdministration
+      currentUserId={currentUser?.id}
+      profile={<>{profileContent}{accountStatusContent}</>}
+      team={teamContent}
+      appearance={appearanceContent}
+      help={helpContent}
+    />
   );
 };

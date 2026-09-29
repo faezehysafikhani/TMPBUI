@@ -1,19 +1,15 @@
 import React from 'react';
-import { Plus, RefreshCw, Filter, LogIn, Bell, LayoutDashboard, PanelRightClose, PanelRightOpen, CircleHelp } from 'lucide-react';
+import { Filter, LogIn, Bell, LayoutDashboard, CircleHelp, User as UserIcon } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { User as UserType, AppTheme, AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 
 interface NavbarProps {
-  /** Omitted when the user may not create tasks: the add button is not shown. */
-  onOpenCreateModal?: () => void;
   totalTasks: number;
   completedTasks: number;
   /** Only on the Kanban page, the one the filters apply to: the filter button is not shown elsewhere. */
   onToggleFilterBar?: () => void;
   isFilterBarOpen: boolean;
-  onRefreshData: () => void;
-  isSyncing?: boolean;
   currentUser: UserType | null;
   currentTheme: AppTheme;
   appColorPalette?: AppColorPalette;
@@ -23,18 +19,15 @@ interface NavbarProps {
   onOpenWelcomeModal?: () => void;
   /** Opens the slide user guide (header "?" button). */
   onOpenUserGuide?: () => void;
-  isDesktopSidebarOpen?: boolean;
-  onToggleDesktopSidebar?: () => void;
+  /** Avatar button: opens the signed-in user's own profile (Settings, "پروفایل" tab). */
+  onOpenSettings?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
-  onOpenCreateModal,
   totalTasks,
   completedTasks,
   onToggleFilterBar,
   isFilterBarOpen,
-  onRefreshData,
-  isSyncing = false,
   currentUser,
   currentTheme,
   appColorPalette = 'indigo',
@@ -43,8 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNotificationModal,
   onOpenWelcomeModal,
   onOpenUserGuide,
-  isDesktopSidebarOpen = true,
-  onToggleDesktopSidebar,
+  onOpenSettings,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
@@ -137,22 +129,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Desktop Sidebar Toggle Button (Hides/Shows Right Sidebar) */}
-            {onToggleDesktopSidebar && (
-              <button
-                type="button"
-                onClick={onToggleDesktopSidebar}
-                title={isDesktopSidebarOpen ? 'مخفی کردن منوی راست' : 'نمایش منوی راست'}
-                className={`hidden lg:flex p-2.5 rounded-xl border transition-all shrink-0 cursor-pointer items-center justify-center my-auto ${
-                  !isDesktopSidebarOpen
-                    ? `${palette.accentBg} text-white ${palette.accentBorder} shadow-xs ring-2 ring-indigo-400/50`
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-slate-700/80'
-                }`}
-              >
-                {isDesktopSidebarOpen ? <PanelRightClose className="w-4 h-4" /> : <PanelRightOpen className="w-4 h-4" />}
-              </button>
-            )}
-
             {/* Filter Toggle Button (Icon Only) - Kanban only */}
             {onToggleFilterBar && (
               <button
@@ -169,20 +145,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Refresh Data Button (Icon Only - Centered and Color Palette Styled) */}
-            <button
-              type="button"
-              onClick={onRefreshData}
-              title="به‌روزرسانی داده‌ها"
-              className="p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${palette.accentText} ${
-                  isSyncing ? 'animate-spin' : 'hover:scale-110 transition-transform'
-                }`}
-              />
-            </button>
-
             {/* If not logged in, show simple login button */}
             {!currentUser && (
               <button
@@ -195,16 +157,27 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {/* Add Task Button (Icon Only on Desktop Header) */}
-            {onOpenCreateModal && (
-            <button
-              type="button"
-              onClick={onOpenCreateModal}
-              title="افزودن فعالیت جدید"
-              className={`hidden sm:flex items-center justify-center p-2.5 bg-gradient-to-tr ${palette.gradientFromTo} text-white rounded-xl shadow-sm transition-all shrink-0 cursor-pointer hover:opacity-90 active:scale-98 my-auto`}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+            {/* Profile Avatar Button: opens the signed-in user's own profile */}
+            {currentUser && onOpenSettings && (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                title="پروفایل من"
+                aria-label="پروفایل من"
+                className="p-1 rounded-xl border border-slate-700/80 hover:border-indigo-400 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+              >
+                {currentUser.avatar ? (
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser.name || 'آواتار کاربر'}
+                    className="w-8 h-8 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">
+                    {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : <UserIcon className="w-4 h-4" />}
+                  </div>
+                )}
+              </button>
             )}
           </div>
 

@@ -33,7 +33,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onToggleSubTask,
 }) => {
   // Group tasks by status in a single pass, then sort each column by last
-  // modification time (newest first). Only statuses with tasks get a column.
+  // modification time (newest first). Every status always gets a column, even with zero tasks.
   const columns = useMemo(() => {
     const byStatus = new Map<TaskStatus, Task[]>();
     for (const task of tasks) {
@@ -44,10 +44,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         byStatus.set(task.status, [task]);
       }
     }
-    return STATUS_KEYS.filter((st) => byStatus.has(st)).map((st) => ({
+    return STATUS_KEYS.map((st) => ({
       status: st,
-      tasks: byStatus
-        .get(st)!
+      tasks: (byStatus.get(st) ?? [])
         .sort((a, b) => getTaskLastModifiedTime(b) - getTaskLastModifiedTime(a)),
     }));
   }, [tasks]);
@@ -64,42 +63,24 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         </div>
       )}
 
-      {columns.length === 0 ? (
-        <div className="p-8 text-center bg-white/80 dark:bg-slate-900/80 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-2xs">
-          <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-            هیچ فعالیتی جهت نمایش وجود ندارد.
-          </p>
-        </div>
-      ) : (
-        <div
-          className={`grid gap-4 sm:gap-4.5 items-start ${
-            columns.length === 1
-              ? 'grid-cols-1 max-w-3xl mx-auto'
-              : columns.length === 2
-              ? 'grid-cols-1 md:grid-cols-2'
-              : columns.length === 3
-              ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-              : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
-          }`}
-        >
-          {columns.map(({ status, tasks: columnTasks }) => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              tasks={columnTasks}
-              currentUser={currentUser}
-              onOpenCreateForStatus={onOpenCreateForStatus}
-              onEditTask={onEditTask}
-              onDeleteTask={onDeleteTask}
-              onStatusChange={onStatusChange}
-              onPreviewAttachment={onPreviewAttachment}
-              onViewDetails={onViewDetails}
-              onOpenProjectDetails={onOpenProjectDetails}
-              onToggleSubTask={onToggleSubTask}
-            />
-          ))}
-        </div>
-      )}
+      <div className="grid gap-4 sm:gap-4.5 items-start grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        {columns.map(({ status, tasks: columnTasks }) => (
+          <KanbanColumn
+            key={status}
+            status={status}
+            tasks={columnTasks}
+            currentUser={currentUser}
+            onOpenCreateForStatus={onOpenCreateForStatus}
+            onEditTask={onEditTask}
+            onDeleteTask={onDeleteTask}
+            onStatusChange={onStatusChange}
+            onPreviewAttachment={onPreviewAttachment}
+            onViewDetails={onViewDetails}
+            onOpenProjectDetails={onOpenProjectDetails}
+            onToggleSubTask={onToggleSubTask}
+          />
+        ))}
+      </div>
 
       {/* Dashboard Charts: 2 side-by-side charts under grouping boxes */}
       <Suspense fallback={<div className="h-48 bg-slate-100/50 dark:bg-slate-800/50 rounded-2xl animate-pulse my-4" />}>

@@ -1181,13 +1181,10 @@ export default function App() {
 
       {/* Top Navbar */}
       <Navbar
-        onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
         totalTasks={visibleTasks.length}
         completedTasks={completedCount}
         onToggleFilterBar={activeTab === 'kanban' ? () => setShowFilterBar((prev) => !prev) : undefined}
         isFilterBarOpen={showFilterBar}
-        onRefreshData={() => loadTasks(true)}
-        isSyncing={isSyncing}
         currentUser={currentUser}
         currentTheme={appColorTheme}
         appColorPalette={appColorPalette}
@@ -1196,8 +1193,7 @@ export default function App() {
         onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
         onOpenWelcomeModal={() => setIsWelcomeModalOpen(true)}
         onOpenUserGuide={currentUser ? () => setIsUserGuideOpen(true) : undefined}
-        isDesktopSidebarOpen={isDesktopSidebarOpen}
-        onToggleDesktopSidebar={handleToggleDesktopSidebar}
+        onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
       />
 
       {/* Floating Restore Button for Desktop Sidebar when Collapsed */}
