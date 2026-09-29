@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Task, TaskComment, TaskLog, TaskStatus, User, STATUSES, PRIORITIES, Attachment, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { formatToJalali, formatFileSize, toPersianDigits, computeAutoTaskStatus, isCompletionDelayed } from '../utils/helpers';
 import { readFileAsDataUrl } from '../utils/storage';
+import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
 import {
   fetchCommentsForTaskPB,
   createTaskCommentPB,
@@ -193,6 +194,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       const newAtts: Attachment[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        if (!isAllowedUploadFile(file)) {
+          alert(UPLOAD_TYPE_ERROR_MESSAGE);
+          continue;
+        }
         if (file.size > MAX_ATTACHMENT_BYTES) {
           alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           continue;
@@ -230,6 +235,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       const newAtts: Attachment[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        if (!isAllowedUploadFile(file)) {
+          alert(UPLOAD_TYPE_ERROR_MESSAGE);
+          continue;
+        }
         if (file.size > MAX_ATTACHMENT_BYTES) {
           alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           continue;
@@ -778,6 +787,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 ref={editCommentFileInputRef}
                                 onChange={(e) => handleEditCommentFileUpload(e.target.files)}
                                 multiple
+                                accept={ALLOWED_UPLOAD_ACCEPT}
                                 className="hidden"
                               />
                               <button
@@ -951,6 +961,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 ref={commentFileInputRef}
                 onChange={(e) => handleCommentFileUpload(e.target.files)}
                 multiple
+                accept={ALLOWED_UPLOAD_ACCEPT}
                 className="hidden"
               />
 

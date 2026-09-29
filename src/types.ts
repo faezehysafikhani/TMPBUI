@@ -1,15 +1,22 @@
 /**
- * Maximum size of any uploaded attachment: 200 KB.
- *
- * Mirrors the backend limit (Nexus.TaskManagement's TaskFileAsset.MaxFileSizeBytes and the
- * CK_Files_MaxSize check constraint). The API rejects anything larger, so accepting a bigger
- * file here would only fail later — and the attachment travels as a base64 data URL, which
- * inflates it by roughly a third on the way.
+ * Maximum size of any uploaded attachment: 200 KB by default, admin-configurable at runtime
+ * (Uploads.MaxFileSizeKb on the backend). App.tsx applies the real value on startup via
+ * setMaxAttachmentBytes(); until then, and if that fetch fails, this 200 KB default matches the
+ * backend's own default so nothing here ever accepts a file the API would reject.
  */
-export const MAX_ATTACHMENT_BYTES = 204800;
+export let MAX_ATTACHMENT_BYTES = 204800;
 
 /** How that limit is written in user-facing messages. */
-export const MAX_ATTACHMENT_LABEL = '۲۰۰ کیلوبایت';
+export let MAX_ATTACHMENT_LABEL = '۲۰۰ کیلوبایت';
+
+/** Applies the admin-configured max upload size (in KB) app-wide. */
+export function setMaxAttachmentBytes(maxFileSizeKb: number): void {
+  if (!(maxFileSizeKb > 0)) return;
+  MAX_ATTACHMENT_BYTES = Math.round(maxFileSizeKb * 1024);
+  MAX_ATTACHMENT_LABEL = maxFileSizeKb >= 1024
+    ? `${Number.isInteger(maxFileSizeKb / 1024) ? maxFileSizeKb / 1024 : (maxFileSizeKb / 1024).toFixed(1)} مگابایت`
+    : `${maxFileSizeKb} کیلوبایت`;
+}
 
 export type TaskStatus = 'todo' | 'in_progress' | 'paused' | 'completed';
 

@@ -4,7 +4,7 @@ import {
   Upload, Camera, Loader2, ShieldCheck, Users, Bell, MessageSquare,
   Smartphone, FileText, Printer, ChevronDown, ChevronUp
 } from 'lucide-react';
-import { AppTheme, AppColorPalette, User as UserType, WorkTeam } from '../types';
+import { AppTheme, AppColorPalette, User as UserType, WorkTeam, MAX_ATTACHMENT_BYTES } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 import { PRESET_AVATARS, compressImageFile } from '../utils/avatars';
 import { readFileAsDataUrl } from '../utils/storage';
@@ -91,6 +91,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }));
   };
 
+  // Re-initialize the form only when the signed-in user actually changes (login/logout/switch),
+  // not on every re-render of the currentUser object (e.g. a background refresh on window focus),
+  // which would otherwise wipe an avatar/photo the user just picked before they could save it.
   useEffect(() => {
     if (currentUser) {
       setProfileName(currentUser.name || '');
@@ -99,7 +102,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setProfilePhoneNumber(currentUser.phoneNumber || '');
       setNotifySms(currentUser.notifySms !== undefined ? !!currentUser.notifySms : true);
     }
-  }, [currentUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   const handleCustomAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -110,7 +114,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return;
     }
 
-    const MAX_ALLOWED_BYTES = 200 * 1024; // 200 KB
+    const MAX_ALLOWED_BYTES = MAX_ATTACHMENT_BYTES;
     const originalKb = (file.size / 1024).toFixed(0);
 
     try {

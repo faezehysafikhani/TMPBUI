@@ -21,7 +21,7 @@ import {
   ExternalLink,
   ChevronDown,
 } from 'lucide-react';
-import { User, WorkTeam, DirectMessage, AppColorPalette, Task, TaskStatus, STATUSES, PRIORITIES } from '../types';
+import { User, WorkTeam, DirectMessage, AppColorPalette, Task, TaskStatus, STATUSES, PRIORITIES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { toPersianDigits, formatTime24h, formatToJalali } from '../utils/helpers';
 import { COLOR_PALETTES } from '../utils/theme';
 import { responsibleIdsOf, responsibleNamesOf } from '../utils/taskPeople';
@@ -40,6 +40,7 @@ import {
   fetchPresencePB,
 } from '../services/dataService';
 import { userErrorMessage } from '../utils/errorMessages';
+import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
 
 interface TeamChatViewProps {
   currentUser: User | null;
@@ -531,8 +532,13 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      alert('حداکثر حجم فایل پیوست ۵ مگابایت می‌باشد.');
+    if (!isAllowedUploadFile(file)) {
+      alert(UPLOAD_TYPE_ERROR_MESSAGE);
+      return;
+    }
+
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      alert(`حجم فایل پیوست بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
       return;
     }
 
@@ -995,7 +1001,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 className="p-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-xl cursor-pointer transition-colors shrink-0"
               >
                 <Paperclip className="w-5 h-5" />
-                <input type="file" className="hidden" onChange={handleFileUpload} />
+                <input type="file" accept={ALLOWED_UPLOAD_ACCEPT} className="hidden" onChange={handleFileUpload} />
               </label>
 
               <textarea

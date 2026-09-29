@@ -1748,6 +1748,29 @@ export async function listLoginHistory(options: { page: number; pageSize: number
   });
 }
 
+// ---- Upload policy (max file size + accepted types, everywhere a file can be uploaded) -----
+
+export interface UploadPolicy {
+  maxFileSizeKb: number;
+  allowedExtensions: string[];
+}
+
+/** The current admin-configured upload limit; falls back to the 200 KB default on any error. */
+export async function fetchUploadPolicy(): Promise<UploadPolicy> {
+  try {
+    return await request<UploadPolicy>('GET', '/api/platform/upload-policy');
+  } catch {
+    return { maxFileSizeKb: 200, allowedExtensions: ['.xlsx', '.xls', '.doc', '.docx', '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'] };
+  }
+}
+
+/** Admin-only: changes the system-wide max upload size (settings.update). */
+export async function updateMaxUploadSizeKb(maxFileSizeKb: number): Promise<void> {
+  await request<unknown>('PUT', '/api/platform/settings', {
+    body: { tenantId: null, key: 'Uploads.MaxFileSizeKb', value: String(Math.max(1, Math.round(maxFileSizeKb))), scope: 'System' },
+  });
+}
+
 // ---- SMS panel -------------------------------------------------------------
 
 const CHANNELS = '/api/platform/notification-channels';

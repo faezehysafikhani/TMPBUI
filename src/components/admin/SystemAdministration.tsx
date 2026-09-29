@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText } from 'lucide-react';
-import { getMyPermissions, changeMyPassword } from '../../services/nexusApi';
+import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud } from 'lucide-react';
+import { getMyPermissions, changeMyPassword, fetchUploadPolicy, updateMaxUploadSizeKb } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
@@ -111,6 +111,72 @@ export const ChangePasswordCard: React.FC = () => {
   );
 };
 
+/** Admin-only (settings.update): the system-wide max upload file size, in KB. */
+const UploadSizeSettingsCard: React.FC = () => {
+  const [valueKb, setValueKb] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchUploadPolicy()
+      .then((policy) => { if (alive) setValueKb(String(policy.maxFileSizeKb)); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const kb = Number(valueKb);
+    if (!Number.isFinite(kb) || kb <= 0) {
+      setMessage({ type: 'error', text: 'مقدار وارد شده معتبر نیست.' });
+      return;
+    }
+    setSaving(true);
+    setMessage(null);
+    try {
+      await updateMaxUploadSizeKb(kb);
+      setMessage({ type: 'success', text: 'حداکثر حجم فایل آپلودی ذخیره شد.' });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: userErrorMessage(err, 'ذخیره تنظیمات با خطا مواجه شد.') });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AdminCard className="p-5 sm:p-6">
+      <form onSubmit={submit} className="space-y-4">
+        <div className="flex items-center gap-2">
+          <UploadCloud className="w-5 h-5 text-indigo-700 dark:text-indigo-400" />
+          <h3 className="text-base font-extrabold text-slate-900 dark:text-white">محدودیت حجم فایل آپلودی</h3>
+        </div>
+        {message && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <Field label="حداکثر حجم مجاز (کیلوبایت)" hint="پیش‌فرض: ۲۰۰ کیلوبایت">
+            <input
+              type="number"
+              min={1}
+              className={inputClass}
+              value={valueKb}
+              onChange={(e) => setValueKb(e.target.value)}
+              disabled={loading}
+            />
+          </Field>
+          <PrimaryButton type="submit" disabled={saving || loading}>
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>ذخیره</span>
+          </PrimaryButton>
+        </div>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+          این مقدار برای بارگذاری فایل در فعالیت‌ها، گفتگو و یادداشت‌ها در کل سامانه اعمال می‌شود.
+        </p>
+      </form>
+    </AdminCard>
+  );
+};
+
 /**
  * «تنظیمات سامانه»: the header card with the main tabs. Profile / Team / Appearance / Help are
  * always-present personal-settings tabs; SMS panel and user management appear by permission.
@@ -149,7 +215,12 @@ export const SystemAdministration: React.FC<{
 
       {current === 'profile' && profile}
       {current === 'team' && team}
-      {current === 'appearance' && appearance}
+      {current === 'appearance' && (
+        <div className="space-y-5">
+          {can('settings.update') && <UploadSizeSettingsCard />}
+          {appearance}
+        </div>
+      )}
       {current === 'help' && help}
       {current === 'sms' && <SmsPanel canUpdate={can('sms_settings.update')} canTest={can('sms_settings.test')} />}
       {current === 'users' && currentUserId && <UserManagementSection currentUserId={currentUserId} can={can} />}

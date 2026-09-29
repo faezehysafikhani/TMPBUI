@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Task, TaskStatus, Priority, Attachment, STATUSES, PRIORITIES, AppColorPalette, User, WorkTeam, WorkTeamMember, RecurringFrequency, RecurringConfig, OccurrenceNth, ProjectCharter, ProjectSubTask, SubTaskImportance, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 import { readFileAsDataUrl } from '../utils/storage';
+import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
 import { formatFileSize, toPersianDigits, computeAutoTaskStatus } from '../utils/helpers';
 import { JalaliDateTimePicker } from './JalaliDateTimePicker';
 import { getNowISO, iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
@@ -333,6 +334,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       const newAttachments: Attachment[] = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        if (!isAllowedUploadFile(file)) {
+          alert(UPLOAD_TYPE_ERROR_MESSAGE);
+          continue;
+        }
         if (file.size > MAX_ATTACHMENT_BYTES) {
           alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           continue;
@@ -1649,6 +1654,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               ref={fileInputRef}
               onChange={(e) => handleFileUpload(e.target.files)}
               multiple
+              accept={ALLOWED_UPLOAD_ACCEPT}
               className="hidden"
             />
 

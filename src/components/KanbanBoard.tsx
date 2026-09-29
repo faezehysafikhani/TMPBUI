@@ -53,16 +53,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <div className="w-full space-y-6">
-      {/* Desktop Drag and Drop Quick Guidance */}
-      {columns.length > 1 && (
-        <div className="hidden sm:flex items-center justify-between px-4 py-2.5 bg-indigo-50/80 dark:bg-indigo-950/40 rounded-2xl border border-indigo-200/80 dark:border-indigo-900/60 text-indigo-900 dark:text-indigo-200 text-xs font-medium shadow-2xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
-            <span>قابلیت کشیدن و رها کردن (Drag & Drop): کارت هر فعالیت را می‌توانید به ستون دلخواه بکشید تا وضعیت آن بروزرسانی شود.</span>
-          </div>
-        </div>
-      )}
-
       <div className="grid gap-4 sm:gap-4.5 items-start grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         {columns.map(({ status, tasks: columnTasks }) => (
           <KanbanColumn

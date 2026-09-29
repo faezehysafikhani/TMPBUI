@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification } from './types';
+import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification, setMaxAttachmentBytes } from './types';
+import { getUploadPolicy } from './utils/uploadPolicy';
 import { isOverdue, toPersianDigits, formatToJalali, getTaskLastModifiedTime, computeAutoTaskStatus } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { FilterBar } from './components/FilterBar';
@@ -294,6 +295,7 @@ export default function App() {
         }
       }
       fetchSystemNotificationSettingsPB().catch((err) => console.warn('Sync notification settings error:', err));
+      getUploadPolicy().then((policy) => setMaxAttachmentBytes(policy.maxFileSizeKb)).catch(() => {});
       loadTasks(true);
     }
 
@@ -1375,18 +1377,19 @@ export default function App() {
           </>
         )}
 
-          {/* Footer Card Box styled like header */}
-          <footer className="mt-16 mb-20 md:mb-6">
-            <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
-              <span className="font-bold tracking-tight text-white/95">
-                تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
-              </span>
-            </div>
-          </footer>
-
           </main>
         </div>
       </div>
+
+      {/* Footer Card Box styled like header: sticks to the bottom of the viewport when the
+          page content is short, and flows right after the content when it overflows/scrolls. */}
+      <footer className="mt-auto w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-6 pb-4">
+        <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
+          <span className="font-bold tracking-tight text-white/95">
+            تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
+          </span>
+        </div>
+      </footer>
 
       <Suspense fallback={null}>
         {/* Form Modal for Add/Edit Task */}

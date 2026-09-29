@@ -22,6 +22,7 @@ import { User, PersonalNote, NoteAttachment, AppColorPalette, MAX_ATTACHMENT_BYT
 import { toPersianDigits, formatFileSize } from '../utils/helpers';
 import { COLOR_PALETTES } from '../utils/theme';
 import { readFileAsDataUrl } from '../utils/storage';
+import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
 import {
   fetchPersonalNotesPB,
   createPersonalNotePB,
@@ -165,6 +166,10 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      if (!isAllowedUploadFile(file)) {
+        alert(UPLOAD_TYPE_ERROR_MESSAGE);
+        continue;
+      }
       if (file.size > MAX_ATTACHMENT_BYTES) {
         alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
         continue;
@@ -446,6 +451,7 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
                     ref={noteFileInputRef}
                     type="file"
                     multiple
+                    accept={ALLOWED_UPLOAD_ACCEPT}
                     onChange={handleNoteFileSelect}
                     className="hidden"
                   />

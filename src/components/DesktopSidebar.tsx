@@ -1,5 +1,5 @@
 import React from 'react';
-import { Kanban, Calendar, AlertCircle, Settings, CheckSquare, LogOut, MessageSquare, FileText, PanelRightClose, Plus } from 'lucide-react';
+import { Kanban, Calendar, AlertCircle, Settings, LogOut, MessageSquare, FileText, PanelRightClose, Plus } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette, User as UserType } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -47,9 +47,14 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     return null;
   }
 
+  const progressRatio = totalTasks > 0 ? Math.min(1, completedTasks / totalTasks) : 0;
+  const progressPercent = Math.round(progressRatio * 100);
+  const RADIUS = 40;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
   return (
-    <aside className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm h-fit sticky top-20 animate-in fade-in slide-in-from-right-4 duration-300">
-      
+    <aside className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm sticky top-20 h-[calc(100vh-6rem)] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300">
+
       {onOpenCreateModal && (
         <button
           type="button"
@@ -218,16 +223,34 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 
       {/* Progress Summary Widget */}
       {totalTasks > 0 && (
-        <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800/80">
-          <div className="p-2 bg-slate-50 dark:bg-slate-800/40 rounded-xl flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-            <CheckSquare className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <div>
-              <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200">
-                وضعیت پیشرفت
-              </div>
-              <div className="mt-0.5 text-[9px]">
-                {toPersianDigits(completedTasks)} از {toPersianDigits(totalTasks)} فعالیت
-              </div>
+        <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800/80 flex-1 min-h-0 flex flex-col items-center justify-center gap-2">
+          <div className="relative w-24 h-24 shrink-0">
+            <svg viewBox="0 0 100 100" className="w-24 h-24 -rotate-90">
+              <circle cx="50" cy="50" r={RADIUS} fill="none" strokeWidth="10" className="stroke-slate-100 dark:stroke-slate-800" />
+              <circle
+                cx="50"
+                cy="50"
+                r={RADIUS}
+                fill="none"
+                strokeWidth="10"
+                strokeLinecap="round"
+                className="stroke-emerald-500 transition-all duration-500"
+                strokeDasharray={CIRCUMFERENCE}
+                strokeDashoffset={CIRCUMFERENCE * (1 - progressRatio)}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-base font-black text-slate-800 dark:text-slate-100">
+                {toPersianDigits(progressPercent)}٪
+              </span>
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200">
+              وضعیت پیشرفت
+            </div>
+            <div className="mt-0.5 text-[9px] text-slate-500 dark:text-slate-400">
+              {toPersianDigits(completedTasks)} از {toPersianDigits(totalTasks)} فعالیت
             </div>
           </div>
         </div>

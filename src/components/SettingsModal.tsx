@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Settings, Sun, Moon, Grid, Palette, Check, LogOut, LogIn, User as UserIcon, ChevronDown, ChevronUp, Upload, Camera, Loader2, ShieldCheck, Users, Bell, MessageSquare, Smartphone, FileText, Printer } from 'lucide-react';
-import { AppTheme, AppColorPalette, User as UserType, WorkTeam } from '../types';
+import { AppTheme, AppColorPalette, User as UserType, WorkTeam, MAX_ATTACHMENT_BYTES } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 import { PRESET_AVATARS, compressImageFile } from '../utils/avatars';
 import { readFileAsDataUrl } from '../utils/storage';
@@ -80,6 +80,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Re-initialize the form only when the signed-in user actually changes or the modal (re)opens,
+  // not on every re-render of the currentUser object (e.g. a background refresh on window focus),
+  // which would otherwise wipe an avatar/photo the user just picked before they could save it.
   useEffect(() => {
     if (currentUser) {
       setProfileName(currentUser.name || '');
@@ -88,7 +91,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       setProfilePhoneNumber(currentUser.phoneNumber || '');
       setNotifySms(currentUser.notifySms !== undefined ? !!currentUser.notifySms : true);
     }
-  }, [currentUser, isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, isOpen]);
 
   if (!isOpen) return null;
 
@@ -101,7 +105,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
 
-    const MAX_ALLOWED_BYTES = 200 * 1024; // 200 KB
+    const MAX_ALLOWED_BYTES = MAX_ATTACHMENT_BYTES;
     const originalKb = (file.size / 1024).toFixed(0);
 
     try {
