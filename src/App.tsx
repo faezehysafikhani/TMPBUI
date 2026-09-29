@@ -1124,8 +1124,6 @@ export default function App() {
             </p>
             <p className="text-[11px] font-medium text-indigo-200/80 flex items-center justify-center gap-2 dir-ltr">
               <span>پشتیبانی: ۸۸۷۳۱۶۰۱</span>
-              <span className="text-white/30">|</span>
-              <span>info@parspmi.ir</span>
             </p>
           </div>
         </div>

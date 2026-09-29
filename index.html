@@ -70,6 +70,9 @@
   </head>
   <body class="bg-slate-50 text-slate-800 antialiased selection:bg-indigo-500 selection:text-white min-h-screen">
     <div id="root"></div>
+    <!-- Read fresh from the server on every load - see server.ts's /runtime-config.js. Must
+         load before the app bundle so window.__RUNTIME_CONFIG__ exists when it reads it. -->
+    <script src="/runtime-config.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

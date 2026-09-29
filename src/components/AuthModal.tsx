@@ -591,8 +591,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </p>
             <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center justify-center gap-2 dir-ltr">
               <span>پشتیبانی: ۸۸۷۳۱۶۰۱</span>
-              <span className="text-slate-300 dark:text-slate-700">|</span>
-              <span>info@parspmi.ir</span>
             </p>
           </div>
         </div>

@@ -26,6 +26,19 @@ app.get(["/api/health", "/health"], (_req, res) => {
   res.json({ status: "ok" });
 });
 
+// Runtime configuration for the frontend: read fresh from THIS PROCESS's own environment on
+// every request, never baked into the built JS by Vite. This is what lets the exact same
+// dist/ build be deployed at a different backend host by changing only this server's own
+// environment (API_BASE_URL) - no rebuild, no source edit. Empty means same-origin: the
+// frontend calls whatever host served it, which is the right default when a reverse proxy
+// serves the API under the same origin as the UI.
+app.get("/runtime-config.js", (_req, res) => {
+  const apiBaseUrl = (process.env.API_BASE_URL || "").trim();
+  res.setHeader("Content-Type", "application/javascript; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.send(`window.__RUNTIME_CONFIG__ = ${JSON.stringify({ apiBaseUrl })};`);
+});
+
 // App Icon endpoint with link-preview crawler compatibility
 app.get(["/icon.svg", "/favicon.svg"], (req, res) => {
   const userAgent = (req.headers["user-agent"] || "").toLowerCase();

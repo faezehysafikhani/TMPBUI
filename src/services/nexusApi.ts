@@ -41,8 +41,19 @@ import type { ServerNotificationDto } from '../utils/serverNotifications';
 
 const env = ((import.meta as any).env || {}) as Record<string, string | undefined>;
 
+/**
+ * window.__RUNTIME_CONFIG__ is written by server.ts's /runtime-config.js, read fresh from that
+ * server's own environment on every page load - not baked into this build by Vite. It's checked
+ * first so the exact same built artifact can be pointed at a different backend host by changing
+ * only the server's environment, with no rebuild. VITE_API_BASE_URL (embedded at build time) is
+ * kept only as a fallback for the plain `vite`/`vite preview` dev workflow, where server.ts's
+ * route isn't in play; a real deployment should set API_BASE_URL on the server instead.
+ */
+const runtimeConfig = (typeof window !== 'undefined' ? (window as any).__RUNTIME_CONFIG__ : undefined) || {};
+
 /** Backend origin, e.g. http://localhost:5151. Defaults to the origin serving the app. */
-export const NEXUS_API_BASE_URL = ((env.VITE_API_BASE_URL || '').trim()
+export const NEXUS_API_BASE_URL = ((runtimeConfig.apiBaseUrl || '').trim()
+  || (env.VITE_API_BASE_URL || '').trim()
   || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/+$/, '');
 
 /** Optional tenant slug sent with login. Leave empty for a single-tenant install. */
