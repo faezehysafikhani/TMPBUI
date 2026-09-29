@@ -85,13 +85,16 @@ async function startServer() {
         const indexPath = path.join(distPath, "index.html");
         if (fs.existsSync(indexPath)) {
           try {
-            const host = (req.headers["x-forwarded-host"] || req.headers.host || "task.parspmi.ir").toString();
+            // index.html ships with "app.invalid" (a placeholder, not a real host) baked into its
+            // link-preview meta tags. Swap it for whatever origin actually served this request, so
+            // no specific deployment's domain needs to be hardcoded here or rebuilt into the bundle.
+            const host = (req.headers["x-forwarded-host"] || req.headers.host || "").toString();
             const proto = (req.headers["x-forwarded-proto"] || "https").toString();
             const currentOrigin = `${proto}://${host}`;
 
             let html = fs.readFileSync(indexPath, "utf-8");
-            if (host && !host.includes('task.parspmi.ir')) {
-              html = html.replace(/https:\/\/task\.parspmi\.ir/g, currentOrigin);
+            if (host) {
+              html = html.replace(/https:\/\/app\.invalid/g, currentOrigin);
             }
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             return res.send(html);
