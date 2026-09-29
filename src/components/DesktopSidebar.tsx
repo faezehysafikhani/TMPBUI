@@ -52,13 +52,24 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   const RADIUS = 40;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
+  // `position: sticky` unsticks once it runs out of room inside its own flex row - which, right
+  // before the footer, is exactly where a user would notice it detach and start scrolling with
+  // the page. `fixed` has no such edge case: it is pinned to the viewport for the entire scroll
+  // range. Right offset replicates where the sticky flex item used to sit (the ".../mx-auto
+  // .../px-3" main container from App.tsx, right-most child in this RTL row): the page's own
+  // side padding, plus, once the centered max-w-[1920px] container has margins of its own, that
+  // margin too. The spacer div below keeps the fixed sidebar's width reserved in the row so the
+  // main content doesn't shift into the space it used to occupy.
+  const fixedRight = 'max(0.75rem, calc((100vw - 1920px) / 2 + 0.75rem))';
+
   return (
-    // Sticky, pinned within the viewport: top offset matches the sticky `top`, and the height is
-    // derived from the viewport (100dvh, not 100vh, so mobile browser chrome can't make it
-    // overflow) minus that same top offset again for a matching gap at the bottom. Anything the
-    // sidebar's own content can't fit in that height scrolls internally (overflow-y-auto), never
-    // the page itself.
-    <aside className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm sticky top-20 h-[calc(100dvh-5rem-5rem)] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300">
+    <>
+    {/* Reserves the sidebar's width/gap in the flex row; the sidebar itself is fixed (out of flow). */}
+    <div className="hidden lg:block w-48 shrink-0" aria-hidden="true" />
+    <aside
+      className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm fixed z-20 top-20 h-[calc(100dvh-5rem-5rem)] overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300"
+      style={{ right: fixedRight }}
+    >
 
       {onOpenCreateModal && (
         <button
@@ -261,5 +272,6 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         </div>
       )}
     </aside>
+    </>
   );
 };
