@@ -225,7 +225,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
           transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0, 0, 1)',
           touchAction: 'pan-y',
         }}
-        className={`group relative rounded-2xl border transition-all duration-200 hover:shadow-md ${
+        className={`ui-surface group relative rounded-2xl border transition-all duration-200 hover:shadow-md ${
           canChangeStatus ? 'cursor-grab active:cursor-grabbing' : ''
         } ${
           isDraggingCard

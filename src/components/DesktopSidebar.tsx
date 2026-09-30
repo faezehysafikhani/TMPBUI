@@ -78,7 +78,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
         <button
           type="button"
           onClick={onOpenCreateModal}
-          className={`w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-tr ${palette.gradientFromTo} text-white font-bold text-xs rounded-xl shadow-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer`}
+          className={`ui-glow w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-tr ${palette.gradientFromTo} text-white font-bold text-xs rounded-xl shadow-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer`}
         >
           <Plus className="w-4 h-4 shrink-0" />
           <span>افزودن فعالیت</span>
@@ -108,7 +108,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           onClick={() => setActiveTab('kanban')}
           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'kanban'
-              ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
+              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
               : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
@@ -126,7 +126,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           onClick={() => setActiveTab('calendar')}
           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'calendar'
-              ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
+              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
               : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
@@ -143,7 +143,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           onClick={() => setActiveTab('chat')}
           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'chat'
-              ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
+              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
               : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
@@ -165,7 +165,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           onClick={() => setActiveTab('notes')}
           className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'notes'
-              ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
+              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
               : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >
@@ -220,7 +220,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           onClick={() => setActiveTab('settings')}
           className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'settings'
-              ? `${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
+              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
               : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
           }`}
         >

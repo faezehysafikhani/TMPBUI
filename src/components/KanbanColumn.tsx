@@ -83,7 +83,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
               e.stopPropagation();
               setIsCollapsed(!isCollapsed);
             }}
-            className={`w-7 h-7 rounded-xl flex items-center justify-center font-bold text-sm transition-all ${
+            className={`ui-raised w-7 h-7 rounded-xl flex items-center justify-center font-bold text-sm transition-all ${
               isCollapsed
                 ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900'
                 : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600'

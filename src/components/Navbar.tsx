@@ -41,7 +41,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
   return (
-    <header className="sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md text-white transition-colors duration-300">
+    <header className="ui-bar sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md text-white transition-colors duration-300">
       <div className="w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 py-3 sm:py-3.5">
         <div className="flex items-center justify-between gap-3">
           
@@ -91,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onOpenWelcomeModal}
                 title="داشبورد خلاصه وضعیت"
-                className="flex items-center gap-1.5 px-3 py-2 bg-slate-800/80 hover:bg-slate-800 text-indigo-300 hover:text-white rounded-xl text-xs font-semibold border border-indigo-500/30 transition-all shrink-0 cursor-pointer"
+                className="ui-raised-dark flex items-center gap-1.5 px-3 py-2 bg-slate-800/80 hover:bg-slate-800 text-indigo-300 hover:text-white rounded-xl text-xs font-semibold border border-indigo-500/30 transition-all shrink-0 cursor-pointer"
               >
                 <LayoutDashboard className="w-4 h-4 text-indigo-400" />
                 <span className="hidden md:inline">خلاصه وضعیت</span>
@@ -105,7 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onOpenNotificationModal}
                 title="اطلاعیه‌ها و هشدارها"
-                className="relative p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+                className="ui-raised-dark relative p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
               >
                 <Bell className={`w-4 h-4 ${unreadNotificationsCount > 0 ? palette.accentText : ''}`} />
                 {unreadNotificationsCount > 0 && (
@@ -123,7 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={onOpenUserGuide}
                 title="راهنمای کاربری"
                 aria-label="راهنمای کاربری"
-                className="p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+                className="ui-raised-dark p-2.5 text-slate-200 hover:text-white bg-slate-800/60 hover:bg-slate-800 rounded-xl border border-slate-700/80 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
               >
                 <CircleHelp className="w-4 h-4" />
               </button>
@@ -135,7 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={onToggleFilterBar}
                 title={isFilterBarOpen ? 'بستن فیلترها' : 'نمایش فیلترها'}
-                className={`p-2.5 rounded-xl border transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto ${
+                className={`ui-raised-dark p-2.5 rounded-xl border transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto ${
                   isFilterBarOpen
                     ? `${palette.accentBg} text-white ${palette.accentBorder} shadow-xs`
                     : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-slate-700/80'
@@ -164,7 +164,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={onOpenSettings}
                 title="پروفایل من"
                 aria-label="پروفایل من"
-                className="p-1 rounded-xl border border-slate-700/80 hover:border-indigo-400 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
+                className="ui-raised-dark p-1 rounded-xl border border-slate-700/80 hover:border-indigo-400 transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto"
               >
                 {currentUser.avatar ? (
                   <img

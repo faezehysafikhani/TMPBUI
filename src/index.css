@@ -15,6 +15,103 @@
   --shadow-2xl: 0 6px 12px rgb(15 23 42 / 0.12), 0 32px 64px -12px rgb(15 23 42 / 0.34);
 }
 
+/* ---------------------------------------------------------------------------------------------
+   Raised "3D" look. Unlayered on purpose so it wins over Tailwind's shadow utilities. Only
+   background-image overlays and box-shadows - never background-color, size, spacing or
+   transform (a transform on an ancestor would break the fixed desktop sidebar). The overlays
+   are translucent, so status tints under them (e.g. red overdue cards) still show, and the
+   Tailwind ring variables are kept at the front of every shadow so focus/drag rings still work.
+   --------------------------------------------------------------------------------------------- */
+:root {
+  --ui-rings: var(--tw-inset-shadow, 0 0 #0000), var(--tw-inset-ring-shadow, 0 0 #0000),
+    var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000);
+  --ui-glow: 79 70 229;
+}
+.palette-emerald { --ui-glow: 5 150 105; }
+.palette-rose { --ui-glow: 225 29 72; }
+.palette-amber { --ui-glow: 234 88 12; }
+.palette-cyan { --ui-glow: 8 145 178; }
+.palette-slate { --ui-glow: 51 65 85; }
+
+/* Surfaces: white rounded cards/panels/modals with a border (plus anything tagged ui-surface). */
+.ui-surface,
+:where([class*="rounded-2xl"], [class*="rounded-3xl"]):where([class*="bg-white"]):where([class*=" border "], [class*=" border-"], [class^="border"]):not([class*="bg-gradient"]):not([class*="bg-linear"]):not(button) {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.75) 0%, rgb(255 255 255 / 0) 42%, rgb(15 23 42 / 0.025) 100%);
+  box-shadow: var(--ui-rings),
+    inset 0 1px 0 rgb(255 255 255 / 0.95),
+    inset 0 -1px 0 rgb(15 23 42 / 0.04),
+    0 1px 2px rgb(15 23 42 / 0.06),
+    0 8px 18px -6px rgb(15 23 42 / 0.12),
+    0 22px 44px -18px rgb(30 41 59 / 0.22);
+}
+.dark .ui-surface,
+.dark :where([class*="rounded-2xl"], [class*="rounded-3xl"]):where([class*="bg-white"]):where([class*=" border "], [class*=" border-"], [class^="border"]):not([class*="bg-gradient"]):not([class*="bg-linear"]):not(button) {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.05) 0%, rgb(255 255 255 / 0) 45%, rgb(0 0 0 / 0.12) 100%);
+  box-shadow: var(--ui-rings),
+    inset 0 1px 0 rgb(255 255 255 / 0.06),
+    0 1px 2px rgb(0 0 0 / 0.3),
+    0 12px 28px -10px rgb(0 0 0 / 0.55);
+}
+
+/* Colored buttons (gradients and solid accent fills): glossy top highlight, darker bottom edge,
+   soft drop shadow. `ui-glow` adds a glow in the current palette color. */
+button:is([class*="bg-gradient-to"], [class*=" bg-indigo-600"], [class*=" bg-emerald-600"], [class*=" bg-rose-600"],
+  [class*=" bg-amber-600"], [class*=" bg-cyan-600"], [class*=" bg-violet-600"], [class*=" bg-blue-600"],
+  [class^="bg-indigo-600"], [class^="bg-emerald-600"], [class^="bg-rose-600"]),
+.ui-glossy,
+.ui-glow {
+  box-shadow: var(--ui-rings),
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -2px 4px rgb(0 0 0 / 0.14),
+    0 2px 3px rgb(15 23 42 / 0.12),
+    0 8px 16px -6px rgb(15 23 42 / 0.32);
+}
+.ui-glow.ui-glow {
+  box-shadow: var(--ui-rings),
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -2px 4px rgb(0 0 0 / 0.14),
+    0 2px 4px rgb(var(--ui-glow) / 0.25),
+    0 10px 22px -6px rgb(var(--ui-glow) / 0.55);
+}
+
+/* Small raised icon buttons/pills on light surfaces; pressed state sinks in. */
+.ui-raised {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.7), rgb(255 255 255 / 0) 55%);
+  box-shadow: var(--ui-rings),
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 1px 2px rgb(15 23 42 / 0.10),
+    0 4px 10px -3px rgb(15 23 42 / 0.20);
+}
+.dark .ui-raised {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0) 55%);
+  box-shadow: var(--ui-rings), inset 0 1px 0 rgb(255 255 255 / 0.08), 0 4px 10px -3px rgb(0 0 0 / 0.5);
+}
+
+/* Raised buttons on the dark header. */
+.ui-raised-dark {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.10), rgb(255 255 255 / 0) 60%);
+  box-shadow: var(--ui-rings),
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    inset 0 -1px 0 rgb(0 0 0 / 0.35),
+    0 4px 10px -2px rgb(0 0 0 / 0.45);
+}
+
+.ui-raised:active,
+.ui-raised-dark:active,
+.ui-glossy:active,
+.ui-glow.ui-glow:active {
+  box-shadow: var(--ui-rings), inset 0 2px 5px rgb(0 0 0 / 0.22);
+}
+
+/* Dark bars (header, footer): top sheen plus a deep shadow underneath. */
+.ui-bar {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.07) 0%, rgb(255 255 255 / 0) 55%, rgb(0 0 0 / 0.18) 100%);
+  box-shadow: var(--ui-rings),
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 4px 8px rgb(15 23 42 / 0.18),
+    0 14px 30px -10px rgb(15 23 42 / 0.45);
+}
+
 * {
   font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
 }
