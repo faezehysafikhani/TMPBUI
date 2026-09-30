@@ -602,7 +602,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     userId === currentUser.id ? 'شما' : contacts.find((c) => c.userId === userId)?.name || fallback;
 
   return (
-    <div className="bg-white dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden flex flex-col md:flex-row h-[75vh] min-h-[480px] relative" data-chat-root>
+    <div className="bg-white dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden flex flex-col md:flex-row h-[75vh] lg:h-[min(75vh,calc(100dvh-12rem))] min-h-[480px] relative" data-chat-root>
 
       {/* RIGHT SIDEBAR (RTL): team threads and people */}
       <div

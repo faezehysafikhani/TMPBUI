@@ -442,7 +442,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
   };
 
   return (
-    <div className="mt-8 pt-6 border-t border-slate-200/80 dark:border-slate-800 space-y-4">
+    <div className="mt-8 pt-6 lg:mt-3 lg:pt-4 border-t border-slate-200/80 dark:border-slate-800 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
           <span>آمار و تحلیل وضعیت فعالیت‌ها</span>
@@ -473,7 +473,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
             </div>
           </div>
 
-          <div className="h-72 sm:h-80 w-full relative my-auto">
+          <div className="h-72 sm:h-80 lg:h-[clamp(12rem,calc(100dvh-27rem),20rem)] w-full relative my-auto">
             {activeUserTasksCount > 0 ? (
               <Doughnut data={pieData} options={pieOptions} aria-label="نمودار وضعیت تاخیر فعالیت‌های جاری کاربر" />
             ) : (
@@ -528,7 +528,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
             </div>
           </div>
 
-          <div className="h-72 sm:h-80 w-full relative my-auto">
+          <div className="h-72 sm:h-80 lg:h-[clamp(12rem,calc(100dvh-27rem),20rem)] w-full relative my-auto">
             {assigneeBarData.some((d) => d.count > 0) ? (
               <Bar data={barData} options={barOptions} plugins={[barLabelPlugin]} aria-label="نمودار تعداد فعالیت‌ها بر اساس مسئول انجام" />
             ) : (

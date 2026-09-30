@@ -553,11 +553,16 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
         </div>
 
         {/* Calendar Days Grid */}
-        <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center">
+        <div
+          className="grid grid-cols-7 gap-1 sm:gap-2 text-center"
+          // Desktop: 5rem cells, shrunk (to 3.5rem at most) only when the month's rows would
+          // otherwise push the page past the screen height.
+          style={{ '--cal-cell-h': `clamp(3.5rem, calc((100dvh - 22rem) / ${Math.ceil((firstDayOfWeek + totalDays) / 7)} - 0.5rem), 5rem)` } as React.CSSProperties}
+        >
           
           {/* Empty Cells Offset */}
           {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-            <div key={`offset-${i}`} className="h-14 sm:h-20 rounded-2xl bg-slate-50/30 dark:bg-slate-900/30" />
+            <div key={`offset-${i}`} className="h-14 sm:h-20 lg:h-(--cal-cell-h) rounded-2xl bg-slate-50/30 dark:bg-slate-900/30" />
           ))}
 
           {/* Month Day Cells */}
@@ -589,7 +594,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
                   }
                 }}
                 title={holidayInfo.isHoliday ? holidayInfo.title : undefined}
-                className={`relative h-14 sm:h-20 p-1 sm:p-2 rounded-2xl border transition-all duration-200 flex flex-col justify-between items-center cursor-pointer ${
+                className={`relative h-14 sm:h-20 lg:h-(--cal-cell-h) p-1 sm:p-2 lg:p-1.5 rounded-2xl border transition-all duration-200 flex flex-col justify-between items-center cursor-pointer ${
                   isSelected
                     ? isRedDay
                       ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-200 dark:shadow-none scale-102 z-10'

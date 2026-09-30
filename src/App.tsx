@@ -1212,7 +1212,7 @@ export default function App() {
       )}
 
       {/* Main Container with Right Desktop Sidebar */}
-      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 sm:pt-6 pb-24 lg:pb-12">
+      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 sm:pt-6 lg:pt-4 pb-24 lg:pb-4">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           
           {/* Desktop Sidebar (Renders on Right Side in RTL) */}
@@ -1385,8 +1385,8 @@ export default function App() {
           pages the flex-1 main container above pushes it to the bottom of the screen. While the
           fixed desktop sidebar is open, it sits in the main column (sidebar 12rem + gap 1.5rem +
           page padding 0.75rem) so the sidebar never covers it. */}
-      <footer className={`w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-6 pb-4 ${isDesktopSidebarOpen ? 'lg:pr-[14.25rem]' : ''}`}>
-        <div className="ui-bar bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
+      <footer className={`w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-6 pb-4 lg:pt-3 lg:pb-3 ${isDesktopSidebarOpen ? 'lg:pr-[14.25rem]' : ''}`}>
+        <div className="ui-bar bg-slate-900 text-white rounded-2xl p-4 lg:py-3 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
           <span className="font-bold tracking-tight text-white/95">
             تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
           </span>
