@@ -18,7 +18,8 @@
 ## پیش‌نیازها
 
 - Node.js نسخه ۲۰ یا بالاتر
-- یک نمونه در حال اجرا از API سامانه NexusCore (آدرس آن در `VITE_API_BASE_URL` فایل `.env`)
+- یک نمونه در حال اجرا از API سامانه NexusCore. در Production آدرس API از
+  `config/runtime-config.js` داخل خروجی build خوانده می‌شود و بدون rebuild قابل تغییر است.
 
 ## راه‌اندازی
 
@@ -28,7 +29,8 @@
 npm install
 ```
 
-۲. ساخت فایل `.env` بر اساس `.env.example` و تنظیم مقادیر آن.
+۲. برای توسعه محلی، در صورت نیاز فایل `.env.development` را بر اساس
+`.env.development.example` بسازید.
 
 ۳. اجرای برنامه در حالت توسعه:
 
@@ -44,6 +46,22 @@ npm run dev
 npm run build
 npm start
 ```
+
+بعد از build، برای استقرار same-origin پشت IIS مقدارهای زیر را در
+`dist/config/runtime-config.js` خالی بگذارید:
+
+```js
+window.__TMPB_RUNTIME_CONFIG__ = {
+  apiBaseUrl: "",
+  signalRBaseUrl: "",
+  tenantSlug: "",
+  requestTimeoutMs: 30000
+};
+```
+
+در این حالت فرانت‌اند API را از `/api` و SignalR را از `/hubs/...` مصرف می‌کند.
+اگر Backend روی origin جداست، فقط همین فایل runtime را روی سرور تغییر دهید؛ نیازی به
+تغییر سورس یا اجرای دوباره `npm run build` نیست.
 
 ## دستورات
 

@@ -85,14 +85,7 @@ async function startServer() {
         const indexPath = path.join(distPath, "index.html");
         if (fs.existsSync(indexPath)) {
           try {
-            const host = (req.headers["x-forwarded-host"] || req.headers.host || "task.parspmi.ir").toString();
-            const proto = (req.headers["x-forwarded-proto"] || "https").toString();
-            const currentOrigin = `${proto}://${host}`;
-
             let html = fs.readFileSync(indexPath, "utf-8");
-            if (host && !host.includes('task.parspmi.ir')) {
-              html = html.replace(/https:\/\/task\.parspmi\.ir/g, currentOrigin);
-            }
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             return res.send(html);
           } catch (e) {

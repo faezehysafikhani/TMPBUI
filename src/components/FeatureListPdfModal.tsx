@@ -34,6 +34,11 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
 
     const contentElement = document.getElementById('pdf-report-content');
     const contentHtml = contentElement ? contentElement.innerHTML : '';
+    const documentStyles = Array.from(
+      document.querySelectorAll<HTMLStyleElement | HTMLLinkElement>('style, link[rel="stylesheet"]')
+    )
+      .map((element) => element.outerHTML)
+      .join('\n');
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -42,8 +47,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>دفترچه راهنما و کاتالوگ امکانات سامانه</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
+        ${documentStyles}
         <style>
           body { font-family: 'Vazirmatn', sans-serif; background: #f8fafc; color: #0f172a; padding: 16px; margin: 0; }
           @media print {
