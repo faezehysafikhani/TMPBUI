@@ -1,8 +1,9 @@
 /**
  * REST connection to the NexusCore backend (ASP.NET Core 8, TaskManagement module).
  *
- * This is the app's only backend. The origin comes from VITE_API_BASE_URL; without it the
- * app calls the origin it is served from (a reverse proxy in front of both).
+ * This is the app's only backend. In production, the origin is read at runtime from
+ * /config/runtime-config.js; without it the app calls the origin it is served from
+ * (a reverse proxy in front of both).
  *
  * The functions in dataService.ts delegate here; the components keep calling the same
  * functions and receive the same shapes.
@@ -39,16 +40,50 @@ import type { ServerNotificationDto } from '../utils/serverNotifications';
 // Configuration
 // ---------------------------------------------------------------------------
 
-const env = ((import.meta as any).env || {}) as Record<string, string | undefined>;
+const env = ((import.meta as any).env || {}) as Record<string, string | undefined | boolean>;
 
-/** Backend origin, e.g. http://localhost:5151. Defaults to the origin serving the app. */
-export const NEXUS_API_BASE_URL = ((env.VITE_API_BASE_URL || '').trim()
-  || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/+$/, '');
+interface RuntimeConfig {
+  apiBaseUrl?: string;
+  signalRBaseUrl?: string;
+  tenantSlug?: string;
+  requestTimeoutMs?: number | string;
+}
+
+declare global {
+  interface Window {
+    __TMPB_RUNTIME_CONFIG__?: RuntimeConfig;
+  }
+}
+
+const runtimeConfig: RuntimeConfig =
+  typeof window !== 'undefined' && window.__TMPB_RUNTIME_CONFIG__
+    ? window.__TMPB_RUNTIME_CONFIG__
+    : {};
+
+function cleanBaseUrl(value: unknown): string {
+  return typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
+}
+
+const isDevelopment = env.DEV === true || env.MODE === 'development';
+
+/** Backend origin. Empty means same-origin: /api/... */
+export const NEXUS_API_BASE_URL = cleanBaseUrl(
+  runtimeConfig.apiBaseUrl || (isDevelopment ? env.VITE_DEV_API_BASE_URL : '')
+);
+
+/** SignalR origin. Empty means same-origin: /hubs/... */
+export const NEXUS_SIGNALR_BASE_URL = cleanBaseUrl(
+  runtimeConfig.signalRBaseUrl
+  || runtimeConfig.apiBaseUrl
+  || (isDevelopment ? env.VITE_DEV_SIGNALR_BASE_URL || env.VITE_DEV_API_BASE_URL : '')
+);
 
 /** Optional tenant slug sent with login. Leave empty for a single-tenant install. */
-const NEXUS_TENANT_SLUG = (env.VITE_NEXUS_TENANT_SLUG || '').trim();
+const NEXUS_TENANT_SLUG = String(runtimeConfig.tenantSlug || env.VITE_NEXUS_TENANT_SLUG || '').trim();
 
-const REQUEST_TIMEOUT_MS = Number(env.VITE_API_TIMEOUT_MS) > 0 ? Number(env.VITE_API_TIMEOUT_MS) : 30000;
+const timeoutFromRuntime = Number(runtimeConfig.requestTimeoutMs);
+const timeoutFromEnv = Number(env.VITE_API_TIMEOUT_MS);
+const REQUEST_TIMEOUT_MS = timeoutFromRuntime > 0 ? timeoutFromRuntime : (timeoutFromEnv > 0 ? timeoutFromEnv : 30000);
 
 
 /** Name of the seeded system role (NexusCore.Infrastructure/Persistence/DefaultDataSeeder.cs). */
@@ -2206,7 +2241,7 @@ export function subscribeToTaskChanges(onChange: () => void): () => void {
     const hub = new HubConnectionBuilder()
       // The token travels as access_token; no cookies are needed. With credentials the browser's
       // negotiate request is refused by the API's CORS policy and live updates never connect.
-      .withUrl(`${NEXUS_API_BASE_URL}/hubs/task-management`, { accessTokenFactory: hubAccessToken, withCredentials: false })
+      .withUrl(`${NEXUS_SIGNALR_BASE_URL}/hubs/task-management`, { accessTokenFactory: hubAccessToken, withCredentials: false })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
       .build();
