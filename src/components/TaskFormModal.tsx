@@ -536,21 +536,23 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 my-auto text-slate-800 dark:text-slate-100 max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/55 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
+      <div className="relative w-full max-w-2xl bg-white/95 dark:bg-slate-900/95 rounded-[28px] shadow-[0_28px_90px_-30px_rgba(15,23,42,0.75)] border border-white/80 dark:border-slate-700/80 ring-1 ring-indigo-100/70 dark:ring-indigo-500/15 overflow-hidden animate-in fade-in zoom-in-95 my-auto text-slate-800 dark:text-slate-100 max-h-[90vh] flex flex-col">
         
-        <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[90vh] overflow-hidden">
+        <form onSubmit={handleSubmit} className="app-form flex flex-col h-full max-h-[90vh] overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3.5 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800 shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shrink-0">
+          <div className="relative flex items-center justify-between px-5 sm:px-6 py-4.5 bg-gradient-to-l from-indigo-100/90 via-white to-violet-100/80 dark:from-indigo-950/70 dark:via-slate-900 dark:to-violet-950/50 border-b border-indigo-200/70 dark:border-indigo-900/60 shrink-0 overflow-hidden">
+            <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-violet-500 via-indigo-500 to-sky-400" />
+            <div className="absolute -top-14 -left-8 w-32 h-32 rounded-full bg-violet-400/20 blur-3xl pointer-events-none" />
+            <div className="relative flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/30 shrink-0 ring-4 ring-white/80 dark:ring-slate-800 rotate-[-4deg]">
                 <Paperclip className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
+                <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
                   {taskToEdit ? 'ویرایش فعالیت' : 'ثبت فعالیت جدید'}
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
+                <p className="text-xs text-indigo-700/70 dark:text-indigo-200/70 hidden sm:block">
                   مشخصات فعالیت، موعد انجام، اولویت و فایل‌های ضمیمه را وارد کنید
                 </p>
               </div>
@@ -559,7 +561,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
+              className="relative p-2 text-indigo-400 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-white bg-white/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-700 rounded-xl border border-indigo-100/80 dark:border-slate-600 shadow-sm transition-all hover:rotate-90 cursor-pointer"
               title="بستن"
             >
               <X className="w-5 h-5" />
@@ -567,7 +569,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </div>
 
           {/* Form Body */}
-          <div className="p-5 space-y-4 overflow-y-auto grow">
+          <div className="p-5 sm:p-6 space-y-5 overflow-y-auto grow bg-gradient-to-b from-white to-slate-50/70 dark:from-slate-900 dark:to-slate-950/30">
 
           {/* Notice Banner for Assignees who can only update status */}
           {isStatusOnlyEdit && (
@@ -578,7 +580,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           )}
 
           {/* Title Input */}
-          <div>
+          <div className="flex items-center gap-3 pt-1"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-black shadow-md shadow-indigo-500/25">۱</span><div><p className="text-sm font-black text-slate-900 dark:text-white">شرح فعالیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">ابتدا عنوان روشن و توضیح کوتاه بنویسید.</p></div></div>
+          <div className="rounded-2xl border border-indigo-100/80 dark:border-indigo-900/50 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(79,70,229,0.55)]">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
               عنوان فعالیت <span className="text-rose-500">*</span>
             </label>
@@ -610,7 +613,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </div>
 
           {/* Description Input */}
-          <div>
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.45)]">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
               شرح توضیحات
             </label>
@@ -627,7 +630,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </div>
 
           {/* Jalali Date Time Picker & Status Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex items-center gap-3 pt-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white text-xs font-black shadow-md shadow-violet-500/25">۲</span><div><p className="text-sm font-black text-slate-900 dark:text-white">زمان‌بندی و مسئولیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">موعد، وضعیت و افراد مسئول را مشخص کنید.</p></div></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/90 dark:bg-slate-800/35 p-4 shadow-sm">
             
             {/* Jalali Date & Time Picker (not for a recurring task: its schedule sets the dates) */}
             {!hideDueDate && (
@@ -672,7 +676,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </div>
 
           {/* Work Team & Individual Member Selection */}
-          <div className="space-y-3 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
+          <div className="space-y-3 bg-white dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1 flex items-center justify-between">
                 <span className="flex items-center gap-1.5">
@@ -1737,18 +1741,18 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </div>
 
           {/* Form Actions Footer */}
-          <div className="p-4 bg-slate-50/80 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
+          <div className="p-4 sm:px-6 bg-white/90 dark:bg-slate-900/90 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2.5 shrink-0 shadow-[0_-10px_30px_-24px_rgba(15,23,42,0.4)]">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition-colors cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold transition-all cursor-pointer"
             >
               انصراف
             </button>
             <button
               type="submit"
               disabled={isUploading}
-              className={`px-5 py-2.5 rounded-xl ${palette.accentBg} ${palette.accentHover} text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
+              className={`px-5 py-2.5 rounded-xl ${palette.accentBg} ${palette.accentHover} text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
               <span>{taskToEdit ? 'ذخیره تغییرات' : 'ثبت فعالیت جدید'}</span>

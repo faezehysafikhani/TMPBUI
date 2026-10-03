@@ -1781,8 +1781,30 @@ export interface SmsPanelSettings {
   apiUrl: string;
   /** Write-only: empty keeps the stored key. Never filled from the server. */
   apiKey: string;
+  /** Write-only: empty keeps the stored value. Never filled from the server. */
+  username: string;
+  /** Write-only: empty keeps the stored value. Never filled from the server. */
+  password: string;
   lineNumber: string;
   apiKeyConfigured: boolean;
+  usernameConfigured: boolean;
+  passwordConfigured: boolean;
+  providers: SmsProviderConfiguration[];
+}
+
+export interface SmsProviderConfiguration {
+  id: string;
+  name: string;
+  provider: string;
+  enabled: boolean;
+  apiUrl: string;
+  apiKey: string;
+  lineNumber: string;
+  username: string;
+  password: string;
+  apiKeyConfigured: boolean;
+  usernameConfigured: boolean;
+  passwordConfigured: boolean;
 }
 
 export interface SmsProviderOption { key: string; displayName: string; defaultBaseUrl: string; }
@@ -1805,29 +1827,64 @@ export async function getSmsProviders(): Promise<SmsProviderOption[]> {
 
 export async function getSmsPanelSettings(): Promise<SmsPanelSettings> {
   const s = await request<{ sms: any }>('GET', CHANNELS);
+  const toProvider = (item: any, fallbackId: string): SmsProviderConfiguration => ({
+    id: item?.id || fallbackId,
+    name: item?.name || (item?.provider === 'kavenegar' ? 'کاوه‌نگار' : 'سرویس‌دهنده پیامک'),
+    provider: item?.provider || 'kavenegar',
+    enabled: !!item?.enabled,
+    apiUrl: item?.apiUrl || '',
+    apiKey: '',
+    lineNumber: item?.lineNumber || '',
+    username: '',
+    password: '',
+    apiKeyConfigured: !!item?.apiKeyConfigured,
+    usernameConfigured: !!item?.usernameConfigured,
+    passwordConfigured: !!item?.passwordConfigured,
+  });
+  const savedProviders = Array.isArray(s.sms?.providers)
+    ? s.sms.providers.map((item: any, index: number) => toProvider(item, `provider-${index}`))
+    : [toProvider(s.sms, '00000000-0000-0000-0000-000000000001')];
   return {
     enabled: !!s.sms?.enabled,
     provider: s.sms?.provider || 'kavenegar',
     apiUrl: s.sms?.apiUrl || '',
     apiKey: '',
+    username: '',
+    password: '',
     lineNumber: s.sms?.lineNumber || '',
     apiKeyConfigured: !!s.sms?.apiKeyConfigured,
+    usernameConfigured: !!s.sms?.usernameConfigured,
+    passwordConfigured: !!s.sms?.passwordConfigured,
+    providers: savedProviders,
   };
 }
 
 export async function saveSmsPanelSettings(settings: SmsPanelSettings): Promise<SmsPanelSettings> {
-  const saved = await request<{ sms: any }>('PUT', CHANNELS, {
+  await request<{ sms: any }>('PUT', CHANNELS, {
     body: {
       sms: {
         enabled: settings.enabled,
         provider: settings.provider,
         apiUrl: settings.apiUrl.trim() || null,
         apiKey: settings.apiKey.trim() || null,
+        username: settings.username.trim() || null,
+        password: settings.password || null,
         lineNumber: settings.lineNumber.trim() || null,
+        providers: settings.providers.map((provider) => ({
+          id: provider.id,
+          name: provider.name.trim(),
+          provider: provider.provider,
+          enabled: provider.enabled,
+          apiUrl: provider.apiUrl.trim() || null,
+          apiKey: provider.apiKey.trim() || null,
+          username: provider.username.trim() || null,
+          password: provider.password || null,
+          lineNumber: provider.lineNumber.trim() || null,
+        })),
       },
     },
   });
-  return { ...settings, apiKey: '', apiKeyConfigured: !!saved.sms?.apiKeyConfigured };
+  return getSmsPanelSettings();
 }
 
 export async function sendTestSms(phoneNumber: string, message?: string): Promise<{ success: boolean; message: string }> {

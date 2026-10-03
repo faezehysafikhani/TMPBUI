@@ -33,7 +33,6 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
     }
 
     const contentElement = document.getElementById('pdf-report-content');
-    const contentHtml = contentElement ? contentElement.innerHTML : '';
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -42,10 +41,8 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>دفترچه راهنما و کاتالوگ امکانات سامانه</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;900&display=swap" rel="stylesheet">
         <style>
-          body { font-family: 'Vazirmatn', sans-serif; background: #f8fafc; color: #0f172a; padding: 16px; margin: 0; }
+          body { font-family: 'Vazirmatn Variable', sans-serif; background: #f8fafc; color: #0f172a; padding: 16px; margin: 0; }
           @media print {
             body { background: #ffffff; padding: 0; }
             .no-print { display: none !important; }
@@ -62,28 +59,29 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
             <p class="text-xs text-slate-300 mt-1">جهت چاپ یا ذخیره فایل PDF روی گزینه چاپ کلیک کرده یا در صورت اتمام کار صفحه را ببندید.</p>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <button onclick="window.print()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 active:scale-95">
+            <button id="print-report" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black rounded-xl text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5 active:scale-95">
               <span>🖨️ چاپ دفترچه / ذخیره PDF</span>
             </button>
-            <button onclick="window.close()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 transition-all cursor-pointer active:scale-95">
+            <button id="close-report" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 transition-all cursor-pointer active:scale-95">
               <span>✕ بستن صفحه</span>
             </button>
           </div>
         </div>
 
-        <div class="max-w-3xl mx-auto bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 print-container shadow-sm">
-          ${contentHtml}
-        </div>
-
-        <script>
-          setTimeout(() => {
-            window.print();
-          }, 600);
-        </script>
+        <div id="print-content" class="max-w-3xl mx-auto bg-white p-6 sm:p-10 rounded-2xl border border-slate-200 print-container shadow-sm"></div>
       </body>
       </html>
     `);
     printWindow.document.close();
+    document.querySelectorAll('link[rel="stylesheet"], style').forEach((element) => {
+      printWindow.document.head.appendChild(printWindow.document.importNode(element, true));
+    });
+    if (contentElement) {
+      printWindow.document.getElementById('print-content')?.appendChild(printWindow.document.importNode(contentElement, true));
+    }
+    printWindow.document.getElementById('print-report')?.addEventListener('click', () => printWindow.print());
+    printWindow.document.getElementById('close-report')?.addEventListener('click', () => printWindow.close());
+    printWindow.setTimeout(() => printWindow.print(), 600);
   };
 
   const currentDateJalali = formatToJalali(new Date().toISOString());

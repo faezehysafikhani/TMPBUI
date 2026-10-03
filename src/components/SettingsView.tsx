@@ -63,8 +63,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onBackToKanban,
 }) => {
   // Profile Form States
-  const [profileName, setProfileName] = useState<string>('');
-  const [profileUsername, setProfileUsername] = useState<string>('');
   const [selectedAvatar, setSelectedAvatar] = useState<string>('');
   const [profilePhoneNumber, setProfilePhoneNumber] = useState<string>('');
   const [notifySms, setNotifySms] = useState<boolean>(true);
@@ -96,8 +94,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // which would otherwise wipe an avatar/photo the user just picked before they could save it.
   useEffect(() => {
     if (currentUser) {
-      setProfileName(currentUser.name || '');
-      setProfileUsername(currentUser.username || '');
       setSelectedAvatar(currentUser.avatar || '');
       setProfilePhoneNumber(currentUser.phoneNumber || '');
       setNotifySms(currentUser.notifySms !== undefined ? !!currentUser.notifySms : true);
@@ -152,12 +148,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setProfileMsg(null);
     try {
       await onSaveProfile({
-        name: profileName.trim(),
         avatar: selectedAvatar,
         phoneNumber: profilePhoneNumber.trim(),
         notifySms: notifySms,
       });
-      setProfileMsg({ type: 'success', text: 'تغییرات پروفایل، شماره همراه و تنظیمات اطلاع‌رسانی با موفقیت ذخیره شد 🎉' });
+      setProfileMsg({ type: 'success', text: 'آواتار، شماره همراه و تنظیمات اطلاع‌رسانی ذخیره شد 🎉' });
     } catch (err: any) {
       setProfileMsg({ type: 'error', text: userErrorMessage(err, 'خطا در ذخیره‌سازی پروفایل در دیتابیس.') });
     } finally {
@@ -174,7 +169,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* Section 2: User Profile & Avatar Form */}
       {currentUser && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-[0_8px_28px_-24px_rgba(15,23,42,0.4)] space-y-4">
           <button
             type="button"
             onClick={() => toggleSection('profile')}
@@ -201,7 +196,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </div>
               )}
 
-              <form onSubmit={handleSaveProfileSubmit} className="space-y-5">
+              <form onSubmit={handleSaveProfileSubmit} className="app-form space-y-5">
                 {/* Current Avatar & File Upload */}
                 <div className="flex flex-col sm:flex-row items-center gap-5 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-700/80">
                   <div className="relative shrink-0">
@@ -213,7 +208,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       />
                     ) : (
                       <div className="w-20 h-20 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold text-2xl border-2 border-indigo-400 shadow-md">
-                        {profileName ? profileName.charAt(0).toUpperCase() : <UserIcon className="w-10 h-10" />}
+                        {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : <UserIcon className="w-10 h-10" />}
                       </div>
                     )}
                     <button
@@ -299,7 +294,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
                 </div>
 
-                {/* Name & Username Inputs */}
+                {/* Identity fields are shown for reference; changes require administrator intervention. */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -307,11 +302,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </label>
                     <input
                       type="text"
-                      value={profileName}
-                      onChange={(e) => setProfileName(e.target.value)}
-                      placeholder="مثلاً: علی محمدی"
-                      required
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={currentUser.name || ''}
+                      readOnly
+                      aria-readonly="true"
+                      title="نام ثبت‌شده در پروفایل شخصی قابل تغییر نیست."
+                      className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-700 dark:text-slate-200 cursor-not-allowed"
                     />
                   </div>
 
@@ -321,13 +316,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </label>
                     <input
                       type="text"
-                      value={profileUsername}
+                      value={currentUser.username || ''}
                       readOnly
+                      aria-readonly="true"
                       title="نام کاربری (کد ملی) فقط توسط مدیر سامانه قابل تغییر است."
                       className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 dir-ltr text-right font-mono"
                     />
                   </div>
                 </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">نام، نام خانوادگی و شناسهٔ ورود پس از ثبت از این صفحه قابل ویرایش نیستند. برای اصلاح اطلاعات هویتی با مدیر سامانه تماس بگیرید.</p>
 
                 {/* Notification Inputs (SMS) */}
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-4">
@@ -387,7 +384,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     ) : (
                       <>
                         <Check className="w-4 h-4" />
-                        <span>ذخیره آواتار و مشخصات در دیتابیس</span>
+                        <span>ذخیره آواتار و تنظیمات پیامک</span>
                       </>
                     )}
                   </button>
@@ -404,7 +401,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 3: Work Team Management Card */}
       {currentUser && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-[0_8px_28px_-24px_rgba(15,23,42,0.4)] space-y-4">
           <button
             type="button"
             onClick={() => toggleSection('team')}
@@ -432,7 +429,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const appearanceContent = (
     <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 4: Light / Dark Mode Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-[0_8px_28px_-24px_rgba(15,23,42,0.4)] space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('themeMode')}
@@ -485,7 +482,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Section 5: Color Palette Selector Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-[0_8px_28px_-24px_rgba(15,23,42,0.4)] space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('colorPalette')}
@@ -540,7 +537,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Section 6: Background Pattern Theme Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-[0_8px_28px_-24px_rgba(15,23,42,0.4)] space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('patternBg')}
@@ -604,7 +601,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <div className="w-full space-y-6 animate-in fade-in duration-200">
       {/* Section 7: Feature Catalog & PDF Handbook (Collapsible, closed by default) */}
       {onOpenPdfCatalog && (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-[0_8px_28px_-24px_rgba(15,23,42,0.4)] space-y-4">
           <button
             type="button"
             onClick={() => toggleSection('catalog')}
@@ -658,7 +655,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Section 8: User Account Status & Logout Card - stays part of the "پروفایل" tab, alongside
   // the password/profile cards above.
   const accountStatusContent = (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs space-y-4">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-[0_8px_28px_-24px_rgba(15,23,42,0.4)] space-y-4">
         <button
           type="button"
           onClick={() => toggleSection('account')}

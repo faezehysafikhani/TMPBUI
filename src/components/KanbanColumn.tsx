@@ -66,14 +66,14 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
           onStatusChange(taskId, status);
         }
       }}
-      className={`w-full max-w-full overflow-hidden flex flex-col rounded-3xl border transition-all duration-300 bg-white/90 dark:bg-slate-900/80 shadow-2xs ${
+      className={`w-full max-w-full overflow-hidden flex flex-col rounded-3xl border transition-all duration-300 bg-gradient-to-b from-white to-slate-50/80 dark:from-slate-900 dark:to-slate-900/80 shadow-[0_10px_28px_-18px_rgba(15,23,42,0.55)] hover:shadow-[0_16px_34px_-18px_rgba(15,23,42,0.55)] ${
         isDragOver ? dragHighlightStyles[status] : `${cfg.borderColor} dark:border-slate-800`
       }`}
     >
       {/* Column Accordion Header */}
       <div
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="flex items-center justify-between p-3.5 sm:p-4 cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-700/50 rounded-3xl transition-colors select-none"
+        className="flex items-center justify-between p-3.5 sm:p-4 cursor-pointer hover:bg-indigo-50/40 dark:hover:bg-slate-700/50 rounded-3xl transition-colors select-none"
       >
         <div className="flex items-center gap-2.5">
           {/* Collapse/Expand Toggle Icon (+ / -) */}

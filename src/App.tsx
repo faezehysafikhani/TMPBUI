@@ -48,7 +48,6 @@ import {
   fetchUserTeamsPB,
   fetchUserTeamsAsyncPB,
   fetchAllUsersPB,
-  fetchSystemNotificationSettingsPB,
   fetchUnreadMessageCountsPB,
   extractResetTokenFromURL,
   ACTIVE_DATA_SERVER_URL,
@@ -197,22 +196,22 @@ export default function App() {
   const [initialDescriptionForNewTask, setInitialDescriptionForNewTask] = useState<string>('');
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
 
-  // Load all users and teams for AI Assistant context and team views. The organization-wide
+  // Load all users and teams for team views. The organization-wide
   // user list needs users.view - a restricted user (a plain task assignee/team member) does
   // not have it, so this only asks for it when the user actually holds the permission, instead
   // of firing a request that is bound to 403 on every Dashboard/Home load.
   const loadUsersAndTeams = useCallback(async () => {
     try {
-      if (can(currentUser, 'users.view')) {
-        const usersList = await fetchAllUsersPB();
+      const [usersList, teamsList] = await Promise.all([
+        can(currentUser, 'users.view') ? fetchAllUsersPB() : Promise.resolve(null),
+        currentUser ? fetchUserTeamsAsyncPB(currentUser.id) : Promise.resolve(null),
+      ]);
+      if (usersList) {
         setAllUsers(usersList);
       } else if (currentUser) {
         setAllUsers([currentUser]);
       }
-      if (currentUser) {
-        const teamsList = await fetchUserTeamsAsyncPB(currentUser.id);
-        setAllTeams(teamsList);
-      }
+      if (teamsList) setAllTeams(teamsList);
     } catch (err) {
       console.warn('Could not load user/team context:', err);
     }
@@ -284,17 +283,16 @@ export default function App() {
 
   // Load tasks & sync user profile on mount
   useEffect(() => {
-    async function syncUserAndTasks() {
+    function syncUserAndTasks() {
       if (getCurrentUser()) {
-        const liveUser = await refreshCurrentUserPB();
-        if (liveUser) {
+        refreshCurrentUserPB().then((liveUser) => {
+          if (!liveUser) return;
           setCurrentUser(liveUser);
           if (liveUser.theme) setAppColorTheme(liveUser.theme);
           if (liveUser.colorPalette) setAppColorPalette(liveUser.colorPalette);
           if (liveUser.themeMode) setThemeMode(liveUser.themeMode);
-        }
+        }).catch((err) => console.warn('Could not refresh user profile:', err));
       }
-      fetchSystemNotificationSettingsPB().catch((err) => console.warn('Sync notification settings error:', err));
       getUploadPolicy().then((policy) => setMaxAttachmentBytes(policy.maxFileSizeKb)).catch(() => {});
       loadTasks(true);
     }
@@ -1079,7 +1077,7 @@ export default function App() {
         {/* Ambient App Title Card in Background */}
         <div className="relative z-10 text-center max-w-sm mx-auto space-y-4 p-8 rounded-3xl bg-white/10 dark:bg-slate-900/50 border border-white/10 shadow-2xl backdrop-blur-md">
           <img 
-            src="/icon.svg" 
+            src="/tm-logo.png"
             alt="لوگو" 
             className="w-16 h-16 mx-auto rounded-2xl shadow-xl object-cover border border-white/20" 
           />
@@ -1145,7 +1143,7 @@ export default function App() {
             {/* App Logo Image */}
             <div className="relative p-2 rounded-2xl bg-slate-900 border border-white/15 shadow-2xl">
               <img 
-                src="/icon.svg" 
+                src="/tm-logo.png"
                 alt="لوگوی برنامه" 
                 className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover shadow-md"
               />
@@ -1178,6 +1176,18 @@ export default function App() {
           tasks={visibleTasks}
           isLoading={isLoading}
           onNavigateToTab={(tab) => handleNavigateTab(tab)}
+          onOpenTaskFilter={(filter) => {
+            setIsWelcomeModalOpen(false);
+            setShowFilterBar(true);
+            if (filter === 'completed') {
+              setStatusFilter('completed');
+              setTagFilter('all');
+            } else {
+              setStatusFilter('all');
+              setTagFilter('__is_project');
+            }
+            handleNavigateTab('kanban');
+          }}
         />
       )}
 
@@ -1198,16 +1208,16 @@ export default function App() {
         onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
       />
 
-      {/* Floating Restore Button for Desktop Sidebar when Collapsed */}
       {!isDesktopSidebarOpen && (
         <button
           type="button"
           onClick={handleToggleDesktopSidebar}
-          className="hidden lg:flex items-center gap-2 fixed right-0 top-24 z-20 px-3.5 py-2.5 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 border border-r-0 border-slate-200/90 dark:border-slate-800 rounded-l-2xl shadow-xl hover:bg-indigo-50 dark:hover:bg-slate-800 transition-all cursor-pointer group animate-in fade-in duration-200"
-          title="نمایش منوی سمت راست"
+          title="باز کردن منوی سمت راست"
+          aria-label="باز کردن منوی سمت راست"
+          className="hidden lg:flex fixed right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-20 flex-col items-center justify-center gap-1 rounded-l-xl border border-r-0 border-sky-200 bg-sky-50 text-indigo-700 shadow-[0_4px_10px_-5px_rgba(30,64,175,0.4)] hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-indigo-600 transition-colors cursor-pointer"
         >
-          <PanelRightOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
-          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">منوی راست</span>
+          <PanelRightOpen className="w-4 h-4" />
+          <span className="text-[10px] font-bold [writing-mode:vertical-rl]">منو</span>
         </button>
       )}
 
@@ -1236,7 +1246,7 @@ export default function App() {
 
 
           {/* Main Content Workspace */}
-          <main className="flex-1 w-full min-w-0">
+          <main className="flex-1 w-full lg:w-auto min-w-0">
         
         {/* Error Alert */}
         {pbError && (

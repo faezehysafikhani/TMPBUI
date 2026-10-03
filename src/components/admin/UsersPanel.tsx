@@ -201,6 +201,7 @@ const UserFormDialog: React.FC<{
   });
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [roleIds, setRoleIds] = useState<string[]>([]);
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -226,6 +227,7 @@ const UserFormDialog: React.FC<{
     if (form.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) return 'ایمیل معتبر نیست.';
     if (isNew && (form.password || '').length < 8) return 'رمز عبور اولیه باید حداقل ۸ کاراکتر باشد.';
     if (!isNew && form.password && form.password.length < 8) return 'رمز عبور جدید باید حداقل ۸ کاراکتر باشد.';
+    if (form.password !== passwordConfirm) return 'رمز عبور و تکرار آن یکسان نیستند.';
     return null;
   };
 
@@ -264,9 +266,9 @@ const UserFormDialog: React.FC<{
         </>
       }
     >
-      <form id="user-form" onSubmit={submit} className="space-y-4" noValidate>
+      <form id="user-form" onSubmit={submit} className="space-y-3" noValidate>
         {error && <Notice type="error">{error}</Notice>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30 p-3">
           <Field label="نام" required><input className={inputClass} value={form.firstName} onChange={set('firstName')} maxLength={80} autoFocus /></Field>
           <Field label="نام خانوادگی" required><input className={inputClass} value={form.lastName} onChange={set('lastName')} maxLength={80} /></Field>
           <Field label="نام کاربری (کد ملی)" required hint={!isNew && user?.username && !NATIONAL_CODE.test(user.username) ? 'نام کاربری فعلی پیش از قانون کد ملی ثبت شده؛ اگر تغییرش دهید باید کد ملی ۱۰ رقمی باشد.' : 'دقیقاً ۱۰ رقم، فقط عدد.'}>
@@ -278,16 +280,21 @@ const UserFormDialog: React.FC<{
           <Field label="ایمیل" hint="اختیاری؛ برای ارسال لینک بازیابی رمز عبور." className="sm:col-span-2">
             <input className={`${inputClass} dir-ltr text-right`} type="email" value={form.email} onChange={set('email')} autoComplete="off" />
           </Field>
-          <Field label={isNew ? 'رمز عبور اولیه' : 'رمز عبور جدید'} required={isNew} hint={isNew ? 'حداقل ۸ کاراکتر. آن را به‌صورت امن به کاربر اعلام کنید.' : 'خالی بگذارید تا رمز فعلی بماند. تغییر رمز، همه نشست‌های کاربر را می‌بندد.'} className="sm:col-span-2">
-            <input className={`${inputClass} dir-ltr text-right`} type="password" value={form.password} onChange={set('password')} autoComplete="new-password" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-violet-100 dark:border-violet-900 bg-violet-50/40 dark:bg-violet-950/20 p-3">
+          <Field label={isNew ? 'رمز عبور اولیه' : 'رمز عبور جدید'} required={isNew} hint={isNew ? 'حداقل ۸ کاراکتر.' : 'خالی بگذارید تا رمز فعلی بماند.'}>
+            <input className={`${inputClass} dir-ltr text-right`} type="password" value={form.password} onChange={set('password')} autoComplete="new-password" minLength={form.password || isNew ? 8 : undefined} />
+          </Field>
+          <Field label="تکرار رمز عبور" required={isNew} hint={passwordConfirm && form.password !== passwordConfirm ? 'رمزها یکسان نیستند.' : undefined}>
+            <input className={`${inputClass} dir-ltr text-right ${passwordConfirm && form.password !== passwordConfirm ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-400/40' : ''}`} type="password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} autoComplete="new-password" aria-invalid={!!passwordConfirm && form.password !== passwordConfirm} />
           </Field>
         </div>
         {isNew && canAssignRoles && roles.length > 0 && (
-          <div>
+          <div className="rounded-2xl border border-violet-100 dark:border-violet-900 bg-violet-50/40 dark:bg-violet-950/20 p-3">
             <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">نقش‌ها</span>
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => (
-                <label key={role.id} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-sm cursor-pointer">
+                <label key={role.id} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm cursor-pointer hover:border-indigo-400 hover:shadow-sm transition-all">
                   <input type="checkbox" checked={roleIds.includes(role.id)} onChange={(e) => setRoleIds((ids) => e.target.checked ? [...ids, role.id] : ids.filter((id) => id !== role.id))} />
                   <span>{roleTitle(role.name)}</span>
                 </label>

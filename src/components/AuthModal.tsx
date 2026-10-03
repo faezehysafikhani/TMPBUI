@@ -232,7 +232,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <div className="flex items-center gap-3">
             <img 
-              src="/icon.svg" 
+              src="/tm-logo.png"
               alt="لوگو" 
               className="w-12 h-12 rounded-2xl border border-indigo-400/30 shadow-lg object-cover shrink-0" 
             />
@@ -255,7 +255,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {mode === 'login' ? (
             /* Login Form */
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="app-form space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   نام کاربری یا شماره تلفن همراه
@@ -402,7 +402,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </button>
                 </div>
               ) : forgotStep === 'request' ? (
-                <form onSubmit={handleForgotPassword} className="space-y-4">
+                <form onSubmit={handleForgotPassword} className="app-form space-y-4">
                   <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                     نام کاربری یا شماره تلفن همراه ثبت‌شده را وارد نمایید. کد تأیید به شماره تلفن همراه ثبت‌شده برای حساب شما پیامک خواهد شد.
                   </p>
@@ -452,7 +452,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </button>
                 </form>
               ) : forgotStep === 'code' ? (
-                <form onSubmit={handleVerifyCode} className="space-y-4">
+                <form onSubmit={handleVerifyCode} className="app-form space-y-4">
                   {forgotInfo && (
                     <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-xs text-emerald-800 dark:text-emerald-200 flex items-start gap-2.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
@@ -517,7 +517,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </button>
                 </form>
               ) : (
-                <form onSubmit={handleSetNewPassword} className="space-y-4">
+                <form onSubmit={handleSetNewPassword} className="app-form space-y-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                       رمز عبور جدید

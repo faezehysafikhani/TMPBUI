@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@fontsource-variable/vazirmatn/wght.css";
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -112,13 +113,56 @@ button:is([class*="bg-gradient-to"], [class*=" bg-indigo-600"], [class*=" bg-eme
     0 14px 30px -10px rgb(15 23 42 / 0.45);
 }
 
+.navbar-clock {
+  position: relative;
+  isolation: isolate;
+  text-shadow: 0 2px 3px rgb(0 0 0 / 0.7), 0 0 16px rgb(129 140 248 / 0.28);
+}
+.navbar-clock::before {
+  content: '';
+  position: absolute;
+  inset: -5px -10px;
+  z-index: -1;
+  border-radius: 1.5rem;
+  background: radial-gradient(ellipse at center, rgb(7 12 30 / 0.72), rgb(7 12 30 / 0) 72%);
+  box-shadow: inset 0 10px 15px -14px rgb(0 0 0 / 0.85), inset 0 -10px 15px -14px rgb(0 0 0 / 0.75);
+  pointer-events: none;
+}
+
+.dashboard-chart-panel {
+  background: #fff;
+  background-image: none;
+}
+.dark .dashboard-chart-panel {
+  background: #0f172a;
+  background-image: none;
+}
+
+/* Consistent depth and focus treatment for the application's data-entry forms. */
+.app-form :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), textarea, select):not(:disabled) {
+  box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.045), 0 2px 6px -4px rgb(15 23 42 / 0.16);
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+.app-form :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), textarea, select):not(:disabled):hover {
+  border-color: rgb(165 180 252 / 0.9);
+}
+.app-form :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), textarea, select):not(:disabled):focus {
+  box-shadow: 0 0 0 3px rgb(99 102 241 / 0.16), 0 6px 16px -8px rgb(79 70 229 / 0.4);
+}
+.app-form label {
+  letter-spacing: -0.01em;
+}
+.dark .app-form :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), textarea, select):not(:disabled) {
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.15), 0 2px 6px -4px rgb(0 0 0 / 0.32);
+}
+
 * {
-  font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+  font-family: 'Vazirmatn Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
 }
 
 @layer base {
   body {
-    font-family: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Vazirmatn Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
 }
 

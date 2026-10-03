@@ -184,7 +184,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
       )}
 
       {/* Team Tabs & Create Team Button */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white dark:bg-slate-800/80 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           {teams.length === 0 ? (
             <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1">
@@ -224,7 +224,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
       {isCreatingTeam && (
         <form
           onSubmit={handleCreateTeam}
-          className="p-3 bg-indigo-50/50 dark:bg-indigo-950/40 rounded-2xl border border-indigo-200 dark:border-indigo-800 flex items-center gap-2 animate-in fade-in duration-200"
+          className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-indigo-100 dark:border-indigo-800 flex items-center gap-2 animate-in fade-in duration-200"
         >
           <input
             type="text"
@@ -261,7 +261,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
         <div className="space-y-4">
           
           {/* Active Team Header Info & Search Members Section */}
-          <div className="bg-white dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-700/80 pb-3">
               <div>
                 <h4 className="font-bold text-xs text-slate-900 dark:text-slate-100 flex items-center gap-2">

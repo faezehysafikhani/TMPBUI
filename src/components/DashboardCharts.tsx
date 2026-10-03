@@ -456,7 +456,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         
         {/* Chart 1: Pie Chart (وضعیت تاخیر فعالیت‌های کاربر - شروع نشده و در حال اجرا) */}
-        <div className="bg-white dark:bg-slate-900/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between md:col-span-5 lg:col-span-4">
+        <div className="dashboard-chart-panel rounded-3xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)] flex flex-col justify-between md:col-span-5 lg:col-span-4">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-rose-50 dark:bg-rose-950/60 rounded-xl text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900">
@@ -477,15 +477,16 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
             {activeUserTasksCount > 0 ? (
               <Doughnut data={pieData} options={pieOptions} aria-label="نمودار وضعیت تاخیر فعالیت‌های جاری کاربر" />
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400 dark:text-slate-500 font-medium text-center px-4">
-                هیچ فعالیت جاری (شروع‌نشده یا در حال اجرا) برای کاربر یافت نشد
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-4">
+                <span className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900 flex items-center justify-center text-rose-400"><Clock className="w-5 h-5" /></span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">فعالیت جاری برای شما ثبت نشده است</span>
               </div>
             )}
           </div>
         </div>
 
         {/* Chart 2: Bar Chart (تعداد بر اساس مسئول انجام) - Takes wider space on desktop */}
-        <div className="bg-white dark:bg-slate-900/90 rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col justify-between md:col-span-7 lg:col-span-8">
+        <div className="dashboard-chart-panel rounded-3xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-[0_18px_40px_-28px_rgba(15,23,42,0.45)] flex flex-col justify-between md:col-span-7 lg:col-span-8">
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900">
@@ -532,8 +533,9 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
             {assigneeBarData.some((d) => d.count > 0) ? (
               <Bar data={barData} options={barOptions} plugins={[barLabelPlugin]} aria-label="نمودار تعداد فعالیت‌ها بر اساس مسئول انجام" />
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-400 dark:text-slate-500 font-medium">
-                هیچ فعالیتی جهت نمایش یافت نشد
+              <div className="h-full flex flex-col items-center justify-center gap-3 text-center px-4">
+                <span className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center text-indigo-400"><Users className="w-5 h-5" /></span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">هنوز فعالیتی برای نمایش در نمودار ثبت نشده است</span>
               </div>
             )}
           </div>

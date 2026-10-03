@@ -1,5 +1,5 @@
-import React from 'react';
-import { Filter, LogIn, Bell, LayoutDashboard, CircleHelp, User as UserIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Filter, LogIn, Bell, LayoutDashboard, CircleHelp, User as UserIcon, CalendarDays, Clock3 } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { User as UserType, AppTheme, AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -39,17 +39,24 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettings,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
+  const [systemNow, setSystemNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setSystemNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const systemDate = new Intl.DateTimeFormat('fa-IR-u-ca-persian', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(systemNow);
+  const systemTime = new Intl.DateTimeFormat('fa-IR', { hour: '2-digit', minute: '2-digit', hour12: false }).format(systemNow);
 
   return (
     <header className="ui-bar sticky top-0 z-30 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-md text-white transition-colors duration-300">
       <div className="w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 py-3 sm:py-3.5">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           
           {/* Logo & Title */}
           <div className="flex items-center gap-3.5">
             <img 
-              src="/icon.svg" 
-              alt="لوگوی مدیریت وظایف (TM)" 
+              src="/tm-logo.png"
+              alt="لوگوی TM"
               className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl shadow-md shrink-0 object-cover border border-white/20 cursor-pointer hover:opacity-90 transition-opacity" 
               onClick={onOpenWelcomeModal}
             />
@@ -81,6 +88,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="navbar-clock order-3 w-full sm:order-none sm:w-auto flex items-center justify-center gap-3.5 px-5 py-1.5" title="تاریخ و ساعت دستگاه شما؛ بدون نیاز به اینترنت">
+            <span className="relative z-10 flex items-center gap-2 text-xs sm:text-sm font-bold text-indigo-100"><CalendarDays className="w-4 h-4 text-indigo-300 drop-shadow-[0_0_8px_rgba(165,180,252,0.8)]" />{systemDate}</span>
+            <span className="relative z-10 h-6 w-px bg-gradient-to-b from-transparent via-indigo-300/40 to-transparent" />
+            <span className="relative z-10 flex items-center gap-2 tabular-nums text-base sm:text-lg font-black tracking-wide text-white"><Clock3 className="w-4.5 h-4.5 text-indigo-300 drop-shadow-[0_0_8px_rgba(165,180,252,0.8)]" />{systemTime}</span>
           </div>
 
           {/* Quick Actions */}

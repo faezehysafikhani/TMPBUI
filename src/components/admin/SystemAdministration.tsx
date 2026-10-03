@@ -5,11 +5,12 @@ import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice,
 import { UsersPanel } from './UsersPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
 import { LdapPanel } from './LdapPanel';
+import { SsoPreparationPanel } from './SsoPreparationPanel';
 import { SmsPanel } from './SmsPanel';
 import { userErrorMessage } from '../../utils/errorMessages';
 
 type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users';
-type UsersTab = 'list' | 'history' | 'ldap';
+type UsersTab = 'list' | 'history' | 'ldap' | 'sso';
 
 /** Permission names the signed-in user holds. The server re-checks every call. */
 export function useMyPermissions(userId: string | undefined): Set<string> | null {
@@ -31,6 +32,7 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
     ...(can('users.view') ? [{ id: 'list' as const, label: 'مدیریت کاربران', icon: Users }] : []),
     ...(can('audit_logs.view') ? [{ id: 'history' as const, label: 'تاریخچه ورود', icon: History }] : []),
     ...(can('ldap_settings.view') ? [{ id: 'ldap' as const, label: 'LDAP', icon: Network }] : []),
+    ...(can('users.view') ? [{ id: 'sso' as const, label: 'ورود با SSO', icon: KeyRound }] : []),
   ];
   const [active, setActive] = useState<UsersTab>(tabs[0]?.id ?? 'list');
   const current = tabs.some((t) => t.id === active) ? active : tabs[0]?.id;
@@ -52,6 +54,7 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
       )}
       {current === 'history' && <LoginHistoryPanel />}
       {current === 'ldap' && <LdapPanel canUpdate={can('ldap_settings.update')} canTest={can('ldap_settings.test')} />}
+      {current === 'sso' && <SsoPreparationPanel />}
     </div>
   );
 };

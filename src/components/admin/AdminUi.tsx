@@ -5,7 +5,7 @@ import { toPersianDigits } from '../../utils/helpers';
 /** Shared building blocks of the administration screens (Settings), in one visual language. */
 
 export const AdminCard: React.FC<{ className?: string; children: React.ReactNode }> = ({ className = '', children }) => (
-  <div className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.04)] ${className}`}>
+  <div className={`bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-[0_8px_28px_-24px_rgba(15,23,42,0.4)] ${className}`}>
     {children}
   </div>
 );

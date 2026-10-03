@@ -10,14 +10,11 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: "10mb" }));
 
-// CORS middleware for Vercel and proxies
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
   next();
 });
 
@@ -85,14 +82,7 @@ async function startServer() {
         const indexPath = path.join(distPath, "index.html");
         if (fs.existsSync(indexPath)) {
           try {
-            const host = (req.headers["x-forwarded-host"] || req.headers.host || "task.parspmi.ir").toString();
-            const proto = (req.headers["x-forwarded-proto"] || "https").toString();
-            const currentOrigin = `${proto}://${host}`;
-
-            let html = fs.readFileSync(indexPath, "utf-8");
-            if (host && !host.includes('task.parspmi.ir')) {
-              html = html.replace(/https:\/\/task\.parspmi\.ir/g, currentOrigin);
-            }
+            const html = fs.readFileSync(indexPath, "utf-8");
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             return res.send(html);
           } catch (e) {

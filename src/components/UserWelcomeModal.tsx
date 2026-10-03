@@ -70,6 +70,7 @@ interface UserWelcomeModalProps {
   tasks: Task[];
   isLoading?: boolean;
   onNavigateToTab?: (tab: 'kanban' | 'calendar' | 'overdue' | 'chat' | 'notes') => void;
+  onOpenTaskFilter?: (filter: 'completed' | 'projects') => void;
 }
 
 export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
@@ -79,6 +80,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
   tasks,
   isLoading = false,
   onNavigateToTab,
+  onOpenTaskFilter,
 }) => {
   if (!isOpen || !currentUser) return null;
 
@@ -222,7 +224,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
             </div>
 
             {/* 3. Completed & Success Rate */}
-            <div className="p-4 rounded-2xl bg-emerald-950/35 backdrop-blur-md border border-emerald-500/40 flex flex-col justify-between space-y-2 hover:bg-emerald-900/45 hover:border-emerald-400/60 transition-all shadow-sm">
+            <button type="button" onClick={() => onOpenTaskFilter?.('completed')} className="text-right p-4 rounded-2xl bg-emerald-950/35 backdrop-blur-md border border-emerald-500/40 flex flex-col justify-between space-y-2 hover:bg-emerald-900/45 hover:border-emerald-400/60 transition-all shadow-sm cursor-pointer">
               <div className="flex items-center justify-between text-emerald-300">
                 <span className="text-[11px] font-bold">خاتمه یافته</span>
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -236,10 +238,10 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
                 </span>
               </div>
               <span className="text-[10px] text-emerald-200/90 font-medium">نرخ موفقیت کاری</span>
-            </div>
+            </button>
 
             {/* 4. Active Projects */}
-            <div className="p-4 rounded-2xl bg-purple-950/35 backdrop-blur-md border border-purple-500/40 flex flex-col justify-between space-y-2 hover:bg-purple-900/45 hover:border-purple-400/60 transition-all shadow-sm">
+            <button type="button" onClick={() => onOpenTaskFilter?.('projects')} className="text-right p-4 rounded-2xl bg-purple-950/35 backdrop-blur-md border border-purple-500/40 flex flex-col justify-between space-y-2 hover:bg-purple-900/45 hover:border-purple-400/60 transition-all shadow-sm cursor-pointer">
               <div className="flex items-center justify-between text-purple-300">
                 <span className="text-[11px] font-bold">پروژه‌ها</span>
                 <FolderKanban className="w-4 h-4 text-purple-400" />
@@ -248,7 +250,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
                 <AnimatedCounter value={projectTasks.length} />
               </div>
               <span className="text-[10px] text-purple-200/90 font-medium">پروژه‌های کلان</span>
-            </div>
+            </button>
           </div>
 
           {/* Quick Status Bar */}
