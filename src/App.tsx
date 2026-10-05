@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification, setMaxAttachmentBytes } from './types';
-import { getUploadPolicy } from './utils/uploadPolicy';
+import { getUploadPolicy, refreshUploadPolicy } from './utils/uploadPolicy';
 import { isOverdue, toPersianDigits, formatToJalali, getTaskLastModifiedTime, computeAutoTaskStatus } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { FilterBar } from './components/FilterBar';
@@ -323,6 +323,8 @@ export default function App() {
   useEffect(() => {
     const onFocus = async () => {
       if (!getCurrentUser()) return;
+      // The upload size limit can be changed by an admin at any time too.
+      refreshUploadPolicy().catch(() => {});
       const liveUser = await refreshCurrentUserPB();
       if (liveUser) setCurrentUser((prev) => (prev ? { ...prev, permissions: liveUser.permissions } : prev));
     };

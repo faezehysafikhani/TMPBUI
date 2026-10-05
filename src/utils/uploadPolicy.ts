@@ -1,4 +1,5 @@
 import { fetchUploadPolicy, UploadPolicy } from '../services/nexusApi';
+import { setMaxAttachmentBytes } from '../types';
 
 /** Accepted everywhere a user can upload a file: Excel, Word, PDF and images. */
 export const ALLOWED_UPLOAD_EXTENSIONS = ['.xlsx', '.xls', '.doc', '.docx', '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp'];
@@ -10,7 +11,7 @@ const DEFAULT_MAX_FILE_SIZE_KB = 200;
 
 let cachedPolicy: Promise<UploadPolicy> | null = null;
 
-/** The admin-configured upload limit, cached for the page's lifetime (falls back to 200 KB). */
+/** The admin-configured upload limit, cached until refreshUploadPolicy() (falls back to 200 KB). */
 export function getUploadPolicy(): Promise<UploadPolicy> {
   if (!cachedPolicy) {
     cachedPolicy = fetchUploadPolicy().catch(() => ({
@@ -19,6 +20,14 @@ export function getUploadPolicy(): Promise<UploadPolicy> {
     }));
   }
   return cachedPolicy;
+}
+
+/** Re-reads the limit from the server and applies it app-wide (after an admin changes it, or when
+ *  the window regains focus), so upload checks never keep using the value from page load. */
+export async function refreshUploadPolicy(): Promise<void> {
+  cachedPolicy = null;
+  const policy = await getUploadPolicy();
+  setMaxAttachmentBytes(policy.maxFileSizeKb);
 }
 
 export function isAllowedUploadFile(file: File): boolean {
