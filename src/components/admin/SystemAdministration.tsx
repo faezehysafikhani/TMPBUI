@@ -33,7 +33,7 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
     ...(can('users.view') ? [{ id: 'list' as const, label: 'مدیریت کاربران', icon: Users }] : []),
     ...(can('audit_logs.view') ? [{ id: 'history' as const, label: 'تاریخچه ورود', icon: History }] : []),
     ...(can('ldap_settings.view') ? [{ id: 'ldap' as const, label: 'LDAP', icon: Network }] : []),
-    ...(can('users.view') ? [{ id: 'sso' as const, label: 'ورود با SSO', icon: KeyRound }] : []),
+    ...(can('sso_settings.view') ? [{ id: 'sso' as const, label: 'ورود با SSO', icon: KeyRound }] : []),
   ];
   const [active, setActive] = useState<UsersTab>(tabs[0]?.id ?? 'list');
   const current = tabs.some((t) => t.id === active) ? active : tabs[0]?.id;
@@ -204,7 +204,7 @@ export const SystemAdministration: React.FC<{
     { id: 'appearance', label: 'ظاهر سامانه', icon: Palette },
     { id: 'help', label: 'راهنما', icon: FileText },
     ...(can('sms_settings.view') ? [{ id: 'sms' as const, label: 'پنل پیامکی', icon: MessageSquare }] : []),
-    ...(can('users.view') || can('audit_logs.view') || can('ldap_settings.view')
+    ...(can('users.view') || can('audit_logs.view') || can('ldap_settings.view') || can('sso_settings.view')
       ? [{ id: 'users' as const, label: 'مدیریت کاربران', icon: Users }] : []),
   ];
   const current = tabs.some((t) => t.id === active) ? active : 'profile';
