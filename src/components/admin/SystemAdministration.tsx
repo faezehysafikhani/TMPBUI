@@ -8,6 +8,7 @@ import { LdapPanel } from './LdapPanel';
 import { SsoPreparationPanel } from './SsoPreparationPanel';
 import { SmsPanel } from './SmsPanel';
 import { userErrorMessage } from '../../utils/errorMessages';
+import { refreshUploadPolicy } from '../../utils/uploadPolicy';
 
 type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users';
 type UsersTab = 'list' | 'history' | 'ldap' | 'sso';
@@ -140,6 +141,8 @@ const UploadSizeSettingsCard: React.FC = () => {
     setMessage(null);
     try {
       await updateMaxUploadSizeKb(kb);
+      // Apply the new limit to this open app right away, not only after a reload.
+      await refreshUploadPolicy();
       setMessage({ type: 'success', text: 'حداکثر حجم فایل آپلودی ذخیره شد.' });
     } catch (err: any) {
       setMessage({ type: 'error', text: userErrorMessage(err, 'ذخیره تنظیمات با خطا مواجه شد.') });
