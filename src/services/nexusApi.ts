@@ -34,6 +34,7 @@ import {
 import { iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { NETWORK_ERROR, TIMEOUT_ERROR, persianApiMessage } from '../utils/errorMessages';
+import { normalizeAvatar } from '../utils/avatars';
 import type { ServerNotificationDto } from '../utils/serverNotifications';
 
 // ---------------------------------------------------------------------------
@@ -619,7 +620,7 @@ export function mapUserDto(u: UserDto): User {
     username: u.username || '',
     email: u.email || '',
     name: u.displayName || u.username || '',
-    avatar: u.avatarUrl || undefined,
+    avatar: normalizeAvatar(u.avatarUrl),
     theme: (u.theme as User['theme']) || undefined,
     colorPalette: (u.colorPalette as User['colorPalette']) || undefined,
     themeMode: (u.themeMode as User['themeMode']) || undefined,
@@ -1001,7 +1002,7 @@ export interface ChatContactDto {
 export async function fetchChatDirectory(): Promise<ChatContactDto[]> {
   if (!readSession()) return [];
   const contacts = await request<{ id: string; displayName: string; avatarUrl?: string | null }[]>('GET', '/api/chat/direct/directory');
-  return (contacts || []).map((c) => ({ id: c.id, name: c.displayName, avatar: c.avatarUrl || undefined }));
+  return (contacts || []).map((c) => ({ id: c.id, name: c.displayName, avatar: normalizeAvatar(c.avatarUrl) }));
 }
 
 export async function deleteUser(userId: string): Promise<void> {
@@ -2057,7 +2058,7 @@ async function mapDirectMessage(m: DirectMessageDto): Promise<DirectMessage> {
     id: m.id,
     senderId: m.senderUserId,
     senderName: m.senderDisplayName || 'کاربر',
-    senderAvatar: m.senderAvatarUrl || undefined,
+    senderAvatar: normalizeAvatar(m.senderAvatarUrl),
     receiverId: m.receiverUserId,
     text: m.text,
     attachmentUrl: m.attachment ? (await attachmentUrlFor(m.id)) || undefined : undefined,
@@ -2136,7 +2137,7 @@ async function mapTeamMessage(m: TeamMessageDto): Promise<DirectMessage> {
     id: m.id,
     senderId: m.senderUserId,
     senderName: m.senderDisplayName || 'کاربر',
-    senderAvatar: m.senderAvatarUrl || undefined,
+    senderAvatar: normalizeAvatar(m.senderAvatarUrl),
     receiverId: m.teamId,
     text: m.text,
     attachmentUrl: m.attachment ? (await attachmentUrlFor(m.id)) || undefined : undefined,
