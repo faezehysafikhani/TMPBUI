@@ -41,6 +41,8 @@ interface TaskCardProps {
   onViewDetails?: (task: Task) => void;
   onOpenProjectDetails?: (task: Task) => void;
   onToggleSubTask?: (taskId: string, subTaskId: string) => void;
+  /** «نمایش اطلاعات» in the grouping bar: when false, the owner, responsible and tag chips are hidden. */
+  showDetails?: boolean;
 }
 
 const TaskCardBase: React.FC<TaskCardProps> = ({
@@ -53,6 +55,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
   onViewDetails,
   onOpenProjectDetails,
   onToggleSubTask,
+  showDetails = true,
 }) => {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showSubTasks, setShowSubTasks] = useState(false);
@@ -315,7 +318,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             </span>
           )}
 
-          {task.ownerName && (
+          {showDetails && task.ownerName && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700" title="مالک / ایجادکننده فعالیت">
               <UserIcon className="w-2.5 h-2.5 text-slate-500 dark:text-slate-400" />
               <span>مالک: {task.ownerName}</span>
@@ -324,7 +327,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
 
           {/* NOTE: main work team tag (task.assignedTeamName) and status tags are excluded from card tags */}
 
-          {responsibleNamesOf(task) && (
+          {showDetails && responsibleNamesOf(task) && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
               <UserIcon className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
               <span>مسئول: {responsibleNamesOf(task)}</span>
@@ -346,7 +349,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             </button>
           )}
 
-          {task.tags &&
+          {showDetails && task.tags &&
             task.tags
               .filter((t) => t !== 'تکرارشونده' && t !== 'تکرار' && t !== 'فعالیت تکرارشونده')
               .map((t, idx) => (

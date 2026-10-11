@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Filter, LogIn, Bell, LayoutDashboard, CircleHelp, User as UserIcon, CalendarDays, Clock3 } from 'lucide-react';
+import { Filter, Layers, LogIn, Bell, LayoutDashboard, CircleHelp, User as UserIcon, CalendarDays, Clock3 } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { User as UserType, AppTheme, AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -10,6 +10,9 @@ interface NavbarProps {
   /** Only on the Kanban page, the one the filters apply to: the filter button is not shown elsewhere. */
   onToggleFilterBar?: () => void;
   isFilterBarOpen: boolean;
+  /** Kanban only, like the filter button: opens «نوار گروه‌بندی و تنظیمات نمای کارت». */
+  onToggleGroupingBar?: () => void;
+  isGroupingBarOpen?: boolean;
   currentUser: UserType | null;
   currentTheme: AppTheme;
   appColorPalette?: AppColorPalette;
@@ -28,6 +31,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   completedTasks,
   onToggleFilterBar,
   isFilterBarOpen,
+  onToggleGroupingBar,
+  isGroupingBarOpen = false,
   currentUser,
   currentTheme,
   appColorPalette = 'indigo',
@@ -155,6 +160,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <Filter className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Grouping & Card View Button (Icon Only) - Kanban only */}
+            {onToggleGroupingBar && (
+              <button
+                type="button"
+                onClick={onToggleGroupingBar}
+                title={isGroupingBarOpen ? 'بستن گروه‌بندی و نمای کارت' : 'گروه‌بندی و تنظیمات نمای کارت'}
+                aria-label="گروه‌بندی و تنظیمات نمای کارت"
+                aria-pressed={isGroupingBarOpen}
+                className={`ui-raised-dark p-2.5 rounded-xl border transition-all shrink-0 cursor-pointer flex items-center justify-center my-auto ${
+                  isGroupingBarOpen
+                    ? `${palette.accentBg} text-white ${palette.accentBorder} shadow-xs`
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border-slate-700/80'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
               </button>
             )}
 

@@ -4,6 +4,8 @@ import { getUploadPolicy, refreshUploadPolicy } from './utils/uploadPolicy';
 import { isOverdue, toPersianDigits, formatToJalali, getTaskLastModifiedTime, computeAutoTaskStatus } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { FilterBar } from './components/FilterBar';
+import { BoardViewBar } from './components/BoardViewBar';
+import { BoardViewSettings, loadBoardView, saveBoardView } from './utils/boardView';
 import { KanbanBoard } from './components/KanbanBoard';
 import { SandwichBar, ActiveTab } from './components/SandwichBar';
 import { DesktopSidebar } from './components/DesktopSidebar';
@@ -131,6 +133,13 @@ export default function App() {
   }, [activeTab]);
 
   const [showFilterBar, setShowFilterBar] = useState(false);
+  // «نوار گروه‌بندی و تنظیمات نمای کارت»: open state, and the choices (remembered in this browser).
+  const [showGroupingBar, setShowGroupingBar] = useState(false);
+  const [boardView, setBoardView] = useState<BoardViewSettings>(loadBoardView);
+  const handleBoardViewChange = useCallback((next: BoardViewSettings) => {
+    setBoardView(next);
+    saveBoardView(next);
+  }, []);
   // The user guide opens only from the header's "?" button, never on its own.
   const [isUserGuideOpen, setIsUserGuideOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1199,6 +1208,8 @@ export default function App() {
         completedTasks={completedCount}
         onToggleFilterBar={activeTab === 'kanban' ? () => setShowFilterBar((prev) => !prev) : undefined}
         isFilterBarOpen={showFilterBar}
+        onToggleGroupingBar={activeTab === 'kanban' ? () => setShowGroupingBar((prev) => !prev) : undefined}
+        isGroupingBarOpen={showGroupingBar}
         currentUser={currentUser}
         currentTheme={appColorTheme}
         appColorPalette={appColorPalette}
@@ -1282,6 +1293,11 @@ export default function App() {
           />
         )}
 
+        {/* Grouping & card view bar (Toggleable) */}
+        {showGroupingBar && activeTab === 'kanban' && !isPageTransitioning && (
+          <BoardViewBar settings={boardView} onChange={handleBoardViewChange} onClose={() => setShowGroupingBar(false)} />
+        )}
+
         {/* Page Switch Loading Spinner with Active Theme Color */}
         {isPageTransitioning ? (
           <PageViewLoader appColorPalette={appColorPalette} />
@@ -1301,6 +1317,7 @@ export default function App() {
                   onViewDetails={handleOpenTaskDetail}
                   onOpenProjectDetails={handleOpenProjectDetails}
                   onToggleSubTask={handleToggleSubTask}
+                  view={boardView}
                 />
               </div>
             )}

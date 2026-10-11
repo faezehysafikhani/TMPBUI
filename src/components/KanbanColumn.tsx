@@ -17,6 +17,7 @@ interface KanbanColumnProps {
   onViewDetails?: (task: Task) => void;
   onOpenProjectDetails?: (task: Task) => void;
   onToggleSubTask?: (taskId: string, subTaskId: string) => void;
+  showDetails?: boolean;
 }
 
 const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
@@ -31,6 +32,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
   onViewDetails,
   onOpenProjectDetails,
   onToggleSubTask,
+  showDetails = true,
 }) => {
   // Default state is COLLAPSED by user request
   const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
@@ -156,6 +158,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
                   key={task.id}
                   task={task}
                   currentUser={currentUser}
+                  showDetails={showDetails}
                   onEdit={onEditTask}
                   onDelete={onDeleteTask}
                   onStatusChange={onStatusChange}
