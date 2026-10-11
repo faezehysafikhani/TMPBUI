@@ -104,17 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Dashboard Executive Summary Button */}
-            {currentUser && onOpenWelcomeModal && (
-              <button
-                type="button"
-                onClick={onOpenWelcomeModal}
-                title="داشبورد خلاصه وضعیت"
-                className="ui-raised-dark flex items-center gap-1.5 px-3 py-2 bg-slate-800/80 hover:bg-slate-800 text-indigo-300 hover:text-white rounded-xl text-xs font-semibold border border-indigo-500/30 transition-all shrink-0 cursor-pointer"
-              >
-                <LayoutDashboard className="w-4 h-4 text-indigo-400" />
-                <span className="hidden md:inline">خلاصه وضعیت</span>
-              </button>
-            )}
+            
 
 
             {/* Notification Bell Button */}
