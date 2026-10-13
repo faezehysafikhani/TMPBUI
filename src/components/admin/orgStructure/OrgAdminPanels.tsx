@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Plus, Pencil, Trash2, Network, Link2, Unlink, Loader2, Ban } from 'lucide-react';
+import { Plus, Pencil, Trash2, Network, Link2, Unlink, Loader2, Ban, CheckCircle2 } from 'lucide-react';
 import {
   AdminCard, AdminDialog, Field, IconAction, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass,
 } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
 import {
-  Company, CompanyUnitLink, OrgUnit, Position, buildUnitTree, createCompany, createOrgUnit, createPosition, deactivateOrgUnit,
-  deleteCompany, deletePosition, flattenUnitTree, linkUnitToCompany, listCompanies, listCompanyUnits, listOrgUnits,
-  listPositions, unitSubtreeIds, unlinkUnit, updateCompany, updateOrgUnit, updatePosition,
+  Company, CompanyUnitLink, OrgUnit, Position, createCompany, createOrgUnit, createPosition, deactivateOrgUnit,
+  deleteCompany, deletePosition, linkUnitToCompany, listCompanies, listCompanyUnits, listOrgUnits,
+  listPositions, sortOrgUnits, unlinkUnit, updateCompany, updateOrgUnit, updatePosition,
 } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, UserPicker, useLoad, useUserNames } from './orgShared';
 
@@ -160,7 +160,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
   );
 };
 
-/** Which deputies (top units) belong to a company. Units below a linked unit follow it. */
+/** Which units belong to a company. */
 const CompanyUnitsDialog: React.FC<{
   company: Company;
   units: OrgUnit[];
@@ -172,15 +172,11 @@ const CompanyUnitsDialog: React.FC<{
   const [selected, setSelected] = useState('');
   const { busy, run } = useAction(onChanged, setMessage);
 
-  // A unit can be linked when neither it, a unit above it, nor a unit below it is linked yet.
   const covered = useMemo(() => {
-    const set = new Set<string>();
-    links.forEach((l) => unitSubtreeIds(units, l.unitId).forEach((id) => set.add(id)));
-    return set;
-  }, [links, units]);
+    return new Set(links.map((link) => link.unitId));
+  }, [links]);
   const eligible = useMemo(
-    () => flattenUnitTree(buildUnitTree(units.filter((u) => u.isActive)))
-      .filter((u) => !covered.has(u.id) && ![...unitSubtreeIds(units, u.id)].some((id) => id !== u.id && covered.has(id))),
+    () => sortOrgUnits(units.filter((unit) => unit.isActive && !covered.has(unit.id))),
     [units, covered],
   );
   const mine = links.filter((l) => l.companyId === company.id);
@@ -188,7 +184,7 @@ const CompanyUnitsDialog: React.FC<{
   return (
     <AdminDialog title={`معاونت‌های ${company.name}`} onClose={onClose} footer={<SecondaryButton onClick={onClose}>بستن</SecondaryButton>}>
       {message && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
-      <p className="text-xs text-slate-500 leading-relaxed">هر معاونت (یا واحد بالادستی) که به شرکت اختصاص داده شود، همه واحدهای زیرمجموعه‌اش هم متعلق به همان شرکت می‌شوند.</p>
+      <p className="text-xs text-slate-500 leading-relaxed">معاونت‌ها و واحدها را به‌صورت جداگانه به شرکت اختصاص دهید.</p>
       <div className="space-y-2">
         {mine.length === 0 ? <p className="text-sm text-slate-500">هنوز معاونتی اختصاص داده نشده است.</p> : mine.map((l) => (
           <div key={l.unitId} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
@@ -200,7 +196,7 @@ const CompanyUnitsDialog: React.FC<{
       <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
         <select className={inputClass} value={selected} onChange={(e) => setSelected(e.target.value)}>
           <option value="">انتخاب معاونت یا واحد...</option>
-          {eligible.map((u) => <option key={u.id} value={u.id}>{' '.repeat(u.depth * 3)}{u.name}</option>)}
+          {eligible.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <PrimaryButton disabled={!selected || busy} onClick={async () => { if (await run(() => linkUnitToCompany(selected, company.id), 'معاونت به شرکت اختصاص یافت.', 'اختصاص معاونت انجام نشد.')) setSelected(''); }}>
           <Link2 className="w-4 h-4" /> افزودن
@@ -213,7 +209,7 @@ const CompanyUnitsDialog: React.FC<{
 
 // ============================================================================ units (Nexus.Organization)
 
-interface UnitDraft { id?: string; name: string; code: string; parentId: string | null; managerUserId: string | null; managerName: string | null; isActive: boolean }
+interface UnitDraft { id?: string; name: string; managerUserId: string | null; managerName: string | null; isActive: boolean }
 
 export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canDeactivate: boolean }> = ({ canCreate, canUpdate, canDeactivate }) => {
   const data = useLoad(async () => {
@@ -225,25 +221,19 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
   const [draft, setDraft] = useState<UnitDraft | null>(null);
   const { busy, run } = useAction(data.reload, setMessage);
 
-  const rows = useMemo(() => (data.data ? flattenUnitTree(buildUnitTree(data.data.units)) : []), [data.data]);
+  const rows = useMemo(() => (data.data ? sortOrgUnits(data.data.units) : []), [data.data]);
   const companyOf = useMemo(() => {
     const map = new Map<string, string>();
     if (!data.data) return map;
-    for (const link of data.data.links) unitSubtreeIds(data.data.units, link.unitId).forEach((id) => map.set(id, link.companyName));
+    for (const link of data.data.links) map.set(link.unitId, link.companyName);
     return map;
   }, [data.data]);
-  const parentOptions = useMemo(() => {
-    if (!draft || !data.data) return rows;
-    const blocked = draft.id ? unitSubtreeIds(data.data.units, draft.id) : new Set<string>();
-    return rows.filter((u) => !blocked.has(u.id));
-  }, [draft, rows, data.data]);
-
   const save = async () => {
     if (!draft) return;
     const ok = await run(
       () => draft.id
-        ? updateOrgUnit(draft.id, { name: draft.name, code: draft.code, parentId: draft.parentId, managerUserId: draft.managerUserId, isActive: draft.isActive })
-        : createOrgUnit({ name: draft.name, code: draft.code, parentId: draft.parentId }),
+        ? updateOrgUnit(draft.id, { name: draft.name, managerUserId: draft.managerUserId, isActive: draft.isActive })
+        : createOrgUnit({ name: draft.name }),
       draft.id ? 'واحد ویرایش شد.' : 'واحد ایجاد شد.',
       'ذخیره واحد انجام نشد.',
     );
@@ -260,7 +250,7 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
             <p className="text-xs text-slate-500 mt-0.5">درخت واحدهای سازمانی. مدیر هر واحد، مدیر پیش‌فرض کارکنان آن واحد است.</p>
           </div>
           {canCreate && (
-            <PrimaryButton onClick={() => setDraft({ name: '', code: '', parentId: null, managerUserId: null, managerName: null, isActive: true })}>
+            <PrimaryButton onClick={() => setDraft({ name: '', managerUserId: null, managerName: null, isActive: true })}>
               <Plus className="w-4 h-4" /> واحد جدید
             </PrimaryButton>
           )}
@@ -270,26 +260,38 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px]">
                 <thead className="bg-slate-50 dark:bg-slate-800/60"><tr>
-                  <th className={th}>نام واحد</th><th className={th}>کد</th><th className={th}>مدیر واحد</th><th className={th}>شرکت</th><th className={th}>وضعیت</th><th className={th} />
+                  <th className={th}>نام واحد</th><th className={th}>مدیر واحد</th><th className={th}>شرکت</th><th className={th}>وضعیت</th><th className={th} />
                 </tr></thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.map((u) => (
                     <tr key={u.id}>
                       <td className={td}>
-                        <span className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100" style={{ paddingRight: `${u.depth * 1.25}rem` }}>
-                          <Network className={`w-4 h-4 shrink-0 ${u.depth === 0 ? 'text-indigo-600' : 'text-slate-400'}`} /> {u.name}
+                        <span className="flex items-center gap-2 font-bold text-slate-900 dark:text-slate-100">
+                          <Network className="w-4 h-4 shrink-0 text-indigo-600" /> {u.name}
                         </span>
                       </td>
-                      <td className={`${td} dir-ltr text-right text-slate-500`}>{u.code}</td>
                       <td className={td}>{u.managerUserId ? names.get(u.managerUserId) || 'کاربر' : '—'}</td>
                       <td className={td}>{companyOf.get(u.id) || <span className="text-xs text-slate-400">بدون شرکت</span>}</td>
                       <td className={td}>{u.isActive ? <StatusBadge tone="green">فعال</StatusBadge> : <StatusBadge tone="red">غیرفعال</StatusBadge>}</td>
                       <td className={`${td} whitespace-nowrap text-left`}>
                         {canUpdate && (
-                          <IconAction icon={Pencil} label="ویرایش" onClick={() => setDraft({ id: u.id, name: u.name, code: u.code, parentId: u.parentId, managerUserId: u.managerUserId, managerName: u.managerUserId ? names.get(u.managerUserId) || 'کاربر' : null, isActive: u.isActive })} />
+                          <IconAction icon={Pencil} label="ویرایش" onClick={() => setDraft({ id: u.id, name: u.name, managerUserId: u.managerUserId, managerName: u.managerUserId ? names.get(u.managerUserId) || 'کاربر' : null, isActive: u.isActive })} />
                         )}
                         {canDeactivate && u.isActive && (
                           <IconAction icon={Ban} tone="rose" label="غیرفعال کردن" disabled={busy} onClick={() => run(() => deactivateOrgUnit(u.id), 'واحد غیرفعال شد.', 'غیرفعال کردن واحد انجام نشد.')} />
+                        )}
+                        {canUpdate && !u.isActive && (
+                          <IconAction
+                            icon={CheckCircle2}
+                            tone="emerald"
+                            label="فعال‌سازی"
+                            disabled={busy}
+                            onClick={() => run(
+                              () => updateOrgUnit(u.id, { name: u.name, managerUserId: u.managerUserId, isActive: true }),
+                              'واحد فعال شد.',
+                              'فعال‌سازی واحد انجام نشد.',
+                            )}
+                          />
                         )}
                       </td>
                     </tr>
@@ -306,19 +308,10 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
           onClose={() => setDraft(null)}
           footer={<>
             <SecondaryButton onClick={() => setDraft(null)}>انصراف</SecondaryButton>
-            <PrimaryButton onClick={save} disabled={busy || !draft.name.trim() || !draft.code.trim()}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
+            <PrimaryButton onClick={save} disabled={busy || !draft.name.trim()}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
           </>}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="نام واحد" required hint="مثلاً «معاونت فناوری اطلاعات»"><input className={inputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
-            <Field label="کد واحد" required><input className={`${inputClass} dir-ltr text-right`} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} /></Field>
-          </div>
-          <Field label="واحد بالادستی" hint="برای معاونت‌ها خالی بگذارید.">
-            <select className={inputClass} value={draft.parentId || ''} onChange={(e) => setDraft({ ...draft, parentId: e.target.value || null })}>
-              <option value="">— بدون واحد بالادستی —</option>
-              {parentOptions.map((u) => <option key={u.id} value={u.id}>{' '.repeat(u.depth * 3)}{u.name}</option>)}
-            </select>
-          </Field>
+          <Field label="نام واحد" required hint="مثلاً «معاونت فناوری اطلاعات»"><input className={inputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
           {draft.id && (
             <>
               <Field label="مدیر واحد" hint="کارکنان این واحد که مدیر جداگانه‌ای ندارند، به این شخص گزارش می‌دهند.">
@@ -336,7 +329,7 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
 
 // ============================================================================ positions
 
-interface PositionDraft { id?: string; title: string; code: string; isActive: boolean }
+interface PositionDraft { id?: string; title: string; parentPositionId: string | null; isActive: boolean }
 
 export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) => {
   const data = useLoad(listPositions, 'دریافت فهرست سمت‌ها ممکن نشد.');
@@ -344,11 +337,29 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
   const [draft, setDraft] = useState<PositionDraft | null>(null);
   const { busy, run } = useAction(data.reload, setMessage);
 
+  const parentOptions = useMemo(() => {
+    const positions = data.data || [];
+    if (!draft?.id) return positions;
+    const descendants = new Set<string>([draft.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const position of positions) {
+        if (position.parentPositionId && descendants.has(position.parentPositionId) && !descendants.has(position.id)) {
+          descendants.add(position.id);
+          changed = true;
+        }
+      }
+    }
+    return positions.filter((position) => !descendants.has(position.id));
+  }, [data.data, draft?.id]);
+
   const save = async () => {
     if (!draft) return;
-    const code = draft.code.trim() || null;
     const ok = await run(
-      () => (draft.id ? updatePosition(draft.id, draft.title, code, draft.isActive) : createPosition(draft.title, code)),
+      () => (draft.id
+        ? updatePosition(draft.id, draft.title, draft.parentPositionId, draft.isActive)
+        : createPosition(draft.title, draft.parentPositionId)),
       draft.id ? 'سمت ویرایش شد.' : 'سمت ایجاد شد.',
       'ذخیره سمت انجام نشد.',
     );
@@ -364,7 +375,7 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
             <h3 className="text-base font-extrabold text-slate-900 dark:text-white">سمت‌ها</h3>
             <p className="text-xs text-slate-500 mt-0.5">عنوان‌های شغلی سازمان، مثل کارشناس، رئیس اداره و معاون. (جدا از نقش‌های دسترسی)</p>
           </div>
-          {canManage && <PrimaryButton onClick={() => setDraft({ title: '', code: '', isActive: true })}><Plus className="w-4 h-4" /> سمت جدید</PrimaryButton>}
+          {canManage && <PrimaryButton onClick={() => setDraft({ title: '', parentPositionId: null, isActive: true })}><Plus className="w-4 h-4" /> سمت جدید</PrimaryButton>}
         </div>
         {data.loading ? <LoadingRow /> : data.error ? <div className="p-5"><Notice type="error">{data.error}</Notice></div>
           : (data.data || []).length === 0 ? <EmptyRow>هنوز سمتی تعریف نشده است.</EmptyRow> : (
@@ -373,12 +384,12 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
                 <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{p.title}</span>
-                    {p.code && <span className="text-xs text-slate-400 dir-ltr">{p.code}</span>}
+                    {p.parentPositionId && <span className="text-xs text-slate-500 truncate">مافوق: {data.data?.find((parent) => parent.id === p.parentPositionId)?.title || 'سمت حذف‌شده'}</span>}
                     {!p.isActive && <StatusBadge tone="red">غیرفعال</StatusBadge>}
                   </div>
                   {canManage && (
                     <div className="whitespace-nowrap">
-                      <IconAction icon={Pencil} label="ویرایش" onClick={() => setDraft({ id: p.id, title: p.title, code: p.code || '', isActive: p.isActive })} />
+                      <IconAction icon={Pencil} label="ویرایش" onClick={() => setDraft({ id: p.id, title: p.title, parentPositionId: p.parentPositionId, isActive: p.isActive })} />
                       <IconAction icon={Trash2} tone="rose" label="حذف" disabled={busy} onClick={() => run(() => deletePosition(p.id), 'سمت حذف شد.', 'حذف سمت انجام نشد.')} />
                     </div>
                   )}
@@ -397,10 +408,13 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
             <PrimaryButton onClick={save} disabled={busy || !draft.title.trim()}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
           </>}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="عنوان سمت" required><input className={inputClass} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Field>
-            <Field label="کد (اختیاری)"><input className={`${inputClass} dir-ltr text-right`} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} /></Field>
-          </div>
+          <Field label="عنوان سمت" required><input className={inputClass} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Field>
+          <Field label="سمت مافوق">
+            <select className={inputClass} value={draft.parentPositionId || ''} onChange={(e) => setDraft({ ...draft, parentPositionId: e.target.value || null })}>
+              <option value="">— بدون سمت مافوق —</option>
+              {parentOptions.map((position) => <option key={position.id} value={position.id}>{position.title}</option>)}
+            </select>
+          </Field>
           {draft.id && <Toggle checked={draft.isActive} onChange={(v) => setDraft({ ...draft, isActive: v })} label="سمت فعال است" description="سمت غیرفعال برای انتصاب جدید قابل انتخاب نیست." />}
         </AdminDialog>
       )}

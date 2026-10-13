@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Field, inputClass } from '../AdminUi';
 import {
   Company, CompanyUnitLink, OrgUnit, Position,
-  buildUnitTree, flattenUnitTree, listCompanies, listCompanyUnits, listOrgUnits, listPositions, unitSubtreeIds,
+  listCompanies, listCompanyUnits, listOrgUnits, listPositions, sortOrgUnits,
 } from '../../../services/orgStructureApi';
 import { useLoad, UserPicker } from './orgShared';
 
@@ -54,13 +54,12 @@ export const OrgPlacementFields: React.FC<{
   data: OrgPlacementData;
   excludeManagerIds?: string[];
 }> = ({ draft, onChange, data, excludeManagerIds = [] }) => {
-  /** Units of the chosen company: its linked deputies and everything below them. */
+  /** Units directly linked to the chosen company. */
   const unitsOfCompany = useMemo(() => {
     if (!draft.companyId) return [];
     const ids = new Set<string>();
-    data.links.filter((l) => l.companyId === draft.companyId)
-      .forEach((l) => unitSubtreeIds(data.units, l.unitId).forEach((id) => ids.add(id)));
-    return flattenUnitTree(buildUnitTree(data.units.filter((u) => ids.has(u.id) && u.isActive)));
+    data.links.filter((l) => l.companyId === draft.companyId).forEach((l) => ids.add(l.unitId));
+    return sortOrgUnits(data.units.filter((u) => ids.has(u.id) && u.isActive));
   }, [data, draft.companyId]);
 
   return (
@@ -75,7 +74,7 @@ export const OrgPlacementFields: React.FC<{
         <Field label="معاونت / واحد" hint={unitsOfCompany.length === 0 ? 'این شرکت هنوز معاونتی ندارد.' : undefined}>
           <select className={inputClass} value={draft.unitId} onChange={(e) => onChange({ ...draft, unitId: e.target.value })} disabled={unitsOfCompany.length === 0}>
             <option value="">— مستقیم زیر شرکت —</option>
-            {unitsOfCompany.map((u) => <option key={u.id} value={u.id}>{' '.repeat(u.depth * 3)}{u.name}</option>)}
+            {unitsOfCompany.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         </Field>
       </div>
