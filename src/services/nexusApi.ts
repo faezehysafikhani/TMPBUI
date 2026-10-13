@@ -413,6 +413,11 @@ function toApiError(status: number, body: any, unauthorizedMessage?: string): Ne
   return new NexusApiError(persianApiMessage(status, code, detail), status, code);
 }
 
+/** The same client for API modules kept in their own file (e.g. orgStructureApi.ts). */
+export function apiRequest<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+  return request<T>(method, path, options);
+}
+
 async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
   const { body, form, query, auth = true, retryOnUnauthorized = true, responseType = 'json' } = options;
 
