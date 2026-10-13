@@ -173,7 +173,8 @@ export const ReportsView: React.FC<{
           const pages = Array.from(document.querySelectorAll<HTMLElement>('.report-print-root .report-page'));
           const blob = await pagesToPdf(pages, (done, total) => setPdfProgress(`در حال ساخت PDF: صفحه ${toPersianDigits(done)} از ${toPersianDigits(total)}`));
           saveBlob(blob, `task-report-${jalaliStamp()}.pdf`);
-        } catch {
+        } catch (err) {
+          console.error('Report PDF export failed:', err);
           setError('ساخت فایل PDF ممکن نشد. لطفاً دوباره تلاش کنید.');
         }
       }

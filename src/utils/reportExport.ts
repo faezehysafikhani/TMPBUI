@@ -52,8 +52,21 @@ export async function pagesToPdf(pages: HTMLElement[], onProgress?: (done: numbe
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
   if (document.fonts?.ready) await document.fonts.ready;
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
+  // html2canvas reads the background of <html> and <body> in its copy of the document, and cannot
+  // parse the oklch() colours Tailwind gives them (bg-slate-50, dark mode) - it throws. The copy
+  // is made plain white here; the pages themselves use hex colours only.
+  const onclone = (copy: Document) => {
+    for (const el of [copy.documentElement, copy.body]) {
+      el.removeAttribute('class');
+      el.style.setProperty('background', '#ffffff', 'important');
+      el.style.setProperty('color', '#0f172a', 'important');
+    }
+    for (const child of Array.from(copy.body.children)) {
+      if (!child.classList.contains('report-print-root')) child.remove();
+    }
+  };
   for (let i = 0; i < pages.length; i++) {
-    const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true });
+    const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, onclone });
     if (i > 0) pdf.addPage('a4', 'landscape');
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.88), 'JPEG', 0, 0, 297, 210, undefined, 'FAST');
     onProgress?.(i + 1, pages.length);
