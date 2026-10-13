@@ -412,3 +412,45 @@ button:is([class*="bg-gradient-to"], [class*=" bg-indigo-600"], [class*=" bg-eme
     border: none !important;
   }
 }
+
+/* «گزارش فعالیت‌ها»: printable pages (ReportPrintPages). Off screen normally (the PDF export
+   captures them there); when printing, only they are shown. */
+.report-print-root {
+  position: fixed;
+  top: 0;
+  left: -20000px;
+  z-index: -1;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  body:has(> .report-print-root) > *:not(.report-print-root) {
+    display: none !important;
+  }
+
+  body:has(> .report-print-root) .report-print-root {
+    position: static !important;
+  }
+
+  /* The general print rule above hides everything but its own catalogue; the report's pages stay visible. */
+  .report-print-root,
+  .report-print-root * {
+    visibility: visible !important;
+  }
+
+  .report-page {
+    break-after: page;
+    page-break-after: always;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .report-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud } from 'lucide-react';
+import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2 } from 'lucide-react';
 import { getMyPermissions, changeMyPassword, fetchUploadPolicy, updateMaxUploadSizeKb } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
@@ -9,8 +9,10 @@ import { SsoPreparationPanel } from './SsoPreparationPanel';
 import { SmsPanel } from './SmsPanel';
 import { userErrorMessage } from '../../utils/errorMessages';
 import { refreshUploadPolicy } from '../../utils/uploadPolicy';
+import { getMyPlacement, ORG_STRUCTURE_PERMISSIONS, ORG_UNIT_PERMISSIONS } from '../../services/orgStructureApi';
+import { OrgStructureSection } from './orgStructure/OrgStructureSection';
 
-type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users';
+type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users' | 'org';
 type UsersTab = 'list' | 'history' | 'ldap' | 'sso';
 
 /** Permission names the signed-in user holds. The server re-checks every call. */
@@ -27,8 +29,25 @@ export function useMyPermissions(userId: string | undefined): Set<string> | null
   return permissions;
 }
 
+/**
+ * Whether the backend has the organization-structure module (companies, positions, managers).
+ * Products without it answer 404 and the «ساختار سازمانی» tab never appears.
+ */
+function useOrgStructureAvailable(userId: string | undefined): boolean {
+  const [available, setAvailable] = useState(false);
+  useEffect(() => {
+    if (!userId) { setAvailable(false); return; }
+    let alive = true;
+    getMyPlacement()
+      .then((placement) => alive && setAvailable(placement !== null))
+      .catch(() => alive && setAvailable(false));
+    return () => { alive = false; };
+  }, [userId]);
+  return available;
+}
+
 /** «مدیریت کاربران» with its sub-tabs: users, sign-in history and LDAP. */
-const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) => boolean }> = ({ currentUserId, can }) => {
+const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) => boolean; orgStructureAvailable: boolean }> = ({ currentUserId, can, orgStructureAvailable }) => {
   const tabs: TabItem<UsersTab>[] = [
     ...(can('users.view') ? [{ id: 'list' as const, label: 'مدیریت کاربران', icon: Users }] : []),
     ...(can('audit_logs.view') ? [{ id: 'history' as const, label: 'تاریخچه ورود', icon: History }] : []),
@@ -51,6 +70,9 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
             assignRoles: can('users.assign_roles'),
             assignPermissions: can('users.assign_permissions'),
           }}
+          orgStructureAvailable={orgStructureAvailable}
+          canManageOrgAssignments={can(ORG_STRUCTURE_PERMISSIONS.manageAssignments)}
+          canSeeOrgUnits={can(ORG_UNIT_PERMISSIONS.view)}
         />
       )}
       {current === 'history' && <LoginHistoryPanel />}
@@ -196,6 +218,7 @@ export const SystemAdministration: React.FC<{
 }> = ({ currentUserId, profile, team, appearance, help }) => {
   const permissions = useMyPermissions(currentUserId);
   const can = (p: string) => !!permissions?.has(p);
+  const orgStructureAvailable = useOrgStructureAvailable(currentUserId);
   const [active, setActive] = useState<MainTab>('profile');
 
   const tabs: TabItem<MainTab>[] = [
@@ -206,6 +229,7 @@ export const SystemAdministration: React.FC<{
     ...(can('sms_settings.view') ? [{ id: 'sms' as const, label: 'پنل پیامکی', icon: MessageSquare }] : []),
     ...(can('users.view') || can('audit_logs.view') || can('ldap_settings.view') || can('sso_settings.view')
       ? [{ id: 'users' as const, label: 'مدیریت کاربران', icon: Users }] : []),
+    ...(orgStructureAvailable ? [{ id: 'org' as const, label: 'ساختار سازمانی', icon: Building2 }] : []),
   ];
   const current = tabs.some((t) => t.id === active) ? active : 'profile';
 
@@ -229,7 +253,8 @@ export const SystemAdministration: React.FC<{
       )}
       {current === 'help' && help}
       {current === 'sms' && <SmsPanel canUpdate={can('sms_settings.update')} canTest={can('sms_settings.test')} />}
-      {current === 'users' && currentUserId && <UserManagementSection currentUserId={currentUserId} can={can} />}
+      {current === 'users' && currentUserId && <UserManagementSection currentUserId={currentUserId} can={can} orgStructureAvailable={orgStructureAvailable} />}
+      {current === 'org' && <OrgStructureSection can={can} />}
     </div>
   );
 };

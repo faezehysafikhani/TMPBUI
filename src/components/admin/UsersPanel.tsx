@@ -1,17 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pencil, ShieldCheck, UserX, UserCheck, UserPlus, Loader2, Lock } from 'lucide-react';
+import { Pencil, ShieldCheck, UserX, UserCheck, UserPlus, Loader2, Lock, UserRound, Building2 } from 'lucide-react';
 import {
   AdminUser, AdminUserInput, AdminRole, UserAccess, UserAccessEntry, NexusApiError,
   listUsersPage, adminCreateUser, adminUpdateUser, setUserActive,
   listRoles, getUserAccess, setUserRoles, setUserDirectPermissions,
 } from '../../services/nexusApi';
+import { getAssignment, setAssignment, removeAssignment } from '../../services/orgStructureApi';
 import { toPersianDigits, formatToJalali } from '../../utils/helpers';
 import {
   AdminCard, SearchBox, StatusBadge, IconAction, Pagination, Field, inputClass, Notice,
-  AdminDialog, PrimaryButton, SecondaryButton, toLatinDigits, useDebounced,
+  AdminDialog, PrimaryButton, SecondaryButton, toLatinDigits, useDebounced, PillTabs,
 } from './AdminUi';
 import { moduleTitle, accessIsEffective, toggleUserAccess } from '../../utils/permissions';
 import { userErrorMessage } from '../../utils/errorMessages';
+import { LoadingRow } from './orgStructure/orgShared';
+import { OrgPlacementFields, useOrgPlacementData, EMPTY_PLACEMENT_DRAFT, OrgPlacementDraft } from './orgStructure/OrgPlacementFields';
 
 const PAGE_SIZE = 10;
 const NATIONAL_CODE = /^[0-9]{10}$/;
@@ -32,7 +35,16 @@ function errorText(err: unknown, fallback: string): string {
   return userErrorMessage(err, fallback);
 }
 
-export const UsersPanel: React.FC<{ currentUserId: string; rights: UserAdminRights }> = ({ currentUserId, rights }) => {
+export const UsersPanel: React.FC<{
+  currentUserId: string;
+  rights: UserAdminRights;
+  /** Whether the backend has the organization-structure module at all. */
+  orgStructureAvailable: boolean;
+  /** org_structure.manage_assignments: required to show the «جایگاه سازمانی» tab. */
+  canManageOrgAssignments: boolean;
+  /** organization_units.view: whether the unit (deputy) dropdown can be populated. */
+  canSeeOrgUnits: boolean;
+}> = ({ currentUserId, rights, orgStructureAvailable, canManageOrgAssignments, canSeeOrgUnits }) => {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounced(search);
   const [page, setPage] = useState(1);
@@ -166,6 +178,8 @@ export const UsersPanel: React.FC<{ currentUserId: string; rights: UserAdminRigh
         <UserFormDialog
           user={editing === 'new' ? null : editing}
           canAssignRoles={rights.assignRoles}
+          showPlacementTab={orgStructureAvailable && canManageOrgAssignments}
+          canSeeOrgUnits={canSeeOrgUnits}
           onClose={() => setEditing(null)}
           onSaved={async (text) => { setEditing(null); setMessage({ type: 'success', text }); await load(); }}
         />
@@ -187,9 +201,11 @@ export const UsersPanel: React.FC<{ currentUserId: string; rights: UserAdminRigh
 const UserFormDialog: React.FC<{
   user: AdminUser | null;
   canAssignRoles: boolean;
+  showPlacementTab: boolean;
+  canSeeOrgUnits: boolean;
   onClose: () => void;
   onSaved: (message: string) => void;
-}> = ({ user, canAssignRoles, onClose, onSaved }) => {
+}> = ({ user, canAssignRoles, showPlacementTab, canSeeOrgUnits, onClose, onSaved }) => {
   const isNew = user === null;
   const [form, setForm] = useState<AdminUserInput>({
     firstName: user?.firstName || (user && !user.firstName && !user.lastName ? user.displayName : ''),
@@ -205,6 +221,11 @@ const UserFormDialog: React.FC<{
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [activeTab, setActiveTab] = useState<'basic' | 'placement'>('basic');
+  const [placementDraft, setPlacementDraft] = useState<OrgPlacementDraft>(EMPTY_PLACEMENT_DRAFT);
+  const [hadExistingAssignment, setHadExistingAssignment] = useState(false);
+  const placementData = useOrgPlacementData(canSeeOrgUnits, showPlacementTab);
+
   useEffect(() => {
     if (!isNew || !canAssignRoles) return;
     listRoles().then((list) => {
@@ -213,6 +234,24 @@ const UserFormDialog: React.FC<{
       if (member) setRoleIds([member.id]);
     }).catch(() => setRoles([]));
   }, [isNew, canAssignRoles]);
+
+  // The user's current placement, to prefill the «جایگاه سازمانی» tab when editing.
+  useEffect(() => {
+    if (isNew || !showPlacementTab) return;
+    let alive = true;
+    getAssignment(user!.id).then((a) => {
+      if (!alive || !a) return;
+      setHadExistingAssignment(true);
+      setPlacementDraft({
+        companyId: a.companyId,
+        unitId: a.unitId || '',
+        positionId: a.positionId || '',
+        managerUserId: a.explicitManagerUserId,
+        managerName: a.explicitManagerUserId ? a.manager?.displayName || 'کاربر' : null,
+      });
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [isNew, showPlacementTab, user?.id]);
 
   const set = (key: keyof AdminUserInput) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [key]: key === 'username' || key === 'phoneNumber' ? toLatinDigits(e.target.value) : e.target.value }));
@@ -238,13 +277,31 @@ const UserFormDialog: React.FC<{
     setSaving(true);
     setError(null);
     try {
+      let savedUserId: string;
       if (isNew) {
-        await adminCreateUser(form, canAssignRoles ? roleIds : []);
-        onSaved(`کاربر «${form.firstName} ${form.lastName}» ایجاد شد.`);
+        savedUserId = (await adminCreateUser(form, canAssignRoles ? roleIds : [])).id;
       } else {
         await adminUpdateUser(user!, form);
-        onSaved(`مشخصات «${form.firstName} ${form.lastName}» ذخیره شد.`);
+        savedUserId = user!.id;
       }
+
+      // Placement is optional: only touch it when a company was actually chosen on that tab.
+      // Clearing it back to «— بدون شرکت —» on a user who had a placement removes it instead of
+      // silently leaving the old one in place.
+      if (showPlacementTab) {
+        if (placementDraft.companyId) {
+          await setAssignment(savedUserId, {
+            companyId: placementDraft.companyId,
+            unitId: placementDraft.unitId || null,
+            positionId: placementDraft.positionId || null,
+            managerUserId: placementDraft.managerUserId,
+          });
+        } else if (hadExistingAssignment) {
+          await removeAssignment(savedUserId);
+        }
+      }
+
+      onSaved(isNew ? `کاربر «${form.firstName} ${form.lastName}» ایجاد شد.` : `مشخصات «${form.firstName} ${form.lastName}» ذخیره شد.`);
     } catch (err) {
       setError(errorText(err, 'ذخیره کاربر انجام نشد.'));
     } finally {
@@ -266,40 +323,69 @@ const UserFormDialog: React.FC<{
         </>
       }
     >
+      {showPlacementTab && (
+        <PillTabs
+          tabs={[
+            { id: 'basic', label: 'اطلاعات کاربر', icon: UserRound },
+            { id: 'placement', label: 'جایگاه سازمانی', icon: Building2 },
+          ]}
+          active={activeTab}
+          onChange={setActiveTab}
+        />
+      )}
       <form id="user-form" onSubmit={submit} className="space-y-3" noValidate>
         {error && <Notice type="error">{error}</Notice>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30 p-3">
-          <Field label="نام" required><input className={inputClass} value={form.firstName} onChange={set('firstName')} maxLength={80} autoFocus /></Field>
-          <Field label="نام خانوادگی" required><input className={inputClass} value={form.lastName} onChange={set('lastName')} maxLength={80} /></Field>
-          <Field label="نام کاربری (کد ملی)" required hint={!isNew && user?.username && !NATIONAL_CODE.test(user.username) ? 'نام کاربری فعلی پیش از قانون کد ملی ثبت شده؛ اگر تغییرش دهید باید کد ملی ۱۰ رقمی باشد.' : 'دقیقاً ۱۰ رقم، فقط عدد.'}>
-            <input className={`${inputClass} dir-ltr text-right font-mono`} value={form.username} onChange={set('username')} inputMode="numeric" maxLength={usernameChanged ? 10 : 64} autoComplete="off" />
-          </Field>
-          <Field label="شماره موبایل" required hint="برای ورود و دریافت پیامک.">
-            <input className={`${inputClass} dir-ltr text-right font-mono`} value={form.phoneNumber} onChange={set('phoneNumber')} inputMode="tel" placeholder="09121234567" autoComplete="off" />
-          </Field>
-          <Field label="ایمیل" hint="اختیاری؛ برای ارسال لینک بازیابی رمز عبور." className="sm:col-span-2">
-            <input className={`${inputClass} dir-ltr text-right`} type="email" value={form.email} onChange={set('email')} autoComplete="off" />
-          </Field>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-violet-100 dark:border-violet-900 bg-violet-50/40 dark:bg-violet-950/20 p-3">
-          <Field label={isNew ? 'رمز عبور اولیه' : 'رمز عبور جدید'} required={isNew} hint={isNew ? 'حداقل ۸ کاراکتر.' : 'خالی بگذارید تا رمز فعلی بماند.'}>
-            <input className={`${inputClass} dir-ltr text-right`} type="password" value={form.password} onChange={set('password')} autoComplete="new-password" minLength={form.password || isNew ? 8 : undefined} />
-          </Field>
-          <Field label="تکرار رمز عبور" required={isNew} hint={passwordConfirm && form.password !== passwordConfirm ? 'رمزها یکسان نیستند.' : undefined}>
-            <input className={`${inputClass} dir-ltr text-right ${passwordConfirm && form.password !== passwordConfirm ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-400/40' : ''}`} type="password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} autoComplete="new-password" aria-invalid={!!passwordConfirm && form.password !== passwordConfirm} />
-          </Field>
-        </div>
-        {isNew && canAssignRoles && roles.length > 0 && (
-          <div className="rounded-2xl border border-violet-100 dark:border-violet-900 bg-violet-50/40 dark:bg-violet-950/20 p-3">
-            <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">نقش‌ها</span>
-            <div className="flex flex-wrap gap-2">
-              {roles.map((role) => (
-                <label key={role.id} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm cursor-pointer hover:border-indigo-400 hover:shadow-sm transition-all">
-                  <input type="checkbox" checked={roleIds.includes(role.id)} onChange={(e) => setRoleIds((ids) => e.target.checked ? [...ids, role.id] : ids.filter((id) => id !== role.id))} />
-                  <span>{roleTitle(role.name)}</span>
-                </label>
-              ))}
+        {(!showPlacementTab || activeTab === 'basic') && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30 p-3">
+              <Field label="نام" required><input className={inputClass} value={form.firstName} onChange={set('firstName')} maxLength={80} autoFocus /></Field>
+              <Field label="نام خانوادگی" required><input className={inputClass} value={form.lastName} onChange={set('lastName')} maxLength={80} /></Field>
+              <Field label="نام کاربری (کد ملی)" required hint={!isNew && user?.username && !NATIONAL_CODE.test(user.username) ? 'نام کاربری فعلی پیش از قانون کد ملی ثبت شده؛ اگر تغییرش دهید باید کد ملی ۱۰ رقمی باشد.' : 'دقیقاً ۱۰ رقم، فقط عدد.'}>
+                <input className={`${inputClass} dir-ltr text-right font-mono`} value={form.username} onChange={set('username')} inputMode="numeric" maxLength={usernameChanged ? 10 : 64} autoComplete="off" />
+              </Field>
+              <Field label="شماره موبایل" required hint="برای ورود و دریافت پیامک.">
+                <input className={`${inputClass} dir-ltr text-right font-mono`} value={form.phoneNumber} onChange={set('phoneNumber')} inputMode="tel" placeholder="09121234567" autoComplete="off" />
+              </Field>
+              <Field label="ایمیل" hint="اختیاری؛ برای ارسال لینک بازیابی رمز عبور." className="sm:col-span-2">
+                <input className={`${inputClass} dir-ltr text-right`} type="email" value={form.email} onChange={set('email')} autoComplete="off" />
+              </Field>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-violet-100 dark:border-violet-900 bg-violet-50/40 dark:bg-violet-950/20 p-3">
+              <Field label={isNew ? 'رمز عبور اولیه' : 'رمز عبور جدید'} required={isNew} hint={isNew ? 'حداقل ۸ کاراکتر.' : 'خالی بگذارید تا رمز فعلی بماند.'}>
+                <input className={`${inputClass} dir-ltr text-right`} type="password" value={form.password} onChange={set('password')} autoComplete="new-password" minLength={form.password || isNew ? 8 : undefined} />
+              </Field>
+              <Field label="تکرار رمز عبور" required={isNew} hint={passwordConfirm && form.password !== passwordConfirm ? 'رمزها یکسان نیستند.' : undefined}>
+                <input className={`${inputClass} dir-ltr text-right ${passwordConfirm && form.password !== passwordConfirm ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-400/40' : ''}`} type="password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)} autoComplete="new-password" aria-invalid={!!passwordConfirm && form.password !== passwordConfirm} />
+              </Field>
+            </div>
+            {isNew && canAssignRoles && roles.length > 0 && (
+              <div className="rounded-2xl border border-violet-100 dark:border-violet-900 bg-violet-50/40 dark:bg-violet-950/20 p-3">
+                <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">نقش‌ها</span>
+                <div className="flex flex-wrap gap-2">
+                  {roles.map((role) => (
+                    <label key={role.id} className="flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm cursor-pointer hover:border-indigo-400 hover:shadow-sm transition-all">
+                      <input type="checkbox" checked={roleIds.includes(role.id)} onChange={(e) => setRoleIds((ids) => e.target.checked ? [...ids, role.id] : ids.filter((id) => id !== role.id))} />
+                      <span>{roleTitle(role.name)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+        {showPlacementTab && activeTab === 'placement' && (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              شرکت، معاونت/واحد، سمت و مدیر مستقیم این کاربر؛ اختیاری است و بعداً هم قابل تغییر.
+            </p>
+            {placementData.loading ? <LoadingRow /> : placementData.error ? <Notice type="error">{placementData.error}</Notice> : (
+              <OrgPlacementFields
+                draft={placementDraft}
+                onChange={setPlacementDraft}
+                data={placementData.data!}
+                excludeManagerIds={user ? [user.id] : []}
+              />
+            )}
           </div>
         )}
       </form>
