@@ -75,3 +75,35 @@ export async function pagesToPdf(pages: HTMLElement[], onProgress?: (done: numbe
   }
   return pdf.output('blob');
 }
+
+const PRINT_FRAME_ID = 'report-print-frame';
+
+/**
+ * Prints a PDF from a hidden frame. Browsers add no header or footer (address, page numbers)
+ * to a printed PDF. The frame stays until the next print: removing it while the print dialog
+ * is open would close the dialog.
+ */
+export function printPdf(blob: Blob): Promise<void> {
+  const previous = document.getElementById(PRINT_FRAME_ID) as HTMLIFrameElement | null;
+  if (previous) { URL.revokeObjectURL(previous.src); previous.remove(); }
+  // Without a built-in PDF viewer the frame would download the file instead.
+  if (navigator.pdfViewerEnabled === false) return Promise.reject(new Error('The browser has no PDF viewer.'));
+  return new Promise((resolve, reject) => {
+    const frame = document.createElement('iframe');
+    frame.id = PRINT_FRAME_ID;
+    frame.title = 'print';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;bottom:0;right:0;width:0;height:0;border:0;visibility:hidden';
+    frame.onload = () => {
+      try {
+        frame.contentWindow!.focus();
+        frame.contentWindow!.print();
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    };
+    frame.src = URL.createObjectURL(blob);
+    document.body.appendChild(frame);
+  });
+}

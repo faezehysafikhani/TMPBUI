@@ -6,7 +6,7 @@ import { toPersianDigits } from '../utils/helpers';
 import { gregorianToJalali, getCurrentJalali } from '../utils/jalali';
 import { JalaliDatePicker } from './JalaliDatePicker';
 import { PrintableRow, ReportPrintPages } from './ReportPrintPages';
-import { buildXlsx, jalaliStamp, pagesToPdf, saveBlob } from '../utils/reportExport';
+import { buildXlsx, jalaliStamp, pagesToPdf, printPdf, saveBlob } from '../utils/reportExport';
 import { userErrorMessage } from '../utils/errorMessages';
 import {
   REPORT_TYPE_TITLES, ReportPersonRole, ReportScope, ReportTaskType, TaskReport, TaskReportFilters, TaskReportRow, getTaskReport,
@@ -158,7 +158,9 @@ export const ReportsView: React.FC<{
     completedText: r.completedAtUtc ? jalaliDate(iranDay(r.completedAtUtc)) : '',
   })), [rows]);
 
-  // Print and PDF render the printable pages first (off screen), then use them.
+  // Print and PDF render the printable pages first (off screen), then make a PDF of them. Print
+  // prints that PDF: printing the web page itself would let the browser add its header and footer
+  // (address, page number) whenever its print dialog has margins.
   useEffect(() => {
     if (!printJob) return;
     let cancelled = false;
@@ -166,17 +168,24 @@ export const ReportsView: React.FC<{
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       if (document.fonts?.ready) await document.fonts.ready;
       if (cancelled) return;
-      if (printJob === 'print') {
-        window.print();
-      } else {
-        try {
-          const pages = Array.from(document.querySelectorAll<HTMLElement>('.report-print-root .report-page'));
-          const blob = await pagesToPdf(pages, (done, total) => setPdfProgress(`در حال ساخت PDF: صفحه ${toPersianDigits(done)} از ${toPersianDigits(total)}`));
+      const label = printJob === 'print' ? 'در حال آماده‌سازی چاپ' : 'در حال ساخت PDF';
+      try {
+        const pages = Array.from(document.querySelectorAll<HTMLElement>('.report-print-root .report-page'));
+        const blob = await pagesToPdf(pages, (done, total) => setPdfProgress(`${label}: صفحه ${toPersianDigits(done)} از ${toPersianDigits(total)}`));
+        if (printJob === 'pdf') {
           saveBlob(blob, `task-report-${jalaliStamp()}.pdf`);
-        } catch (err) {
-          console.error('Report PDF export failed:', err);
-          setError('ساخت فایل PDF ممکن نشد. لطفاً دوباره تلاش کنید.');
+        } else {
+          try {
+            await printPdf(blob);
+          } catch (err) {
+            // No PDF printing in this browser: print the pages themselves.
+            console.error('Report PDF print failed, printing the page instead:', err);
+            window.print();
+          }
         }
+      } catch (err) {
+        console.error('Report PDF export failed:', err);
+        setError(printJob === 'print' ? 'آماده‌سازی چاپ ممکن نشد. لطفاً دوباره تلاش کنید.' : 'ساخت فایل PDF ممکن نشد. لطفاً دوباره تلاش کنید.');
       }
       if (!cancelled) { setPrintJob(null); setPdfProgress(null); }
     };
@@ -211,7 +220,9 @@ export const ReportsView: React.FC<{
             <SecondaryButton onClick={() => setPrintJob('pdf')} disabled={!report || loading || !!printJob}>
               {printJob === 'pdf' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4 text-rose-600" />} دانلود PDF
             </SecondaryButton>
-            <SecondaryButton onClick={() => setPrintJob('print')} disabled={!report || loading || !!printJob}><Printer className="w-4 h-4 text-indigo-600" /> چاپ</SecondaryButton>
+            <SecondaryButton onClick={() => setPrintJob('print')} disabled={!report || loading || !!printJob}>
+              {printJob === 'print' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4 text-indigo-600" />} چاپ
+            </SecondaryButton>
           </div>
         </div>
 
