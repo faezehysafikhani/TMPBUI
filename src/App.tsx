@@ -19,6 +19,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 // Lazy loaded views & modals for secondary views
 const JalaliCalendarView = lazy(() => import('./components/JalaliCalendarView').then(m => ({ default: m.JalaliCalendarView })));
 const OverdueTasksView = lazy(() => import('./components/OverdueTasksView').then(m => ({ default: m.OverdueTasksView })));
+const ReportsView = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
 const TeamChatView = lazy(() => import('./components/TeamChatView').then(m => ({ default: m.TeamChatView })));
 const PersonalNotesView = lazy(() => import('./components/PersonalNotesView').then(m => ({ default: m.PersonalNotesView })));
 const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
@@ -66,6 +67,7 @@ import {
 } from './utils/serverNotifications';
 import { Database, PanelRightOpen } from 'lucide-react';
 import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION } from './services/nexusApi';
+import { getReportScope, ReportScope } from './services/taskReportApi';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
 import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
@@ -346,6 +348,24 @@ export default function App() {
   useEffect(() => {
     if (!canOpenTab(currentUser, activeTab)) setActiveTab(firstAllowedTab(currentUser));
   }, [currentUser, activeTab]);
+
+  // «گزارش فعالیت‌ها» exists only where the backend offers task reports (they follow the
+  // organization structure); elsewhere this answers 404 and the section stays hidden. The scope
+  // (whose tasks, which positions and tags) is read once per signed-in user.
+  const [reportScope, setReportScope] = useState<ReportScope | null>(null);
+  const currentUserId = currentUser?.id;
+  const mayViewTasks = can(currentUser, PERMISSIONS.tasksView);
+  useEffect(() => {
+    setReportScope(null);
+    if (!currentUserId || !mayViewTasks) return;
+    let alive = true;
+    getReportScope().then((scope) => alive && setReportScope(scope)).catch(() => {});
+    return () => { alive = false; };
+  }, [currentUserId, mayViewTasks]);
+  const canOpenSection = useCallback(
+    (tab: ActiveTab) => canOpenTab(currentUser, tab) && (tab !== 'reports' || reportScope !== null),
+    [currentUser, reportScope],
+  );
 
   const canCreateTask = can(currentUser, PERMISSIONS.tasksCreate);
 
@@ -1243,7 +1263,7 @@ export default function App() {
             activeTab={activeTab}
             setActiveTab={handleNavigateTab}
             onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
-            canOpenTab={(tab) => canOpenTab(currentUser, tab)}
+            canOpenTab={canOpenSection}
             onOpenSettings={() => handleNavigateTab('settings')}
             onOpenPdfCatalog={() => setIsPdfCatalogOpen(true)}
             onLogout={handleLogout}
@@ -1351,6 +1371,13 @@ export default function App() {
                   onViewDetails={handleOpenTaskDetail}
                   onToggleSubTask={handleToggleSubTask}
                 />
+              </Suspense>
+            )}
+
+            {/* Task reports (only where the backend offers them) */}
+            {activeTab === 'reports' && reportScope && canOpenTab(currentUser, 'reports') && (
+              <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
+                <ReportsView scope={reportScope} visibleTasks={visibleTasks} onOpenTask={handleOpenTaskDetail} />
               </Suspense>
             )}
 
@@ -1564,7 +1591,7 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={handleNavigateTab}
         onOpenCreateModal={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
-        canOpenTab={(tab) => canOpenTab(currentUser, tab)}
+        canOpenTab={canOpenSection}
         onOpenSettings={() => setIsSettingsOpen(true)}
         overdueCount={overdueCount}
         unreadChatCount={totalUnreadChatCount}

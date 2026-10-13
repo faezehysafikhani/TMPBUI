@@ -37,6 +37,7 @@ const TAB_PERMISSION: Partial<Record<ActiveTab, string>> = {
   calendar: PERMISSIONS.tasksView,
   overdue: PERMISSIONS.tasksView,
   notes: PERMISSIONS.notesManage,
+  reports: PERMISSIONS.tasksView,
 };
 
 /** Whether a section (menu entry and page) is available to the user. Chat and settings always are. */
