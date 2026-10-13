@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Download, Eye, FilterX, Loader2, Repeat, FolderKanban, AlertCircle, Tag, X } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, FileDown, Printer, Eye, FilterX, Loader2, Repeat, FolderKanban, AlertCircle, Tag } from 'lucide-react';
 import { Task, TaskStatus, STATUSES, PRIORITIES } from '../types';
 import { AdminCard, AdminDialog, Field, Notice, Pagination, SecondaryButton, StatusBadge, inputClass } from './admin/AdminUi';
 import { toPersianDigits } from '../utils/helpers';
-import { gregorianToJalali, jalaliToGregorian, getJalaliMonthDays, getCurrentJalali } from '../utils/jalali';
+import { gregorianToJalali, getCurrentJalali } from '../utils/jalali';
+import { JalaliDatePicker } from './JalaliDatePicker';
+import { PrintableRow, ReportPrintPages } from './ReportPrintPages';
+import { buildXlsx, jalaliStamp, pagesToPdf, saveBlob } from '../utils/reportExport';
 import { userErrorMessage } from '../utils/errorMessages';
 import {
   REPORT_TYPE_TITLES, ReportPersonRole, ReportScope, ReportTaskType, TaskReport, TaskReportFilters, TaskReportRow, getTaskReport,
 } from '../services/taskReportApi';
 
 const PAGE_SIZE = 25;
-const MONTHS = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
 const STATUS_KEYS: TaskStatus[] = ['todo', 'in_progress', 'paused', 'completed'];
 const RELATION_TITLES = { self: 'خودم', direct: 'زیردست مستقیم', indirect: 'زیرمجموعه', all: '' } as const;
 
@@ -40,47 +42,6 @@ const FieldGroup: React.FC<{ label: string; hint?: string; children: React.React
   </div>
 );
 
-/** An optional Jalali day for a filter: day / month / year, or empty. Value is Gregorian yyyy-MM-dd. */
-const JalaliDateField: React.FC<{ label: string; value: string | undefined; onChange: (value: string | undefined) => void }> = ({ label, value, onChange }) => {
-  const now = getCurrentJalali();
-  const current = value ? (() => { const [gy, gm, gd] = value.split('-').map(Number); return gregorianToJalali(gy, gm, gd); })() : null;
-  const [draft, setDraft] = useState<{ jy: number; jm: number; jd: number }>(current || { jy: now.jy, jm: now.jm, jd: now.jd });
-  useEffect(() => { if (current) setDraft(current); }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const apply = (next: { jy: number; jm: number; jd: number }) => {
-    const jd = Math.min(next.jd, getJalaliMonthDays(next.jy, next.jm));
-    const fixed = { ...next, jd };
-    setDraft(fixed);
-    const { gy, gm, gd } = jalaliToGregorian(fixed.jy, fixed.jm, fixed.jd);
-    onChange(`${gy}-${String(gm).padStart(2, '0')}-${String(gd).padStart(2, '0')}`);
-  };
-  const selectClass = `${inputClass} px-2`;
-  return (
-    <FieldGroup label={label}>
-      <div className="flex items-center gap-1.5">
-        {value ? (
-          <>
-            <select aria-label={`${label} - روز`} className={selectClass} value={draft.jd} onChange={(e) => apply({ ...draft, jd: Number(e.target.value) })}>
-              {Array.from({ length: getJalaliMonthDays(draft.jy, draft.jm) }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{toPersianDigits(d)}</option>)}
-            </select>
-            <select aria-label={`${label} - ماه`} className={selectClass} value={draft.jm} onChange={(e) => apply({ ...draft, jm: Number(e.target.value) })}>
-              {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </select>
-            <select aria-label={`${label} - سال`} className={selectClass} value={draft.jy} onChange={(e) => apply({ ...draft, jy: Number(e.target.value) })}>
-              {Array.from({ length: 6 }, (_, i) => now.jy - 4 + i).map((y) => <option key={y} value={y}>{toPersianDigits(y)}</option>)}
-            </select>
-            <button type="button" onClick={() => onChange(undefined)} className="p-2 rounded-lg text-slate-400 hover:text-rose-600 cursor-pointer shrink-0" aria-label={`حذف ${label}`}>
-              <X className="w-4 h-4" />
-            </button>
-          </>
-        ) : (
-          <button type="button" onClick={() => apply(draft)} className={`${inputClass} text-right text-slate-400 cursor-pointer`}>انتخاب تاریخ...</button>
-        )}
-      </div>
-    </FieldGroup>
-  );
-};
-
 const SummaryCard: React.FC<{ label: string; value: number; tone: string; active?: boolean; onClick?: () => void }> = ({ label, value, tone, active, onClick }) => (
   <button
     type="button"
@@ -95,11 +56,11 @@ const SummaryCard: React.FC<{ label: string; value: number; tone: string; active
   </button>
 );
 
-function exportCsv(rows: TaskReportRow[]) {
-  const header = ['ردیف', 'عنوان', 'نوع', 'وضعیت', 'اولویت', 'مسئول', 'سمت مسئول', 'ایجادکننده', 'موعد انجام', 'عقب‌افتاده', 'تاریخ تکمیل', 'برچسب‌ها'];
-  const cell = (value: string) => `"${value.replace(/"/g, '""')}"`;
-  const lines = rows.map((r, i) => [
-    String(i + 1),
+/** The report as an .xlsx workbook (right to left, header row frozen, auto-filter). */
+function exportExcel(rows: TaskReportRow[]) {
+  const header = ['ردیف', 'عنوان', 'نوع', 'وضعیت', 'اولویت', 'مسئول', 'سمت مسئول', 'ایجادکننده', 'موعد انجام', 'عقب‌افتاده', 'تاریخ تکمیل', 'برچسب‌ها', 'شرح'];
+  const data = rows.map((r, i) => [
+    i + 1,
     r.title,
     REPORT_TYPE_TITLES[r.type],
     STATUSES[r.status]?.title || r.status,
@@ -111,20 +72,9 @@ function exportCsv(rows: TaskReportRow[]) {
     r.isOverdue ? 'بله' : '',
     r.completedAtUtc ? jalaliDate(iranDay(r.completedAtUtc)) : '',
     r.tags.join('، '),
-  ].map(cell).join(','));
-  // The BOM makes Excel read the file as UTF-8, so Persian text shows correctly.
-  const blob = new Blob(['﻿' + [header.map(cell).join(','), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
-  const now = getCurrentJalali();
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  // ASCII on purpose: browsers reject some Persian file names (e.g. with a zero-width non-joiner)
-  // and fall back to a bare "download".
-  link.download = `task-report-${now.jy}-${String(now.jm).padStart(2, '0')}-${String(now.jd).padStart(2, '0')}.csv`;
-  // Attached while clicked: a detached link's file name is ignored by some browsers.
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    r.description || '',
+  ]);
+  saveBlob(buildXlsx('گزارش فعالیت‌ها', header, data, [6, 40, 11, 12, 9, 30, 20, 18, 13, 10, 13, 22, 45]), `task-report-${jalaliStamp()}.xlsx`);
 }
 
 /** Read-only view of a task that is in the report only as the manager of its people. */
@@ -174,10 +124,64 @@ export const ReportsView: React.FC<{
 
   const set = (patch: Partial<TaskReportFilters>) => setFilters((f) => ({ ...f, ...patch }));
   const hasFilters = !!(filters.personId || filters.positionId || filters.tag || filters.type || filters.status || filters.dueFrom || filters.dueTo);
+  const [printJob, setPrintJob] = useState<null | 'print' | 'pdf'>(null);
+  const [pdfProgress, setPdfProgress] = useState<string | null>(null);
   const byId = useMemo(() => new Map(visibleTasks.map((t) => [t.id, t])), [visibleTasks]);
   const rows = report?.rows || [];
   const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const subordinates = scope.people.filter((p) => p.relation === 'direct' || p.relation === 'indirect').length;
+  const scopeText = scope.seesAll
+    ? 'همه فعالیت‌های سازمان'
+    : subordinates > 0
+      ? `فعالیت‌های شما و ${toPersianDigits(subordinates)} نفر از زیرمجموعه‌تان`
+      : 'فعالیت‌های شما (زیرمجموعه‌ای برای شما ثبت نشده است)';
+
+  /** The active filters in words, for the printed / PDF header. */
+  const filtersText = (() => {
+    const parts: string[] = [];
+    const person = scope.people.find((p) => p.userId === filters.personId);
+    const role = filters.personRole === 'creator' ? 'ایجادکننده' : 'مسئول';
+    if (person) parts.push(`${role}: ${person.displayName}`);
+    const position = scope.positions.find((p) => p.id === filters.positionId);
+    if (position) parts.push(`سمت ${role}: ${position.title}`);
+    if (filters.tag) parts.push(`برچسب: ${filters.tag}`);
+    if (filters.type) parts.push(`نوع: ${REPORT_TYPE_TITLES[filters.type]}`);
+    if (filters.status) parts.push(`وضعیت: ${STATUSES[filters.status].title}`);
+    if (filters.dueFrom) parts.push(`موعد از ${jalaliDate(filters.dueFrom)}`);
+    if (filters.dueTo) parts.push(`موعد تا ${jalaliDate(filters.dueTo)}`);
+    return parts.length ? parts.join(' • ') : 'بدون فیلتر';
+  })();
+
+  const printableRows: PrintableRow[] = useMemo(() => rows.map((r) => ({
+    ...r,
+    dueDateText: jalaliDate(r.dueDate),
+    completedText: r.completedAtUtc ? jalaliDate(iranDay(r.completedAtUtc)) : '',
+  })), [rows]);
+
+  // Print and PDF render the printable pages first (off screen), then use them.
+  useEffect(() => {
+    if (!printJob) return;
+    let cancelled = false;
+    const run = async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      if (document.fonts?.ready) await document.fonts.ready;
+      if (cancelled) return;
+      if (printJob === 'print') {
+        window.print();
+      } else {
+        try {
+          const pages = Array.from(document.querySelectorAll<HTMLElement>('.report-print-root .report-page'));
+          const blob = await pagesToPdf(pages, (done, total) => setPdfProgress(`در حال ساخت PDF: صفحه ${toPersianDigits(done)} از ${toPersianDigits(total)}`));
+          saveBlob(blob, `task-report-${jalaliStamp()}.pdf`);
+        } catch {
+          setError('ساخت فایل PDF ممکن نشد. لطفاً دوباره تلاش کنید.');
+        }
+      }
+      if (!cancelled) { setPrintJob(null); setPdfProgress(null); }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [printJob]);
 
   const open = (row: TaskReportRow) => {
     const task = row.canOpen ? byId.get(row.id) : undefined;
@@ -196,19 +200,17 @@ export const ReportsView: React.FC<{
             <h2 className="flex items-center gap-2 text-xl font-extrabold text-slate-900 dark:text-white">
               <BarChart3 className="w-6 h-6 text-indigo-600" /> گزارش فعالیت‌ها
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              {scope.seesAll
-                ? 'همه فعالیت‌های سازمان'
-                : subordinates > 0
-                  ? `فعالیت‌های شما و ${toPersianDigits(subordinates)} نفر از زیرمجموعه‌تان`
-                  : 'فعالیت‌های شما (زیرمجموعه‌ای برای شما ثبت نشده است)'}
-            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{scopeText}</p>
           </div>
           <div className="flex items-center gap-2">
             {hasFilters && (
               <SecondaryButton onClick={() => setFilters({ personRole: 'responsible' })}><FilterX className="w-4 h-4" /> پاک کردن فیلترها</SecondaryButton>
             )}
-            <SecondaryButton onClick={() => exportCsv(rows)} disabled={rows.length === 0}><Download className="w-4 h-4" /> خروجی Excel</SecondaryButton>
+            <SecondaryButton onClick={() => exportExcel(rows)} disabled={!report || loading || !!printJob || rows.length === 0}><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> دانلود Excel</SecondaryButton>
+            <SecondaryButton onClick={() => setPrintJob('pdf')} disabled={!report || loading || !!printJob}>
+              {printJob === 'pdf' ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4 text-rose-600" />} دانلود PDF
+            </SecondaryButton>
+            <SecondaryButton onClick={() => setPrintJob('print')} disabled={!report || loading || !!printJob}><Printer className="w-4 h-4 text-indigo-600" /> چاپ</SecondaryButton>
           </div>
         </div>
 
@@ -257,8 +259,12 @@ export const ReportsView: React.FC<{
               {STATUS_KEYS.map((st) => <option key={st} value={st}>{STATUSES[st].title}</option>)}
             </select>
           </Field>
-          <JalaliDateField label="موعد انجام از" value={filters.dueFrom} onChange={(dueFrom) => set({ dueFrom })} />
-          <JalaliDateField label="موعد انجام تا" value={filters.dueTo} onChange={(dueTo) => set({ dueTo })} />
+          <FieldGroup label="موعد انجام از">
+            <JalaliDatePicker ariaLabel="موعد انجام از" value={filters.dueFrom} onChange={(dueFrom) => set({ dueFrom })} />
+          </FieldGroup>
+          <FieldGroup label="موعد انجام تا">
+            <JalaliDatePicker ariaLabel="موعد انجام تا" value={filters.dueTo} onChange={(dueTo) => set({ dueTo })} />
+          </FieldGroup>
         </div>
       </AdminCard>
 
@@ -345,6 +351,20 @@ export const ReportsView: React.FC<{
       </AdminCard>
 
       {readOnly && <ReportTaskDialog row={readOnly} onClose={() => setReadOnly(null)} />}
+      {pdfProgress && (
+        <div role="status" className="fixed bottom-24 lg:bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm shadow-xl">
+          <Loader2 className="w-4 h-4 animate-spin" /> {pdfProgress}
+        </div>
+      )}
+      {printJob && report && (
+        <ReportPrintPages
+          rows={printableRows}
+          summary={report.summary}
+          scopeText={scopeText}
+          filtersText={filtersText}
+          generatedText={`تاریخ تهیه: ${jalaliDate(iranDay(new Date().toISOString()))}`}
+        />
+      )}
     </div>
   );
 };
