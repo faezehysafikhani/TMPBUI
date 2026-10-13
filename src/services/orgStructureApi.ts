@@ -129,6 +129,17 @@ export const deletePosition = (id: string) => apiRequest<void>('DELETE', `${BASE
 
 export const listAssignments = (filter: { companyId?: string; unitId?: string } = {}) =>
   apiRequest<UserAssignment[]>('GET', `${BASE}/assignments`, { query: filter });
+
+/** A single user's current placement; null when none has been set yet. */
+export async function getAssignment(userId: string): Promise<UserAssignment | null> {
+  try {
+    return await apiRequest<UserAssignment>('GET', `${BASE}/assignments/${userId}`);
+  } catch (err) {
+    if (err instanceof NexusApiError && err.httpStatus === 404) return null;
+    throw err;
+  }
+}
+
 export const setAssignment = (userId: string, input: AssignmentInput) =>
   apiRequest<UserAssignment>('PUT', `${BASE}/assignments/${userId}`, { body: input });
 export const removeAssignment = (userId: string) => apiRequest<void>('DELETE', `${BASE}/assignments/${userId}`);

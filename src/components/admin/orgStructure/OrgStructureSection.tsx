@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { UserRound, GitFork, Building2, Network, Briefcase, Users } from 'lucide-react';
+import { UserRound, GitFork, Building2, Network, Briefcase } from 'lucide-react';
 import { PillTabs, TabItem } from '../AdminUi';
 import { ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U } from '../../../services/orgStructureApi';
 import { MyPlacementPanel, OrgChartPanel } from './OrgViews';
 import { CompaniesPanel, PositionsPanel, UnitsPanel } from './OrgAdminPanels';
-import { AssignmentsPanel } from './AssignmentsPanel';
 
-type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions' | 'people';
+type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions';
 
 /**
  * «ساختار سازمانی»: companies, deputies/units, positions and who reports to whom. Shown only
@@ -21,7 +20,6 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
     ...(reader ? [{ id: 'companies' as const, label: 'شرکت‌ها', icon: Building2 }] : []),
     ...(can(U.view) ? [{ id: 'units' as const, label: 'معاونت‌ها و واحدها', icon: Network }] : []),
     ...(reader ? [{ id: 'positions' as const, label: 'سمت‌ها', icon: Briefcase }] : []),
-    ...(reader ? [{ id: 'people' as const, label: 'جایگاه کاربران', icon: Users }] : []),
   ];
   const [active, setActive] = useState<OrgTab>('me');
   const current = tabs.some((t) => t.id === active) ? active : 'me';
@@ -34,7 +32,6 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
       {current === 'companies' && <CompaniesPanel canManage={can(P.manageCompanies)} canSeeUnits={can(U.view)} />}
       {current === 'units' && <UnitsPanel canCreate={can(U.create)} canUpdate={can(U.update)} canDeactivate={can(U.delete)} />}
       {current === 'positions' && <PositionsPanel canManage={can(P.managePositions)} />}
-      {current === 'people' && <AssignmentsPanel canManage={can(P.manageAssignments)} canSeeUnits={can(U.view)} />}
     </div>
   );
 };

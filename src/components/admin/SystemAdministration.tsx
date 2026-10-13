@@ -9,7 +9,7 @@ import { SsoPreparationPanel } from './SsoPreparationPanel';
 import { SmsPanel } from './SmsPanel';
 import { userErrorMessage } from '../../utils/errorMessages';
 import { refreshUploadPolicy } from '../../utils/uploadPolicy';
-import { getMyPlacement } from '../../services/orgStructureApi';
+import { getMyPlacement, ORG_STRUCTURE_PERMISSIONS, ORG_UNIT_PERMISSIONS } from '../../services/orgStructureApi';
 import { OrgStructureSection } from './orgStructure/OrgStructureSection';
 
 type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users' | 'org';
@@ -47,7 +47,7 @@ function useOrgStructureAvailable(userId: string | undefined): boolean {
 }
 
 /** «مدیریت کاربران» with its sub-tabs: users, sign-in history and LDAP. */
-const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) => boolean }> = ({ currentUserId, can }) => {
+const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) => boolean; orgStructureAvailable: boolean }> = ({ currentUserId, can, orgStructureAvailable }) => {
   const tabs: TabItem<UsersTab>[] = [
     ...(can('users.view') ? [{ id: 'list' as const, label: 'مدیریت کاربران', icon: Users }] : []),
     ...(can('audit_logs.view') ? [{ id: 'history' as const, label: 'تاریخچه ورود', icon: History }] : []),
@@ -70,6 +70,9 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
             assignRoles: can('users.assign_roles'),
             assignPermissions: can('users.assign_permissions'),
           }}
+          orgStructureAvailable={orgStructureAvailable}
+          canManageOrgAssignments={can(ORG_STRUCTURE_PERMISSIONS.manageAssignments)}
+          canSeeOrgUnits={can(ORG_UNIT_PERMISSIONS.view)}
         />
       )}
       {current === 'history' && <LoginHistoryPanel />}
@@ -250,7 +253,7 @@ export const SystemAdministration: React.FC<{
       )}
       {current === 'help' && help}
       {current === 'sms' && <SmsPanel canUpdate={can('sms_settings.update')} canTest={can('sms_settings.test')} />}
-      {current === 'users' && currentUserId && <UserManagementSection currentUserId={currentUserId} can={can} />}
+      {current === 'users' && currentUserId && <UserManagementSection currentUserId={currentUserId} can={can} orgStructureAvailable={orgStructureAvailable} />}
       {current === 'org' && <OrgStructureSection can={can} />}
     </div>
   );
