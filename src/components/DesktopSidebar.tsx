@@ -1,5 +1,5 @@
 import React from 'react';
-import { Kanban, Calendar, AlertCircle, Settings, LogOut, MessageSquare, FileText, PanelRightClose, Plus } from 'lucide-react';
+import { Kanban, Calendar, AlertCircle, Settings, LogOut, MessageSquare, FileText, PanelRightClose, Plus, BarChart3 } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette, User as UserType } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -202,6 +202,24 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
               {toPersianDigits(overdueCount)}
             </span>
           )}
+        </button>
+        )}
+
+        {/* 6. Task Reports (only where the backend offers them) */}
+        {canOpenTab('reports') && (
+        <button
+          type="button"
+          onClick={() => setActiveTab('reports')}
+          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'reports'
+              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
+              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 shrink-0" />
+            <span className="truncate">گزارش فعالیت‌ها</span>
+          </div>
         </button>
         )}
       </div>

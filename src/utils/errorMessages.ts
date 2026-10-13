@@ -162,6 +162,11 @@ const KNOWN_MESSAGES: Record<string, string> = {
   'Email delivery is not configured (Email:Smtp).': 'ارسال ایمیل روی سرور پیکربندی نشده است.',
   'The email could not be sent.': 'ارسال ایمیل انجام نشد.',
   'Setting key is required.': 'کلید تنظیمات مشخص نشده است.',
+  // Task reports
+  'Person role must be responsible or creator.': 'نقش فرد باید «مسئول» یا «ایجادکننده» باشد.',
+  'Unknown task type.': 'نوع فعالیت معتبر نیست.',
+  'Unknown task status.': 'وضعیت فعالیت معتبر نیست.',
+  'The start date is after the end date.': 'تاریخ «از» نباید بعد از تاریخ «تا» باشد.',
   // Organization structure (companies, units, positions, managers)
   'Company was not found.': 'شرکت یافت نشد.',
   'The company is inactive.': 'این شرکت غیرفعال است.',

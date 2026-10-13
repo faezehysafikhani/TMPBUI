@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Kanban, Calendar, Plus, AlertCircle, Settings, MessageSquare, FileText, Layers, X } from 'lucide-react';
+import { Kanban, Calendar, Plus, AlertCircle, Settings, MessageSquare, FileText, Layers, X, BarChart3 } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 
-export type ActiveTab = 'kanban' | 'calendar' | 'overdue' | 'chat' | 'notes' | 'settings';
+export type ActiveTab = 'kanban' | 'calendar' | 'overdue' | 'chat' | 'notes' | 'reports' | 'settings';
 
 interface SandwichBarProps {
   activeTab: ActiveTab;
@@ -96,6 +96,26 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                     aria-label="یادداشت‌های شخصی"
                   >
                     <FileText className="w-5.5 h-5.5" />
+                  </button>
+                  )}
+
+                  {/* 3. Task Reports Icon Button (only where the backend offers them) */}
+                  {canOpenTab('reports') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsToolsMenuOpen(false);
+                      setActiveTab('reports');
+                    }}
+                    className={`w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-100 ${
+                      activeTab === 'reports'
+                        ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
+                        : 'bg-slate-800 hover:bg-slate-700 text-sky-400'
+                    }`}
+                    title="گزارش فعالیت‌ها"
+                    aria-label="گزارش فعالیت‌ها"
+                  >
+                    <BarChart3 className="w-5.5 h-5.5" />
                   </button>
                   )}
 
