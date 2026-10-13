@@ -108,11 +108,11 @@ const MemberChip: React.FC<{ member: ChartMember }> = ({ member }) => (
   </span>
 );
 
-const UnitNode: React.FC<{ unit: ChartUnit; depth: number }> = ({ unit, depth }) => {
-  const [open, setOpen] = useState(depth < 1);
+const UnitNode: React.FC<{ unit: ChartUnit }> = ({ unit }) => {
+  const [open, setOpen] = useState(true);
   const count = unit.members.length;
   return (
-    <div className={depth > 0 ? 'border-r-2 border-indigo-100 dark:border-indigo-900 pr-3 mr-2' : ''}>
+    <div>
       <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between gap-2 py-2 text-right cursor-pointer">
         <span className="flex items-center gap-2 min-w-0">
           {open ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronLeft className="w-4 h-4 text-slate-400 shrink-0" />}
@@ -125,7 +125,6 @@ const UnitNode: React.FC<{ unit: ChartUnit; depth: number }> = ({ unit, depth })
       {open && (
         <div className="space-y-1 pb-1">
           {count > 0 && <div className="flex flex-wrap gap-1.5 pr-6 pb-1">{unit.members.map((m) => <MemberChip key={m.userId} member={m} />)}</div>}
-          {unit.children.map((child) => <UnitNode key={child.unitId} unit={child} depth={depth + 1} />)}
         </div>
       )}
     </div>
@@ -150,7 +149,7 @@ const CompanyCard: React.FC<{ company: ChartCompany }> = ({ company }) => (
     {company.units.length === 0 ? (
       <p className="text-xs text-slate-500">هنوز معاونتی به این شرکت اختصاص داده نشده است.</p>
     ) : (
-      <div className="divide-y divide-slate-100 dark:divide-slate-800">{company.units.map((u) => <UnitNode key={u.unitId} unit={u} depth={0} />)}</div>
+      <div className="divide-y divide-slate-100 dark:divide-slate-800">      {company.units.map((u) => <UnitNode key={u.unitId} unit={u} />)}</div>
     )}
   </AdminCard>
 );

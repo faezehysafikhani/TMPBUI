@@ -6,9 +6,9 @@ import {
 import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
-  CompanyUnitLink, MANAGER_SOURCE_TITLES, OrgUnit, Subordinate, UserAssignment, buildUnitTree, flattenUnitTree,
+  CompanyUnitLink, MANAGER_SOURCE_TITLES, OrgUnit, Subordinate, UserAssignment, sortOrgUnits,
   getSubordinatesOf, listAssignments, listCompanies, listCompanyUnits, listOrgUnits, listPositions, removeAssignment,
-  setAssignment, unitSubtreeIds,
+  setAssignment,
 } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, UserPicker, useLoad } from './orgShared';
 
@@ -46,13 +46,13 @@ export const AssignmentsPanel: React.FC<{ canManage: boolean; canSeeUnits: boole
     (!companyFilter || a.companyId === companyFilter)
     && (!search.trim() || [a.displayName, a.unitName, a.positionTitle, a.manager?.displayName].some((v) => v?.includes(search.trim())))), [data.data, search, companyFilter]);
 
-  /** Units of the chosen company: its linked deputies and everything below them. */
+  /** Units directly linked to the chosen company. */
   const unitsOfCompany = useMemo(() => {
     if (!data.data || !draft?.companyId) return [];
     const ids = new Set<string>();
     data.data.links.filter((l: CompanyUnitLink) => l.companyId === draft.companyId)
-      .forEach((l) => unitSubtreeIds(data.data!.units, l.unitId).forEach((id) => ids.add(id)));
-    return flattenUnitTree(buildUnitTree(data.data.units.filter((u) => ids.has(u.id) && u.isActive)));
+      .forEach((link) => ids.add(link.unitId));
+    return sortOrgUnits(data.data.units.filter((unit) => ids.has(unit.id) && unit.isActive));
   }, [data.data, draft?.companyId]);
 
   const open = (a?: UserAssignment) => setDraft(a ? {
@@ -173,7 +173,7 @@ export const AssignmentsPanel: React.FC<{ canManage: boolean; canSeeUnits: boole
             <Field label="معاونت / واحد" hint={unitsOfCompany.length === 0 ? 'این شرکت هنوز معاونتی ندارد.' : undefined}>
               <select className={inputClass} value={draft.unitId} onChange={(e) => setDraft({ ...draft, unitId: e.target.value })} disabled={unitsOfCompany.length === 0}>
                 <option value="">— مستقیم زیر شرکت —</option>
-                {unitsOfCompany.map((u) => <option key={u.id} value={u.id}>{' '.repeat(u.depth * 3)}{u.name}</option>)}
+                {unitsOfCompany.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </Field>
           </div>

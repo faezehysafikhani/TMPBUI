@@ -20,7 +20,7 @@ export interface CompanyInput { name: string; code: string; description?: string
 
 export interface CompanyUnitLink { unitId: string; unitName: string; companyId: string; companyName: string }
 
-export interface Position { id: string; title: string; code: string | null; isActive: boolean }
+export interface Position { id: string; title: string; parentPositionId: string | null; isActive: boolean }
 
 export type ManagerSource = 'Explicit' | 'UnitManager' | 'CompanyManager';
 
@@ -57,7 +57,7 @@ export interface MyPlacement { assignment: UserAssignment | null; managementChai
 
 export interface ChartMember { userId: string; displayName: string; isActive: boolean; positionTitle: string | null; managerUserId: string | null }
 
-export interface ChartUnit { unitId: string; name: string; code: string; manager: PersonRef | null; members: ChartMember[]; children: ChartUnit[] }
+export interface ChartUnit { unitId: string; name: string; manager: PersonRef | null; members: ChartMember[] }
 
 export interface ChartCompany {
   companyId: string;
@@ -70,9 +70,9 @@ export interface ChartCompany {
 }
 
 /** An organization unit (a deputy, a department...) from Nexus.Organization. */
-export interface OrgUnit { id: string; name: string; code: string; parentId: string | null; managerUserId: string | null; isActive: boolean }
+export interface OrgUnit { id: string; name: string; managerUserId: string | null; isActive: boolean }
 
-export interface OrgUnitInput { name: string; code: string; parentId: string | null; managerUserId: string | null; isActive: boolean }
+export interface OrgUnitInput { name: string; managerUserId: string | null; isActive: boolean }
 
 const BASE = '/api/org-structure';
 
@@ -122,9 +122,10 @@ export const linkUnitToCompany = (unitId: string, companyId: string) =>
 export const unlinkUnit = (unitId: string) => apiRequest<void>('DELETE', `${BASE}/company-units/${unitId}`);
 
 export const listPositions = () => apiRequest<Position[]>('GET', `${BASE}/positions`);
-export const createPosition = (title: string, code: string | null) => apiRequest<Position>('POST', `${BASE}/positions`, { body: { title, code } });
-export const updatePosition = (id: string, title: string, code: string | null, isActive: boolean) =>
-  apiRequest<Position>('PUT', `${BASE}/positions/${id}`, { body: { title, code, isActive } });
+export const createPosition = (title: string, parentPositionId: string | null) =>
+  apiRequest<Position>('POST', `${BASE}/positions`, { body: { title, parentPositionId } });
+export const updatePosition = (id: string, title: string, parentPositionId: string | null, isActive: boolean) =>
+  apiRequest<Position>('PUT', `${BASE}/positions/${id}`, { body: { title, parentPositionId, isActive } });
 export const deletePosition = (id: string) => apiRequest<void>('DELETE', `${BASE}/positions/${id}`);
 
 export const listAssignments = (filter: { companyId?: string; unitId?: string } = {}) =>
@@ -137,60 +138,12 @@ export const getSubordinatesOf = (userId: string, all: boolean) =>
   apiRequest<Subordinate[]>('GET', `${BASE}/users/${userId}/subordinates`, { query: { all } });
 
 export const listOrgUnits = () => apiRequest<OrgUnit[]>('GET', '/api/organization/units');
-export const createOrgUnit = (input: { name: string; code: string; parentId: string | null }) =>
+export const createOrgUnit = (input: { name: string }) =>
   apiRequest<OrgUnit>('POST', '/api/organization/units', { body: { ...input, tenantId: getSessionTenantId() } });
 export const updateOrgUnit = (id: string, input: OrgUnitInput) => apiRequest<OrgUnit>('PUT', `/api/organization/units/${id}`, { body: input });
 export const deactivateOrgUnit = (id: string) => apiRequest<void>('DELETE', `/api/organization/units/${id}`);
 
-export interface UnitTreeNode extends OrgUnit { depth: number; children: UnitTreeNode[] }
-
-/** Units as a tree (roots first, children alphabetical); loops and orphans become roots. */
-export function buildUnitTree(units: OrgUnit[]): UnitTreeNode[] {
-  const byId = new Map(units.map((u) => [u.id, u]));
-  const children = new Map<string, OrgUnit[]>();
-  const roots: OrgUnit[] = [];
-  for (const unit of units) {
-    if (unit.parentId && byId.has(unit.parentId) && unit.parentId !== unit.id) {
-      children.set(unit.parentId, [...(children.get(unit.parentId) || []), unit]);
-    } else {
-      roots.push(unit);
-    }
-  }
-  const visited = new Set<string>();
-  const build = (unit: OrgUnit, depth: number): UnitTreeNode => {
-    visited.add(unit.id);
-    const kids = (children.get(unit.id) || [])
-      .filter((c) => !visited.has(c.id))
-      .sort((a, b) => a.name.localeCompare(b.name, 'fa'))
-      .map((c) => build(c, depth + 1));
-    return { ...unit, depth, children: kids };
-  };
-  const tree = roots.sort((a, b) => a.name.localeCompare(b.name, 'fa')).map((r) => build(r, 0));
-  // Units caught in a parent loop were never reached from a root: show them at the top level.
-  for (const unit of units) if (!visited.has(unit.id)) tree.push(build(unit, 0));
-  return tree;
-}
-
-/** The tree flattened in display order, each with its depth (for indented lists and selects). */
-export function flattenUnitTree(tree: UnitTreeNode[]): UnitTreeNode[] {
-  const out: UnitTreeNode[] = [];
-  const walk = (nodes: UnitTreeNode[]) => nodes.forEach((n) => { out.push(n); walk(n.children); });
-  walk(tree);
-  return out;
-}
-
-/** The given unit and every unit below it. */
-export function unitSubtreeIds(units: OrgUnit[], rootId: string): Set<string> {
-  const result = new Set<string>([rootId]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const unit of units) {
-      if (unit.parentId && result.has(unit.parentId) && !result.has(unit.id)) {
-        result.add(unit.id);
-        grew = true;
-      }
-    }
-  }
-  return result;
+/** Units are independent entries, ordered alphabetically for selectors and lists. */
+export function sortOrgUnits(units: OrgUnit[]): OrgUnit[] {
+  return [...units].sort((a, b) => a.name.localeCompare(b.name, 'fa'));
 }
