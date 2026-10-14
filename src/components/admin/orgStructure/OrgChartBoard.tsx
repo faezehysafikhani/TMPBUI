@@ -254,7 +254,7 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
  * no deputy, and people with no place at all. Clicking any of them shows it in the side panel,
  * where it can be changed right away (as the user's permissions allow; the server checks again).
  *
- * The chart is a canvas: it opens showing all of it, the wheel (or two fingers) zooms where the
+ * The chart is a canvas: it opens at half size from the top, the wheel (or two fingers) zooms where the
  * pointer is, dragging moves it, and choosing a card while zoomed out - on the chart, in the side
  * panel or by searching - takes the chart to it.
  */
@@ -286,7 +286,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
 
   const chart = data.data?.chart || [];
   const company: ChartCompany | undefined = chart.find((c) => c.companyId === companyId) || chart[0];
-  const { fit, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company);
+  const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company);
 
   // The company first shown is selected, so the side panel is never empty.
   useEffect(() => {
@@ -329,8 +329,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   const units = company?.units || [];
   const perRow = useMemo(() => chooseColumns(units, canvasSize.width, canvasSize.height), [units, canvasSize.width, canvasSize.height]);
 
-  // The chart opens showing all of it: for another company, another layout or full screen too.
-  useLayoutEffect(() => { fit(); }, [company?.companyId, perRow, fullscreen, fit]);
+  // The chart opens at half size from the top: for another company, another layout or full screen too.
+  useLayoutEffect(() => { home(); }, [company?.companyId, perRow, fullscreen, home]);
 
   useEffect(() => {
     if (!reveal) return;
@@ -553,7 +553,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         onWheel={() => setHint(false)}
         aria-label="چارت سازمانی؛ با چرخ ماوس یا دو انگشت بزرگ‌نمایی کنید و با کشیدن جابه‌جا کنید"
         style={screenHeight ? { height: screenHeight } : undefined}
-        className={`relative overflow-hidden touch-none select-none outline-hidden cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:[&_*]:cursor-grabbing bg-slate-50/60 dark:bg-slate-950/40 bg-[radial-gradient(circle,_#cbd5e1_1px,_transparent_1.2px)] dark:bg-[radial-gradient(circle,_#334155_1px,_transparent_1.2px)] ${fullscreen ? 'flex-1 min-h-0' : screenHeight ? '' : 'h-[60vh] sm:h-[70vh] min-h-[380px]'}`}
+        className={`relative overflow-hidden touch-none select-none outline-hidden cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:[&_*]:cursor-grabbing bg-slate-50/60 dark:bg-slate-950/40 ${fullscreen ? 'flex-1 min-h-0' : screenHeight ? '' : 'h-[60vh] sm:h-[70vh] min-h-[380px]'}`}
       >
         <div ref={content} className="absolute top-0 left-0 origin-top-left w-max px-10 py-10 flex flex-col items-center">
           {/* the company */}

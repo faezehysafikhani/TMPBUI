@@ -3,6 +3,8 @@ import { RefObject, useCallback, useEffect, useRef } from 'react';
 export interface PanZoomView { x: number; y: number; s: number }
 
 export const MAX_SCALE = 2;
+/** The zoom the chart opens at (more if the whole chart fits bigger). */
+export const START_SCALE = 0.5;
 /** Below this the cards are hard to read: choosing one zooms in to it. */
 export const READABLE_SCALE = 0.7;
 
@@ -35,7 +37,7 @@ function localRect(el: HTMLElement, content: HTMLElement) {
 export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: RefObject<HTMLDivElement | null>, active: boolean) {
   const view = useRef<PanZoomView>({ x: 0, y: 0, s: 1 });
   const listeners = useRef(new Set<(view: PanZoomView) => void>());
-  /** The user moved or zoomed since the last fit (a resize then keeps their view). */
+  /** The user moved or zoomed since the chart opened (a resize then keeps their view). */
   const moved = useRef(false);
   const dragged = useRef(false);
 
@@ -57,8 +59,6 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
     const { x, y, s } = view.current;
     el.style.transition = animate ? 'transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none';
     el.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
-    vp.style.backgroundSize = `${24 * s}px ${24 * s}px`;
-    vp.style.backgroundPosition = `${x}px ${y}px`;
     listeners.current.forEach((listener) => listener(view.current));
   }, [content, viewport]);
 
@@ -91,6 +91,19 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
     moved.current = false;
     set({ s, x: (vp.clientWidth - w * s) / 2, y: Math.max(top, (vp.clientHeight - h * s) / 2) }, animate);
   }, [content, fitScale, set, viewport]);
+
+  /** How the chart opens: at START_SCALE, centred, from its top (where the company is). */
+  const home = useCallback((animate = false) => {
+    const el = content.current;
+    const vp = viewport.current;
+    if (!el || !vp || !vp.clientWidth || !vp.clientHeight) return;
+    const top = topPad(vp);
+    const s = clampScale(START_SCALE);
+    const w = el.offsetWidth * s;
+    const h = el.offsetHeight * s;
+    moved.current = false;
+    set({ s, x: (vp.clientWidth - w) / 2, y: h <= vp.clientHeight - top - PAD ? (vp.clientHeight - h) / 2 : top }, animate);
+  }, [clampScale, content, set, viewport]);
 
   const zoomAt = useCallback((px: number, py: number, factor: number, animate = false) => {
     const { x, y, s } = view.current;
@@ -255,7 +268,7 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
 
     // Until the user moves the chart, it keeps fitting the canvas as the canvas changes size.
     const resize = new ResizeObserver(() => {
-      if (!moved.current) fit();
+      if (!moved.current) home();
       else set(view.current);
     });
     resize.observe(vp);
@@ -281,7 +294,7 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
       vp.removeEventListener('keydown', onKey);
       vp.removeEventListener('dragstart', onDragStart);
     };
-  }, [active, clampScale, fit, set, viewport, zoomAt, zoomBy]);
+  }, [active, clampScale, fit, home, set, viewport, zoomAt, zoomBy]);
 
-  return { fit, zoomBy, focus, subscribe };
+  return { fit, home, zoomBy, focus, subscribe };
 }
