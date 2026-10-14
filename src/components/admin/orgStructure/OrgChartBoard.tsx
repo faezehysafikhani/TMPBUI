@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
 import { ChartCompany, ChartMember, ChartTeam, ChartUnit, PersonRef, getChart, listPositions, listTeamsOutsideUnits, listUnplacedUsers } from '../../../services/orgStructureApi';
@@ -7,6 +7,7 @@ import { EmptyRow, LoadingRow, useLoad } from './orgShared';
 import { ChartSelection, companyHeadcount, teamsOf, unitHeadcount } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
 import { OrgChartDetails } from './OrgChartDetails';
+import { PanZoomView, usePanZoom } from './usePanZoom';
 
 const PersonLine: React.FC<{ person: PersonRef | null; empty: string }> = ({ person, empty }) => (
   person ? (
@@ -31,12 +32,17 @@ const Toggle: React.FC<{ open: boolean; onClick: () => void; label: string }> = 
 
 /** A card of the chart; the selected one is outlined. */
 const NodeCard: React.FC<{
+  /** Finds the card when it is chosen elsewhere (side panel, search), to bring it into view. */
+  node: string;
+  label: string;
   selected: boolean;
   onSelect: () => void;
   className?: string;
   children: React.ReactNode;
-}> = ({ selected, onSelect, className = '', children }) => (
+}> = ({ node, label, selected, onSelect, className = '', children }) => (
   <div
+    data-node={node}
+    title={label}
     role="button"
     tabIndex={0}
     onClick={onSelect}
@@ -54,6 +60,7 @@ const NodeCard: React.FC<{
 
 const MemberRow: React.FC<{ member: ChartMember; selected: boolean; onSelect: () => void }> = ({ member, selected, onSelect }) => (
   <button
+    data-node={`member:${member.userId}`}
     type="button"
     onClick={(e) => { e.stopPropagation(); onSelect(); }}
     className={`w-full flex items-center gap-2 rounded-xl px-2 py-1.5 text-right cursor-pointer ${selected ? 'bg-indigo-50 dark:bg-indigo-950/50' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'}`}
@@ -68,6 +75,7 @@ const MemberRow: React.FC<{ member: ChartMember; selected: boolean; onSelect: ()
 
 /** A work team (or the deputy's people in no team) under a deputy, with a branch line to it. */
 const BranchCard: React.FC<{
+  node: string;
   icon: React.ComponentType<{ className?: string }>;
   tone: string;
   title: string;
@@ -83,10 +91,10 @@ const BranchCard: React.FC<{
   muted?: boolean;
   /** Drawn on a deputy's branch line (not in the list of teams outside the deputies). */
   onBranch?: boolean;
-}> = ({ icon: Icon, tone, title, subtitle, count, members, open, onToggle, selected, onSelect, selectedUserId, onSelectMember, muted, onBranch = true }) => (
+}> = ({ node, icon: Icon, tone, title, subtitle, count, members, open, onToggle, selected, onSelect, selectedUserId, onSelectMember, muted, onBranch = true }) => (
   <div className="relative">
     {onBranch && <span className="absolute -start-4 top-7 w-4 h-0.5 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />}
-    <NodeCard selected={selected} onSelect={onSelect} className={`w-60 ${muted ? 'opacity-70' : ''}`}>
+    <NodeCard node={node} label={title} selected={selected} onSelect={onSelect} className={`w-60 ${muted ? 'opacity-70' : ''}`}>
       <div className="flex items-center gap-2.5 p-3">
         <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${tone}`}><Icon className="w-[18px] h-[18px]" /></span>
         <span className="min-w-0 flex-1">
@@ -96,7 +104,7 @@ const BranchCard: React.FC<{
         {count > 0 && <Toggle open={open} onClick={onToggle} label={title} />}
       </div>
       {open && members.length > 0 && (
-        <div className="border-t border-slate-100 dark:border-slate-800 p-1.5 space-y-0.5 max-h-60 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div data-scrollable className="relative border-t border-slate-100 dark:border-slate-800 p-1.5 space-y-0.5 max-h-60 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           {members.map((m) => <MemberRow key={m.userId} member={m} selected={selectedUserId === m.userId} onSelect={() => onSelectMember(m.userId)} />)}
         </div>
       )}
@@ -104,12 +112,151 @@ const BranchCard: React.FC<{
   </div>
 );
 
+/** The card of a selection on the chart (a person can show in several teams: the first one). */
+function nodeOf(selection: ChartSelection): string | null {
+  switch (selection.kind) {
+    case 'company': return `company:${selection.companyId}`;
+    case 'direct': return `direct:${selection.companyId}`;
+    case 'unit': return `unit:${selection.unitId}`;
+    case 'noTeam': return `noTeam:${selection.unitId}`;
+    case 'team': return `team:${selection.teamId}`;
+    case 'member': return `member:${selection.userId}`;
+    default: return null;
+  }
+}
+
+// ---------------------------------------------------------------- layout
+
+/** Width of a deputy's column: its card, or its branch of team cards beside the line. */
+const COLUMN_WIDTH = 322;
+
+/** Roughly how tall a deputy's column is with its teams closed. */
+function columnHeight(unit: ChartUnit): number {
+  const branches = teamsOf(unit).length + (unit.members.length > 0 ? 1 : 0);
+  return 112 + (branches > 0 ? 16 + branches * 78 : 0);
+}
+
+/**
+ * Many deputies in one row make a chart too wide to read when zoomed out, so they are laid out
+ * in balanced rows - as many per row as lets the whole chart show biggest in the canvas.
+ */
+function chooseColumns(units: ChartUnit[], width: number, height: number): number {
+  const n = units.length;
+  if (n <= 2 || !width || !height) return Math.max(1, n);
+  let best = n;
+  let bestScale = 0;
+  for (let k = 1; k <= n; k++) {
+    const perRow = Math.ceil(n / Math.ceil(n / k));
+    let total = 170;
+    for (let i = 0; i < n; i += perRow) total += 80 + Math.max(...units.slice(i, i + perRow).map(columnHeight));
+    const scale = Math.min((width - 48) / (perRow * COLUMN_WIDTH + 80), (height - 48) / total);
+    // Fewer, wider rows read more like a chart: they win unless they are clearly smaller.
+    if (scale >= bestScale * 0.95) {
+      best = perRow;
+      bestScale = Math.max(bestScale, scale);
+    }
+  }
+  return best;
+}
+
+function rowsOf<T>(items: T[], perRow: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += perRow) rows.push(items.slice(i, i + perRow));
+  return rows;
+}
+
+// ---------------------------------------------------------------- canvas controls
+
+const controlClass = 'w-9 h-9 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 cursor-pointer';
+
+/** Zoom in/out, the current zoom (click: real size) and the whole chart. */
+const ZoomControls: React.FC<{
+  subscribe: (listener: (view: PanZoomView) => void) => () => void;
+  zoomBy: (factor: number) => void;
+  fit: (animate?: boolean) => void;
+}> = ({ subscribe, zoomBy, fit }) => {
+  const [scale, setScale] = useState(1);
+  useEffect(() => subscribe((view) => setScale(view.s)), [subscribe]);
+  return (
+    <div dir="ltr" className="absolute left-3 top-3 sm:top-auto sm:bottom-3 z-10 flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 shadow-md overflow-hidden" onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+      <button type="button" className={controlClass} onClick={() => zoomBy(1 / 1.3)} title="کوچک‌نمایی" aria-label="کوچک‌نمایی"><ZoomOut className="w-4 h-4" /></button>
+      <button type="button" className="h-9 min-w-14 px-1 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 cursor-pointer tabular-nums" onClick={() => zoomBy(1 / scale)} title="اندازهٔ واقعی" aria-label="اندازهٔ واقعی">
+        {toPersianDigits(Math.round(scale * 100))}٪
+      </button>
+      <button type="button" className={controlClass} onClick={() => zoomBy(1.3)} title="بزرگ‌نمایی" aria-label="بزرگ‌نمایی"><ZoomIn className="w-4 h-4" /></button>
+      <span className="w-px h-5 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+      <button type="button" className={`${controlClass} gap-1 w-auto px-2.5 text-xs font-bold`} onClick={() => fit(true)} title="دیدن کل چارت" aria-label="دیدن کل چارت"><Scan className="w-4 h-4" /> کل چارت</button>
+    </div>
+  );
+};
+
+/** Persian text compared loosely: Arabic ی/ك, half-spaces and case do not matter. */
+const normalize = (text: string) => text.replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/‌/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+
+interface SearchHit { key: string; label: string; detail: string; kind: 'unit' | 'team' | 'person'; go: () => void }
+
+/** Finds a deputy, a team or a person in the chart and takes the chart to it. */
+const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
+  const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+  const query = normalize(text);
+  const found = query ? hits.filter((h) => normalize(h.label).includes(query)).slice(0, 8) : [];
+  const choose = (hit: SearchHit) => { hit.go(); setText(''); setOpen(false); };
+  const icons = { unit: Network, team: Users, person: UserRound };
+  const tones = {
+    unit: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300',
+    team: 'bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300',
+    person: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  };
+  return (
+    <div className="relative w-full sm:w-64">
+      <Search className="w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 start-3 pointer-events-none" />
+      <input
+        value={text}
+        onChange={(e) => { setText(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && found[0]) { e.preventDefault(); choose(found[0]); }
+          if (e.key === 'Escape') { setText(''); setOpen(false); }
+        }}
+        placeholder="جستجوی معاونت، تیم یا فرد…"
+        aria-label="جستجو در چارت"
+        className="w-full ps-9 pe-8 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:outline-hidden focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900"
+      />
+      {text && (
+        <button type="button" onClick={() => setText('')} className="absolute top-1/2 -translate-y-1/2 end-2 p-1 text-slate-400 hover:text-slate-600 cursor-pointer" aria-label="پاک کردن جستجو"><X className="w-3.5 h-3.5" /></button>
+      )}
+      {open && query && (
+        <div className="absolute z-30 mt-1 w-full sm:w-80 end-0 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-1 max-h-80 overflow-y-auto">
+          {found.length === 0 ? <p className="text-xs text-slate-400 px-3 py-2">چیزی پیدا نشد.</p> : found.map((hit) => {
+            const Icon = icons[hit.kind];
+            return (
+              <button key={hit.key} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => choose(hit)} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${tones[hit.kind]}`}><Icon className="w-3.5 h-3.5" /></span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{hit.label}</span>
+                  <span className="block text-[11px] text-slate-500 truncate">{hit.detail}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /**
  * «چارت سازمانی»: the company at the top, its deputies under it, under each deputy the work teams
  * its people built and everyone in them (from any deputy; a person in several teams shows in each)
  * - and the deputy's people in no team, the teams whose builder is in no deputy, the company's people in
  * no deputy, and people with no place at all. Clicking any of them shows it in the side panel,
  * where it can be changed right away (as the user's permissions allow; the server checks again).
+ *
+ * The chart is a canvas: it opens showing all of it, the wheel (or two fingers) zooms where the
+ * pointer is, dragging moves it, and choosing a card while zoomed out - on the chart, in the side
+ * panel or by searching - takes the chart to it.
  */
 export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> = ({ can }) => {
   const data = useLoad(async () => {
@@ -127,23 +274,43 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   const [collapsedUnits, setCollapsedUnits] = useState<Set<string>>(new Set());
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [fullscreen, setFullscreen] = useState(false);
-  const canvas = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  /** How to move around, until the user first does. */
+  const [hint, setHint] = useState(true);
+  /** A card to bring into view once it is on the page (`force`: even if it is already in view). */
+  const [reveal, setReveal] = useState<{ node: string; force: boolean; seq: number } | null>(null);
+  const viewport = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
 
   const chart = data.data?.chart || [];
   const company: ChartCompany | undefined = chart.find((c) => c.companyId === companyId) || chart[0];
+  const { fit, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company);
 
   // The company first shown is selected, so the side panel is never empty.
   useEffect(() => {
     if (company && !selection) setSelection({ kind: 'company', companyId: company.companyId });
   }, [company?.companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A tree wider than the screen opens at its middle, where the company is - not at one edge.
   useEffect(() => {
-    const el = canvas.current;
-    if (!el || el.scrollWidth <= el.clientWidth) return;
-    const middle = (el.scrollWidth - el.clientWidth) / 2;
-    el.scrollLeft = getComputedStyle(el).direction === 'rtl' ? -middle : middle;
-  }, [company?.companyId, !!data.data, fullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
+    const el = viewport.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setCanvasSize((prev) => (
+      prev.width === el.clientWidth && prev.height === el.clientHeight ? prev : { width: el.clientWidth, height: el.clientHeight })));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [!!company]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const units = company?.units || [];
+  const perRow = useMemo(() => chooseColumns(units, canvasSize.width, canvasSize.height), [units, canvasSize.width, canvasSize.height]);
+
+  // The chart opens showing all of it: for another company, another layout or full screen too.
+  useLayoutEffect(() => { fit(); }, [company?.companyId, perRow, fullscreen, fit]);
+
+  useEffect(() => {
+    if (!reveal) return;
+    const el = content.current?.querySelector<HTMLElement>(`[data-node="${CSS.escape(reveal.node)}"]`);
+    if (el) focus(el, { onlyIfNeeded: !reveal.force });
+  }, [reveal, focus]);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -157,15 +324,75 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     if (next.has(key)) next.delete(key); else next.add(key);
     return next;
   });
+  const addTo = (set: React.Dispatch<React.SetStateAction<Set<string>>>, key: string) => set((prev) => (prev.has(key) ? prev : new Set([...prev, key])));
+  const removeFrom = (set: React.Dispatch<React.SetStateAction<Set<string>>>, key: string) => set((prev) => {
+    if (!prev.has(key)) return prev;
+    const next = new Set(prev);
+    next.delete(key);
+    return next;
+  });
+
+  /** Selects, and takes the chart to the card when it is out of sight or too small to read. */
+  const choose = (next: ChartSelection, options: { force?: boolean; node?: string } = {}) => {
+    setSelection(next);
+    const node = options.node || nodeOf(next);
+    if (node) setReveal((prev) => ({ node, force: !!options.force, seq: (prev?.seq || 0) + 1 }));
+  };
 
   const allGroupKeys = useMemo(() => (company ? company.units.flatMap((u) => [`none:${u.unitId}`, ...teamsOf(u).map((t) => `team:${t.teamId}`)]) : []), [company]);
   const allOpen = !!company && collapsedUnits.size === 0 && allGroupKeys.every((k) => openGroups.has(k));
   const expandAll = () => { setCollapsedUnits(new Set()); setOpenGroups(new Set(allGroupKeys)); };
   const collapseAll = () => { setOpenGroups(new Set()); };
 
+  const searchHits = useMemo<SearchHit[]>(() => {
+    if (!company) return [];
+    const hits: SearchHit[] = [];
+    const people = new Set<string>();
+    const openUnit = (unitId: string) => removeFrom(setCollapsedUnits, unitId);
+    for (const unit of company.units) {
+      hits.push({
+        key: `unit:${unit.unitId}`, kind: 'unit', label: unit.name, detail: `معاونت · ${toPersianDigits(unitHeadcount(unit))} نفر`,
+        go: () => { openUnit(unit.unitId); choose({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId }, { force: true }); },
+      });
+      for (const team of teamsOf(unit)) {
+        hits.push({
+          key: `team:${team.teamId}`, kind: 'team', label: team.name, detail: `تیم · ${unit.name}`,
+          go: () => { openUnit(unit.unitId); choose({ kind: 'team', teamId: team.teamId }, { force: true }); },
+        });
+        for (const member of team.members) {
+          if (people.has(member.userId)) continue;
+          people.add(member.userId);
+          hits.push({
+            key: `person:${member.userId}`, kind: 'person', label: member.displayName, detail: [member.positionTitle, team.name].filter(Boolean).join(' · '),
+            go: () => { openUnit(unit.unitId); addTo(setOpenGroups, `team:${team.teamId}`); choose({ kind: 'member', userId: member.userId }, { force: true }); },
+          });
+        }
+      }
+    }
+    for (const unit of company.units) {
+      for (const member of unit.members) {
+        if (people.has(member.userId)) continue;
+        people.add(member.userId);
+        hits.push({
+          key: `person:${member.userId}`, kind: 'person', label: member.displayName, detail: [member.positionTitle, `${unit.name} · بدون تیم`].filter(Boolean).join(' · '),
+          go: () => { openUnit(unit.unitId); addTo(setOpenGroups, `none:${unit.unitId}`); choose({ kind: 'member', userId: member.userId }, { force: true }); },
+        });
+      }
+    }
+    for (const member of company.members) {
+      if (people.has(member.userId)) continue;
+      people.add(member.userId);
+      hits.push({
+        key: `person:${member.userId}`, kind: 'person', label: member.displayName, detail: 'مستقیم زیر شرکت',
+        go: () => choose({ kind: 'member', userId: member.userId }, { force: true, node: `direct:${company.companyId}` }),
+      });
+    }
+    return hits;
+  }, [company]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const selectedUserId = selection && (selection.kind === 'member' || selection.kind === 'unplaced') ? selection.userId : null;
   const isSelected = (s: ChartSelection) => JSON.stringify(s) === JSON.stringify(selection);
-  const selectMember = (userId: string) => setSelection({ kind: 'member', userId });
+  const selectMember = (userId: string) => choose({ kind: 'member', userId });
 
   if (data.loading && !data.data) return <AdminCard><LoadingRow /></AdminCard>;
   if (data.error) return <Notice type="error">{data.error}</Notice>;
@@ -177,8 +404,10 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     return (
       <div className="flex flex-col items-center">
         <NodeCard
+          node={`unit:${unit.unitId}`}
+          label={unit.name}
           selected={isSelected({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
-          onSelect={() => setSelection({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
+          onSelect={() => choose({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
           className={`w-64 ${unit.isActive === false ? 'opacity-60' : ''}`}
         >
           <div className="flex items-center gap-2.5 p-3.5">
@@ -203,6 +432,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
               {teams.map((team: ChartTeam) => (
                 <BranchCard
                   key={team.teamId}
+                  node={`team:${team.teamId}`}
                   icon={Users}
                   tone="bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
                   title={team.name}
@@ -212,13 +442,14 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
                   open={openGroups.has(`team:${team.teamId}`)}
                   onToggle={() => toggleIn(setOpenGroups, `team:${team.teamId}`)}
                   selected={isSelected({ kind: 'team', teamId: team.teamId })}
-                  onSelect={() => setSelection({ kind: 'team', teamId: team.teamId })}
+                  onSelect={() => choose({ kind: 'team', teamId: team.teamId })}
                   selectedUserId={selectedUserId}
                   onSelectMember={selectMember}
                 />
               ))}
               {unit.members.length > 0 && (
                 <BranchCard
+                  node={`noTeam:${unit.unitId}`}
                   icon={UserRound}
                   tone="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                   title="بدون تیم"
@@ -227,7 +458,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
                   open={openGroups.has(`none:${unit.unitId}`)}
                   onToggle={() => toggleIn(setOpenGroups, `none:${unit.unitId}`)}
                   selected={isSelected({ kind: 'noTeam', companyId: company.companyId, unitId: unit.unitId })}
-                  onSelect={() => setSelection({ kind: 'noTeam', companyId: company.companyId, unitId: unit.unitId })}
+                  onSelect={() => choose({ kind: 'noTeam', companyId: company.companyId, unitId: unit.unitId })}
                   selectedUserId={selectedUserId}
                   onSelectMember={selectMember}
                 />
@@ -239,7 +470,29 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     );
   };
 
-  const units = company.units;
+  const line = 'bg-slate-300 dark:bg-slate-600';
+  const rows = rowsOf(units, perRow);
+
+  /** One row of deputies hanging from a bar; with several rows the bar runs from the line down their start side. */
+  const unitRow = (row: ChartUnit[], joinedAtStart: boolean) => (
+    <div className="flex items-start">
+      {row.map((unit, i) => {
+        const first = i === 0;
+        const last = i === row.length - 1;
+        const bar = joinedAtStart
+          ? (last ? 'start-0 end-1/2' : 'start-0 end-0')
+          : row.length === 1 ? null : first ? 'start-1/2 end-0' : last ? 'start-0 end-1/2' : 'start-0 end-0';
+        return (
+          <div key={unit.unitId} className="relative px-4 pt-8 flex flex-col items-center">
+            {bar && <span aria-hidden="true" className={`absolute top-0 h-0.5 ${line} ${bar}`} />}
+            <span className={`absolute top-0 start-1/2 w-0.5 h-8 ${line}`} aria-hidden="true" />
+            {unitTree(unit)}
+          </div>
+        );
+      })}
+    </div>
+  );
+
   const board = (
     <AdminCard className={fullscreen ? 'overflow-hidden flex flex-col h-full' : 'overflow-hidden'}>
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
@@ -247,7 +500,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white"><GitFork className="w-5 h-5 text-indigo-600" /> چارت سازمانی</h3>
           <p className="text-xs text-slate-500 mt-0.5">روی هر بخش بزنید تا جزئیاتش را ببینید و همان‌جا تغییرش دهید.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <ChartSearch hits={searchHits} />
           {chart.length > 1 && (
             <select
               className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold"
@@ -267,12 +521,21 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         </div>
       </div>
 
-      <div ref={canvas} className={`overflow-auto ${fullscreen ? 'flex-1' : 'max-h-[70vh]'}`}>
-        <div className="min-w-max px-6 py-8 flex flex-col items-center">
+      <div
+        ref={viewport}
+        tabIndex={0}
+        onPointerDown={() => setHint(false)}
+        onWheel={() => setHint(false)}
+        aria-label="چارت سازمانی؛ با چرخ ماوس یا دو انگشت بزرگ‌نمایی کنید و با کشیدن جابه‌جا کنید"
+        className={`relative overflow-hidden touch-none select-none outline-hidden cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:[&_*]:cursor-grabbing bg-slate-50/60 dark:bg-slate-950/40 bg-[radial-gradient(circle,_#cbd5e1_1px,_transparent_1.2px)] dark:bg-[radial-gradient(circle,_#334155_1px,_transparent_1.2px)] ${fullscreen ? 'flex-1 min-h-0' : 'h-[60vh] sm:h-[70vh] min-h-[380px]'}`}
+      >
+        <div ref={content} className="absolute top-0 left-0 origin-top-left w-max px-10 py-10 flex flex-col items-center">
           {/* the company */}
           <NodeCard
+            node={`company:${company.companyId}`}
+            label={company.name}
             selected={isSelected({ kind: 'company', companyId: company.companyId })}
-            onSelect={() => setSelection({ kind: 'company', companyId: company.companyId })}
+            onSelect={() => choose({ kind: 'company', companyId: company.companyId })}
             className="w-72 bg-gradient-to-br from-indigo-50/80 to-white dark:from-indigo-950/40 dark:to-slate-900"
           >
             <div className="flex items-center gap-3 p-4">
@@ -291,8 +554,9 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           {company.members.length > 0 && (
             <button
               type="button"
-              onClick={() => setSelection({ kind: 'direct', companyId: company.companyId })}
-              className={`mt-2 px-3 py-1 rounded-full border text-[11px] font-bold cursor-pointer ${isSelected({ kind: 'direct', companyId: company.companyId }) ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:border-indigo-300'}`}
+              data-node={`direct:${company.companyId}`}
+              onClick={() => choose({ kind: 'direct', companyId: company.companyId })}
+              className={`mt-2 px-3 py-1 rounded-full border bg-white dark:bg-slate-900 text-[11px] font-bold cursor-pointer ${isSelected({ kind: 'direct', companyId: company.companyId }) ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:border-indigo-300'}`}
             >
               مستقیم زیر شرکت · {toPersianDigits(company.members.length)} نفر
             </button>
@@ -302,25 +566,29 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
             <p className="mt-6 text-sm text-slate-500">این شرکت هنوز معاونتی ندارد. از پنل کنار، «افزودن معاونت» را بزنید.</p>
           ) : (
             <>
-              <span className="w-0.5 h-8 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-              <div className="flex items-start">
-                {units.map((unit, i) => (
-                  <div key={unit.unitId} className="relative px-4 pt-8 flex flex-col items-center">
-                    {/* the bar joining the deputies, and each one's drop from it */}
-                    {units.length > 1 && (
-                      <span
-                        aria-hidden="true"
-                        className={`absolute top-0 h-0.5 bg-slate-200 dark:bg-slate-700 ${i === 0 ? 'start-1/2 end-0' : i === units.length - 1 ? 'start-0 end-1/2' : 'start-0 end-0'}`}
-                      />
-                    )}
-                    <span className="absolute top-0 start-1/2 w-0.5 h-8 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-                    {unitTree(unit)}
-                  </div>
-                ))}
-              </div>
+              <span className={`w-0.5 h-8 ${line}`} aria-hidden="true" />
+              {rows.length === 1 ? unitRow(rows[0], false) : (
+                <div className="flex flex-col items-start">
+                  {rows.map((row, r) => (
+                    <div key={row[0].unitId} className={`relative ${r > 0 ? 'pt-14' : ''}`}>
+                      {/* the line down the start side that joins the rows */}
+                      {r < rows.length - 1
+                        ? <span aria-hidden="true" className={`absolute start-0 top-0 bottom-0 w-0.5 ${line}`} />
+                        : <span aria-hidden="true" className={`absolute start-0 top-0 h-14 w-0.5 ${line}`} />}
+                      {unitRow(row, true)}
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
+
+        {hint && <p className="pointer-events-none absolute top-3 left-3 z-10 hidden sm:block rounded-lg bg-white/80 dark:bg-slate-900/80 px-2.5 py-1 text-[11px] text-slate-500 shadow-xs">
+          <span className="pointer-coarse:hidden">چرخ ماوس: بزرگ‌نمایی · کشیدن: جابه‌جایی · دوبار کلیک: نزدیک‌تر</span>
+          <span className="hidden pointer-coarse:inline">دو انگشت: بزرگ‌نمایی · کشیدن: جابه‌جایی</span>
+        </p>}
+        <ZoomControls subscribe={subscribe} zoomBy={zoomBy} fit={fit} />
       </div>
 
       {(data.data?.outsideTeams.length || 0) > 0 && (
@@ -333,6 +601,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
             {data.data!.outsideTeams.map((team) => (
               <BranchCard
                 key={team.teamId}
+                node={`outside:${team.teamId}`}
                 onBranch={false}
                 icon={Users}
                 tone="bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
@@ -345,7 +614,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
                 selected={isSelected({ kind: 'team', teamId: team.teamId })}
                 onSelect={() => setSelection({ kind: 'team', teamId: team.teamId })}
                 selectedUserId={selectedUserId}
-                onSelectMember={selectMember}
+                onSelectMember={(userId) => setSelection({ kind: 'member', userId })}
               />
             ))}
           </div>
@@ -392,11 +661,11 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         unplaced={data.data?.unplaced || []}
         outsideTeams={data.data?.outsideTeams || []}
         selection={selection}
-        onSelect={setSelection}
+        onSelect={(next) => choose(next)}
         onChanged={data.reload}
       />
       </div>
-      <div className={fullscreen ? 'min-h-0 order-1 lg:order-none' : 'order-1 xl:order-none'}>{board}</div>
+      <div className={fullscreen ? 'min-h-0 flex flex-col order-1 lg:order-none' : 'order-1 xl:order-none'}>{board}</div>
     </div>
     </>
   );

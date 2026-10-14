@@ -156,8 +156,8 @@ export const OrgChartDetails: React.FC<{
               <p className="text-xs font-bold text-slate-500">معاونت‌ها</p>
               {company.units.map((u) => (
                 <button key={u.unitId} type="button" onClick={() => onSelect({ kind: 'unit', companyId: company.companyId, unitId: u.unitId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
-                  <span className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100"><Network className="w-4 h-4 text-emerald-600" /> {u.name}</span>
-                  <span className="text-[11px] text-slate-500">{toPersianDigits(unitHeadcount(u))} نفر</span>
+                  <span className="flex items-center gap-2 min-w-0 text-sm font-bold text-slate-800 dark:text-slate-100"><Network className="w-4 h-4 text-emerald-600 shrink-0" /> {u.name}</span>
+                  <span className="text-[11px] text-slate-500 whitespace-nowrap shrink-0">{toPersianDigits(unitHeadcount(u))} نفر</span>
                 </button>
               ))}
             </div>
@@ -195,8 +195,8 @@ export const OrgChartDetails: React.FC<{
               <p className="text-xs font-bold text-slate-500">تیم‌های کاری که افراد این معاونت ساخته‌اند</p>
               {teams.map((t) => (
                 <button key={t.teamId} type="button" onClick={() => onSelect({ kind: 'team', teamId: t.teamId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
-                  <span className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100"><Users className="w-4 h-4 text-violet-600" /> {t.name}</span>
-                  <span className="text-[11px] text-slate-500">{toPersianDigits(t.members.length)} نفر</span>
+                  <span className="flex items-center gap-2 min-w-0 text-sm font-bold text-slate-800 dark:text-slate-100"><Users className="w-4 h-4 text-violet-600 shrink-0" /> {t.name}</span>
+                  <span className="text-[11px] text-slate-500 whitespace-nowrap shrink-0">{toPersianDigits(t.members.length)} نفر</span>
                 </button>
               ))}
             </div>
@@ -378,7 +378,7 @@ const MemberDetails: React.FC<{
         {teams.length === 0 ? <p className="text-xs text-slate-400">عضو هیچ تیم کاری نیست.</p> : teams.map(({ team, unit }) => (
           <button key={team.teamId} type="button" onClick={() => onSelect({ kind: 'team', teamId: team.teamId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
             <span className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100 min-w-0"><Users className="w-4 h-4 text-violet-600 shrink-0" /> <span className="truncate">{team.name}</span></span>
-            <span className="text-[11px] text-slate-500 shrink-0">{team.owner.userId === member.userId ? 'سازنده' : unit?.name || ''}</span>
+            <span className="text-[11px] text-slate-500 whitespace-nowrap shrink-0">{team.owner.userId === member.userId ? 'سازنده' : unit?.name || ''}</span>
           </button>
         ))}
       </div>
