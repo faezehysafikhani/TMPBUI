@@ -2,7 +2,6 @@ import { RefObject, useCallback, useEffect, useRef } from 'react';
 
 export interface PanZoomView { x: number; y: number; s: number }
 
-export const MIN_SCALE = 0.12;
 export const MAX_SCALE = 2;
 /** Below this the cards are hard to read: choosing one zooms in to it. */
 export const READABLE_SCALE = 0.7;
@@ -10,7 +9,6 @@ export const READABLE_SCALE = 0.7;
 const PAD = 24;
 /** On narrow screens the zoom controls sit over the top of the canvas: the chart starts below them. */
 const topPad = (vp: HTMLElement) => (vp.clientWidth < 640 ? 64 : PAD);
-const clampScale = (s: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
 
 /** An element's place inside the zoomed content, unaffected by the current zoom. */
 function localRect(el: HTMLElement, content: HTMLElement) {
@@ -41,6 +39,17 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
   const moved = useRef(false);
   const dragged = useRef(false);
 
+  /** The zoom that shows the whole chart (never bigger than its real size). */
+  const fitScale = useCallback(() => {
+    const el = content.current;
+    const vp = viewport.current;
+    if (!el || !vp || !el.offsetWidth || !el.offsetHeight || !vp.clientWidth || !vp.clientHeight) return 1;
+    return Math.max(0.01, Math.min(1, (vp.clientWidth - 2 * PAD) / el.offsetWidth, (vp.clientHeight - topPad(vp) - PAD) / el.offsetHeight));
+  }, [content, viewport]);
+
+  /** Zooming out stops where the whole chart is in view. */
+  const clampScale = useCallback((s: number) => Math.min(MAX_SCALE, Math.max(fitScale(), s)), [fitScale]);
+
   const apply = useCallback((animate: boolean) => {
     const el = content.current;
     const vp = viewport.current;
@@ -68,7 +77,7 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
       y: Math.min(vp.clientHeight - keep, Math.max(keep - h, next.y)),
     };
     apply(animate);
-  }, [apply, content, viewport]);
+  }, [apply, clampScale, content, viewport]);
 
   /** The whole chart in view (never bigger than its real size). */
   const fit = useCallback((animate = false) => {
@@ -78,17 +87,17 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
     const w = el.offsetWidth;
     const h = el.offsetHeight;
     const top = topPad(vp);
-    const s = clampScale(Math.min(1, (vp.clientWidth - 2 * PAD) / w, (vp.clientHeight - top - PAD) / h));
+    const s = fitScale();
     moved.current = false;
     set({ s, x: (vp.clientWidth - w * s) / 2, y: Math.max(top, (vp.clientHeight - h * s) / 2) }, animate);
-  }, [content, set, viewport]);
+  }, [content, fitScale, set, viewport]);
 
   const zoomAt = useCallback((px: number, py: number, factor: number, animate = false) => {
     const { x, y, s } = view.current;
     const ns = clampScale(s * factor);
     moved.current = true;
     set({ s: ns, x: px - (px - x) * (ns / s), y: py - (py - y) * (ns / s) }, animate);
-  }, [set]);
+  }, [clampScale, set]);
 
   const zoomBy = useCallback((factor: number) => {
     const vp = viewport.current;
@@ -120,7 +129,7 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
       // A third of the way down, so what hangs under the card (a deputy's teams) shows too.
       y: r.h * ns > vh - topPad(vp) - PAD ? topPad(vp) - r.y * ns : Math.max(topPad(vp), vh / 3 - (r.h * ns) / 2) - r.y * ns,
     }, true);
-  }, [content, set, viewport]);
+  }, [clampScale, content, set, viewport]);
 
   const subscribe = useCallback((listener: (view: PanZoomView) => void) => {
     listeners.current.add(listener);
@@ -272,7 +281,7 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
       vp.removeEventListener('keydown', onKey);
       vp.removeEventListener('dragstart', onDragStart);
     };
-  }, [active, fit, set, viewport, zoomAt, zoomBy]);
+  }, [active, clampScale, fit, set, viewport, zoomAt, zoomBy]);
 
   return { fit, zoomBy, focus, subscribe };
 }

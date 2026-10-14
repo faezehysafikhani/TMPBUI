@@ -281,6 +281,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   const [reveal, setReveal] = useState<{ node: string; force: boolean; seq: number } | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
+  /** On wide screens the canvas takes the rest of the screen, so the whole page fits without scrolling. */
+  const [screenHeight, setScreenHeight] = useState<number | null>(null);
 
   const chart = data.data?.chart || [];
   const company: ChartCompany | undefined = chart.find((c) => c.companyId === companyId) || chart[0];
@@ -299,6 +301,22 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     observer.observe(el);
     return () => observer.disconnect();
   }, [!!company]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Measured with the page at its top: everything above the canvas, and the card's sections under it, stay in view.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const vp = viewport.current;
+      const box = vp?.parentElement; // the chart's card
+      if (!vp || !box || fullscreen || window.innerWidth < 1280) { setScreenHeight(null); return; }
+      const top = vp.getBoundingClientRect().top + window.scrollY;
+      const below = box.getBoundingClientRect().bottom - vp.getBoundingClientRect().bottom;
+      const height = Math.max(420, Math.round(window.innerHeight - top - below - 16));
+      setScreenHeight((prev) => (prev !== null && Math.abs(prev - height) < 2 ? prev : height));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [!!company, fullscreen, data.data?.outsideTeams.length, data.data?.unplaced.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const units = company?.units || [];
   const perRow = useMemo(() => chooseColumns(units, canvasSize.width, canvasSize.height), [units, canvasSize.width, canvasSize.height]);
@@ -527,6 +545,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         onPointerDown={() => setHint(false)}
         onWheel={() => setHint(false)}
         aria-label="چارت سازمانی؛ با چرخ ماوس یا دو انگشت بزرگ‌نمایی کنید و با کشیدن جابه‌جا کنید"
+        style={screenHeight ? { height: screenHeight } : undefined}
         className={`relative overflow-hidden touch-none select-none outline-hidden cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:[&_*]:cursor-grabbing bg-slate-50/60 dark:bg-slate-950/40 bg-[radial-gradient(circle,_#cbd5e1_1px,_transparent_1.2px)] dark:bg-[radial-gradient(circle,_#334155_1px,_transparent_1.2px)] ${fullscreen ? 'flex-1 min-h-0' : 'h-[60vh] sm:h-[70vh] min-h-[380px]'}`}
       >
         <div ref={content} className="absolute top-0 left-0 origin-top-left w-max px-10 py-10 flex flex-col items-center">
@@ -650,10 +669,12 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     {/* Full screen keeps the details panel beside the chart. */}
     <div className={fullscreen
       ? 'fixed inset-3 z-50 grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-3 items-stretch'
-      : 'grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 items-start'}
+      : 'grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 items-start xl:items-stretch'}
     >
-      {/* On narrow screens the chart comes first and the details below it. */}
-      <div className={fullscreen ? 'overflow-y-auto min-h-0 order-2 lg:order-none' : 'order-2 xl:order-none'}>
+      {/* On narrow screens the chart comes first and the details below it. Beside the chart the
+          details are exactly as tall as it, scrolling inside when they are longer. */}
+      <div className={fullscreen ? 'overflow-y-auto min-h-0 order-2 lg:order-none' : 'order-2 xl:order-none xl:relative'}>
+      <div className={fullscreen ? '' : 'xl:absolute xl:inset-0'}>
       <OrgChartDetails
         can={can}
         chart={chart}
@@ -664,6 +685,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         onSelect={(next) => choose(next)}
         onChanged={data.reload}
       />
+      </div>
       </div>
       <div className={fullscreen ? 'min-h-0 flex flex-col order-1 lg:order-none' : 'order-1 xl:order-none'}>{board}</div>
     </div>

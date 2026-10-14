@@ -19,7 +19,7 @@ export interface TabItem<T extends string> {
 /** The main navigation of a settings page: a soft track with the active tab raised. */
 export function SegmentedTabs<T extends string>({ tabs, active, onChange }: { tabs: TabItem<T>[]; active: T; onChange: (id: T) => void }) {
   return (
-    <div className="flex gap-1 p-1.5 bg-slate-100/80 dark:bg-slate-800/70 rounded-2xl overflow-x-auto" role="tablist">
+    <div className="flex gap-1 p-1 bg-slate-100/80 dark:bg-slate-800/70 rounded-2xl overflow-x-auto" role="tablist">
       {tabs.map(({ id, label, icon: Icon }) => {
         const selected = id === active;
         return (
@@ -29,7 +29,7 @@ export function SegmentedTabs<T extends string>({ tabs, active, onChange }: { ta
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all cursor-pointer ${
               selected
                 ? 'bg-white dark:bg-slate-900 text-indigo-800 dark:text-indigo-300 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'

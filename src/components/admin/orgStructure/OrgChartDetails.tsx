@@ -285,7 +285,7 @@ export const OrgChartDetails: React.FC<{
   }
 
   return (
-    <AdminCard className="p-4 space-y-4 xl:sticky xl:top-4">
+    <AdminCard className="p-4 space-y-4 xl:h-full xl:overflow-y-auto">
       <div>
         <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white"><Zap className="w-5 h-5 text-indigo-600" /> جزئیات</h3>
         <p className="text-xs text-slate-500 mt-0.5">اطلاعات و عملیات بخش انتخاب‌شده</p>
