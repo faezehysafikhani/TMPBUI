@@ -5,6 +5,8 @@ import { COLOR_PALETTES } from '../utils/theme';
 import { PRESET_AVATARS, compressImageFile } from '../utils/avatars';
 import { readFileAsDataUrl } from '../utils/storage';
 import { WorkTeamManagement } from './WorkTeamManagement';
+import { useMyPermissions } from './admin/SystemAdministration';
+import { canSeeWorkTeams } from '../utils/permissions';
 import { userErrorMessage } from '../utils/errorMessages';
 
 export type ThemeMode = 'light' | 'dark';
@@ -63,6 +65,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
   const [isAdminMgmtOpen, setIsAdminMgmtOpen] = useState<boolean>(false);
   const [isTeamMgmtOpen, setIsTeamMgmtOpen] = useState<boolean>(false);
+  // The work-team section is only for people given the work-team permissions.
+  const myPermissions = useMyPermissions(currentUser?.id);
   const [isThemeModeOpen, setIsThemeModeOpen] = useState<boolean>(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState<boolean>(false);
   const [isPatternOpen, setIsPatternOpen] = useState<boolean>(false);
@@ -422,8 +426,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* Work Team Management Accordion (For All Users) */}
-          {currentUser && (
+          {/* Work Team Management Accordion (only with the work-team permissions) */}
+          {currentUser && canSeeWorkTeams(myPermissions) && (
             <div className="border border-indigo-200 dark:border-indigo-900/60 rounded-2xl overflow-hidden bg-indigo-50/20 dark:bg-indigo-950/20">
               <button
                 type="button"

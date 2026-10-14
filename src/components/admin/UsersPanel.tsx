@@ -531,10 +531,7 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
                               setDenied(next.denied);
                             }}
                           />
-                          <span className="min-w-0">
-                            <span className="block text-sm text-slate-800 dark:text-slate-100">{entry.description}</span>
-                            <span className="block text-[11px] font-mono text-slate-400 dir-ltr text-right">{entry.name}</span>
-                          </span>
+                          <span className="min-w-0 text-sm text-slate-800 dark:text-slate-100">{entry.description}</span>
                         </span>
                         <span className="flex flex-wrap gap-1 justify-end">
                           <AccessSourceBadges entry={entry} direct={direct} denied={denied} />

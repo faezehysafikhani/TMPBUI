@@ -729,6 +729,8 @@ const ACTIVITY_ACTION_TITLES: Record<string, string> = {
 
 function translateActivityDetails(action: string, details: string | null): string {
   if (!details) return '';
+  // The server's plain "updated" entry carries only the task's title, which the bell shows anyway.
+  if (action === 'Task updated') return '';
   if (action === 'Status changed') {
     const match = /^(\w+)\s*->\s*(\w+)$/.exec(details.trim());
     if (match) {
@@ -749,6 +751,7 @@ function mapActivity(a: TaskActivityDto): TaskLog {
     action: ACTIVITY_ACTION_TITLES[a.action] || a.action,
     details: translateActivityDetails(a.action, a.details),
     createdAt: a.occurredAtUtc,
+    serverAction: a.action in ACTIVITY_ACTION_TITLES ? a.action : undefined,
   };
 }
 
@@ -797,6 +800,7 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     assignedTeamId: dto.assignedUserGroup?.id,
     assignedTeamName: dto.assignedUserGroup?.name,
     teamMemberIds: (dto.assignees || []).map((a) => a.id),
+    teamMemberNames: (dto.assignees || []).map((a) => a.displayName),
     allowAssigneeStatusUpdate: dto.allowAssigneeStatusUpdate,
     tags: (dto.tags || []).map((t) => t.name),
     isProject: dto.isProject,
@@ -1121,9 +1125,34 @@ export function withoutDuplicateCreation<T extends { action: string }>(items: T[
   return items.some((a) => a.action === TASK_CREATED_ACTION) ? items.filter((a) => a.action !== 'Task created') : items;
 }
 
+/** The server's own entries for the parts of an edit; this app's edit entry describes them all. */
+const SERVER_EDIT_ACTIONS = new Set(['Task updated', 'Status changed', 'Priority changed', 'Assignee changed', 'Team changed']);
+/** How far apart an edit's server entries and this app's entry for it can be. */
+const EDIT_ENTRY_WINDOW_MS = 2 * 60_000;
+
+/**
+ * Saving an edit makes the server record its own short entries ("Task updated" with just the
+ * title, "Status changed"...) and this app then records one entry saying exactly what changed.
+ * Same edit, same person: the server's entries are left out, so the history and the bell tell
+ * it once, clearly. Server entries with no such entry next to them (e.g. a subtask ticked on
+ * the board) stay.
+ */
+export function withoutEditDuplicates(logs: TaskLog[]): TaskLog[] {
+  const appEdits = logs.filter((l) => !l.serverAction && l.action !== TASK_CREATED_ACTION && l.action !== 'حذف کامل فعالیت');
+  return logs.filter((l) => {
+    if (!l.serverAction || !SERVER_EDIT_ACTIONS.has(l.serverAction)) return true;
+    const at = new Date(l.createdAt).getTime();
+    return !appEdits.some((edit) => {
+      const editAt = new Date(edit.createdAt).getTime();
+      return edit.userId === l.userId && at <= editAt + 5_000 && editAt - at <= EDIT_ENTRY_WINDOW_MS;
+    });
+  });
+}
+
 async function fetchActivity(taskId: string): Promise<TaskLog[]> {
   const items = await request<TaskActivityDto[]>('GET', `${TASKS}/${taskId}/activity`);
-  return withoutDuplicateCreation(items || []).map(mapActivity).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return withoutEditDuplicates(withoutDuplicateCreation(items || []).map(mapActivity))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 /**

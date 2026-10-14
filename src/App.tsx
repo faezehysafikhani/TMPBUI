@@ -66,7 +66,8 @@ import {
   toAppNotification,
 } from './utils/serverNotifications';
 import { Database, PanelRightOpen } from 'lucide-react';
-import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION } from './services/nexusApi';
+import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION, withoutEditDuplicates } from './services/nexusApi';
+import { describeTaskChanges, summarizeTaskChanges, userNameLookup } from './utils/taskChangeSummary';
 import { getReportScope, ReportScope } from './services/taskReportApi';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
@@ -413,63 +414,6 @@ export default function App() {
       if (taskId) {
         const oldTask = tasks.find((t) => t.id === taskId);
 
-        // Calculate detailed changes
-        // Calculate detailed changes across ALL fields
-        const changes: string[] = [];
-        if (oldTask) {
-          if (taskData.title !== oldTask.title) {
-            changes.push(`عنوان: از "${oldTask.title}" به "${taskData.title}"`);
-          }
-          if (taskData.status !== oldTask.status) {
-            const oldSt = STATUSES[oldTask.status]?.title || oldTask.status;
-            const newSt = STATUSES[taskData.status]?.title || taskData.status;
-            changes.push(`وضعیت: از "${oldSt}" به "${newSt}"`);
-          }
-          if (taskData.priority !== oldTask.priority) {
-            const oldPr = PRIORITIES[oldTask.priority]?.title || oldTask.priority;
-            const newPr = PRIORITIES[taskData.priority]?.title || taskData.priority;
-            changes.push(`اولویت: از "${oldPr}" به "${newPr}"`);
-          }
-          if (taskData.dueDate !== oldTask.dueDate) {
-            const oldD = oldTask.dueDate ? formatToJalali(oldTask.dueDate) : 'بدون مهلت';
-            const newD = taskData.dueDate ? formatToJalali(taskData.dueDate) : 'بدون مهلت';
-            changes.push(`مهلت تحویل: از "${oldD}" به "${newD}"`);
-          }
-          if (responsibleNamesOf(taskData) !== responsibleNamesOf(oldTask)) {
-            const newAssigned = responsibleNamesOf(taskData) || 'بدون مسئول';
-            const oldAssigned = responsibleNamesOf(oldTask) || 'بدون مسئول';
-            changes.push(`مسئولان اجرا: از "${oldAssigned}" به "${newAssigned}"`);
-          }
-          if (taskData.assignedTeamName !== oldTask.assignedTeamName) {
-            const newTeam = taskData.assignedTeamName || 'بدون تیم';
-            const oldTeam = oldTask.assignedTeamName || 'بدون تیم';
-            changes.push(`تیم کاری: از "${oldTeam}" به "${newTeam}"`);
-          }
-          if (JSON.stringify(taskData.teamMemberIds) !== JSON.stringify(oldTask.teamMemberIds)) {
-            changes.push(`اعضای تیم کاری: از ${toPersianDigits(oldTask.teamMemberIds?.length || 0)} نفر به ${toPersianDigits(taskData.teamMemberIds?.length || 0)} نفر`);
-          }
-          if (JSON.stringify(taskData.tags) !== JSON.stringify(oldTask.tags)) {
-            const oldT = oldTask.tags && oldTask.tags.length > 0 ? oldTask.tags.map(t => '#' + t).join(', ') : 'بدون برچسب';
-            const newT = taskData.tags && taskData.tags.length > 0 ? taskData.tags.map(t => '#' + t).join(', ') : 'بدون برچسب';
-            changes.push(`برچسب‌ها: از (${oldT}) به (${newT})`);
-          }
-          if (taskData.ownerName && taskData.ownerName !== oldTask.ownerName) {
-            changes.push(`مالک فعالیت: از "${oldTask.ownerName || 'نامشخص'}" به "${taskData.ownerName}"`);
-          }
-          if (taskData.isProject !== oldTask.isProject) {
-            changes.push(`حالت پروژه: از ${oldTask.isProject ? 'پروژه' : 'فعالیت عادی'} به ${taskData.isProject ? 'پروژه' : 'فعالیت عادی'}`);
-          }
-          if (taskData.isRecurring !== oldTask.isRecurring) {
-            changes.push(`حالت تکرارشونده: از ${oldTask.isRecurring ? 'بله' : 'خیر'} به ${taskData.isRecurring ? 'بله' : 'خیر'}`);
-          }
-          if (taskData.description !== oldTask.description) {
-            changes.push(`شرح توضیحات تغییر یافت`);
-          }
-          if (taskData.attachments?.length !== oldTask.attachments?.length) {
-            changes.push(`تعداد پیوست‌ها: از ${toPersianDigits(oldTask.attachments?.length || 0)} به ${toPersianDigits(taskData.attachments?.length || 0)}`);
-          }
-        }
-
         // Set or clear actualCompletionDate on edit
         if (taskData.status === 'completed') {
           if (!taskData.actualCompletionDate) {
@@ -478,9 +422,6 @@ export default function App() {
         } else {
           taskData.actualCompletionDate = undefined;
         }
-
-        const logAction = changes.length > 0 ? `ویرایش ${toPersianDigits(changes.length)} فیلد` : 'ویرایش مشخصات فعالیت';
-        const logDetails = changes.length > 0 ? changes.join(' | ') : `اطلاعات فعالیت "${taskData.title}" بازبینی شد.`;
 
         // Optimistic UI update
         setTasks((prev) =>
@@ -498,18 +439,22 @@ export default function App() {
           setSelectedTaskForDetail((prev) => (prev ? { ...prev, ...saved } : null));
         }
 
-        // Log detailed edit action
+        // One history entry (and bell notification) saying exactly what changed: compared with
+        // what the server saved, so names and values are the real ones.
         if (currentUser) {
+          const { action, details } = summarizeTaskChanges(
+            oldTask ? describeTaskChanges(oldTask, saved, userNameLookup([oldTask, saved], allUsers, allTeams)) : [],
+          );
           const newLog = await createTaskLogPB({
             taskId,
             userId: currentUser.id,
             userName: currentUser.name || currentUser.username,
             userAvatar: currentUser.avatar,
-            action: logAction,
-            details: logDetails,
+            action,
+            details,
           });
           setTasks((prev) =>
-            prev.map((t) => (t.id === taskId ? { ...t, logs: [newLog, ...(t.logs || [])] } : t))
+            prev.map((t) => (t.id === taskId ? { ...t, logs: withoutEditDuplicates([newLog, ...(t.logs || [])]) } : t))
           );
         }
       } else {

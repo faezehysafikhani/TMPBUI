@@ -25,6 +25,24 @@ export function can(user: User | null | undefined, permission: string): boolean 
   return user.permissions.includes(permission);
 }
 
+/** The work-team permissions: see the «مدیریت تیم کاری» section, and build or manage teams in it. */
+export const WORK_TEAM_PERMISSIONS = { view: 'groups.view_own', manage: 'groups.manage_own' } as const;
+
+/**
+ * Whether the «مدیریت تیم کاری» section is shown at all. Unlike `can`, unknown permissions hide
+ * it: nobody without one of the two permissions should see it. Managing teams implies seeing them.
+ */
+export function canSeeWorkTeams(permissions: Iterable<string> | null | undefined): boolean {
+  if (!permissions) return false;
+  const held = new Set(permissions);
+  return held.has(WORK_TEAM_PERMISSIONS.view) || held.has(WORK_TEAM_PERMISSIONS.manage);
+}
+
+/** Whether the user may build work teams and change their own teams' members (the server checks too). */
+export function canManageWorkTeams(permissions: Iterable<string> | null | undefined): boolean {
+  return !!permissions && new Set(permissions).has(WORK_TEAM_PERMISSIONS.manage);
+}
+
 /** Manages every task of the organization (and is treated as the UI's task administrator). */
 export function isTaskAdmin(user: User | null | undefined): boolean {
   if (!user) return false;
@@ -88,9 +106,9 @@ export function toggleUserAccess(
 
 /** Persian titles of the permission groups (the server sends module ids such as "TaskManagement"). */
 const MODULE_TITLES: Record<string, string> = {
-  Identity: 'کاربران، نقش‌ها و گروه‌ها',
+  Identity: 'کاربران، نقش‌ها، گروه‌ها و تیم‌های کاری',
   Platform: 'تنظیمات سامانه و سازمان‌ها',
-  TaskManagement: 'مدیریت وظایف',
+  TaskManagement: 'مدیریت فعالیت‌ها',
   Ticketing: 'تیکت‌ها',
   Organization: 'ساختار سازمانی',
   Calendar: 'تقویم کاری',

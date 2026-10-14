@@ -11,6 +11,7 @@ import { userErrorMessage } from '../../utils/errorMessages';
 import { refreshUploadPolicy } from '../../utils/uploadPolicy';
 import { getMyPlacement, ORG_STRUCTURE_PERMISSIONS, ORG_UNIT_PERMISSIONS } from '../../services/orgStructureApi';
 import { OrgStructureSection } from './orgStructure/OrgStructureSection';
+import { canSeeWorkTeams } from '../../utils/permissions';
 
 type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users' | 'org';
 type UsersTab = 'list' | 'history' | 'ldap' | 'sso';
@@ -223,7 +224,8 @@ export const SystemAdministration: React.FC<{
 
   const tabs: TabItem<MainTab>[] = [
     { id: 'profile', label: 'پروفایل', icon: UserIcon },
-    { id: 'team', label: 'مدیریت تیم کاری', icon: Users },
+    // Only for people given the work-team permissions; nobody else sees the tab.
+    ...(canSeeWorkTeams(permissions) ? [{ id: 'team' as const, label: 'مدیریت تیم کاری', icon: Users }] : []),
     { id: 'appearance', label: 'ظاهر سامانه', icon: Palette },
     { id: 'help', label: 'راهنما', icon: FileText },
     ...(can('sms_settings.view') ? [{ id: 'sms' as const, label: 'پنل پیامکی', icon: MessageSquare }] : []),
@@ -244,7 +246,7 @@ export const SystemAdministration: React.FC<{
       </AdminCard>
 
       {current === 'profile' && profile}
-      {current === 'team' && team}
+      {current === 'team' && canSeeWorkTeams(permissions) && team}
       {current === 'appearance' && (
         <div className="space-y-5">
           {can('settings.update') && <UploadSizeSettingsCard />}

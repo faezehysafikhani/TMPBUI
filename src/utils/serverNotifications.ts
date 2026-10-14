@@ -41,9 +41,10 @@ export function toAppNotification(dto: ServerNotificationDto, visibleTasks: Task
   const matches = isReminder ? visibleTasks.filter((t) => t.title.trim() === taskTitle) : [];
   return {
     id: SERVER_NOTIFICATION_PREFIX + dto.id,
-    type: 'reminder',
+    type: isReminder ? 'reminder' : 'system',
     taskId: matches.length === 1 ? matches[0].id : '',
-    taskTitle,
+    // Only a reminder is about a task; another notice's title is its own subject.
+    taskTitle: isReminder ? taskTitle : '',
     actorName: 'سامانه',
     actionTitle: isReminder ? 'یادآوری موعد وظیفه' : dto.title,
     details: dto.message,

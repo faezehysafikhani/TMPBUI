@@ -13,6 +13,7 @@ import {
   Inbox
 } from 'lucide-react';
 import { formatToJalali, toPersianDigits } from '../utils/helpers';
+import { CHANGE_SEPARATOR } from '../utils/taskChangeSummary';
 
 interface NotificationModalProps {
   isOpen: boolean;
@@ -181,6 +182,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                           <MessageSquare className="w-4 h-4 text-indigo-500" />
                         ) : notification.type === 'reminder' ? (
                           <BellRing className="w-4 h-4 text-rose-500" />
+                        ) : notification.type === 'system' ? (
+                          <Bell className="w-4 h-4 text-sky-500" />
                         ) : (
                           <History className="w-4 h-4 text-emerald-500" />
                         )}
@@ -199,6 +202,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                             ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
                             : notification.type === 'reminder'
                             ? 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
+                            : notification.type === 'system'
+                            ? 'bg-sky-50 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800'
                             : notification.actionTitle.includes('ایجاد') || notification.actionTitle.includes('ثبت')
                             ? 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
                             : notification.actionTitle.includes('واگذار')
@@ -210,6 +215,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                           ? 'دیدگاه جدید'
                           : notification.type === 'reminder'
                           ? 'یادآوری موعد'
+                          : notification.type === 'system'
+                          ? 'اطلاعیه'
                           : notification.actionTitle.includes('ایجاد') || notification.actionTitle.includes('ثبت')
                           ? 'فعالیت جدید'
                           : notification.actionTitle.includes('واگذار')
@@ -222,12 +229,26 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                     </div>
 
                     <p className="text-xs font-medium text-slate-700 dark:text-slate-300 break-words leading-relaxed">
-                      <strong className="text-indigo-600 dark:text-indigo-400 font-bold ml-1">
-                        [{notification.taskTitle}]:
-                      </strong>
-                      {notification.actionTitle}
-                      {notification.details ? ` - ${notification.details}` : ''}
+                      {notification.taskTitle && (
+                        <>
+                          <span className="text-slate-500 dark:text-slate-400">فعالیت </span>
+                          <strong className="text-indigo-600 dark:text-indigo-400 font-bold">«{notification.taskTitle}»</strong>
+                          <span className="text-slate-400 mx-1.5">—</span>
+                        </>
+                      )}
+                      <span className={notification.type === 'comment' ? '' : 'font-bold'}>{notification.actionTitle}</span>
                     </p>
+                    {/* An edit's changes, each on its own line. */}
+                    {notification.details && (
+                      <ul className="space-y-0.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed break-words">
+                        {notification.details.split(CHANGE_SEPARATOR).map((line, i) => (
+                          <li key={i} className="flex gap-1.5">
+                            <span className="text-slate-400 shrink-0">•</span>
+                            <span>{line}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
 
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium pt-0.5">
                       {formatToJalali(notification.createdAt)}

@@ -104,6 +104,8 @@ export interface TaskLog {
   action: string;
   details?: string;
   createdAt: string;
+  /** The server's own entry kind ("Task updated", "Status changed"...); unset for entries this app wrote. */
+  serverAction?: string;
 }
 
 export type SubTaskImportance = 'low' | 'medium' | 'high';
@@ -165,6 +167,7 @@ export interface Task {
   assignedTeamId?: string; // the task's team: its context, not who is responsible
   assignedTeamName?: string;
   teamMemberIds?: string[]; // the access list: who else may see and work on the task
+  teamMemberNames?: string[]; // their names, in the same order
   allowAssigneeStatusUpdate?: boolean; // آیا مسئول امکان بروزرسانی وضعیت را دارد یا خیر
   tags?: string[];
   isProject?: boolean;
@@ -280,8 +283,11 @@ export const PRIORITIES: Record<Priority, PriorityConfig> = {
 
 export interface AppNotification {
   id: string;
-  /** reminder: stored by the server (GET /api/notifications); the others are derived from tasks. */
-  type: 'comment' | 'task_log' | 'reminder';
+  /**
+   * reminder and system: stored by the server (GET /api/notifications) - a task falling due, or
+   * another notice such as being added to a work team. The others are derived from tasks.
+   */
+  type: 'comment' | 'task_log' | 'reminder' | 'system';
   taskId: string;
   taskTitle: string;
   actorName: string;

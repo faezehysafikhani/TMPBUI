@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { User, WorkTeam } from '../types';
 import { changeUserTeamPB, fetchAllUsersPB, fetchUserTeamsAsyncPB } from '../services/dataService';
 import { userErrorMessage } from '../utils/errorMessages';
+import { canManageWorkTeams, canSeeWorkTeams } from '../utils/permissions';
+import { useMyPermissions } from './admin/SystemAdministration';
 import {
   Users,
   UserPlus,
@@ -29,6 +31,10 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
   const [isCreatingTeam, setIsCreatingTeam] = useState<boolean>(false);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
+  // Building a team and changing its members needs groups.manage_own; without it the teams one
+  // belongs to are only shown (the server refuses the changes anyway).
+  const permissions = useMyPermissions(currentUser.id);
+  const canManage = canManageWorkTeams(permissions);
 
   // Load users and teams
   const loadData = async () => {
@@ -52,7 +58,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
   }, [currentUser.id]);
 
   const activeTeam = teams.find((t) => t.id === activeTeamId) || teams[0];
-  const canManageActiveTeam = !!activeTeam && activeTeam.ownerId === currentUser.id;
+  const canManageActiveTeam = canManage && !!activeTeam && activeTeam.ownerId === currentUser.id;
 
   /**
    * Sends one change to the server and only then shows the result - the teams exactly as the
@@ -154,6 +160,9 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
         (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Without either work-team permission the section is not shown at all.
+  if (permissions && !canSeeWorkTeams(permissions)) return null;
+
   return (
     <div className="space-y-4">
       {/* Alert Banner */}
@@ -210,6 +219,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
           )}
         </div>
 
+        {canManage && (
         <button
           type="button"
           onClick={() => setIsCreatingTeam(!isCreatingTeam)}
@@ -218,10 +228,11 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
           <Plus className="w-4 h-4" />
           <span>ساخت تیم کاری جدید</span>
         </button>
+        )}
       </div>
 
       {/* Form to Create New Team */}
-      {isCreatingTeam && (
+      {canManage && isCreatingTeam && (
         <form
           onSubmit={handleCreateTeam}
           className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-indigo-100 dark:border-indigo-800 flex items-center gap-2 animate-in fade-in duration-200"
