@@ -105,13 +105,23 @@ export function toggleUserAccess(
 }
 
 /**
- * Permissions this product has no screen for, left out of the access list: the organisational
- * user groups (granting permissions to a whole group) are managed only through the API. They are
+ * Permissions left out of the access list because this product has no use for them. They are
  * hidden, not removed - whatever a user already holds of them is kept when their access is saved.
- * Personal work teams (groups.view_own, groups.manage_own) are a different thing and stay listed.
  */
 const UNLISTED_PERMISSIONS = new Set([
+  // Organisational user groups (granting permissions to a whole group): managed only through the
+  // API here. Personal work teams (groups.view_own, groups.manage_own) are different and stay.
   'groups.view', 'groups.create', 'groups.update', 'groups.assign_permissions', 'groups.manage_members', 'groups.delete',
+  // No screen for them: deleting users (they are deactivated instead), managing roles, tenants
+  // (one organization).
+  'users.delete', 'roles.create', 'roles.update', 'roles.assign_permissions',
+  'tenants.view', 'tenants.create', 'tenants.manage_all',
+  // Assigning happens through creating and editing a task (Tasks.Create / Tasks.Edit); the
+  // endpoints that need this one are not used by this app.
+  'Tasks.Assign',
+  // Nothing in this app needs them alone; the permissions that do imply them
+  // (users.assign_permissions, settings.update).
+  'permissions.view', 'settings.view',
 ]);
 
 /** Whether a permission is shown in the access list. */
