@@ -5,7 +5,7 @@ import {
   listUsersPage, adminCreateUser, adminUpdateUser, setUserActive,
   listRoles, getUserAccess, setUserRoles, setUserDirectPermissions,
 } from '../../services/nexusApi';
-import { getAssignment, setAssignment, removeAssignment } from '../../services/orgStructureApi';
+import { getAssignment, setAssignment, removeAssignment, Honorific, listTitles, getUserTitle, setUserTitle } from '../../services/orgStructureApi';
 import { toPersianDigits, formatToJalali } from '../../utils/helpers';
 import {
   AdminCard, SearchBox, StatusBadge, IconAction, Pagination, Field, inputClass, Notice,
@@ -126,7 +126,8 @@ export const UsersPanel: React.FC<{
                 <tr key={user.id} className={`hover:bg-slate-50/60 dark:hover:bg-slate-800/30 ${loading ? 'opacity-60' : ''}`}>
                   <td className="px-5 py-3.5">
                     <div className="font-extrabold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <span>{user.firstName || user.lastName ? `${user.firstName} ${user.lastName}`.trim() : user.displayName}</span>
+                      {/* The display name: first and last name, with the user's title before them when they have one. */}
+                      <span>{user.displayName || `${user.firstName} ${user.lastName}`.trim()}</span>
                       {user.isSystem && (
                         <StatusBadge tone="indigo" title="ایجادشده توسط سیستم؛ قابل حذف، غیرفعال‌سازی یا تغییر دسترسی نیست">
                           <Lock className="w-3 h-3" /> مدیر اصلی
@@ -180,6 +181,7 @@ export const UsersPanel: React.FC<{
           canAssignRoles={rights.assignRoles}
           showPlacementTab={orgStructureAvailable && canManageOrgAssignments}
           canSeeOrgUnits={canSeeOrgUnits}
+          showTitle={orgStructureAvailable && (rights.create || rights.update)}
           onClose={() => setEditing(null)}
           onSaved={async (text) => { setEditing(null); setMessage({ type: 'success', text }); await load(); }}
         />
@@ -203,9 +205,11 @@ const UserFormDialog: React.FC<{
   canAssignRoles: boolean;
   showPlacementTab: boolean;
   canSeeOrgUnits: boolean;
+  /** The organization-structure module's titles («آقای»، «خانم»...) before the name. */
+  showTitle: boolean;
   onClose: () => void;
   onSaved: (message: string) => void;
-}> = ({ user, canAssignRoles, showPlacementTab, canSeeOrgUnits, onClose, onSaved }) => {
+}> = ({ user, canAssignRoles, showPlacementTab, canSeeOrgUnits, showTitle: titlesAvailable, onClose, onSaved }) => {
   const isNew = user === null;
   const [form, setForm] = useState<AdminUserInput>({
     firstName: user?.firstName || (user && !user.firstName && !user.lastName ? user.displayName : ''),
@@ -225,6 +229,27 @@ const UserFormDialog: React.FC<{
   const [placementDraft, setPlacementDraft] = useState<OrgPlacementDraft>(EMPTY_PLACEMENT_DRAFT);
   const [hadExistingAssignment, setHadExistingAssignment] = useState(false);
   const placementData = useOrgPlacementData(canSeeOrgUnits, showPlacementTab);
+
+  // The title before the name. Not for the built-in administrator, whose name cannot change.
+  const showTitle = titlesAvailable && !user?.isSystem;
+  const [titles, setTitles] = useState<Honorific[]>([]);
+  const [titleId, setTitleId] = useState('');
+  const [originalTitleId, setOriginalTitleId] = useState('');
+  useEffect(() => {
+    if (!showTitle) return;
+    let alive = true;
+    listTitles().then((list) => alive && setTitles(list)).catch(() => {});
+    if (!isNew) {
+      getUserTitle(user!.id).then((t) => {
+        if (!alive) return;
+        setTitleId(t.honorificId || '');
+        setOriginalTitleId(t.honorificId || '');
+      }).catch(() => {});
+    }
+    return () => { alive = false; };
+  }, [showTitle, isNew, user?.id]);
+  const selectableTitles = titles.filter((t) => t.isActive || t.id === titleId);
+  const chosenTitle = titles.find((t) => t.id === titleId)?.title;
 
   useEffect(() => {
     if (!isNew || !canAssignRoles) return;
@@ -285,6 +310,11 @@ const UserFormDialog: React.FC<{
         savedUserId = user!.id;
       }
 
+      // Saving the name rebuilds it from first and last name, so a title is put back each time.
+      if (showTitle && (titleId || originalTitleId)) {
+        await setUserTitle(savedUserId, titleId || null);
+      }
+
       // Placement is optional: only touch it when a company was actually chosen on that tab.
       // Clearing it back to «— بدون شرکت —» on a user who had a placement removes it instead of
       // silently leaving the old one in place.
@@ -338,6 +368,22 @@ const UserFormDialog: React.FC<{
         {(!showPlacementTab || activeTab === 'basic') && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/30 p-3">
+              {showTitle && (
+                <Field
+                  label="عنوان"
+                  className="sm:col-span-2"
+                  hint={
+                    selectableTitles.length === 0
+                      ? 'هنوز عنوانی تعریف نشده است (مدیریت کاربران ← عنوان‌ها).'
+                      : `نام نمایشی: ${[chosenTitle, form.firstName.trim(), form.lastName.trim()].filter(Boolean).join(' ') || '—'}`
+                  }
+                >
+                  <select className={inputClass} value={titleId} onChange={(e) => setTitleId(e.target.value)} disabled={selectableTitles.length === 0}>
+                    <option value="">— بدون عنوان —</option>
+                    {selectableTitles.map((t) => <option key={t.id} value={t.id}>{t.title}{t.isActive ? '' : ' (غیرفعال)'}</option>)}
+                  </select>
+                </Field>
+              )}
               <Field label="نام" required><input className={inputClass} value={form.firstName} onChange={set('firstName')} maxLength={80} autoFocus /></Field>
               <Field label="نام خانوادگی" required><input className={inputClass} value={form.lastName} onChange={set('lastName')} maxLength={80} /></Field>
               <Field label="نام کاربری (کد ملی)" required hint={!isNew && user?.username && !NATIONAL_CODE.test(user.username) ? 'نام کاربری فعلی پیش از قانون کد ملی ثبت شده؛ اگر تغییرش دهید باید کد ملی ۱۰ رقمی باشد.' : 'دقیقاً ۱۰ رقم، فقط عدد.'}>

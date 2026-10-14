@@ -4,7 +4,7 @@
 // whole section stays hidden (see isOrgStructureAvailable).
 import { apiRequest, getSessionTenantId, NexusApiError } from './nexusApi';
 
-export interface PersonRef { userId: string; displayName: string; isActive: boolean }
+export interface PersonRef { userId: string; displayName: string; isActive: boolean; avatarUrl?: string | null }
 
 export interface Company {
   id: string;
@@ -38,6 +38,9 @@ export interface UserAssignment {
   positionTitle: string | null;
   explicitManagerUserId: string | null;
   manager: Manager | null;
+  /** The organizational team (of the unit) the user is in. */
+  teamId?: string | null;
+  teamName?: string | null;
 }
 
 export interface AssignmentInput { companyId: string; unitId: string | null; positionId: string | null; managerUserId: string | null }
@@ -55,9 +58,22 @@ export interface Subordinate {
 
 export interface MyPlacement { assignment: UserAssignment | null; managementChain: PersonRef[] }
 
-export interface ChartMember { userId: string; displayName: string; isActive: boolean; positionTitle: string | null; managerUserId: string | null }
+export interface ChartMember {
+  userId: string;
+  displayName: string;
+  isActive: boolean;
+  positionTitle: string | null;
+  managerUserId: string | null;
+  avatarUrl?: string | null;
+  positionId?: string | null;
+  teamId?: string | null;
+}
 
-export interface ChartUnit { unitId: string; name: string; manager: PersonRef | null; members: ChartMember[] }
+/** An organizational team of a unit (deputy) with its members. */
+export interface ChartTeam { teamId: string; name: string; description: string | null; leader: PersonRef | null; isActive: boolean; members: ChartMember[] }
+
+/** members: the unit's people in none of its teams. teams: absent on a backend without teams. */
+export interface ChartUnit { unitId: string; name: string; manager: PersonRef | null; members: ChartMember[]; teams?: ChartTeam[]; isActive?: boolean }
 
 export interface ChartCompany {
   companyId: string;
@@ -87,6 +103,7 @@ export const ORG_STRUCTURE_PERMISSIONS = {
   manageCompanies: 'org_structure.manage_companies',
   managePositions: 'org_structure.manage_positions',
   manageAssignments: 'org_structure.manage_assignments',
+  manageTeams: 'org_structure.manage_teams',
 } as const;
 
 export const ORG_UNIT_PERMISSIONS = {
@@ -158,3 +175,49 @@ export const deactivateOrgUnit = (id: string) => apiRequest<void>('DELETE', `/ap
 export function sortOrgUnits(units: OrgUnit[]): OrgUnit[] {
   return [...units].sort((a, b) => a.name.localeCompare(b.name, 'fa'));
 }
+
+// ---------------------------------------------------------------- organizational teams
+
+export interface OrgTeam {
+  id: string;
+  unitId: string;
+  unitName: string;
+  companyId: string | null;
+  name: string;
+  description: string | null;
+  leader: PersonRef | null;
+  isActive: boolean;
+  memberCount: number;
+}
+
+export interface OrgTeamInput { name: string; description: string | null; leaderUserId: string | null }
+
+export interface UnplacedUser { userId: string; displayName: string; avatarUrl: string | null }
+
+export const listTeams = (unitId?: string) => apiRequest<OrgTeam[]>('GET', `${BASE}/teams`, { query: { unitId } });
+export const createTeam = (unitId: string, input: OrgTeamInput) => apiRequest<OrgTeam>('POST', `${BASE}/teams`, { body: { unitId, ...input } });
+export const updateTeam = (id: string, input: OrgTeamInput & { isActive: boolean }) => apiRequest<OrgTeam>('PUT', `${BASE}/teams/${id}`, { body: input });
+export const deleteTeam = (id: string) => apiRequest<void>('DELETE', `${BASE}/teams/${id}`);
+/** Puts the user in the team (moving them into its unit when needed); null takes them out of their team. */
+export const setUserTeam = (userId: string, teamId: string | null) =>
+  apiRequest<UserAssignment>('PUT', `${BASE}/assignments/${userId}/team`, { body: { teamId } });
+export const listUnplacedUsers = () => apiRequest<UnplacedUser[]>('GET', `${BASE}/unplaced-users`);
+
+// ---------------------------------------------------------------- titles before names
+
+/** A title such as «آقای» or «جناب مهندس»; the user's display name starts with it. */
+export interface Honorific { id: string; title: string; sortOrder: number; isActive: boolean; userCount: number }
+
+export interface UserTitle { userId: string; honorificId: string | null; title: string | null }
+
+/** Managing the list: whoever may add users. Giving a user a title: whoever may add or edit users. */
+export const TITLE_PERMISSIONS = { manage: 'users.create', assign: ['users.create', 'users.update'] } as const;
+
+export const listTitles = () => apiRequest<Honorific[]>('GET', `${BASE}/titles`);
+export const createTitle = (title: string) => apiRequest<Honorific>('POST', `${BASE}/titles`, { body: { title } });
+export const updateTitle = (id: string, input: { title: string; sortOrder: number; isActive: boolean }) =>
+  apiRequest<Honorific>('PUT', `${BASE}/titles/${id}`, { body: input });
+export const deleteTitle = (id: string) => apiRequest<void>('DELETE', `${BASE}/titles/${id}`);
+export const getUserTitle = (userId: string) => apiRequest<UserTitle>('GET', `${BASE}/users/${userId}/title`);
+export const setUserTitle = (userId: string, honorificId: string | null) =>
+  apiRequest<UserTitle>('PUT', `${BASE}/users/${userId}/title`, { body: { honorificId } });

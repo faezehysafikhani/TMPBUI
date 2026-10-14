@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react';
-import { Field, inputClass } from '../AdminUi';
+import { Field } from '../AdminUi';
 import {
   Company, CompanyUnitLink, OrgUnit, Position,
-  listCompanies, listCompanyUnits, listOrgUnits, listPositions, sortOrgUnits,
+  listCompanies, listCompanyUnits, listOrgUnits, listPositions,
 } from '../../../services/orgStructureApi';
 import { useLoad, UserPicker } from './orgShared';
+import { OrgPlacementTree } from './OrgPlacementTree';
 
 export interface OrgPlacementDraft {
   companyId: string;
@@ -54,36 +55,27 @@ export const OrgPlacementFields: React.FC<{
   data: OrgPlacementData;
   excludeManagerIds?: string[];
 }> = ({ draft, onChange, data, excludeManagerIds = [] }) => {
-  /** Units directly linked to the chosen company. */
-  const unitsOfCompany = useMemo(() => {
-    if (!draft.companyId) return [];
-    const ids = new Set<string>();
-    data.links.filter((l) => l.companyId === draft.companyId).forEach((l) => ids.add(l.unitId));
-    return sortOrgUnits(data.units.filter((u) => ids.has(u.id) && u.isActive));
-  }, [data, draft.companyId]);
+  // Deputies come from the company links (they carry the names); with the unit list at hand an
+  // inactive deputy is left out unless it is the current choice.
+  const links = useMemo(() => {
+    const inactive = new Set(data.units.filter((u) => !u.isActive).map((u) => u.id));
+    return data.links.filter((l) => !inactive.has(l.unitId) || l.unitId === draft.unitId);
+  }, [data, draft.unitId]);
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="شرکت">
-          <select className={inputClass} value={draft.companyId} onChange={(e) => onChange({ ...draft, companyId: e.target.value, unitId: '' })}>
-            <option value="">— بدون شرکت —</option>
-            {data.companies.filter((c) => c.isActive || c.id === draft.companyId).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </Field>
-        <Field label="معاونت / واحد" hint={unitsOfCompany.length === 0 ? 'این شرکت هنوز معاونتی ندارد.' : undefined}>
-          <select className={inputClass} value={draft.unitId} onChange={(e) => onChange({ ...draft, unitId: e.target.value })} disabled={unitsOfCompany.length === 0}>
-            <option value="">— مستقیم زیر شرکت —</option>
-            {unitsOfCompany.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
-        </Field>
+      {/* Not inside a <label> (Field): a label forwards clicks to its first control. */}
+      <div className="space-y-1.5">
+        <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">شرکت، معاونت و سمت</span>
+        <OrgPlacementTree
+          companies={data.companies}
+          links={links}
+          positions={data.positions}
+          value={{ companyId: draft.companyId, unitId: draft.unitId, positionId: draft.positionId }}
+          onChange={(choice) => onChange({ ...draft, ...choice })}
+        />
+        <p className="text-[11px] text-slate-500 dark:text-slate-400">با + فهرست زیرمجموعه باز می‌شود؛ روی هر ردیف بزنید تا انتخاب شود.</p>
       </div>
-      <Field label="سمت">
-        <select className={inputClass} value={draft.positionId} onChange={(e) => onChange({ ...draft, positionId: e.target.value })}>
-          <option value="">— بدون سمت —</option>
-          {data.positions.filter((p) => p.isActive || p.id === draft.positionId).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
-        </select>
-      </Field>
       <Field label="مدیر مستقیم (اختیاری)" hint="خالی بگذارید تا مدیر از مدیر واحد یا مدیر ارشد شرکت گرفته شود.">
         <UserPicker
           value={draft.managerUserId}

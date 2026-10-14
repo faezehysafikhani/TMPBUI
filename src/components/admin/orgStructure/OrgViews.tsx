@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { Building2, Network, Briefcase, UserCheck, ChevronLeft, ChevronDown, Users, Crown } from 'lucide-react';
+import { Building2, Network, Briefcase, UserCheck, ChevronLeft, Users } from 'lucide-react';
 import { AdminCard, Notice, StatusBadge, Toggle } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
-import {
-  ChartCompany, ChartMember, ChartUnit, MANAGER_SOURCE_TITLES, getChart, getMyPlacement, getMySubordinates,
-} from '../../../services/orgStructureApi';
+import { MANAGER_SOURCE_TITLES, getMyPlacement, getMySubordinates } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
 
 const InfoTile: React.FC<{ icon: React.ComponentType<{ className?: string }>; label: string; value: React.ReactNode }> = ({ icon: Icon, label, value }) => (
@@ -99,66 +97,4 @@ export const MyPlacementPanel: React.FC = () => {
       </AdminCard>
     </div>
   );
-};
-
-const MemberChip: React.FC<{ member: ChartMember }> = ({ member }) => (
-  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs ${member.isActive ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700' : 'bg-rose-50 border-rose-200 dark:bg-rose-950/40 dark:border-rose-800'}`}>
-    <span className="font-bold text-slate-800 dark:text-slate-100">{member.displayName}</span>
-    {member.positionTitle && <span className="text-slate-500 dark:text-slate-400">{member.positionTitle}</span>}
-  </span>
-);
-
-const UnitNode: React.FC<{ unit: ChartUnit }> = ({ unit }) => {
-  const [open, setOpen] = useState(true);
-  const count = unit.members.length;
-  return (
-    <div>
-      <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between gap-2 py-2 text-right cursor-pointer">
-        <span className="flex items-center gap-2 min-w-0">
-          {open ? <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" /> : <ChevronLeft className="w-4 h-4 text-slate-400 shrink-0" />}
-          <Network className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-          <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{unit.name}</span>
-          {unit.manager && <span className="text-[11px] text-slate-500 truncate">مدیر: {unit.manager.displayName}</span>}
-        </span>
-        <StatusBadge tone="slate">{toPersianDigits(count)} نفر</StatusBadge>
-      </button>
-      {open && (
-        <div className="space-y-1 pb-1">
-          {count > 0 && <div className="flex flex-wrap gap-1.5 pr-6 pb-1">{unit.members.map((m) => <MemberChip key={m.userId} member={m} />)}</div>}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const CompanyCard: React.FC<{ company: ChartCompany }> = ({ company }) => (
-  <AdminCard className="p-5 space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white">
-        <Building2 className="w-5 h-5 text-indigo-600" /> {company.name}
-        <span className="text-xs font-medium text-slate-400 dir-ltr">{company.code}</span>
-      </h3>
-      <div className="flex items-center gap-1.5">
-        {!company.isActive && <StatusBadge tone="red">غیرفعال</StatusBadge>}
-        {company.manager && <StatusBadge tone="indigo"><Crown className="w-3 h-3" /> {company.manager.displayName}</StatusBadge>}
-      </div>
-    </div>
-    {company.members.length > 0 && (
-      <div className="flex flex-wrap gap-1.5">{company.members.map((m) => <MemberChip key={m.userId} member={m} />)}</div>
-    )}
-    {company.units.length === 0 ? (
-      <p className="text-xs text-slate-500">هنوز معاونتی به این شرکت اختصاص داده نشده است.</p>
-    ) : (
-      <div className="divide-y divide-slate-100 dark:divide-slate-800">      {company.units.map((u) => <UnitNode key={u.unitId} unit={u} />)}</div>
-    )}
-  </AdminCard>
-);
-
-/** «چارت سازمانی»: companies → their deputies and units → people. */
-export const OrgChartPanel: React.FC = () => {
-  const chart = useLoad(() => getChart(), 'دریافت چارت سازمانی ممکن نشد.');
-  if (chart.loading) return <AdminCard><LoadingRow /></AdminCard>;
-  if (chart.error) return <Notice type="error">{chart.error}</Notice>;
-  if (!chart.data || chart.data.length === 0) return <AdminCard><EmptyRow>هنوز شرکتی تعریف نشده است.</EmptyRow></AdminCard>;
-  return <div className="space-y-4">{chart.data.map((c) => <CompanyCard key={c.companyId} company={c} />)}</div>;
 };
