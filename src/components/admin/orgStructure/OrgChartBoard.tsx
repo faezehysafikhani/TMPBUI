@@ -302,20 +302,28 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     return () => observer.disconnect();
   }, [!!company]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Measured with the page at its top: everything above the canvas, and the card's sections under it, stay in view.
+  // Measured with the page at its top: everything above the canvas, the card's sections under it,
+  // the page's bottom padding and the site footer all stay in view, so the page needs no scrolling.
   useLayoutEffect(() => {
     const measure = () => {
       const vp = viewport.current;
       const box = vp?.parentElement; // the chart's card
       if (!vp || !box || fullscreen || window.innerWidth < 1280) { setScreenHeight(null); return; }
+      const footers = document.querySelectorAll<HTMLElement>('footer');
+      const footer = footers[footers.length - 1];
+      const page = footer?.previousElementSibling as HTMLElement | null;
+      const pagePadding = page ? parseFloat(getComputedStyle(page).paddingBottom) || 0 : 16;
       const top = vp.getBoundingClientRect().top + window.scrollY;
       const below = box.getBoundingClientRect().bottom - vp.getBoundingClientRect().bottom;
-      const height = Math.max(420, Math.round(window.innerHeight - top - below - 16));
+      const height = Math.max(220, Math.floor(window.innerHeight - top - below - pagePadding - (footer?.offsetHeight || 0) - 1));
       setScreenHeight((prev) => (prev !== null && Math.abs(prev - height) < 2 ? prev : height));
     };
     measure();
+    // What is above the canvas can still change size (fonts, tabs): measure again then too.
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
     window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
   }, [!!company, fullscreen, data.data?.outsideTeams.length, data.data?.unplaced.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const units = company?.units || [];
@@ -513,10 +521,9 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
 
   const board = (
     <AdminCard className={fullscreen ? 'overflow-hidden flex flex-col h-full' : 'overflow-hidden'}>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
         <div>
-          <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white"><GitFork className="w-5 h-5 text-indigo-600" /> چارت سازمانی</h3>
-          <p className="text-xs text-slate-500 mt-0.5">روی هر بخش بزنید تا جزئیاتش را ببینید و همان‌جا تغییرش دهید.</p>
+          <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white" title="روی هر بخش بزنید تا جزئیاتش را ببینید و همان‌جا تغییرش دهید."><GitFork className="w-5 h-5 text-indigo-600" /> چارت سازمانی</h3>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <ChartSearch hits={searchHits} />
@@ -546,7 +553,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         onWheel={() => setHint(false)}
         aria-label="چارت سازمانی؛ با چرخ ماوس یا دو انگشت بزرگ‌نمایی کنید و با کشیدن جابه‌جا کنید"
         style={screenHeight ? { height: screenHeight } : undefined}
-        className={`relative overflow-hidden touch-none select-none outline-hidden cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:[&_*]:cursor-grabbing bg-slate-50/60 dark:bg-slate-950/40 bg-[radial-gradient(circle,_#cbd5e1_1px,_transparent_1.2px)] dark:bg-[radial-gradient(circle,_#334155_1px,_transparent_1.2px)] ${fullscreen ? 'flex-1 min-h-0' : 'h-[60vh] sm:h-[70vh] min-h-[380px]'}`}
+        className={`relative overflow-hidden touch-none select-none outline-hidden cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:[&_*]:cursor-grabbing bg-slate-50/60 dark:bg-slate-950/40 bg-[radial-gradient(circle,_#cbd5e1_1px,_transparent_1.2px)] dark:bg-[radial-gradient(circle,_#334155_1px,_transparent_1.2px)] ${fullscreen ? 'flex-1 min-h-0' : screenHeight ? '' : 'h-[60vh] sm:h-[70vh] min-h-[380px]'}`}
       >
         <div ref={content} className="absolute top-0 left-0 origin-top-left w-max px-10 py-10 flex flex-col items-center">
           {/* the company */}
@@ -641,17 +648,18 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
       )}
 
       {(data.data?.unplaced.length || 0) > 0 && (
-        <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-3">
-          <p className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 mb-2">
+        <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-2 flex items-center gap-3">
+          <p className="shrink-0 flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300">
             <UserX className="w-4 h-4" /> افراد بدون جایگاه سازمانی ({toPersianDigits(data.data!.unplaced.length)})
           </p>
-          <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+          {/* One row (scrolling sideways when long), so the chart keeps the height. */}
+          <div className="flex gap-1.5 overflow-x-auto min-w-0 py-0.5">
             {data.data!.unplaced.map((u) => (
               <button
                 key={u.userId}
                 type="button"
                 onClick={() => setSelection({ kind: 'unplaced', userId: u.userId })}
-                className={`flex items-center gap-1.5 rounded-full border ps-1 pe-3 py-1 text-xs cursor-pointer ${selectedUserId === u.userId ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/50' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}
+                className={`shrink-0 whitespace-nowrap flex items-center gap-1.5 rounded-full border ps-1 pe-3 py-1 text-xs cursor-pointer ${selectedUserId === u.userId ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/50' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}
               >
                 <PersonAvatar name={u.displayName} url={u.avatarUrl} />
                 <span className="font-bold text-slate-700 dark:text-slate-200">{u.displayName}</span>
