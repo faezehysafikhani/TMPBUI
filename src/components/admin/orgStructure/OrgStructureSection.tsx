@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { UserRound, GitFork, Building2, Network, Briefcase } from 'lucide-react';
 import { PillTabs, TabItem } from '../AdminUi';
 import { ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U } from '../../../services/orgStructureApi';
-import { MyPlacementPanel, OrgChartPanel } from './OrgViews';
+import { MyPlacementPanel } from './OrgViews';
+import { OrgChartBoard } from './OrgChartBoard';
 import { CompaniesPanel, PositionsPanel, UnitsPanel } from './OrgAdminPanels';
 
 type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions';
@@ -28,7 +29,7 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
     <div className="space-y-4">
       {tabs.length > 1 && <PillTabs tabs={tabs} active={current} onChange={setActive} />}
       {current === 'me' && <MyPlacementPanel />}
-      {current === 'chart' && <OrgChartPanel />}
+      {current === 'chart' && <OrgChartBoard can={can} />}
       {current === 'companies' && <CompaniesPanel canManage={can(P.manageCompanies)} canSeeUnits={can(U.view)} />}
       {current === 'units' && <UnitsPanel canCreate={can(U.create)} canUpdate={can(U.update)} canDeactivate={can(U.delete)} />}
       {current === 'positions' && <PositionsPanel canManage={can(P.managePositions)} />}

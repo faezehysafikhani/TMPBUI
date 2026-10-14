@@ -4,7 +4,7 @@
 // whole section stays hidden (see isOrgStructureAvailable).
 import { apiRequest, getSessionTenantId, NexusApiError } from './nexusApi';
 
-export interface PersonRef { userId: string; displayName: string; isActive: boolean }
+export interface PersonRef { userId: string; displayName: string; isActive: boolean; avatarUrl?: string | null }
 
 export interface Company {
   id: string;
@@ -55,9 +55,24 @@ export interface Subordinate {
 
 export interface MyPlacement { assignment: UserAssignment | null; managementChain: PersonRef[] }
 
-export interface ChartMember { userId: string; displayName: string; isActive: boolean; positionTitle: string | null; managerUserId: string | null }
+export interface ChartMember {
+  userId: string;
+  displayName: string;
+  isActive: boolean;
+  positionTitle: string | null;
+  managerUserId: string | null;
+  avatarUrl?: string | null;
+  positionId?: string | null;
+}
 
-export interface ChartUnit { unitId: string; name: string; manager: PersonRef | null; members: ChartMember[] }
+/**
+ * A work team (built by someone for their tasks and chat), shown under the unit of the person
+ * who built it, with all its members - who may sit in other units, or in several teams.
+ */
+export interface ChartTeam { teamId: string; name: string; description: string | null; owner: PersonRef; members: ChartMember[] }
+
+/** members: the unit's people in no work team. teams: the work teams its people built (absent on an older backend). */
+export interface ChartUnit { unitId: string; name: string; manager: PersonRef | null; members: ChartMember[]; teams?: ChartTeam[]; isActive?: boolean; peopleCount?: number }
 
 export interface ChartCompany {
   companyId: string;
@@ -67,6 +82,8 @@ export interface ChartCompany {
   manager: PersonRef | null;
   members: ChartMember[];
   units: ChartUnit[];
+  /** How many people the company has (its people in a deputy and those directly under it). */
+  peopleCount?: number;
 }
 
 /** An organization unit (a deputy, a department...) from Nexus.Organization. */
@@ -158,3 +175,31 @@ export const deactivateOrgUnit = (id: string) => apiRequest<void>('DELETE', `/ap
 export function sortOrgUnits(units: OrgUnit[]): OrgUnit[] {
   return [...units].sort((a, b) => a.name.localeCompare(b.name, 'fa'));
 }
+
+// ---------------------------------------------------------------- the chart's other lists
+
+export interface UnplacedUser { userId: string; displayName: string; avatarUrl: string | null }
+
+/** People with no place in the structure yet. */
+export const listUnplacedUsers = () => apiRequest<UnplacedUser[]>('GET', `${BASE}/unplaced-users`);
+/** Work teams whose builder is in no deputy (the chart shows the others under their deputy). */
+export const listTeamsOutsideUnits = () => apiRequest<ChartTeam[]>('GET', `${BASE}/teams-outside-units`);
+
+// ---------------------------------------------------------------- titles before names
+
+/** A title such as «آقای» or «جناب مهندس»; the user's display name starts with it. */
+export interface Honorific { id: string; title: string; sortOrder: number; isActive: boolean; userCount: number }
+
+export interface UserTitle { userId: string; honorificId: string | null; title: string | null }
+
+/** Managing the list: whoever may add users. Giving a user a title: whoever may add or edit users. */
+export const TITLE_PERMISSIONS = { manage: 'users.create', assign: ['users.create', 'users.update'] } as const;
+
+export const listTitles = () => apiRequest<Honorific[]>('GET', `${BASE}/titles`);
+export const createTitle = (title: string) => apiRequest<Honorific>('POST', `${BASE}/titles`, { body: { title } });
+export const updateTitle = (id: string, input: { title: string; sortOrder: number; isActive: boolean }) =>
+  apiRequest<Honorific>('PUT', `${BASE}/titles/${id}`, { body: input });
+export const deleteTitle = (id: string) => apiRequest<void>('DELETE', `${BASE}/titles/${id}`);
+export const getUserTitle = (userId: string) => apiRequest<UserTitle>('GET', `${BASE}/users/${userId}/title`);
+export const setUserTitle = (userId: string, honorificId: string | null) =>
+  apiRequest<UserTitle>('PUT', `${BASE}/users/${userId}/title`, { body: { honorificId } });

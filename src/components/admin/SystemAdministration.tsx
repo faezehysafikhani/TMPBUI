@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2 } from 'lucide-react';
+import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2, BadgeCheck } from 'lucide-react';
 import { getMyPermissions, changeMyPassword, fetchUploadPolicy, updateMaxUploadSizeKb } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
@@ -9,12 +9,13 @@ import { SsoPreparationPanel } from './SsoPreparationPanel';
 import { SmsPanel } from './SmsPanel';
 import { userErrorMessage } from '../../utils/errorMessages';
 import { refreshUploadPolicy } from '../../utils/uploadPolicy';
-import { getMyPlacement, ORG_STRUCTURE_PERMISSIONS, ORG_UNIT_PERMISSIONS } from '../../services/orgStructureApi';
+import { getMyPlacement, ORG_STRUCTURE_PERMISSIONS, ORG_UNIT_PERMISSIONS, TITLE_PERMISSIONS } from '../../services/orgStructureApi';
 import { OrgStructureSection } from './orgStructure/OrgStructureSection';
+import { TitlesPanel } from './orgStructure/TitlesPanel';
 import { canSeeWorkTeams } from '../../utils/permissions';
 
 type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users' | 'org';
-type UsersTab = 'list' | 'history' | 'ldap' | 'sso';
+type UsersTab = 'list' | 'titles' | 'history' | 'ldap' | 'sso';
 
 /** Permission names the signed-in user holds. The server re-checks every call. */
 export function useMyPermissions(userId: string | undefined): Set<string> | null {
@@ -51,6 +52,8 @@ function useOrgStructureAvailable(userId: string | undefined): boolean {
 const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) => boolean; orgStructureAvailable: boolean }> = ({ currentUserId, can, orgStructureAvailable }) => {
   const tabs: TabItem<UsersTab>[] = [
     ...(can('users.view') ? [{ id: 'list' as const, label: 'مدیریت کاربران', icon: Users }] : []),
+    // Titles before names come with the organization-structure module; whoever may add users manages them.
+    ...(orgStructureAvailable && can(TITLE_PERMISSIONS.manage) ? [{ id: 'titles' as const, label: 'عنوان‌ها', icon: BadgeCheck }] : []),
     ...(can('audit_logs.view') ? [{ id: 'history' as const, label: 'تاریخچه ورود', icon: History }] : []),
     ...(can('ldap_settings.view') ? [{ id: 'ldap' as const, label: 'LDAP', icon: Network }] : []),
     ...(can('sso_settings.view') ? [{ id: 'sso' as const, label: 'ورود با SSO', icon: KeyRound }] : []),
@@ -76,6 +79,7 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
           canSeeOrgUnits={can(ORG_UNIT_PERMISSIONS.view)}
         />
       )}
+      {current === 'titles' && <TitlesPanel />}
       {current === 'history' && <LoginHistoryPanel />}
       {current === 'ldap' && <LdapPanel canUpdate={can('ldap_settings.update')} canTest={can('ldap_settings.test')} />}
       {current === 'sso' && <SsoPreparationPanel />}
@@ -236,13 +240,14 @@ export const SystemAdministration: React.FC<{
   const current = tabs.some((t) => t.id === active) ? active : 'profile';
 
   return (
-    <div className="w-full space-y-5" dir="rtl">
-      <AdminCard className="p-5 sm:p-6 space-y-4">
-        <div>
-          <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">تنظیمات سامانه</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">تنظیمات شخصی، پنل پیامکی و مدیریت کاربران سامانه</p>
+    <div className="w-full space-y-4" dir="rtl">
+      {/* Compact: the title and the tabs share one row when there is room, so the page below fits the screen. */}
+      <AdminCard className="px-4 py-3 sm:px-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="shrink-0">
+          <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">تنظیمات سامانه</h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">تنظیمات شخصی، پنل پیامکی و مدیریت کاربران سامانه</p>
         </div>
-        {tabs.length > 1 && <SegmentedTabs tabs={tabs} active={current} onChange={setActive} />}
+        {tabs.length > 1 && <div className="min-w-0 max-w-full"><SegmentedTabs tabs={tabs} active={current} onChange={setActive} /></div>}
       </AdminCard>
 
       {current === 'profile' && profile}

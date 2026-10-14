@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, WorkTeam } from '../types';
 import { changeUserTeamPB, fetchAllUsersPB, fetchUserTeamsAsyncPB } from '../services/dataService';
+import { MyTeamMemberScope, fetchMyTeamMemberScope } from '../services/nexusApi';
 import { userErrorMessage } from '../utils/errorMessages';
 import { canManageWorkTeams, canSeeWorkTeams } from '../utils/permissions';
 import { useMyPermissions } from './admin/SystemAdministration';
@@ -31,6 +32,8 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
   const [isCreatingTeam, setIsCreatingTeam] = useState<boolean>(false);
   const [actionMsg, setActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
+  /** Whom this user may add (their own deputy only, unless they may add from other deputies too). */
+  const [memberScope, setMemberScope] = useState<MyTeamMemberScope | null>(null);
   // Building a team and changing its members needs groups.manage_own; without it the teams one
   // belongs to are only shown (the server refuses the changes anyway).
   const permissions = useMyPermissions(currentUser.id);
@@ -45,6 +48,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
 
       const existingTeams = await fetchUserTeamsAsyncPB(currentUser.id);
       setTeams(existingTeams);
+      setMemberScope(await fetchMyTeamMemberScope());
       setActiveTeamId(existingTeams[0]?.id || '');
     } catch (err) {
       console.error('Error loading team management data:', err);
@@ -151,10 +155,13 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
     await applyChange({ kind: 'delete', teamId }, 'تیم کاری حذف گردید.');
   };
 
-  // Filter users for search results (exclude members already in active team)
+  // Filter users for search results (exclude members already in active team); when adding is
+  // limited (e.g. to one's own deputy), only the people who may be added.
+  const allowedToAdd = memberScope?.limited ? new Set(memberScope.allowedUserIds) : null;
   const availableUsersToSearch = allUsers.filter(
     (u) =>
       u.id !== currentUser.id &&
+      (!allowedToAdd || allowedToAdd.has(u.id)) &&
       ((u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (u.username || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (u.email || '').toLowerCase().includes(searchTerm.toLowerCase()))
@@ -309,6 +316,11 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
                 <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
                   جستجو و اضافه کردن کاربر به {activeTeam.name}:
                 </label>
+                {memberScope?.limited && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    فقط افراد {memberScope.scopeName ? `«${memberScope.scopeName}»` : 'معاونت خودتان'} را می‌توانید به تیم اضافه کنید.
+                  </p>
+                )}
                 <div className="relative">
                   <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
                   <input

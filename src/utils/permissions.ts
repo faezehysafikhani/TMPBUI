@@ -122,6 +122,8 @@ const UNLISTED_PERMISSIONS = new Set([
   // Nothing in this app needs them alone; the permissions that do imply them
   // (users.assign_permissions, settings.update).
   'permissions.view', 'settings.view',
+  // Organizational teams were replaced by the work teams; a database may still list it.
+  'org_structure.manage_teams',
 ]);
 
 /** Whether a permission is shown in the access list. */
