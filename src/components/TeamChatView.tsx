@@ -40,6 +40,8 @@ import {
   fetchPresencePB,
 } from '../services/dataService';
 import { userErrorMessage } from '../utils/errorMessages';
+import { canSeeWorkTeams } from '../utils/permissions';
+import { useMyPermissions } from './admin/SystemAdministration';
 import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
 
 interface TeamChatViewProps {
@@ -62,13 +64,19 @@ export interface ChatContact {
 
 export const TeamChatView: React.FC<TeamChatViewProps> = ({
   currentUser,
-  teams,
+  teams: allTeams,
   appColorPalette = 'indigo',
   onConvertToTask,
   tasks = [],
   onViewTaskDetails,
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
+
+  // Team conversations belong to the work-team feature: without its permissions the user has
+  // none, even of teams they are in (the server refuses them too).
+  const permissions = useMyPermissions(currentUser.id);
+  const teamsAllowed = canSeeWorkTeams(permissions);
+  const teams = useMemo(() => (teamsAllowed ? allTeams : []), [teamsAllowed, allTeams]);
 
   // The open conversation: a team's shared thread, or a direct one with a person. Never both.
   const [activeTeamChatId, setActiveTeamChatId] = useState<string | null>(null);
