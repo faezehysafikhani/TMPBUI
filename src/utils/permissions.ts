@@ -104,6 +104,21 @@ export function toggleUserAccess(
   return { direct: nextDirect, denied: nextDenied };
 }
 
+/**
+ * Permissions this product has no screen for, left out of the access list: the organisational
+ * user groups (granting permissions to a whole group) are managed only through the API. They are
+ * hidden, not removed - whatever a user already holds of them is kept when their access is saved.
+ * Personal work teams (groups.view_own, groups.manage_own) are a different thing and stay listed.
+ */
+const UNLISTED_PERMISSIONS = new Set([
+  'groups.view', 'groups.create', 'groups.update', 'groups.assign_permissions', 'groups.manage_members', 'groups.delete',
+]);
+
+/** Whether a permission is shown in the access list. */
+export function isListedPermission(name: string): boolean {
+  return !UNLISTED_PERMISSIONS.has(name);
+}
+
 /** Persian titles of the permission groups (the server sends module ids such as "TaskManagement"). */
 const MODULE_TITLES: Record<string, string> = {
   Identity: 'کاربران، نقش‌ها، گروه‌ها و تیم‌های کاری',

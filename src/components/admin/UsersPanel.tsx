@@ -11,7 +11,7 @@ import {
   AdminCard, SearchBox, StatusBadge, IconAction, Pagination, Field, inputClass, Notice,
   AdminDialog, PrimaryButton, SecondaryButton, toLatinDigits, useDebounced, PillTabs,
 } from './AdminUi';
-import { moduleTitle, accessIsEffective, toggleUserAccess } from '../../utils/permissions';
+import { moduleTitle, accessIsEffective, toggleUserAccess, isListedPermission } from '../../utils/permissions';
 import { userErrorMessage } from '../../utils/errorMessages';
 import { LoadingRow } from './orgStructure/orgShared';
 import { OrgPlacementFields, useOrgPlacementData, EMPTY_PLACEMENT_DRAFT, OrgPlacementDraft } from './orgStructure/OrgPlacementFields';
@@ -444,6 +444,7 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
     const term = filter.trim().toLowerCase();
     const groups = new Map<string, UserAccess['permissions']>();
     for (const entry of access?.permissions || []) {
+      if (!isListedPermission(entry.name)) continue;
       if (term && !`${entry.name} ${entry.description} ${entry.module} ${moduleTitle(entry.module)}`.toLowerCase().includes(term)) continue;
       groups.set(entry.module, [...(groups.get(entry.module) || []), entry]);
     }
