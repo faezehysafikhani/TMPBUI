@@ -6,44 +6,40 @@ export type ChartSelection =
   /** The company's people in no deputy. */
   | { kind: 'direct'; companyId: string }
   | { kind: 'unit'; companyId: string; unitId: string }
-  /** A deputy's people in none of its teams. */
+  /** A deputy's people in no work team. */
   | { kind: 'noTeam'; companyId: string; unitId: string }
-  | { kind: 'team'; companyId: string; unitId: string; teamId: string }
+  /** A work team, under its builder's deputy or among the teams outside the deputies. */
+  | { kind: 'team'; teamId: string }
   | { kind: 'member'; userId: string }
   /** Someone with no place in the structure yet. */
   | { kind: 'unplaced'; userId: string };
 
-/** Where a person sits in the chart. */
-export interface MemberPlace {
-  member: ChartMember;
-  company: ChartCompany;
-  unit: ChartUnit | null;
-  team: ChartTeam | null;
-}
+/** A work team and where the chart shows it (no unit: among the teams outside the deputies). */
+export interface TeamPlace { team: ChartTeam; company: ChartCompany | null; unit: ChartUnit | null }
 
 export const teamsOf = (unit: ChartUnit): ChartTeam[] => unit.teams || [];
 
-/** Everyone in a deputy: in its teams and in none. */
-export const unitHeadcount = (unit: ChartUnit) =>
-  unit.members.length + teamsOf(unit).reduce((sum, team) => sum + team.members.length, 0);
+/** The people of a deputy (its teams can also hold people of other deputies, so they are not counted). */
+export const unitHeadcount = (unit: ChartUnit) => unit.peopleCount ?? unit.members.length;
 
 export const companyHeadcount = (company: ChartCompany) =>
-  company.members.length + company.units.reduce((sum, unit) => sum + unitHeadcount(unit), 0);
+  company.peopleCount ?? company.members.length + company.units.reduce((sum, unit) => sum + unitHeadcount(unit), 0);
 
-export function findMember(chart: ChartCompany[], userId: string): MemberPlace | null {
-  for (const company of chart) {
-    const direct = company.members.find((m) => m.userId === userId);
-    if (direct) return { member: direct, company, unit: null, team: null };
-    for (const unit of company.units) {
-      const loose = unit.members.find((m) => m.userId === userId);
-      if (loose) return { member: loose, company, unit, team: null };
-      for (const team of teamsOf(unit)) {
-        const inTeam = team.members.find((m) => m.userId === userId);
-        if (inTeam) return { member: inTeam, company, unit, team };
-      }
-    }
-  }
-  return null;
+/** Every work team of the chart, with where it is shown. */
+export function allTeams(chart: ChartCompany[], outside: ChartTeam[]): TeamPlace[] {
+  return [
+    ...chart.flatMap((company) => company.units.flatMap((unit) => teamsOf(unit).map((team) => ({ team, company, unit })))),
+    ...outside.map((team) => ({ team, company: null, unit: null })),
+  ];
+}
+
+/** A person as the chart shows them (from wherever they appear), and the work teams they are in. */
+export function findMember(chart: ChartCompany[], outside: ChartTeam[], userId: string): { member: ChartMember; teams: TeamPlace[] } | null {
+  const teams = allTeams(chart, outside).filter((p) => p.team.members.some((m) => m.userId === userId));
+  const member =
+    chart.flatMap((c) => [...c.members, ...c.units.flatMap((u) => u.members)]).find((m) => m.userId === userId)
+    || teams[0]?.team.members.find((m) => m.userId === userId);
+  return member ? { member, teams } : null;
 }
 
 export function findUnit(chart: ChartCompany[], unitId: string): { company: ChartCompany; unit: ChartUnit } | null {

@@ -38,9 +38,6 @@ export interface UserAssignment {
   positionTitle: string | null;
   explicitManagerUserId: string | null;
   manager: Manager | null;
-  /** The organizational team (of the unit) the user is in. */
-  teamId?: string | null;
-  teamName?: string | null;
 }
 
 export interface AssignmentInput { companyId: string; unitId: string | null; positionId: string | null; managerUserId: string | null }
@@ -66,14 +63,16 @@ export interface ChartMember {
   managerUserId: string | null;
   avatarUrl?: string | null;
   positionId?: string | null;
-  teamId?: string | null;
 }
 
-/** An organizational team of a unit (deputy) with its members. */
-export interface ChartTeam { teamId: string; name: string; description: string | null; leader: PersonRef | null; isActive: boolean; members: ChartMember[] }
+/**
+ * A work team (built by someone for their tasks and chat), shown under the unit of the person
+ * who built it, with all its members - who may sit in other units, or in several teams.
+ */
+export interface ChartTeam { teamId: string; name: string; description: string | null; owner: PersonRef; members: ChartMember[] }
 
-/** members: the unit's people in none of its teams. teams: absent on a backend without teams. */
-export interface ChartUnit { unitId: string; name: string; manager: PersonRef | null; members: ChartMember[]; teams?: ChartTeam[]; isActive?: boolean }
+/** members: the unit's people in no work team. teams: the work teams its people built (absent on an older backend). */
+export interface ChartUnit { unitId: string; name: string; manager: PersonRef | null; members: ChartMember[]; teams?: ChartTeam[]; isActive?: boolean; peopleCount?: number }
 
 export interface ChartCompany {
   companyId: string;
@@ -83,6 +82,8 @@ export interface ChartCompany {
   manager: PersonRef | null;
   members: ChartMember[];
   units: ChartUnit[];
+  /** How many people the company has (its people in a deputy and those directly under it). */
+  peopleCount?: number;
 }
 
 /** An organization unit (a deputy, a department...) from Nexus.Organization. */
@@ -103,7 +104,6 @@ export const ORG_STRUCTURE_PERMISSIONS = {
   manageCompanies: 'org_structure.manage_companies',
   managePositions: 'org_structure.manage_positions',
   manageAssignments: 'org_structure.manage_assignments',
-  manageTeams: 'org_structure.manage_teams',
 } as const;
 
 export const ORG_UNIT_PERMISSIONS = {
@@ -176,32 +176,14 @@ export function sortOrgUnits(units: OrgUnit[]): OrgUnit[] {
   return [...units].sort((a, b) => a.name.localeCompare(b.name, 'fa'));
 }
 
-// ---------------------------------------------------------------- organizational teams
-
-export interface OrgTeam {
-  id: string;
-  unitId: string;
-  unitName: string;
-  companyId: string | null;
-  name: string;
-  description: string | null;
-  leader: PersonRef | null;
-  isActive: boolean;
-  memberCount: number;
-}
-
-export interface OrgTeamInput { name: string; description: string | null; leaderUserId: string | null }
+// ---------------------------------------------------------------- the chart's other lists
 
 export interface UnplacedUser { userId: string; displayName: string; avatarUrl: string | null }
 
-export const listTeams = (unitId?: string) => apiRequest<OrgTeam[]>('GET', `${BASE}/teams`, { query: { unitId } });
-export const createTeam = (unitId: string, input: OrgTeamInput) => apiRequest<OrgTeam>('POST', `${BASE}/teams`, { body: { unitId, ...input } });
-export const updateTeam = (id: string, input: OrgTeamInput & { isActive: boolean }) => apiRequest<OrgTeam>('PUT', `${BASE}/teams/${id}`, { body: input });
-export const deleteTeam = (id: string) => apiRequest<void>('DELETE', `${BASE}/teams/${id}`);
-/** Puts the user in the team (moving them into its unit when needed); null takes them out of their team. */
-export const setUserTeam = (userId: string, teamId: string | null) =>
-  apiRequest<UserAssignment>('PUT', `${BASE}/assignments/${userId}/team`, { body: { teamId } });
+/** People with no place in the structure yet. */
 export const listUnplacedUsers = () => apiRequest<UnplacedUser[]>('GET', `${BASE}/unplaced-users`);
+/** Work teams whose builder is in no deputy (the chart shows the others under their deputy). */
+export const listTeamsOutsideUnits = () => apiRequest<ChartTeam[]>('GET', `${BASE}/teams-outside-units`);
 
 // ---------------------------------------------------------------- titles before names
 

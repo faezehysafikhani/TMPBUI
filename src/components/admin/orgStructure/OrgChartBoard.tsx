@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
-import { ChartCompany, ChartMember, ChartTeam, ChartUnit, PersonRef, getChart, listPositions, listUnplacedUsers } from '../../../services/orgStructureApi';
+import { ChartCompany, ChartMember, ChartTeam, ChartUnit, PersonRef, getChart, listPositions, listTeamsOutsideUnits, listUnplacedUsers } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
 import { ChartSelection, companyHeadcount, teamsOf, unitHeadcount } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
@@ -66,7 +66,7 @@ const MemberRow: React.FC<{ member: ChartMember; selected: boolean; onSelect: ()
   </button>
 );
 
-/** A team (or the deputy's people in no team) under a deputy, with a branch line to it. */
+/** A work team (or the deputy's people in no team) under a deputy, with a branch line to it. */
 const BranchCard: React.FC<{
   icon: React.ComponentType<{ className?: string }>;
   tone: string;
@@ -81,15 +81,17 @@ const BranchCard: React.FC<{
   selectedUserId: string | null;
   onSelectMember: (userId: string) => void;
   muted?: boolean;
-}> = ({ icon: Icon, tone, title, subtitle, count, members, open, onToggle, selected, onSelect, selectedUserId, onSelectMember, muted }) => (
+  /** Drawn on a deputy's branch line (not in the list of teams outside the deputies). */
+  onBranch?: boolean;
+}> = ({ icon: Icon, tone, title, subtitle, count, members, open, onToggle, selected, onSelect, selectedUserId, onSelectMember, muted, onBranch = true }) => (
   <div className="relative">
-    <span className="absolute -start-4 top-7 w-4 h-0.5 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+    {onBranch && <span className="absolute -start-4 top-7 w-4 h-0.5 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />}
     <NodeCard selected={selected} onSelect={onSelect} className={`w-60 ${muted ? 'opacity-70' : ''}`}>
       <div className="flex items-center gap-2.5 p-3">
         <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${tone}`}><Icon className="w-[18px] h-[18px]" /></span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">{title}</span>
-          <span className="flex items-center gap-1 text-[11px] text-slate-500"><Users className="w-3 h-3" /> {toPersianDigits(count)} نفر{subtitle ? ` · ${subtitle}` : ''}</span>
+          <span className="flex items-center gap-1 text-[11px] text-slate-500 min-w-0"><Users className="w-3 h-3 shrink-0" /> <span className="truncate">{toPersianDigits(count)} نفر{subtitle ? ` · ${subtitle}` : ''}</span></span>
         </span>
         {count > 0 && <Toggle open={open} onClick={onToggle} label={title} />}
       </div>
@@ -103,19 +105,21 @@ const BranchCard: React.FC<{
 );
 
 /**
- * «چارت سازمانی»: the company at the top, its deputies under it, each deputy's teams under the
- * deputy and the people inside them - and the deputy's people in no team, the company's people in
+ * «چارت سازمانی»: the company at the top, its deputies under it, under each deputy the work teams
+ * its people built and everyone in them (from any deputy; a person in several teams shows in each)
+ * - and the deputy's people in no team, the teams whose builder is in no deputy, the company's people in
  * no deputy, and people with no place at all. Clicking any of them shows it in the side panel,
  * where it can be changed right away (as the user's permissions allow; the server checks again).
  */
 export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> = ({ can }) => {
   const data = useLoad(async () => {
-    const [chart, positions, unplaced] = await Promise.all([
+    const [chart, positions, unplaced, outsideTeams] = await Promise.all([
       getChart(),
       listPositions().catch(() => []),
       listUnplacedUsers().catch(() => []),
+      listTeamsOutsideUnits().catch(() => [] as ChartTeam[]),
     ]);
-    return { chart, positions, unplaced };
+    return { chart, positions, unplaced, outsideTeams };
   }, 'دریافت چارت سازمانی ممکن نشد.');
 
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -202,16 +206,15 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
                   icon={Users}
                   tone="bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
                   title={team.name}
-                  subtitle={team.isActive ? undefined : 'غیرفعال'}
+                  subtitle={`سازنده: ${team.owner.displayName}`}
                   count={team.members.length}
                   members={team.members}
                   open={openGroups.has(`team:${team.teamId}`)}
                   onToggle={() => toggleIn(setOpenGroups, `team:${team.teamId}`)}
-                  selected={isSelected({ kind: 'team', companyId: company.companyId, unitId: unit.unitId, teamId: team.teamId })}
-                  onSelect={() => setSelection({ kind: 'team', companyId: company.companyId, unitId: unit.unitId, teamId: team.teamId })}
+                  selected={isSelected({ kind: 'team', teamId: team.teamId })}
+                  onSelect={() => setSelection({ kind: 'team', teamId: team.teamId })}
                   selectedUserId={selectedUserId}
                   onSelectMember={selectMember}
-                  muted={!team.isActive}
                 />
               ))}
               {unit.members.length > 0 && (
@@ -320,6 +323,35 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         </div>
       </div>
 
+      {(data.data?.outsideTeams.length || 0) > 0 && (
+        <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-3">
+          <p className="flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300 mb-1">
+            <Users className="w-4 h-4" /> تیم‌هایی که سازنده‌شان در هیچ معاونتی نیست ({toPersianDigits(data.data!.outsideTeams.length)})
+          </p>
+          <p className="text-[11px] text-slate-500 mb-2">با قرار دادن سازندهٔ تیم در یک معاونت، تیم زیر همان معاونت نمایش داده می‌شود.</p>
+          <div className="flex flex-wrap gap-3">
+            {data.data!.outsideTeams.map((team) => (
+              <BranchCard
+                key={team.teamId}
+                onBranch={false}
+                icon={Users}
+                tone="bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
+                title={team.name}
+                subtitle={`سازنده: ${team.owner.displayName}`}
+                count={team.members.length}
+                members={team.members}
+                open={openGroups.has(`team:${team.teamId}`)}
+                onToggle={() => toggleIn(setOpenGroups, `team:${team.teamId}`)}
+                selected={isSelected({ kind: 'team', teamId: team.teamId })}
+                onSelect={() => setSelection({ kind: 'team', teamId: team.teamId })}
+                selectedUserId={selectedUserId}
+                onSelectMember={selectMember}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {(data.data?.unplaced.length || 0) > 0 && (
         <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-3">
           <p className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 mb-2">
@@ -358,6 +390,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         chart={chart}
         positions={data.data?.positions || []}
         unplaced={data.data?.unplaced || []}
+        outsideTeams={data.data?.outsideTeams || []}
         selection={selection}
         onSelect={setSelection}
         onChanged={data.reload}

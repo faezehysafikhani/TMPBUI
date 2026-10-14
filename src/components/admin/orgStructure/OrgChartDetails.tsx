@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2, Network, Users, UserRound, Pencil, Plus, Trash2, UserPlus, Unlink, Zap, Loader2, Briefcase, ArrowLeftRight, LogOut,
+  Building2, Network, Users, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut,
 } from 'lucide-react';
 import { AdminCard, AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
@@ -9,20 +9,17 @@ import { toPersianDigits } from '../../../utils/helpers';
 import {
   ChartCompany, ChartMember, ChartUnit, ChartTeam, Position, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
   ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U,
-  createOrgUnit, createTeam, deleteTeam, getAssignment, linkUnitToCompany, listCompanies, setAssignment, setUserTeam,
-  unlinkUnit, updateCompany, updateOrgUnit, updateTeam,
+  createOrgUnit, getAssignment, linkUnitToCompany, listCompanies, setAssignment,
+  unlinkUnit, updateCompany, updateOrgUnit,
 } from '../../../services/orgStructureApi';
 import { UserPicker } from './orgShared';
-import { ChartSelection, companyHeadcount, findMember, findUnit, teamsOf, unitHeadcount } from './orgChartModel';
+import { ChartSelection, allTeams, companyHeadcount, findMember, findUnit, teamsOf, unitHeadcount } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
 
 type Dialog =
   | { kind: 'editCompany'; company: ChartCompany }
   | { kind: 'addUnit'; company: ChartCompany }
   | { kind: 'editUnit'; unit: ChartUnit }
-  | { kind: 'addTeam'; unit: ChartUnit }
-  | { kind: 'editTeam'; team: ChartTeam }
-  | { kind: 'addTeamMember'; unit: ChartUnit; team: ChartTeam }
   | { kind: 'addUnitMember'; company: ChartCompany; unit: ChartUnit }
   | { kind: 'placeUser'; userId: string; name: string };
 
@@ -108,10 +105,12 @@ export const OrgChartDetails: React.FC<{
   chart: ChartCompany[];
   positions: Position[];
   unplaced: UnplacedUser[];
+  /** Work teams whose builder is in no deputy. */
+  outsideTeams: ChartTeam[];
   selection: ChartSelection | null;
   onSelect: (selection: ChartSelection) => void;
   onChanged: () => Promise<void> | void;
-}> = ({ can, chart, positions, unplaced, selection, onSelect, onChanged }) => {
+}> = ({ can, chart, positions, unplaced, outsideTeams, selection, onSelect, onChanged }) => {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -136,8 +135,6 @@ export const OrgChartDetails: React.FC<{
   };
 
   const openMember = (userId: string) => onSelect({ kind: 'member', userId });
-  const removeFromTeam = (m: ChartMember) =>
-    run(() => setUserTeam(m.userId, null), `«${m.displayName}» از تیم خارج شد و در معاونت ماند.`, 'خروج از تیم انجام نشد.');
 
   let body: React.ReactNode = <p className="text-sm text-slate-500 p-4">یک بخش از چارت را انتخاب کنید.</p>;
 
@@ -151,7 +148,7 @@ export const OrgChartDetails: React.FC<{
           <div>
             <InfoRow label="مدیر ارشد"><PersonValue person={company.manager} empty="تعیین نشده" /></InfoRow>
             <InfoRow label="معاونت‌ها">{toPersianDigits(company.units.length)}</InfoRow>
-            <InfoRow label="تیم‌ها">{toPersianDigits(teamCount)}</InfoRow>
+            <InfoRow label="تیم‌های کاری">{toPersianDigits(teamCount)}</InfoRow>
             <InfoRow label="تعداد افراد">{toPersianDigits(companyHeadcount(company))} نفر</InfoRow>
           </div>
           {company.units.length > 0 && (
@@ -189,15 +186,15 @@ export const OrgChartDetails: React.FC<{
           <Header icon={Network} tone="bg-emerald-600 text-white" title={unit.name} subtitle={`معاونت · ${company.name}`} badge={<ActiveBadge active={unit.isActive !== false} />} />
           <div>
             <InfoRow label="مدیر معاونت"><PersonValue person={unit.manager} empty="تعیین نشده" /></InfoRow>
-            <InfoRow label="تیم‌ها">{toPersianDigits(teams.length)}</InfoRow>
+            <InfoRow label="تیم‌های ساخته‌شده">{toPersianDigits(teams.length)}</InfoRow>
             <InfoRow label="تعداد افراد">{toPersianDigits(unitHeadcount(unit))} نفر</InfoRow>
             <InfoRow label="بدون تیم">{toPersianDigits(unit.members.length)} نفر</InfoRow>
           </div>
           {teams.length > 0 && (
             <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-500">تیم‌ها</p>
+              <p className="text-xs font-bold text-slate-500">تیم‌های کاری که افراد این معاونت ساخته‌اند</p>
               {teams.map((t) => (
-                <button key={t.teamId} type="button" onClick={() => onSelect({ kind: 'team', companyId: company.companyId, unitId: unit.unitId, teamId: t.teamId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
+                <button key={t.teamId} type="button" onClick={() => onSelect({ kind: 'team', teamId: t.teamId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
                   <span className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100"><Users className="w-4 h-4 text-violet-600" /> {t.name}</span>
                   <span className="text-[11px] text-slate-500">{toPersianDigits(t.members.length)} نفر</span>
                 </button>
@@ -206,7 +203,6 @@ export const OrgChartDetails: React.FC<{
           )}
           <QuickActions>
             {can(U.update) && <ActionTile icon={Pencil} label="ویرایش معاونت" onClick={() => setDialog({ kind: 'editUnit', unit })} />}
-            {can(P.manageTeams) && <ActionTile icon={Plus} label="افزودن تیم" onClick={() => setDialog({ kind: 'addTeam', unit })} />}
             {can(P.manageAssignments) && <ActionTile icon={UserPlus} label="افزودن فرد" onClick={() => setDialog({ kind: 'addUnitMember', company, unit })} />}
             {can(P.manageCompanies) && (
               <ActionTile
@@ -226,56 +222,46 @@ export const OrgChartDetails: React.FC<{
         </>
       ) : (
         <>
-          <Header icon={UserRound} tone="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200" title="بدون تیم" subtitle={`${unit.name} · افرادی که در هیچ تیمی نیستند`} />
+          <Header icon={UserRound} tone="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200" title="بدون تیم" subtitle={`${unit.name} · افرادی که عضو هیچ تیم کاری نیستند`} />
           <PeopleList members={unit.members} onOpen={openMember} />
-          {can(P.manageTeams) && teams.length > 0 && <p className="text-[11px] text-slate-500">برای قرار دادن هر نفر در تیم، روی او بزنید یا از جزئیات تیم «افزودن عضو» را بزنید.</p>}
         </>
       );
     }
   }
 
   if (selection?.kind === 'team') {
-    const found = findUnit(chart, selection.unitId);
-    const team = found && teamsOf(found.unit).find((t) => t.teamId === selection.teamId);
-    if (found && team) {
+    const place = allTeams(chart, outsideTeams).find((p) => p.team.teamId === selection.teamId);
+    if (place) {
+      const { team, company, unit } = place;
       body = (
         <>
-          <Header icon={Users} tone="bg-violet-600 text-white" title={team.name} subtitle={`تیم · ${found.unit.name}`} badge={<ActiveBadge active={team.isActive} />} />
+          <Header icon={Users} tone="bg-violet-600 text-white" title={team.name} subtitle={unit ? `تیم کاری · ${unit.name}` : 'تیم کاری · سازنده در هیچ معاونتی نیست'} />
           <div>
-            <InfoRow label="سرپرست تیم"><PersonValue person={team.leader} empty="تعیین نشده" /></InfoRow>
+            <InfoRow label="سازنده تیم"><PersonValue person={team.owner} /></InfoRow>
+            {unit && company && (
+              <InfoRow label="معاونت سازنده">
+                <button type="button" className="text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer" onClick={() => onSelect({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}>
+                  {unit.name}
+                </button>
+              </InfoRow>
+            )}
             <InfoRow label="تعداد اعضا">{toPersianDigits(team.members.length)} نفر</InfoRow>
             {team.description && <InfoRow label="توضیحات"><span className="font-normal whitespace-pre-line">{team.description}</span></InfoRow>}
           </div>
           <div className="space-y-1">
             <p className="text-xs font-bold text-slate-500">اعضای تیم</p>
-            <PeopleList members={team.members} onOpen={openMember} onRemove={can(P.manageTeams) ? removeFromTeam : undefined} busy={busy} />
+            <PeopleList members={team.members} onOpen={openMember} />
           </div>
-          <QuickActions>
-            {can(P.manageTeams) && <ActionTile icon={UserPlus} label="افزودن عضو" disabled={!team.isActive} onClick={() => setDialog({ kind: 'addTeamMember', unit: found.unit, team })} />}
-            {can(P.manageTeams) && <ActionTile icon={Pencil} label="ویرایش تیم" onClick={() => setDialog({ kind: 'editTeam', team })} />}
-            {can(P.manageTeams) && (
-              <ActionTile
-                icon={Trash2}
-                tone="rose"
-                label="حذف تیم"
-                disabled={busy}
-                onClick={() => window.confirm(`تیم «${team.name}» حذف شود؟ اعضای آن در معاونت «${found.unit.name}» می‌مانند.`)
-                  && run(async () => {
-                    await deleteTeam(team.teamId);
-                    onSelect({ kind: 'unit', companyId: found.company.companyId, unitId: found.unit.unitId });
-                  }, 'تیم حذف شد؛ اعضایش در معاونت ماندند.', 'حذف تیم انجام نشد.')}
-              />
-            )}
-          </QuickActions>
+          <p className="text-[11px] text-slate-500">تیم کاری را سازنده‌اش از «مدیریت تیم کاری» می‌سازد و اعضایش را تعیین می‌کند.</p>
         </>
       );
     }
   }
 
   if (selection?.kind === 'member') {
-    const place = findMember(chart, selection.userId);
+    const place = findMember(chart, outsideTeams, selection.userId);
     if (place) {
-      body = <MemberDetails key={selection.userId} place={place} positions={positions} can={can} busy={busy} run={run} onSelect={onSelect} />;
+      body = <MemberDetails key={selection.userId} place={place} chart={chart} positions={positions} can={can} busy={busy} run={run} onSelect={onSelect} />;
     }
   }
 
@@ -289,9 +275,9 @@ export const OrgChartDetails: React.FC<{
             <span className="text-base font-extrabold text-slate-900 dark:text-white">{person.displayName}</span>
             <StatusBadge tone="amber">بدون جایگاه سازمانی</StatusBadge>
           </div>
-          <p className="text-xs text-slate-500">این فرد هنوز در هیچ شرکت، معاونت یا تیمی قرار نگرفته است.</p>
+          <p className="text-xs text-slate-500">این فرد هنوز در هیچ شرکت یا معاونتی قرار نگرفته است.</p>
           <QuickActions>
-            {(can(P.manageAssignments) || can(P.manageTeams)) && <ActionTile icon={UserPlus} label="قرار دادن در ساختار" onClick={() => setDialog({ kind: 'placeUser', userId: person.userId, name: person.displayName })} />}
+            {can(P.manageAssignments) && <ActionTile icon={UserPlus} label="قرار دادن در ساختار" onClick={() => setDialog({ kind: 'placeUser', userId: person.userId, name: person.displayName })} />}
           </QuickActions>
         </>
       );
@@ -337,29 +323,29 @@ const QuickActions: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 type Run = (action: () => Promise<unknown>, success: string, failure: string) => Promise<boolean>;
 
-/** A person: where they sit, their manager, and changing their team or position. */
+/** A person: where they sit (from their assignment), their manager, their work teams, and changing their position. */
 const MemberDetails: React.FC<{
   place: NonNullable<ReturnType<typeof findMember>>;
+  chart: ChartCompany[];
   positions: Position[];
   can: (permission: string) => boolean;
   busy: boolean;
   run: Run;
   onSelect: (selection: ChartSelection) => void;
-}> = ({ place, positions, can, busy, run, onSelect }) => {
-  const { member, company, unit, team } = place;
-  const [assignment, setAssignmentState] = useState<UserAssignment | null>(null);
-  const [teamId, setTeamId] = useState(team?.teamId || '');
+}> = ({ place, chart, positions, can, busy, run, onSelect }) => {
+  const { member, teams } = place;
+  const [assignment, setAssignmentState] = useState<UserAssignment | null | undefined>(undefined);
   const [positionId, setPositionId] = useState(member.positionId || '');
 
   useEffect(() => {
     let alive = true;
-    getAssignment(member.userId).then((a) => alive && setAssignmentState(a)).catch(() => {});
+    getAssignment(member.userId).then((a) => alive && setAssignmentState(a)).catch(() => alive && setAssignmentState(null));
     return () => { alive = false; };
-  }, [member.userId, team?.teamId, member.positionId]);
-  useEffect(() => { setTeamId(team?.teamId || ''); setPositionId(member.positionId || ''); }, [team?.teamId, member.positionId]);
+  }, [member.userId, member.positionId]);
+  useEffect(() => { setPositionId(member.positionId || ''); }, [member.positionId]);
 
-  const teams = unit ? teamsOf(unit).filter((t) => t.isActive || t.teamId === team?.teamId) : [];
-  const path = [company.name, unit?.name, team?.name].filter(Boolean).join(' ‹ ');
+  const company = assignment ? chart.find((c) => c.companyId === assignment.companyId) : undefined;
+  const path = assignment ? [assignment.companyName, assignment.unitName].filter(Boolean).join(' ‹ ') : null;
 
   return (
     <>
@@ -371,12 +357,14 @@ const MemberDetails: React.FC<{
       </div>
       <div>
         <InfoRow label="جایگاه">
-          <button type="button" className="text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer" onClick={() => unit
-            ? onSelect(team ? { kind: 'team', companyId: company.companyId, unitId: unit.unitId, teamId: team.teamId } : { kind: 'unit', companyId: company.companyId, unitId: unit.unitId })
-            : onSelect({ kind: 'company', companyId: company.companyId })}
-          >
-            {path}
-          </button>
+          {assignment === undefined ? '…' : !assignment ? <span className="text-amber-600 font-normal">بدون جایگاه سازمانی</span> : (
+            <button type="button" className="text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer" onClick={() => company && onSelect(assignment.unitId
+              ? { kind: 'unit', companyId: company.companyId, unitId: assignment.unitId }
+              : { kind: 'company', companyId: company.companyId })}
+            >
+              {path}
+            </button>
+          )}
         </InfoRow>
         <InfoRow label="مدیر مستقیم">
           {assignment?.manager
@@ -385,28 +373,17 @@ const MemberDetails: React.FC<{
         </InfoRow>
       </div>
 
-      {can(P.manageTeams) && unit && (
-        <div className="space-y-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
-          <span className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300"><ArrowLeftRight className="w-3.5 h-3.5" /> تیم در «{unit.name}»</span>
-          <div className="flex gap-2">
-            <select className={inputClass} value={teamId} onChange={(e) => setTeamId(e.target.value)} aria-label="تیم">
-              <option value="">— بدون تیم —</option>
-              {teams.map((t) => <option key={t.teamId} value={t.teamId}>{t.name}</option>)}
-            </select>
-            <PrimaryButton
-              type="button"
-              className="shrink-0"
-              disabled={busy || teamId === (team?.teamId || '')}
-              onClick={() => run(() => setUserTeam(member.userId, teamId || null), teamId ? 'تیم فرد تغییر کرد.' : 'فرد از تیم خارج شد.', 'تغییر تیم انجام نشد.')}
-            >
-              ذخیره
-            </PrimaryButton>
-          </div>
-          {teams.length === 0 && <p className="text-[11px] text-slate-400">این معاونت هنوز تیمی ندارد.</p>}
-        </div>
-      )}
+      <div className="space-y-1">
+        <p className="text-xs font-bold text-slate-500">تیم‌های کاری ({toPersianDigits(teams.length)})</p>
+        {teams.length === 0 ? <p className="text-xs text-slate-400">عضو هیچ تیم کاری نیست.</p> : teams.map(({ team, unit }) => (
+          <button key={team.teamId} type="button" onClick={() => onSelect({ kind: 'team', teamId: team.teamId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
+            <span className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100 min-w-0"><Users className="w-4 h-4 text-violet-600 shrink-0" /> <span className="truncate">{team.name}</span></span>
+            <span className="text-[11px] text-slate-500 shrink-0">{team.owner.userId === member.userId ? 'سازنده' : unit?.name || ''}</span>
+          </button>
+        ))}
+      </div>
 
-      {can(P.manageAssignments) && (
+      {can(P.manageAssignments) && assignment && (
         <div className="space-y-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 p-3">
           <span className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300"><Briefcase className="w-3.5 h-3.5" /> سمت</span>
           <div className="flex gap-2">
@@ -446,23 +423,21 @@ const ChartDialog: React.FC<{
   onSelect: (selection: ChartSelection) => void;
 }> = ({ dialog, chart, positions, can, busy, run, onClose, onSelect }) => {
   const [name, setName] = useState(
-    dialog.kind === 'editCompany' ? dialog.company.name : dialog.kind === 'editUnit' ? dialog.unit.name : dialog.kind === 'editTeam' ? dialog.team.name : '',
+    dialog.kind === 'editCompany' ? dialog.company.name : dialog.kind === 'editUnit' ? dialog.unit.name : '',
   );
   const [code, setCode] = useState(dialog.kind === 'editCompany' ? dialog.company.code : '');
-  const [description, setDescription] = useState(dialog.kind === 'editTeam' ? dialog.team.description || '' : '');
-  const initialPerson = dialog.kind === 'editCompany' ? dialog.company.manager : dialog.kind === 'editUnit' ? dialog.unit.manager : dialog.kind === 'editTeam' ? dialog.team.leader : null;
+  const initialPerson = dialog.kind === 'editCompany' ? dialog.company.manager : dialog.kind === 'editUnit' ? dialog.unit.manager : null;
   const [personId, setPersonId] = useState<string | null>(initialPerson?.userId || null);
   const [personName, setPersonName] = useState<string | null>(initialPerson?.displayName || null);
   const [active, setActive] = useState(
-    dialog.kind === 'editCompany' ? dialog.company.isActive : dialog.kind === 'editUnit' ? dialog.unit.isActive !== false : dialog.kind === 'editTeam' ? dialog.team.isActive : true,
+    dialog.kind === 'editCompany' ? dialog.company.isActive : dialog.kind === 'editUnit' ? dialog.unit.isActive !== false : true,
   );
-  // Placing someone: the deputy (or company directly), team and position.
+  // Placing someone: the deputy (or company directly) and position.
   const destinations = chart.flatMap((c) => [
     { key: `${c.companyId}|`, label: `${c.name} (مستقیم زیر شرکت)`, companyId: c.companyId, unit: null as ChartUnit | null },
     ...c.units.map((u) => ({ key: `${c.companyId}|${u.unitId}`, label: `${c.name} ‹ ${u.name}`, companyId: c.companyId, unit: u as ChartUnit | null })),
   ]);
   const [destination, setDestination] = useState(destinations[0]?.key || '');
-  const [teamId, setTeamId] = useState('');
   const [positionId, setPositionId] = useState('');
 
   const close = () => !busy && onClose();
@@ -533,64 +508,6 @@ const ChartDialog: React.FC<{
       );
       break;
     }
-    case 'addTeam':
-    case 'editTeam': {
-      const editing = dialog.kind === 'editTeam';
-      title = editing ? 'ویرایش تیم' : `تیم جدید در «${(dialog as { unit: ChartUnit }).unit.name}»`;
-      canSave = canSave && !!name.trim();
-      save = async () => done(await run(
-        () => (dialog.kind === 'editTeam'
-          ? updateTeam(dialog.team.teamId, { name: name.trim(), description: description.trim() || null, leaderUserId: personId, isActive: active })
-          : createTeam(dialog.unit.unitId, { name: name.trim(), description: description.trim() || null, leaderUserId: personId })),
-        editing ? 'تیم ویرایش شد.' : `تیم «${name.trim()}» ساخته شد.`,
-        editing ? 'ویرایش تیم انجام نشد.' : 'ساخت تیم انجام نشد.',
-      ));
-      content = (
-        <>
-          <Field label="نام تیم" required><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} autoFocus placeholder="مثلاً: تیم فرانت‌اند" /></Field>
-          <Field label="توضیحات"><textarea rows={3} className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={1000} /></Field>
-          <PersonField label="سرپرست تیم (اختیاری)" personId={personId} personName={personName} onChange={(id, n) => { setPersonId(id); setPersonName(n); }} hint="فقط برای نمایش است و مدیر مستقیم کسی را تغییر نمی‌دهد." />
-          {editing && <Toggle checked={active} onChange={setActive} label="فعال" description="به تیم غیرفعال عضو جدید اضافه نمی‌شود." />}
-        </>
-      );
-      break;
-    }
-    case 'addTeamMember': {
-      title = `افزودن عضو به «${dialog.team.name}»`;
-      canSave = canSave && !!personId;
-      save = async () => done(await run(() => setUserTeam(personId!, dialog.team.teamId), `«${personName}» به تیم اضافه شد.`, 'افزودن عضو انجام نشد.'));
-      const loose = dialog.unit.members;
-      content = (
-        <>
-          {loose.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">افراد بدون تیمِ «{dialog.unit.name}»</span>
-              <div className="flex flex-wrap gap-1.5">
-                {loose.map((m) => (
-                  <button
-                    key={m.userId}
-                    type="button"
-                    onClick={() => { setPersonId(m.userId); setPersonName(m.displayName); }}
-                    className={`flex items-center gap-1.5 rounded-full border ps-1 pe-3 py-1 text-xs cursor-pointer ${personId === m.userId ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/50' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300'}`}
-                  >
-                    <PersonAvatar name={m.displayName} url={m.avatarUrl} />
-                    <span className="font-bold">{m.displayName}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          <PersonField
-            label={loose.length ? 'یا هر کاربر دیگری' : 'کاربر'}
-            personId={personId}
-            personName={personName}
-            onChange={(id, n) => { setPersonId(id); setPersonName(n); }}
-            hint="کسی که در معاونت دیگری است به این معاونت منتقل می‌شود؛ سمت و مدیر تعیین‌شده‌اش می‌ماند."
-          />
-        </>
-      );
-      break;
-    }
     case 'addUnitMember': {
       title = `افزودن فرد به «${dialog.unit.name}»`;
       canSave = canSave && !!personId;
@@ -601,7 +518,7 @@ const ChartDialog: React.FC<{
           personId={personId}
           personName={personName}
           onChange={(id, n) => { setPersonId(id); setPersonName(n); }}
-          hint="سمت و مدیر تعیین‌شده‌اش حفظ می‌شود؛ اگر در تیم معاونت دیگری بود، از آن تیم خارج می‌شود."
+          hint="سمت و مدیر تعیین‌شده‌اش حفظ می‌شود."
         />
       );
       break;
@@ -609,43 +526,27 @@ const ChartDialog: React.FC<{
     case 'placeUser': {
       title = `قرار دادن «${dialog.name}» در ساختار`;
       const target = destinations.find((d) => d.key === destination);
-      const teams = target?.unit ? teamsOf(target.unit).filter((t) => t.isActive) : [];
-      canSave = canSave && !!target && (!!teamId ? can(P.manageTeams) : can(P.manageAssignments));
+      canSave = canSave && !!target && can(P.manageAssignments);
       save = async () => {
         if (!target) return;
         done(await run(async () => {
-          if (teamId) {
-            await setUserTeam(dialog.userId, teamId);
-            if (positionId && can(P.manageAssignments)) await placeInUnit(dialog.userId, target.companyId, target.unit!.unitId, positionId);
-          } else {
-            await setAssignment(dialog.userId, { companyId: target.companyId, unitId: target.unit?.unitId ?? null, positionId: positionId || null, managerUserId: null });
-          }
+          await setAssignment(dialog.userId, { companyId: target.companyId, unitId: target.unit?.unitId ?? null, positionId: positionId || null, managerUserId: null });
           onSelect({ kind: 'member', userId: dialog.userId });
         }, `«${dialog.name}» در ساختار قرار گرفت.`, 'قرار دادن در ساختار انجام نشد.'));
       };
       content = (
         <>
           <Field label="معاونت" required>
-            <select className={inputClass} value={destination} onChange={(e) => { setDestination(e.target.value); setTeamId(''); }}>
+            <select className={inputClass} value={destination} onChange={(e) => setDestination(e.target.value)}>
               {destinations.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
             </select>
           </Field>
-          {target?.unit && (
-            <Field label="تیم (اختیاری)" hint={teams.length === 0 ? 'این معاونت هنوز تیمی ندارد.' : undefined}>
-              <select className={inputClass} value={teamId} onChange={(e) => setTeamId(e.target.value)} disabled={teams.length === 0 || !can(P.manageTeams)}>
-                <option value="">— بدون تیم —</option>
-                {teams.map((t) => <option key={t.teamId} value={t.teamId}>{t.name}</option>)}
-              </select>
-            </Field>
-          )}
-          {can(P.manageAssignments) && (
-            <Field label="سمت (اختیاری)">
-              <select className={inputClass} value={positionId} onChange={(e) => setPositionId(e.target.value)}>
-                <option value="">— بدون سمت —</option>
-                {positions.filter((p) => p.isActive).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
-              </select>
-            </Field>
-          )}
+          <Field label="سمت (اختیاری)">
+            <select className={inputClass} value={positionId} onChange={(e) => setPositionId(e.target.value)}>
+              <option value="">— بدون سمت —</option>
+              {positions.filter((p) => p.isActive).map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+            </select>
+          </Field>
         </>
       );
       break;
