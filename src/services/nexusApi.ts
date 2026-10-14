@@ -1093,6 +1093,22 @@ export async function setMyTeamMembers(teamId: string, userIds: string[]): Promi
   return mapTeam(await request<UserGroupDto>('PUT', `${MY_TEAMS}/${teamId}/members`, { body: { userIds } }));
 }
 
+/**
+ * Whom the caller may add to their teams. limited = false: anyone; otherwise only allowedUserIds
+ * (e.g. their own deputy, with the organization structure). null when the server does not say
+ * (an older backend, or no right to build teams) - then nothing is filtered.
+ */
+export interface MyTeamMemberScope { limited: boolean; allowedUserIds: string[]; scopeName: string | null }
+
+export async function fetchMyTeamMemberScope(): Promise<MyTeamMemberScope | null> {
+  if (!readSession()) return null;
+  try {
+    return await request<MyTeamMemberScope>('GET', `${MY_TEAMS}/member-scope`);
+  } catch {
+    return null;
+  }
+}
+
 /** Deletes one of the caller's own teams. */
 export async function deleteMyTeam(teamId: string): Promise<void> {
   await request('DELETE', `${MY_TEAMS}/${teamId}`);

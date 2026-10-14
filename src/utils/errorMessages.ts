@@ -75,6 +75,7 @@ const KNOWN_MESSAGES: Record<string, string> = {
   'One or more users do not exist.': 'یک یا چند کاربر انتخاب‌شده وجود ندارد.',
   'All members must belong to the same tenant as the group.': 'همه اعضا باید از سازمان همین گروه باشند.',
   'All members must belong to the same tenant as the team.': 'همه اعضا باید از سازمان همین تیم باشند.',
+  'Only members of your own deputy can be added to your team.': 'فقط افراد معاونت خودتان را می‌توانید به تیم اضافه کنید؛ برای افزودن افراد سایر معاونت‌ها دسترسی لازم را ندارید.',
   'A personal work team cannot carry permissions.': 'به تیم کاری شخصی نمی‌توان مجوز داد.',
   'Group name is required.': 'نام گروه را وارد کنید.',
   // Organizational teams and titles before names (organization-structure module)
