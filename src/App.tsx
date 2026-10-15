@@ -55,6 +55,7 @@ import {
   extractResetTokenFromURL,
   ACTIVE_DATA_SERVER_URL,
   fetchServerNotificationsPB,
+  serverTellsOfTasksPB,
   markServerNotificationReadPB,
   markAllServerNotificationsReadPB
 } from './services/dataService';
@@ -831,8 +832,25 @@ export default function App() {
 
   // Login Gating: If user is not authenticated, render locked landing screen and uncloseable login modal
   // Computed Notifications for Bell Icon & Notification Modal
+  // A newer server stores the task notifications itself (the same list on every device, and
+  // also for tasks the browser has not loaded); then the bell shows only those.
+  const [serverTellsOfTasks, setServerTellsOfTasks] = useState(false);
+  useEffect(() => {
+    if (!currentUser) {
+      setServerTellsOfTasks(false);
+      return;
+    }
+    let cancelled = false;
+    serverTellsOfTasksPB().then((value) => {
+      if (!cancelled) setServerTellsOfTasks(value);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
+
   const appNotifications = useMemo<AppNotification[]>(() => {
-    if (!currentUser) return [];
+    if (!currentUser || serverTellsOfTasks) return [];
     const items: AppNotification[] = [];
 
     visibleTasks.forEach((t) => {
@@ -899,10 +917,10 @@ export default function App() {
     });
 
     return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [visibleTasks, currentUser, readNotificationIds]);
+  }, [visibleTasks, currentUser, readNotificationIds, serverTellsOfTasks]);
 
-  // Notifications stored by the server (task reminders): fetched on sign-in, every minute and
-  // when the window is focused again; their read state lives on the server.
+  // Notifications stored by the server: fetched on sign-in, whenever tasks change (live), every
+  // minute (reminders) and when the window is focused again; their read state lives on the server.
   const [serverNotifications, setServerNotifications] = useState<ServerNotificationDto[]>([]);
   const loadServerNotifications = useCallback(async () => {
     const list = await fetchServerNotificationsPB();
@@ -917,9 +935,11 @@ export default function App() {
     loadServerNotifications();
     const timer = window.setInterval(loadServerNotifications, 60_000);
     window.addEventListener('focus', loadServerNotifications);
+    const unsubscribe = subscribeToTasksPB(loadServerNotifications);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener('focus', loadServerNotifications);
+      unsubscribe();
     };
   }, [currentUser?.id, loadServerNotifications]);
 

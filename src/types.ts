@@ -296,6 +296,8 @@ export interface AppNotification {
   details?: string;
   createdAt: string;
   isRead: boolean;
+  /** The label shown on the item, when its type's usual one does not fit (e.g. «موعد گذشته»). */
+  badge?: string;
 }
 
 export interface DirectMessage {

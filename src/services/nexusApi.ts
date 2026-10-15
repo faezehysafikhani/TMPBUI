@@ -714,7 +714,7 @@ async function mapFiles(files: TaskFileDto[]): Promise<Attachment[]> {
   );
 }
 
-const ACTIVITY_ACTION_TITLES: Record<string, string> = {
+export const ACTIVITY_ACTION_TITLES: Record<string, string> = {
   'Task created': 'ثبت و ایجاد فعالیت جدید',
   'Task updated': 'ویرایش مشخصات فعالیت',
   'Task deleted': 'حذف کامل فعالیت',
@@ -725,9 +725,11 @@ const ACTIVITY_ACTION_TITLES: Record<string, string> = {
   'Subtask added': 'افزودن زیرفعالیت',
   'Subtask updated': 'ویرایش زیرفعالیت',
   'Subtask deleted': 'حذف زیرفعالیت',
+  'Subtask completed': 'انجام زیرفعالیت',
+  'Subtask reopened': 'بازگشایی زیرفعالیت',
 };
 
-function translateActivityDetails(action: string, details: string | null): string {
+export function translateActivityDetails(action: string, details: string | null): string {
   if (!details) return '';
   // The server's plain "updated" entry carries only the task's title, which the bell shows anyway.
   if (action === 'Task updated') return '';
@@ -1905,6 +1907,10 @@ export interface SmsTemplate {
   /** Placeholders the text must keep, e.g. {Code}. */
   requiredPlaceholders?: string[] | null;
   defaultText?: string | null;
+  /** Whether this SMS is sent at all (an older server always sends it). */
+  enabled?: boolean;
+  /** False for an SMS that can never be turned off, such as the password-reset code. */
+  canDisable?: boolean;
 }
 
 export async function getSmsProviders(): Promise<SmsProviderOption[]> {
@@ -1981,8 +1987,60 @@ export async function getSmsTemplates(): Promise<SmsTemplate[]> {
   return request<SmsTemplate[]>('GET', `${CHANNELS}/templates`);
 }
 
-export async function saveSmsTemplates(templates: { key: string; text: string }[]): Promise<SmsTemplate[]> {
+export async function saveSmsTemplates(templates: { key: string; text: string; enabled?: boolean }[]): Promise<SmsTemplate[]> {
   return request<SmsTemplate[]>('PUT', `${CHANNELS}/templates`, { body: { templates } });
+}
+
+/** The hours no notification SMS is sent; messages that fall in them wait until they end. */
+export interface SmsQuietHours {
+  enabled: boolean;
+  /** HH:mm, e.g. 22:00. */
+  start: string;
+  end: string;
+}
+
+/** Null when the server has no quiet hours (an older version). */
+export async function getSmsQuietHours(): Promise<SmsQuietHours | null> {
+  try {
+    return await request<SmsQuietHours>('GET', `${CHANNELS}/quiet-hours`);
+  } catch (err) {
+    if (err instanceof NexusApiError && (err.httpStatus === 404 || err.httpStatus === 405)) return null;
+    throw err;
+  }
+}
+
+export async function saveSmsQuietHours(value: SmsQuietHours): Promise<SmsQuietHours> {
+  return request<SmsQuietHours>('PUT', `${CHANNELS}/quiet-hours`, { body: value });
+}
+
+/** When tasks are reminded of, per organization. */
+export interface TaskReminderSettings {
+  dueSoonEnabled: boolean;
+  /** How long before a due time the "due soon" reminder goes. */
+  dueSoonHoursBefore: number;
+  /** Tasks with a date only: the hour of the day before ("due soon") and of the day after ("overdue"). */
+  morningHour: number;
+  overdueEnabled: boolean;
+  recurringSoonEnabled: boolean;
+  /** How long before each occurrence of a recurring task. */
+  recurringSoonMinutesBefore: number;
+}
+
+/**
+ * Null when the server does not remind of tasks (an older version). Its presence also means the
+ * server stores task notifications (comments, changes) itself.
+ */
+export async function getTaskReminderSettings(): Promise<TaskReminderSettings | null> {
+  try {
+    return await request<TaskReminderSettings>('GET', '/api/task-management/reminder-settings');
+  } catch (err) {
+    if (err instanceof NexusApiError && (err.httpStatus === 404 || err.httpStatus === 405)) return null;
+    throw err;
+  }
+}
+
+export async function saveTaskReminderSettings(value: TaskReminderSettings): Promise<TaskReminderSettings> {
+  return request<TaskReminderSettings>('PUT', '/api/task-management/reminder-settings', { body: value });
 }
 
 // ---- LDAP ------------------------------------------------------------------

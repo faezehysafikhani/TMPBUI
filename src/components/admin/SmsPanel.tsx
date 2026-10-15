@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Save, Send, MessageSquareText, RotateCcw, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Loader2, Save, Send, MessageSquareText, RotateCcw, Plus, Pencil, Trash2, X, AlarmClock } from 'lucide-react';
 import {
-  SmsPanelSettings, SmsProviderConfiguration, SmsProviderOption, SmsTemplate,
+  SmsPanelSettings, SmsProviderConfiguration, SmsProviderOption, SmsTemplate, SmsQuietHours, TaskReminderSettings,
   getSmsPanelSettings, getSmsProviders, getSmsTemplates, saveSmsPanelSettings, saveSmsTemplates, sendTestSms,
+  getSmsQuietHours, saveSmsQuietHours, getTaskReminderSettings, saveTaskReminderSettings,
 } from '../../services/nexusApi';
 import { AdminCard, Field, inputClass, Toggle, Notice, PrimaryButton, SecondaryButton, toLatinDigits } from './AdminUi';
 import { userErrorMessage } from '../../utils/errorMessages';
@@ -20,11 +21,17 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
   const [busy, setBusy] = useState<'save' | 'test' | 'provider' | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Null when the server has neither (an older version): the section is not shown.
+  const [quietHours, setQuietHours] = useState<SmsQuietHours | null>(null);
+  const [reminders, setReminders] = useState<TaskReminderSettings | null>(null);
 
   useEffect(() => {
     Promise.all([getSmsProviders(), getSmsPanelSettings(), getSmsTemplates()])
       .then(([p, s, t]) => { setProviders(p); setSettings(s); setTemplates(productSmsTemplates(t)); })
       .catch((err) => setLoadError(userErrorMessage(err, 'دریافت تنظیمات پنل پیامکی ممکن نشد.')));
+    // Optional: a failure here never hides the rest of the panel.
+    getSmsQuietHours().then(setQuietHours).catch(() => setQuietHours(null));
+    getTaskReminderSettings().then(setReminders).catch(() => setReminders(null));
   }, []);
 
   if (!settings) {
@@ -130,10 +137,17 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
       setMessage({ type: 'error', text: invalid });
       return false;
     }
+    const timingError = validateTiming(quietHours, reminders);
+    if (timingError) {
+      setMessage({ type: 'error', text: timingError });
+      return false;
+    }
     const saved = await saveSmsPanelSettings(settings);
     setSettings(saved);
     // Only this product's texts are sent; the answer is filtered the same way.
-    setTemplates(productSmsTemplates(await saveSmsTemplates(templates.map((t) => ({ key: t.key, text: t.text })))));
+    setTemplates(productSmsTemplates(await saveSmsTemplates(templates.map((t) => ({ key: t.key, text: t.text, enabled: t.enabled })))));
+    if (quietHours) setQuietHours(await saveSmsQuietHours(quietHours));
+    if (reminders) setReminders(await saveTaskReminderSettings(reminders));
     return true;
   };
 
@@ -269,6 +283,19 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
                   )}
                 </div>
                 {template.description && <p className="text-xs text-slate-500 dark:text-slate-400">{template.description}</p>}
+                {template.enabled !== undefined && template.canDisable !== false && (
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-indigo-600"
+                      checked={template.enabled}
+                      disabled={disabled}
+                      aria-label={`ارسال پیامک «${template.title}»`}
+                      onChange={(e) => setTemplates((list) => list.map((t, i) => (i === index ? { ...t, enabled: e.target.checked } : t)))}
+                    />
+                    <span>{template.enabled ? 'این پیامک ارسال می‌شود' : 'این پیامک ارسال نمی‌شود'}</span>
+                  </label>
+                )}
                 <textarea
                   className={`${inputClass} min-h-24 resize-y leading-relaxed`}
                   value={template.text}
@@ -299,6 +326,61 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
         </div>
       </AdminCard>
 
+      {(quietHours || reminders) && (
+        <AdminCard className="p-5 sm:p-6 space-y-5">
+          <div className="flex items-center gap-2">
+            <AlarmClock className="w-5 h-5 text-indigo-700 dark:text-indigo-400" />
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">زمان‌بندی یادآوری‌ها و ساعات سکوت</h3>
+          </div>
+
+          {quietHours && (
+            <div className="space-y-3">
+              <Toggle
+                checked={quietHours.enabled}
+                onChange={(enabled) => setQuietHours({ ...quietHours, enabled })}
+                disabled={disabled}
+                label="ساعات سکوت پیامک"
+                description="پیامک‌های اطلاع‌رسانی در این بازه ارسال نمی‌شوند و پس از پایان آن ارسال خواهند شد. اعلان داخل سامانه همان لحظه نمایش داده می‌شود؛ کد بازیابی رمز عبور همیشه فوراً ارسال می‌شود."
+              />
+              <div className="grid grid-cols-2 gap-4 max-w-md">
+                <Field label="از ساعت">
+                  <input type="time" className={`${inputClass} dir-ltr text-right`} value={quietHours.start} disabled={disabled || !quietHours.enabled} onChange={(e) => setQuietHours({ ...quietHours, start: e.target.value })} />
+                </Field>
+                <Field label="تا ساعت">
+                  <input type="time" className={`${inputClass} dir-ltr text-right`} value={quietHours.end} disabled={disabled || !quietHours.enabled} onChange={(e) => setQuietHours({ ...quietHours, end: e.target.value })} />
+                </Field>
+              </div>
+            </div>
+          )}
+
+          {reminders && (
+            <div className="space-y-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+              <p className="text-xs text-slate-500 dark:text-slate-400">یادآوری‌ها هم به‌صورت اعلان در سامانه و هم با پیامک (به مسئولین انجام) ارسال می‌شوند. هر پیامک را می‌توانید در بخش «متن پیامک‌ها» خاموش کنید.</p>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3.5">
+                  <Toggle checked={reminders.dueSoonEnabled} onChange={(dueSoonEnabled) => setReminders({ ...reminders, dueSoonEnabled })} disabled={disabled} label="یادآوری نزدیک شدن موعد" />
+                  <Field label="چند ساعت پیش از ساعت موعد" hint="برای فعالیت‌هایی که ساعت موعد دارند">
+                    <input type="number" min={1} max={168} className={`${inputClass} dir-ltr text-right`} value={reminders.dueSoonHoursBefore} disabled={disabled || !reminders.dueSoonEnabled} onChange={(e) => setReminders({ ...reminders, dueSoonHoursBefore: Number(toLatinDigits(e.target.value)) })} />
+                  </Field>
+                  <Field label="ساعت یادآوری فعالیت‌های بدون ساعت" hint="روز قبل از موعد (و برای موعد گذشته، روز بعد) در این ساعت">
+                    <input type="number" min={0} max={23} className={`${inputClass} dir-ltr text-right`} value={reminders.morningHour} disabled={disabled} onChange={(e) => setReminders({ ...reminders, morningHour: Number(toLatinDigits(e.target.value)) })} />
+                  </Field>
+                </div>
+                <div className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3.5">
+                  <Toggle checked={reminders.overdueEnabled} onChange={(overdueEnabled) => setReminders({ ...reminders, overdueEnabled })} disabled={disabled} label="اطلاع گذشتن موعد" description="یک بار، وقتی موعد گذشت و فعالیت هنوز انجام نشده است؛ به مسئولین و ایجادکننده." />
+                </div>
+                <div className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3.5">
+                  <Toggle checked={reminders.recurringSoonEnabled} onChange={(recurringSoonEnabled) => setReminders({ ...reminders, recurringSoonEnabled })} disabled={disabled} label="یادآوری پیش از هر نوبت تکرارشونده" description="برای هر نوبت، حتی اگر نوبت قبلی انجام یا متوقف شده باشد." />
+                  <Field label="چند دقیقه پیش از هر نوبت">
+                    <input type="number" min={5} max={1440} className={`${inputClass} dir-ltr text-right`} value={reminders.recurringSoonMinutesBefore} disabled={disabled || !reminders.recurringSoonEnabled} onChange={(e) => setReminders({ ...reminders, recurringSoonMinutesBefore: Number(toLatinDigits(e.target.value)) })} />
+                  </Field>
+                </div>
+              </div>
+            </div>
+          )}
+        </AdminCard>
+      )}
+
       <AdminCard className="p-5 sm:p-6 space-y-4">
         <h3 className="text-base font-extrabold text-slate-900 dark:text-white">ارسال آزمایشی</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -327,3 +409,18 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
     </div>
   );
 };
+
+/** The same ranges the server accepts, in Persian; null when they are fine. */
+function validateTiming(quietHours: SmsQuietHours | null, reminders: TaskReminderSettings | null): string | null {
+  if (quietHours?.enabled) {
+    if (!/^\d{1,2}:\d{2}$/.test(quietHours.start) || !/^\d{1,2}:\d{2}$/.test(quietHours.end)) return 'ساعت شروع و پایان سکوت پیامک را وارد کنید.';
+    if (quietHours.start === quietHours.end) return 'ساعت شروع و پایان سکوت پیامک نباید یکسان باشد.';
+  }
+  if (reminders) {
+    const whole = (value: number, min: number, max: number) => Number.isInteger(value) && value >= min && value <= max;
+    if (!whole(reminders.dueSoonHoursBefore, 1, 168)) return 'یادآوری موعد باید بین ۱ تا ۱۶۸ ساعت پیش از موعد باشد.';
+    if (!whole(reminders.morningHour, 0, 23)) return 'ساعت یادآوری باید بین ۰ تا ۲۳ باشد.';
+    if (!whole(reminders.recurringSoonMinutesBefore, 5, 1440)) return 'یادآوری تکرارشونده باید بین ۵ تا ۱۴۴۰ دقیقه پیش از نوبت باشد.';
+  }
+  return null;
+}

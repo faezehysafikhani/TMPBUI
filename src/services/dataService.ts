@@ -560,6 +560,15 @@ export async function fetchServerNotificationsPB() {
   }
 }
 
+/** Whether the server stores task notifications (comments, changes, reminders) itself; false for an older server. */
+export async function serverTellsOfTasksPB(): Promise<boolean> {
+  try {
+    return (await nexusApi.getTaskReminderSettings()) !== null;
+  } catch {
+    return false;
+  }
+}
+
 export async function markServerNotificationReadPB(id: string): Promise<void> {
   await nexusApi.markNotificationRead(id);
 }
