@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2, BadgeCheck } from 'lucide-react';
-import { getMyPermissions, changeMyPassword, fetchUploadPolicy, updateMaxUploadSizeKb } from '../../services/nexusApi';
+import { getKnownPermissions, getMyPermissions, changeMyPassword, fetchUploadPolicy, updateMaxUploadSizeKb } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
@@ -9,7 +9,8 @@ import { SsoPreparationPanel } from './SsoPreparationPanel';
 import { SmsPanel } from './SmsPanel';
 import { userErrorMessage } from '../../utils/errorMessages';
 import { refreshUploadPolicy } from '../../utils/uploadPolicy';
-import { getMyPlacement, ORG_STRUCTURE_PERMISSIONS, ORG_UNIT_PERMISSIONS, TITLE_PERMISSIONS } from '../../services/orgStructureApi';
+import { isOrgStructureAvailable, orgStructureLookupKey, ORG_STRUCTURE_PERMISSIONS, ORG_UNIT_PERMISSIONS, TITLE_PERMISSIONS } from '../../services/orgStructureApi';
+import { useLookup } from '../../utils/lookupCache';
 import { OrgStructureSection } from './orgStructure/OrgStructureSection';
 import { TitlesPanel } from './orgStructure/TitlesPanel';
 import { canSeeWorkTeams } from '../../utils/permissions';
@@ -17,15 +18,24 @@ import { canSeeWorkTeams } from '../../utils/permissions';
 type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users' | 'org';
 type UsersTab = 'list' | 'titles' | 'history' | 'ldap' | 'sso';
 
-/** Permission names the signed-in user holds. The server re-checks every call. */
+/**
+ * Permission names the signed-in user holds: those saved at sign-in at once (so menus do not
+ * appear a moment late), then the server's current ones. Null only while none are known yet.
+ * The server re-checks every call.
+ */
 export function useMyPermissions(userId: string | undefined): Set<string> | null {
-  const [permissions, setPermissions] = useState<Set<string> | null>(null);
+  const [permissions, setPermissions] = useState<Set<string> | null>(() => {
+    const known = userId ? getKnownPermissions(userId) : null;
+    return known ? new Set(known) : null;
+  });
   useEffect(() => {
     if (!userId) { setPermissions(new Set()); return; }
     let alive = true;
+    const known = getKnownPermissions(userId);
+    if (known) setPermissions(new Set(known));
     getMyPermissions()
       .then((names) => alive && setPermissions(new Set(names)))
-      .catch(() => alive && setPermissions(new Set()));
+      .catch(() => alive && setPermissions((current) => current ?? new Set()));
     return () => { alive = false; };
   }, [userId]);
   return permissions;
@@ -33,19 +43,12 @@ export function useMyPermissions(userId: string | undefined): Set<string> | null
 
 /**
  * Whether the backend has the organization-structure module (companies, positions, managers).
- * Products without it answer 404 and the «ساختار سازمانی» tab never appears.
+ * Products without it answer 404 and the «ساختار سازمانی» tab never appears. The last answer
+ * is shown at once and checked again in the background.
  */
-function useOrgStructureAvailable(userId: string | undefined): boolean {
-  const [available, setAvailable] = useState(false);
-  useEffect(() => {
-    if (!userId) { setAvailable(false); return; }
-    let alive = true;
-    getMyPlacement()
-      .then((placement) => alive && setAvailable(placement !== null))
-      .catch(() => alive && setAvailable(false));
-    return () => { alive = false; };
-  }, [userId]);
-  return available;
+function useOrgStructureAvailable(userId: string | undefined): { available: boolean; known: boolean } {
+  const { value, known } = useLookup(userId ? orgStructureLookupKey(userId) : null, isOrgStructureAvailable, false);
+  return { available: value, known };
 }
 
 /** «مدیریت کاربران» with its sub-tabs: users, sign-in history and LDAP. */
@@ -223,7 +226,9 @@ export const SystemAdministration: React.FC<{
 }> = ({ currentUserId, profile, team, appearance, help }) => {
   const permissions = useMyPermissions(currentUserId);
   const can = (p: string) => !!permissions?.has(p);
-  const orgStructureAvailable = useOrgStructureAvailable(currentUserId);
+  const { available: orgStructureAvailable, known: orgStructureKnown } = useOrgStructureAvailable(currentUserId);
+  // Until what the user may see is known, a placeholder instead of a partial row of tabs.
+  const tabsReady = permissions !== null && orgStructureKnown;
   const [active, setActive] = useState<MainTab>('profile');
 
   const tabs: TabItem<MainTab>[] = [
@@ -248,7 +253,9 @@ export const SystemAdministration: React.FC<{
           <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">تنظیمات سامانه</h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">تنظیمات شخصی، پنل پیامکی و مدیریت کاربران سامانه</p>
         </div>
-        {tabs.length > 1 && <SegmentedTabs tabs={tabs} active={current} onChange={setActive} />}
+        {!tabsReady ? (
+          <div className="h-[52px] rounded-2xl bg-slate-100/80 dark:bg-slate-800/70 animate-pulse" aria-hidden="true" />
+        ) : tabs.length > 1 && <SegmentedTabs tabs={tabs} active={current} onChange={setActive} />}
       </AdminCard>
 
       {current === 'profile' && profile}

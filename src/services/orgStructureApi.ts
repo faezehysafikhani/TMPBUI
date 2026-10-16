@@ -123,6 +123,14 @@ export async function getMyPlacement(): Promise<MyPlacement | null> {
   }
 }
 
+/** Whether the backend has the organization-structure module (products without it answer 404). */
+export async function isOrgStructureAvailable(): Promise<boolean> {
+  return (await getMyPlacement()) !== null;
+}
+
+/** Where the last answer of isOrgStructureAvailable is kept for this user (see lookupCache). */
+export const orgStructureLookupKey = (userId: string) => `${userId}:org-structure`;
+
 export const getMySubordinates = (all: boolean) => apiRequest<Subordinate[]>('GET', `${BASE}/me/subordinates`, { query: { all } });
 
 export const getChart = (companyId?: string) => apiRequest<ChartCompany[]>('GET', `${BASE}/chart`, { query: { companyId } });

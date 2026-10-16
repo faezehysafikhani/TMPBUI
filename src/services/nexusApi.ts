@@ -35,6 +35,7 @@ import { iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { NETWORK_ERROR, TIMEOUT_ERROR, persianApiMessage } from '../utils/errorMessages';
 import { normalizeAvatar } from '../utils/avatars';
+import { clearLookups } from '../utils/lookupCache';
 import type { ServerNotificationDto } from '../utils/serverNotifications';
 
 // ---------------------------------------------------------------------------
@@ -287,6 +288,7 @@ export const SESSION_ENDED_EVENT = 'nexuscore:session-ended';
 
 function endSession(): void {
   writeSession(null);
+  clearLookups();
   try {
     window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
   } catch {
@@ -984,6 +986,7 @@ export async function refreshCurrentUser(): Promise<User | null> {
 export function logout(): void {
   const refreshToken = readSession()?.refreshToken;
   writeSession(null);
+  clearLookups();
   if (refreshToken) {
     request<void>('POST', '/api/identity/auth/logout', {
       body: { refreshToken },
@@ -1696,10 +1699,27 @@ function toAdminUser(u: UserDto & { firstName?: string | null; lastName?: string
 }
 
 /** Permission names of the signed-in user, as the server grants them (roles, direct, groups). */
+/** The permissions saved with the session at the last /me answer, if it is this user's; no network call. */
+export function getKnownPermissions(userId: string): string[] | null {
+  const session = readSession();
+  return session?.user?.id === userId && session.permissions ? session.permissions : null;
+}
+
+let permissionsInFlight: Promise<string[]> | null = null;
+
+/** GET /me's permissions (callers asking at the same time share one request), saved with the session. */
 export async function getMyPermissions(): Promise<string[]> {
   if (!readSession()) return [];
-  const me = await request<CurrentUserResponse>('GET', '/api/identity/auth/me');
-  return me.permissions || [];
+  if (permissionsInFlight) return permissionsInFlight;
+  permissionsInFlight = request<CurrentUserResponse>('GET', '/api/identity/auth/me')
+    .then((me) => {
+      const permissions = me.permissions || [];
+      const latest = readSession();
+      if (latest && latest.user?.id === me.user.id) writeSession({ ...latest, permissions });
+      return permissions;
+    })
+    .finally(() => { permissionsInFlight = null; });
+  return permissionsInFlight;
 }
 
 /** Server-side search (every searchable column) and paging of the caller's tenant users. */

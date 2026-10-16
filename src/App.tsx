@@ -70,6 +70,8 @@ import { Database, PanelRightOpen } from 'lucide-react';
 import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION, withoutEditDuplicates } from './services/nexusApi';
 import { describeTaskChanges, summarizeTaskChanges, userNameLookup } from './utils/taskChangeSummary';
 import { getReportScope, ReportScope } from './services/taskReportApi';
+import { isOrgStructureAvailable, orgStructureLookupKey } from './services/orgStructureApi';
+import { refreshLookup, useLookup } from './utils/lookupCache';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
 import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
@@ -354,16 +356,16 @@ export default function App() {
   // «گزارش فعالیت‌ها» exists only where the backend offers task reports (they follow the
   // organization structure); elsewhere this answers 404 and the section stays hidden. The scope
   // (whose tasks, which positions and tags) is read once per signed-in user.
-  const [reportScope, setReportScope] = useState<ReportScope | null>(null);
+  // The last known scope is used at once (so the menu item does not appear late) and read
+  // again in the background.
   const currentUserId = currentUser?.id;
   const mayViewTasks = can(currentUser, PERMISSIONS.tasksView);
+  const reportScope = useLookup<ReportScope | null>(
+    currentUserId && mayViewTasks ? `${currentUserId}:report-scope` : null, getReportScope, null).value;
+  // Read once at sign-in, so «ساختار سازمانی» in the settings is there as soon as they open.
   useEffect(() => {
-    setReportScope(null);
-    if (!currentUserId || !mayViewTasks) return;
-    let alive = true;
-    getReportScope().then((scope) => alive && setReportScope(scope)).catch(() => {});
-    return () => { alive = false; };
-  }, [currentUserId, mayViewTasks]);
+    if (currentUserId) refreshLookup(orgStructureLookupKey(currentUserId), isOrgStructureAvailable).catch(() => {});
+  }, [currentUserId]);
   const canOpenSection = useCallback(
     (tab: ActiveTab) => canOpenTab(currentUser, tab) && (tab !== 'reports' || reportScope !== null),
     [currentUser, reportScope],
