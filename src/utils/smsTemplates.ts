@@ -8,6 +8,9 @@ export const PRODUCT_SMS_TEMPLATE_KEYS = [
   'task_assigned',
   'recurring_task_reminder',
   'task_due_changed',
+  'task_due_soon',
+  'task_overdue',
+  'recurring_task_upcoming',
 ] as const;
 
 /** Offered by every template when the server has a product name configured. */

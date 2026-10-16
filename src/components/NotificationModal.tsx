@@ -211,7 +211,9 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
                             : 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                         }`}
                       >
-                        {notification.type === 'comment'
+                        {notification.badge
+                          ? notification.badge
+                          : notification.type === 'comment'
                           ? 'دیدگاه جدید'
                           : notification.type === 'reminder'
                           ? 'یادآوری موعد'
