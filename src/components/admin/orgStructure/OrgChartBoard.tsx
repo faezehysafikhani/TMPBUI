@@ -281,8 +281,6 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   const [reveal, setReveal] = useState<{ node: string; force: boolean; seq: number } | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
-  /** On wide screens the canvas takes the rest of the screen, so the whole page fits without scrolling. */
-  const [screenHeight, setScreenHeight] = useState<number | null>(null);
 
   const chart = data.data?.chart || [];
   const company: ChartCompany | undefined = chart.find((c) => c.companyId === companyId) || chart[0];
@@ -301,30 +299,6 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     observer.observe(el);
     return () => observer.disconnect();
   }, [!!company]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Measured with the page at its top: everything above the canvas, the card's sections under it,
-  // the page's bottom padding and the site footer all stay in view, so the page needs no scrolling.
-  useLayoutEffect(() => {
-    const measure = () => {
-      const vp = viewport.current;
-      const box = vp?.parentElement; // the chart's card
-      if (!vp || !box || fullscreen || window.innerWidth < 1280) { setScreenHeight(null); return; }
-      const footers = document.querySelectorAll<HTMLElement>('footer');
-      const footer = footers[footers.length - 1];
-      const page = footer?.previousElementSibling as HTMLElement | null;
-      const pagePadding = page ? parseFloat(getComputedStyle(page).paddingBottom) || 0 : 16;
-      const top = vp.getBoundingClientRect().top + window.scrollY;
-      const below = box.getBoundingClientRect().bottom - vp.getBoundingClientRect().bottom;
-      const height = Math.max(220, Math.floor(window.innerHeight - top - below - pagePadding - (footer?.offsetHeight || 0) - 1));
-      setScreenHeight((prev) => (prev !== null && Math.abs(prev - height) < 2 ? prev : height));
-    };
-    measure();
-    // What is above the canvas can still change size (fonts, tabs): measure again then too.
-    const observer = new ResizeObserver(measure);
-    observer.observe(document.body);
-    window.addEventListener('resize', measure);
-    return () => { observer.disconnect(); window.removeEventListener('resize', measure); };
-  }, [!!company, fullscreen, data.data?.outsideTeams.length, data.data?.unplaced.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const units = company?.units || [];
   const perRow = useMemo(() => chooseColumns(units, canvasSize.width, canvasSize.height), [units, canvasSize.width, canvasSize.height]);
@@ -552,8 +526,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         onPointerDown={() => setHint(false)}
         onWheel={() => setHint(false)}
         aria-label="چارت سازمانی؛ با چرخ ماوس یا دو انگشت بزرگ‌نمایی کنید و با کشیدن جابه‌جا کنید"
-        style={screenHeight ? { height: screenHeight } : undefined}
-        className={`relative overflow-hidden touch-none select-none outline-hidden cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:[&_*]:cursor-grabbing bg-slate-50/60 dark:bg-slate-950/40 ${fullscreen ? 'flex-1 min-h-0' : screenHeight ? '' : 'h-[60vh] sm:h-[70vh] min-h-[380px]'}`}
+        className={`relative overflow-hidden touch-none select-none outline-hidden cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:[&_*]:cursor-grabbing bg-slate-50/60 dark:bg-slate-950/40 ${fullscreen ? 'flex-1 min-h-0' : 'h-[65vh] min-h-[420px] xl:h-[calc(100vh-170px)] xl:min-h-[620px]'}`}
       >
         <div ref={content} className="absolute top-0 left-0 origin-top-left w-max px-10 py-10 flex flex-col items-center">
           {/* the company */}
@@ -674,15 +647,16 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   return (
     <>
     {fullscreen && <div className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-xs" onClick={() => setFullscreen(false)} />}
-    {/* Full screen keeps the details panel beside the chart. */}
+    {/* The chart takes the page's width from the start (right) edge; on wide screens its details
+        sit beside it at the end, exactly as tall as the chart and scrolling inside when longer, and
+        below that they come under the chart. Full screen keeps them beside it. */}
     <div className={fullscreen
-      ? 'fixed inset-3 z-50 grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)] gap-3 items-stretch'
-      : 'grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-4 items-start xl:items-stretch'}
+      ? 'fixed inset-3 z-50 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-3 items-stretch'
+      : 'grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_380px] gap-4 items-start 2xl:items-stretch'}
     >
-      {/* On narrow screens the chart comes first and the details below it. Beside the chart the
-          details are exactly as tall as it, scrolling inside when they are longer. */}
-      <div className={fullscreen ? 'overflow-y-auto min-h-0 order-2 lg:order-none' : 'order-2 xl:order-none xl:relative'}>
-      <div className={fullscreen ? '' : 'xl:absolute xl:inset-0'}>
+      <div className={fullscreen ? 'min-h-0 flex flex-col' : ''}>{board}</div>
+      <div className={fullscreen ? 'overflow-y-auto min-h-0' : '2xl:relative'}>
+      <div className={fullscreen ? '' : '2xl:absolute 2xl:inset-0'}>
       <OrgChartDetails
         can={can}
         chart={chart}
@@ -695,7 +669,6 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
       />
       </div>
       </div>
-      <div className={fullscreen ? 'min-h-0 flex flex-col order-1 lg:order-none' : 'order-1 xl:order-none'}>{board}</div>
     </div>
     </>
   );
