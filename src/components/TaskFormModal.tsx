@@ -315,8 +315,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
   // Auto update status if project or recurring or has subtasks
   const isAutoStatusTask = isProject || isRecurring || projectSubTasks.length > 0;
-  // A recurring task is scheduled by its own recurrence settings; its plain due date is not asked for.
-  const hideDueDate = !isProject && isRecurring;
+  // A recurring task is scheduled by its own recurrence settings and a project by its charter's
+  // dates (its end date is its deadline); neither asks for the plain due date.
+  const hideDueDate = isProject || isRecurring;
 
   useEffect(() => {
     if (isAutoStatusTask) {
@@ -495,7 +496,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     const recurrenceStartDay = isoToIranDateTimeParts(recurringStartDate || dueDateISO || getNowISO())?.date;
     const finalDueDate = finalIsRecurring
       ? iranDateTimeToISO(recurrenceStartDay, recurringStartTime) || recurringStartDate || dueDateISO || getNowISO()
-      : dueDateISO || getNowISO();
+      : finalIsProject
+        ? projectCharterEndDate || dueDateISO || getNowISO()
+        : dueDateISO || getNowISO();
 
     const finalStatus = (finalIsProject || finalIsRecurring || (finalSubTasks && finalSubTasks.length > 0))
       ? computeAutoTaskStatus(finalSubTasks)
@@ -631,6 +634,497 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
           {/* Jalali Date Time Picker & Status Grid */}
           <div className="flex items-center gap-3 pt-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white text-xs font-black shadow-md shadow-violet-500/25">۲</span><div><p className="text-sm font-black text-slate-900 dark:text-white">زمان‌بندی و مسئولیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">موعد، وضعیت و افراد مسئول را مشخص کنید.</p></div></div>
+          {/* Project or recurring first: either one decides the dates (and hides the plain due date). */}
+          <div className="p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2">
+            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              نوع فعالیت
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              {/* Checkbox: Project */}
+              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={isProject}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsProject(checked);
+                    if (checked) setIsRecurring(false);
+                  }}
+                  className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                />
+                <span>پروژه است</span>
+              </label>
+
+              {/* Checkbox: Recurring */}
+              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-purple-300 transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={isRecurring}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsRecurring(checked);
+                    if (checked) setIsProject(false);
+                  }}
+                  className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
+                />
+                <span>فعالیت تکرارشونده است</span>
+              </label>
+            </div>
+
+            {/* Project Options Inline Panel */}
+            {isProject && (
+              <div className="mt-3 p-3.5 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800/70 space-y-4 animate-in fade-in zoom-in-98">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 dark:text-emerald-200 border-b border-emerald-200/60 dark:border-emerald-800/60 pb-2">
+                  <FolderKanban className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  <span>تنظیمات و جزئیات منشور و زیرفعالیت‌های پروژه</span>
+                </div>
+
+                {/* 1) Project Charter Fields */}
+                <div className="space-y-3">
+                  <h5 className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>منشور پروژه:</span>
+                  </h5>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                      نام مدیر / مسئول پروژه:
+                    </label>
+                    <input
+                      type="text"
+                      value={projectCharterManager}
+                      onChange={(e) => setProjectCharterManager(e.target.value)}
+                      placeholder="نام مدیر پروژه..."
+                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                      اهداف و شرح منشور پروژه:
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={projectCharterDesc}
+                      onChange={(e) => setProjectCharterDesc(e.target.value)}
+                      placeholder="توضیحات، خروجی‌ها و اهداف کلیدی پروژه..."
+                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-100 resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                        تاریخ شروع پروژه:
+                      </label>
+                      <JalaliDateTimePicker
+                        valueISO={projectCharterStartDate}
+                        onChangeISO={(iso) => setProjectCharterStartDate(iso)}
+                        label=""
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
+                        تاریخ پایان پروژه (موعد پروژه): <span className="text-rose-500">*</span>
+                      </label>
+                      <JalaliDateTimePicker
+                        valueISO={projectCharterEndDate}
+                        onChangeISO={(iso) => setProjectCharterEndDate(iso)}
+                        label=""
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2) Subtasks / Milestones */}
+                <div className="pt-3 border-t border-emerald-200/60 dark:border-emerald-800/60 space-y-2.5">
+                  <h5 className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <ListChecks className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>زیرفعالیت‌ها / مایلستون‌های پروژه ({toPersianDigits(projectSubTasks.length)} مورد):</span>
+                  </h5>
+
+                  {/* Add Subtask Form Inline */}
+                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
+                    <input
+                      type="text"
+                      value={newSubTaskTitle}
+                      onChange={(e) => setNewSubTaskTitle(e.target.value)}
+                      placeholder="عنوان زیرفعالیت جدید..."
+                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100"
+                    />
+
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={newSubTaskImportance}
+                        onChange={(e) => setNewSubTaskImportance(e.target.value as SubTaskImportance)}
+                        className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100 cursor-pointer"
+                      >
+                        <option value="low">اهمیت: کم (وزن ۱)</option>
+                        <option value="medium">اهمیت: متوسط (وزن ۲)</option>
+                        <option value="high">اهمیت: زیاد (وزن ۳)</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={handleAddProjectSubTask}
+                        className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>افزودن زیرفعالیت</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Subtasks List */}
+                  {projectSubTasks.length > 0 && (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {projectSubTasks.map((st) => (
+                        <div
+                          key={st.id}
+                          className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-xs"
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+                            <input
+                              type="checkbox"
+                              checked={!!st.completed}
+                              onChange={() => handleToggleModalSubTask(st.id)}
+                              className="w-4 h-4 accent-emerald-600 rounded cursor-pointer shrink-0"
+                            />
+                            <span className={`font-semibold truncate ${st.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                              {st.title}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                              st.importance === 'high' ? 'bg-rose-100 text-rose-800' : st.importance === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {st.importance === 'high' ? 'وزن ۳' : st.importance === 'medium' ? 'وزن ۲' : 'وزن ۱'}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveProjectSubTask(st.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="حذف زیرفعالیت"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Recurring Options Panel */}
+            {isRecurring && (
+              <div className="mt-3 p-3.5 bg-purple-50/70 dark:bg-purple-950/40 rounded-2xl border border-purple-200 dark:border-purple-800/70 space-y-3 animate-in fade-in zoom-in-98">
+                <div className="flex items-center gap-2 text-xs font-bold text-purple-900 dark:text-purple-200">
+                  <Repeat className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>تنظیمات دوره تکرار فعالیت</span>
+                </div>
+
+                {/* Frequency selection tabs */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    نوع و الگوی تکرار:
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRecurringFrequency('daily')}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                        recurringFrequency === 'daily'
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                      }`}
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>روزانه</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRecurringFrequency('weekly')}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                        recurringFrequency === 'weekly'
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                      }`}
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>هفتگی</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRecurringFrequency('monthly_day')}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                        recurringFrequency === 'monthly_day' || recurringFrequency === 'monthly'
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                      }`}
+                    >
+                      <Repeat className="w-3.5 h-3.5" />
+                      <span>روز ماه</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setRecurringFrequency('monthly_nth_weekday')}
+                      className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                        recurringFrequency === 'monthly_nth_weekday'
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                      }`}
+                    >
+                      <Repeat className="w-3.5 h-3.5" />
+                      <span>پیشرفته ماه</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sub-options for Weekly */}
+                {recurringFrequency === 'weekly' && (
+                  <div className="pt-2 border-t border-purple-200/60 dark:border-purple-900/60 space-y-3">
+                    {/* Interval selector */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        فاصله زمانی هفته‌ها:
+                      </label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { val: 1, label: 'هر هفته' },
+                          { val: 2, label: '۲ هفته یکبار' },
+                          { val: 3, label: '۳ هفته یکبار' },
+                          { val: 4, label: '۴ هفته یکبار' },
+                        ].map((item) => (
+                          <button
+                            key={item.val}
+                            type="button"
+                            onClick={() => setRecurringIntervalWeeks(item.val)}
+                            className={`py-1.5 px-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                              recurringIntervalWeeks === item.val
+                                ? 'bg-purple-600 text-white border-purple-600'
+                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Weekdays */}
+                    <div className="space-y-1.5">
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                        <span>روزهای هفته (از شنبه تا جمعه):</span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { id: 0, name: 'شنبه' },
+                          { id: 1, name: 'یکشنبه' },
+                          { id: 2, name: 'دوشنبه' },
+                          { id: 3, name: 'سه‌شنبه' },
+                          { id: 4, name: 'چهارشنبه' },
+                          { id: 5, name: 'پنج‌شنبه' },
+                          { id: 6, name: 'جمعه' },
+                        ].map((day) => {
+                          const isSelected = recurringWeeklyDays.includes(day.id);
+                          return (
+                            <button
+                              key={day.id}
+                              type="button"
+                              onClick={() => {
+                                if (isSelected) {
+                                  if (recurringWeeklyDays.length > 1) {
+                                    setRecurringWeeklyDays(recurringWeeklyDays.filter((d) => d !== day.id));
+                                  }
+                                } else {
+                                  setRecurringWeeklyDays([...recurringWeeklyDays, day.id].sort((a, b) => a - b));
+                                }
+                              }}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                                isSelected
+                                  ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                              }`}
+                            >
+                              {day.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-options for Monthly Day (1..31) */}
+                {(recurringFrequency === 'monthly_day' || recurringFrequency === 'monthly') && (
+                  <div className="pt-2 border-t border-purple-200/60 dark:border-purple-900/60 space-y-1.5">
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Repeat className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>روزهای ماه (انتخاب از ۱ تا ۳۱):</span>
+                    </label>
+                    <div className="grid grid-cols-7 sm:grid-cols-10 gap-1">
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map((dayNum) => {
+                        const isSelected = recurringMonthlyDays.includes(dayNum);
+                        return (
+                          <button
+                            key={dayNum}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                if (recurringMonthlyDays.length > 1) {
+                                  setRecurringMonthlyDays(recurringMonthlyDays.filter((d) => d !== dayNum));
+                                }
+                              } else {
+                                setRecurringMonthlyDays([...recurringMonthlyDays, dayNum].sort((a, b) => a - b));
+                              }
+                            }}
+                            className={`py-1 text-center rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                              isSelected
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
+                            }`}
+                          >
+                            {toPersianDigits(dayNum)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-options for Monthly Nth Weekday (e.g. اولین/آخرین دوشنبه هر ماه) */}
+                {recurringFrequency === 'monthly_nth_weekday' && (
+                  <div className="pt-2 border-t border-purple-200/60 dark:border-purple-900/60 space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        مرتبه وقوع در ماه:
+                      </label>
+                      <div className="grid grid-cols-5 gap-1">
+                        {[
+                          { key: 'first', label: 'اولین' },
+                          { key: 'second', label: 'دومین' },
+                          { key: 'third', label: 'سومین' },
+                          { key: 'fourth', label: 'چهارمین' },
+                          { key: 'last', label: 'آخرین' },
+                        ].map((nth) => (
+                          <button
+                            key={nth.key}
+                            type="button"
+                            onClick={() => setRecurringNthOccurrence(nth.key as OccurrenceNth)}
+                            className={`py-1.5 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                              recurringNthOccurrence === nth.key
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            {nth.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        روز هفته:
+                      </label>
+                      <div className="flex flex-wrap gap-1">
+                        {[
+                          { id: 0, name: 'شنبه' },
+                          { id: 1, name: 'یکشنبه' },
+                          { id: 2, name: 'دوشنبه' },
+                          { id: 3, name: 'سه‌شنبه' },
+                          { id: 4, name: 'چهارشنبه' },
+                          { id: 5, name: 'پنج‌شنبه' },
+                          { id: 6, name: 'جمعه' },
+                        ].map((day) => (
+                          <button
+                            key={day.id}
+                            type="button"
+                            onClick={() => setRecurringNthWeekday(day.id)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                              recurringNthWeekday === day.id
+                                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            {day.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 bg-purple-100/70 dark:bg-purple-900/40 rounded-xl text-xs text-purple-900 dark:text-purple-200 font-medium border border-purple-200 dark:border-purple-800">
+                      💡 الگوی انتخابی: <span className="font-bold">
+                        {recurringNthOccurrence === 'first' ? 'اولین' : recurringNthOccurrence === 'second' ? 'دومین' : recurringNthOccurrence === 'third' ? 'سومین' : recurringNthOccurrence === 'fourth' ? 'چهارمین' : 'آخرین'}{' '}
+                        {['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه'][recurringNthWeekday]} هر ماه شمسی
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3) Start & End Time Fields (ساعت شروع و ساعت پایان) */}
+                <div className="pt-2 border-t border-purple-200/60 dark:border-purple-900/60 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-1">
+                      <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>ساعت شروع برگزاری:</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={recurringStartTime}
+                      onChange={(e) => setRecurringStartTime(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-1">
+                      <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>ساعت پایان برگزاری:</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={recurringEndTime}
+                      onChange={(e) => setRecurringEndTime(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                {/* Start & End Interval */}
+                <div className="pt-2.5 border-t border-purple-200/60 dark:border-purple-900/60 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      تاریخ شروع بازه تکرار:
+                    </label>
+                    <JalaliDateTimePicker
+                      valueISO={recurringStartDate}
+                      onChangeISO={(iso) => setRecurringStartDate(iso)}
+                      label=""
+                      popoverPosition="top"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      تاریخ پایان بازه تکرار (اختیاری):
+                    </label>
+                    <JalaliDateTimePicker
+                      valueISO={recurringEndDate}
+                      onChangeISO={(iso) => setRecurringEndDate(iso)}
+                      label=""
+                      popoverPosition="top"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/90 dark:bg-slate-800/35 p-4 shadow-sm">
             
             {/* Jalali Date & Time Picker (not for a recurring task: its schedule sets the dates) */}
@@ -641,6 +1135,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                   onChangeISO={(iso) => setDueDateISO(iso)}
                   label="موعد انجام (تاریخ و ساعت شمسی)"
                   disabled={isStatusOnlyEdit}
+                  required
                 />
               </div>
             )}
@@ -1131,497 +1626,6 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                     </button>
                   </span>
                 ))}
-              </div>
-            )}
-          </div>
-
-          {/* Special Options: Project and Recurring Checkboxes */}
-          <div className="p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2">
-            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              ویژگی‌های تکمیلی فعالیت
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {/* Checkbox: Project */}
-              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={isProject}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsProject(checked);
-                    if (checked) setIsRecurring(false);
-                  }}
-                  className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
-                />
-                <span>پروژه است</span>
-              </label>
-
-              {/* Checkbox: Recurring */}
-              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-purple-300 transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={isRecurring}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsRecurring(checked);
-                    if (checked) setIsProject(false);
-                  }}
-                  className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
-                />
-                <span>فعالیت تکرارشونده است</span>
-              </label>
-            </div>
-
-            {/* Project Options Inline Panel */}
-            {isProject && (
-              <div className="mt-3 p-3.5 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800/70 space-y-4 animate-in fade-in zoom-in-98">
-                <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 dark:text-emerald-200 border-b border-emerald-200/60 dark:border-emerald-800/60 pb-2">
-                  <FolderKanban className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  <span>تنظیمات و جزئیات منشور و زیرفعالیت‌های پروژه</span>
-                </div>
-
-                {/* 1) Project Charter Fields */}
-                <div className="space-y-3">
-                  <h5 className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>منشور پروژه:</span>
-                  </h5>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                      نام مدیر / مسئول پروژه:
-                    </label>
-                    <input
-                      type="text"
-                      value={projectCharterManager}
-                      onChange={(e) => setProjectCharterManager(e.target.value)}
-                      placeholder="نام مدیر پروژه..."
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-100"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                      اهداف و شرح منشور پروژه:
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={projectCharterDesc}
-                      onChange={(e) => setProjectCharterDesc(e.target.value)}
-                      placeholder="توضیحات، خروجی‌ها و اهداف کلیدی پروژه..."
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-100 resize-none"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                        تاریخ شروع پروژه:
-                      </label>
-                      <JalaliDateTimePicker
-                        valueISO={projectCharterStartDate}
-                        onChangeISO={(iso) => setProjectCharterStartDate(iso)}
-                        label=""
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                        تاریخ پایان پروژه:
-                      </label>
-                      <JalaliDateTimePicker
-                        valueISO={projectCharterEndDate}
-                        onChangeISO={(iso) => setProjectCharterEndDate(iso)}
-                        label=""
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2) Subtasks / Milestones */}
-                <div className="pt-3 border-t border-emerald-200/60 dark:border-emerald-800/60 space-y-2.5">
-                  <h5 className="text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                    <ListChecks className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    <span>زیرفعالیت‌ها / مایلستون‌های پروژه ({toPersianDigits(projectSubTasks.length)} مورد):</span>
-                  </h5>
-
-                  {/* Add Subtask Form Inline */}
-                  <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 space-y-2">
-                    <input
-                      type="text"
-                      value={newSubTaskTitle}
-                      onChange={(e) => setNewSubTaskTitle(e.target.value)}
-                      placeholder="عنوان زیرفعالیت جدید..."
-                      className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100"
-                    />
-
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={newSubTaskImportance}
-                        onChange={(e) => setNewSubTaskImportance(e.target.value as SubTaskImportance)}
-                        className="px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100 cursor-pointer"
-                      >
-                        <option value="low">اهمیت: کم (وزن ۱)</option>
-                        <option value="medium">اهمیت: متوسط (وزن ۲)</option>
-                        <option value="high">اهمیت: زیاد (وزن ۳)</option>
-                      </select>
-
-                      <button
-                        type="button"
-                        onClick={handleAddProjectSubTask}
-                        className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>افزودن زیرفعالیت</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Subtasks List */}
-                  {projectSubTasks.length > 0 && (
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                      {projectSubTasks.map((st) => (
-                        <div
-                          key={st.id}
-                          className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-xs"
-                        >
-                          <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
-                            <input
-                              type="checkbox"
-                              checked={!!st.completed}
-                              onChange={() => handleToggleModalSubTask(st.id)}
-                              className="w-4 h-4 accent-emerald-600 rounded cursor-pointer shrink-0"
-                            />
-                            <span className={`font-semibold truncate ${st.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                              {st.title}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              st.importance === 'high' ? 'bg-rose-100 text-rose-800' : st.importance === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                            }`}>
-                              {st.importance === 'high' ? 'وزن ۳' : st.importance === 'medium' ? 'وزن ۲' : 'وزن ۱'}
-                            </span>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveProjectSubTask(st.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                            title="حذف زیرفعالیت"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Recurring Options Panel */}
-            {isRecurring && (
-              <div className="mt-3 p-3.5 bg-purple-50/70 dark:bg-purple-950/40 rounded-2xl border border-purple-200 dark:border-purple-800/70 space-y-3 animate-in fade-in zoom-in-98">
-                <div className="flex items-center gap-2 text-xs font-bold text-purple-900 dark:text-purple-200">
-                  <Repeat className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  <span>تنظیمات دوره تکرار فعالیت</span>
-                </div>
-
-                {/* Frequency selection tabs */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    نوع و الگوی تکرار:
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRecurringFrequency('daily')}
-                      className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                        recurringFrequency === 'daily'
-                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
-                      }`}
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>روزانه</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRecurringFrequency('weekly')}
-                      className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                        recurringFrequency === 'weekly'
-                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
-                      }`}
-                    >
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>هفتگی</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRecurringFrequency('monthly_day')}
-                      className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                        recurringFrequency === 'monthly_day' || recurringFrequency === 'monthly'
-                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
-                      }`}
-                    >
-                      <Repeat className="w-3.5 h-3.5" />
-                      <span>روز ماه</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setRecurringFrequency('monthly_nth_weekday')}
-                      className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                        recurringFrequency === 'monthly_nth_weekday'
-                          ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
-                          : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
-                      }`}
-                    >
-                      <Repeat className="w-3.5 h-3.5" />
-                      <span>پیشرفته ماه</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Sub-options for Weekly */}
-                {recurringFrequency === 'weekly' && (
-                  <div className="pt-2 border-t border-purple-200/60 dark:border-purple-900/60 space-y-3">
-                    {/* Interval selector */}
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        فاصله زمانی هفته‌ها:
-                      </label>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {[
-                          { val: 1, label: 'هر هفته' },
-                          { val: 2, label: '۲ هفته یکبار' },
-                          { val: 3, label: '۳ هفته یکبار' },
-                          { val: 4, label: '۴ هفته یکبار' },
-                        ].map((item) => (
-                          <button
-                            key={item.val}
-                            type="button"
-                            onClick={() => setRecurringIntervalWeeks(item.val)}
-                            className={`py-1.5 px-2 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                              recurringIntervalWeeks === item.val
-                                ? 'bg-purple-600 text-white border-purple-600'
-                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                            }`}
-                          >
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Weekdays */}
-                    <div className="space-y-1.5">
-                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                        <span>روزهای هفته (از شنبه تا جمعه):</span>
-                      </label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          { id: 0, name: 'شنبه' },
-                          { id: 1, name: 'یکشنبه' },
-                          { id: 2, name: 'دوشنبه' },
-                          { id: 3, name: 'سه‌شنبه' },
-                          { id: 4, name: 'چهارشنبه' },
-                          { id: 5, name: 'پنج‌شنبه' },
-                          { id: 6, name: 'جمعه' },
-                        ].map((day) => {
-                          const isSelected = recurringWeeklyDays.includes(day.id);
-                          return (
-                            <button
-                              key={day.id}
-                              type="button"
-                              onClick={() => {
-                                if (isSelected) {
-                                  if (recurringWeeklyDays.length > 1) {
-                                    setRecurringWeeklyDays(recurringWeeklyDays.filter((d) => d !== day.id));
-                                  }
-                                } else {
-                                  setRecurringWeeklyDays([...recurringWeeklyDays, day.id].sort((a, b) => a - b));
-                                }
-                              }}
-                              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                                isSelected
-                                  ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
-                                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
-                              }`}
-                            >
-                              {day.name}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Sub-options for Monthly Day (1..31) */}
-                {(recurringFrequency === 'monthly_day' || recurringFrequency === 'monthly') && (
-                  <div className="pt-2 border-t border-purple-200/60 dark:border-purple-900/60 space-y-1.5">
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      <Repeat className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                      <span>روزهای ماه (انتخاب از ۱ تا ۳۱):</span>
-                    </label>
-                    <div className="grid grid-cols-7 sm:grid-cols-10 gap-1">
-                      {Array.from({ length: 31 }, (_, i) => i + 1).map((dayNum) => {
-                        const isSelected = recurringMonthlyDays.includes(dayNum);
-                        return (
-                          <button
-                            key={dayNum}
-                            type="button"
-                            onClick={() => {
-                              if (isSelected) {
-                                if (recurringMonthlyDays.length > 1) {
-                                  setRecurringMonthlyDays(recurringMonthlyDays.filter((d) => d !== dayNum));
-                                }
-                              } else {
-                                setRecurringMonthlyDays([...recurringMonthlyDays, dayNum].sort((a, b) => a - b));
-                              }
-                            }}
-                            className={`py-1 text-center rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                              isSelected
-                                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
-                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-purple-300'
-                            }`}
-                          >
-                            {toPersianDigits(dayNum)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Sub-options for Monthly Nth Weekday (e.g. اولین/آخرین دوشنبه هر ماه) */}
-                {recurringFrequency === 'monthly_nth_weekday' && (
-                  <div className="pt-2 border-t border-purple-200/60 dark:border-purple-900/60 space-y-3">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        مرتبه وقوع در ماه:
-                      </label>
-                      <div className="grid grid-cols-5 gap-1">
-                        {[
-                          { key: 'first', label: 'اولین' },
-                          { key: 'second', label: 'دومین' },
-                          { key: 'third', label: 'سومین' },
-                          { key: 'fourth', label: 'چهارمین' },
-                          { key: 'last', label: 'آخرین' },
-                        ].map((nth) => (
-                          <button
-                            key={nth.key}
-                            type="button"
-                            onClick={() => setRecurringNthOccurrence(nth.key as OccurrenceNth)}
-                            className={`py-1.5 text-center rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                              recurringNthOccurrence === nth.key
-                                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
-                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                            }`}
-                          >
-                            {nth.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        روز هفته:
-                      </label>
-                      <div className="flex flex-wrap gap-1">
-                        {[
-                          { id: 0, name: 'شنبه' },
-                          { id: 1, name: 'یکشنبه' },
-                          { id: 2, name: 'دوشنبه' },
-                          { id: 3, name: 'سه‌شنبه' },
-                          { id: 4, name: 'چهارشنبه' },
-                          { id: 5, name: 'پنج‌شنبه' },
-                          { id: 6, name: 'جمعه' },
-                        ].map((day) => (
-                          <button
-                            key={day.id}
-                            type="button"
-                            onClick={() => setRecurringNthWeekday(day.id)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                              recurringNthWeekday === day.id
-                                ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
-                                : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                            }`}
-                          >
-                            {day.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="p-2.5 bg-purple-100/70 dark:bg-purple-900/40 rounded-xl text-xs text-purple-900 dark:text-purple-200 font-medium border border-purple-200 dark:border-purple-800">
-                      💡 الگوی انتخابی: <span className="font-bold">
-                        {recurringNthOccurrence === 'first' ? 'اولین' : recurringNthOccurrence === 'second' ? 'دومین' : recurringNthOccurrence === 'third' ? 'سومین' : recurringNthOccurrence === 'fourth' ? 'چهارمین' : 'آخرین'}{' '}
-                        {['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه'][recurringNthWeekday]} هر ماه شمسی
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3) Start & End Time Fields (ساعت شروع و ساعت پایان) */}
-                <div className="pt-2 border-t border-purple-200/60 dark:border-purple-900/60 grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-1">
-                      <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                      <span>ساعت شروع برگزاری:</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={recurringStartTime}
-                      onChange={(e) => setRecurringStartTime(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-slate-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-1">
-                      <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                      <span>ساعت پایان برگزاری:</span>
-                    </label>
-                    <input
-                      type="time"
-                      value={recurringEndTime}
-                      onChange={(e) => setRecurringEndTime(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-slate-100"
-                    />
-                  </div>
-                </div>
-
-                {/* Start & End Interval */}
-                <div className="pt-2.5 border-t border-purple-200/60 dark:border-purple-900/60 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      تاریخ شروع بازه تکرار:
-                    </label>
-                    <JalaliDateTimePicker
-                      valueISO={recurringStartDate}
-                      onChangeISO={(iso) => setRecurringStartDate(iso)}
-                      label=""
-                      popoverPosition="top"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                      تاریخ پایان بازه تکرار (اختیاری):
-                    </label>
-                    <JalaliDateTimePicker
-                      valueISO={recurringEndDate}
-                      onChangeISO={(iso) => setRecurringEndDate(iso)}
-                      label=""
-                      popoverPosition="top"
-                    />
-                  </div>
-                </div>
               </div>
             )}
           </div>
