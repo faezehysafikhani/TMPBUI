@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X } from 'lucide-react';
+import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2 } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
 import { ChartCompany, ChartMember, ChartTeam, ChartUnit, PersonRef, getChart, listPositions, listTeamsOutsideUnits, listUnplacedUsers } from '../../../services/orgStructureApi';
@@ -274,6 +274,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   const [collapsedUnits, setCollapsedUnits] = useState<Set<string>>(new Set());
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [fullscreen, setFullscreen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   /** How to move around, until the user first does. */
   const [hint, setHint] = useState(true);
@@ -513,6 +514,29 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           )}
           <button type="button" onClick={allOpen ? collapseAll : expandAll} className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer" title={allOpen ? 'بستن همه' : 'باز کردن همه'} aria-label={allOpen ? 'بستن همه' : 'باز کردن همه'}>
             {allOpen ? <ChevronsDownUp className="w-4 h-4" /> : <ChevronsUpDown className="w-4 h-4" />}
+          </button>
+          <button
+            type="button"
+            disabled={exporting}
+            onClick={async () => {
+              if (!content.current) return;
+              setExporting(true);
+              try {
+                const { downloadOrgChartPdf } = await import('../../../utils/orgChartPdf');
+                const day = new Date().toISOString().slice(0, 10);
+                await downloadOrgChartPdf(content.current, `چارت سازمانی ${company.name}`, `org-chart-${day}.pdf`);
+              } catch (err) {
+                console.error('Org chart PDF failed:', err);
+                window.alert('دریافت فایل PDF چارت انجام نشد.');
+              } finally {
+                setExporting(false);
+              }
+            }}
+            className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+            title="دریافت PDF چارت"
+            aria-label="دریافت PDF چارت"
+          >
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
           </button>
           <button type="button" onClick={() => setFullscreen(!fullscreen)} className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer" title={fullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'} aria-label={fullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}>
             {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}

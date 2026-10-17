@@ -29,6 +29,8 @@ interface JalaliDateTimePickerProps {
   label?: string;
   popoverPosition?: 'top' | 'bottom' | 'auto';
   disabled?: boolean;
+  /** Marks the field as required (red star after the label). */
+  required?: boolean;
 }
 
 export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
@@ -37,6 +39,7 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
   label = 'موعد انجام (تاریخ و ساعت)',
   popoverPosition = 'auto',
   disabled = false,
+  required = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -231,6 +234,7 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
         <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1 flex items-center gap-1.5">
           <CalendarIcon className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
           <span>{label}</span>
+          {required && <span className="text-rose-500">*</span>}
         </label>
       )}
 

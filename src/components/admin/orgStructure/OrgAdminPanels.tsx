@@ -185,15 +185,8 @@ const CompanyUnitsDialog: React.FC<{
     <AdminDialog title={`معاونت‌های ${company.name}`} onClose={onClose} footer={<SecondaryButton onClick={onClose}>بستن</SecondaryButton>}>
       {message && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
       <p className="text-xs text-slate-500 leading-relaxed">معاونت‌ها و واحدها را به‌صورت جداگانه به شرکت اختصاص دهید.</p>
-      <div className="space-y-2">
-        {mine.length === 0 ? <p className="text-sm text-slate-500">هنوز معاونتی اختصاص داده نشده است.</p> : mine.map((l) => (
-          <div key={l.unitId} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
-            <span className="flex items-center gap-2 text-sm font-bold"><Network className="w-4 h-4 text-indigo-600" /> {l.unitName}</span>
-            <IconAction icon={Unlink} tone="rose" label="حذف از شرکت" disabled={busy} onClick={() => run(() => unlinkUnit(l.unitId), 'معاونت از شرکت جدا شد.', 'جدا کردن معاونت انجام نشد.')} />
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+      {/* Adding comes first; the deputies already in the company are listed under it. */}
+      <div className="flex flex-col sm:flex-row gap-2">
         <select className={inputClass} value={selected} onChange={(e) => setSelected(e.target.value)}>
           <option value="">انتخاب معاونت یا واحد...</option>
           {eligible.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -202,7 +195,14 @@ const CompanyUnitsDialog: React.FC<{
           <Link2 className="w-4 h-4" /> افزودن
         </PrimaryButton>
       </div>
-      {eligible.length === 0 && <p className="text-[11px] text-slate-500">واحد آزادی برای اختصاص نیست. ابتدا در بخش «معاونت‌ها و واحدها» واحد جدید بسازید.</p>}
+      <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+        {mine.length === 0 ? <p className="text-sm text-slate-500">هنوز معاونتی اختصاص داده نشده است.</p> : mine.map((l) => (
+          <div key={l.unitId} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700">
+            <span className="flex items-center gap-2 text-sm font-bold"><Network className="w-4 h-4 text-indigo-600" /> {l.unitName}</span>
+            <IconAction icon={Unlink} tone="rose" label="حذف از شرکت" disabled={busy} onClick={() => run(() => unlinkUnit(l.unitId), 'معاونت از شرکت جدا شد.', 'جدا کردن معاونت انجام نشد.')} />
+          </div>
+        ))}
+      </div>
     </AdminDialog>
   );
 };
