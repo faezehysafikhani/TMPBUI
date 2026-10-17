@@ -104,6 +104,191 @@ export function toggleUserAccess(
   return { direct: nextDirect, denied: nextDenied };
 }
 
+const PERMISSION_PREREQUISITES: Readonly<Record<string, readonly string[]>> = {
+  'users.assign_roles': ['users.view'],
+  'users.change_status': ['users.view'],
+  'users.create': ['users.view'],
+  'users.update': ['users.view'],
+  'org_structure.manage_companies': ['org_structure.view', 'users.view', 'users.update'],
+  'org_structure.manage_positions': ['org_structure.view', 'users.view', 'users.update'],
+  'org_structure.manage_assignments': ['org_structure.view', 'users.view', 'users.update'],
+  'organization_units.create': ['organization_units.view'],
+  'organization_units.update': ['organization_units.view'],
+  'organization_units.delete': ['organization_units.view'],
+  'Tasks.Comment': ['Tasks.View'],
+  'Tasks.Create': ['Tasks.View'],
+  'Tasks.Edit': ['Tasks.View'],
+  'Tasks.Delete': ['Tasks.View'],
+  'Actions.Create': ['Actions.View'],
+  'Actions.Edit': ['Actions.View'],
+  'Actions.Delete': ['Actions.View'],
+  'Actions.Submit': ['Actions.View'],
+};
+
+export function hasKnownPermissionDependents(permissionName: string): boolean {
+  return Object.values(PERMISSION_PREREQUISITES).some((prerequisites) => prerequisites.includes(permissionName));
+}
+
+export function rolePermissionNames(
+  rolePermissions: readonly string[],
+  entries: readonly UserAccessEntry[],
+): string[] {
+  const permissionsById = new Map(entries.map((entry) => [entry.permissionId.toLowerCase(), entry.name]));
+  const namesByLowercase = new Map(entries.map((entry) => [entry.name.toLowerCase(), entry.name]));
+  return rolePermissions.map((permission) =>
+    permissionsById.get(permission.toLowerCase())
+      || namesByLowercase.get(permission.toLowerCase())
+      || permission
+  );
+}
+
+/**
+ * Find an active permission that depends on this one. This includes direct/group grants, the
+ * roles currently selected in the dialog, and prerequisites implied by those active permissions.
+ */
+export function enabledDependentForPrerequisite(
+  prerequisite: UserAccessEntry,
+  entries: readonly UserAccessEntry[],
+  direct: ReadonlySet<string>,
+  denied: ReadonlySet<string>,
+  selectedRoleNames: ReadonlySet<string>,
+  selectedRolePermissions: ReadonlySet<string>,
+): UserAccessEntry | undefined {
+  const enabledNames = new Set<string>();
+  for (const entry of entries) {
+    if (denied.has(entry.permissionId)) continue;
+    const grantedBySelectedRole = selectedRolePermissions.has(entry.name)
+      || selectedRolePermissions.has(entry.permissionId)
+      || (entry.grantedByRole && (
+        entry.grantingRoles.length === 0
+        || entry.grantingRoles.some((roleName) => selectedRoleNames.has(roleName))
+      ));
+    if (direct.has(entry.permissionId) || entry.grantedByGroup || grantedBySelectedRole) {
+      enabledNames.add(entry.name);
+    }
+  }
+
+  const entriesByName = new Map(entries.map((entry) => [entry.name, entry]));
+  const pending = [...enabledNames];
+  while (pending.length > 0) {
+    const enabledName = pending.pop()!;
+    for (const prerequisiteName of PERMISSION_PREREQUISITES[enabledName] || []) {
+      const entry = entriesByName.get(prerequisiteName);
+      if (!entry || denied.has(entry.permissionId) || enabledNames.has(prerequisiteName)) continue;
+      enabledNames.add(prerequisiteName);
+      pending.push(prerequisiteName);
+    }
+  }
+
+  return entries.find((entry) =>
+    enabledNames.has(entry.name)
+    && (PERMISSION_PREREQUISITES[entry.name] || []).includes(prerequisite.name)
+  );
+}
+
+/**
+ * Remove explicit denials for prerequisites of an enabled permission. The server grants the
+ * prerequisite itself; this only prevents a stale denial from overriding that grant.
+ */
+export function clearPrerequisiteDenials(
+  entry: UserAccessEntry,
+  entries: readonly UserAccessEntry[],
+  denied: ReadonlySet<string>,
+): Set<string> {
+  return clearPrerequisiteDenialsForPermissions([entry.name], entries, denied);
+}
+
+export function clearPrerequisiteDenialsForPermissions(
+  permissionNames: Iterable<string>,
+  entries: readonly UserAccessEntry[],
+  denied: ReadonlySet<string>,
+): Set<string> {
+  const entriesByName = new Map(entries.map((permission) => [permission.name, permission]));
+  const nextDenied = new Set(denied);
+  const pending = [...permissionNames].flatMap((name) => PERMISSION_PREREQUISITES[name] || []);
+  const visited = new Set<string>();
+
+  while (pending.length > 0) {
+    const prerequisiteName = pending.pop()!;
+    if (visited.has(prerequisiteName)) continue;
+    visited.add(prerequisiteName);
+
+    const prerequisite = entriesByName.get(prerequisiteName);
+    if (!prerequisite) continue;
+    nextDenied.delete(prerequisite.permissionId);
+    pending.push(...(PERMISSION_PREREQUISITES[prerequisite.name] || []));
+  }
+
+  return nextDenied;
+}
+
+export function preservePermissionPrerequisites(
+  permissionNames: Iterable<string>,
+  entries: readonly UserAccessEntry[],
+  direct: ReadonlySet<string>,
+  denied: ReadonlySet<string>,
+): Set<string> {
+  const entriesByName = new Map(entries.map((permission) => [permission.name, permission]));
+  const nextDirect = new Set(direct);
+  const pending = [...permissionNames].flatMap((name) => PERMISSION_PREREQUISITES[name] || []);
+  const visited = new Set<string>();
+
+  while (pending.length > 0) {
+    const prerequisiteName = pending.pop()!;
+    if (visited.has(prerequisiteName)) continue;
+    visited.add(prerequisiteName);
+
+    const prerequisite = entriesByName.get(prerequisiteName);
+    if (!prerequisite) continue;
+    if (
+      !denied.has(prerequisite.permissionId)
+      && !prerequisite.grantedByRole
+      && !prerequisite.grantedByGroup
+    ) {
+      nextDirect.add(prerequisite.permissionId);
+    }
+    pending.push(...(PERMISSION_PREREQUISITES[prerequisite.name] || []));
+  }
+
+  return nextDirect;
+}
+
+/**
+ * Keep currently effective prerequisites when their dependent permission is turned off.
+ * Otherwise a prerequisite that was only implied would disappear from the user's access.
+ */
+export function preservePrerequisitesWhenDisabling(
+  entry: UserAccessEntry,
+  entries: readonly UserAccessEntry[],
+  direct: ReadonlySet<string>,
+  denied: ReadonlySet<string>,
+): Set<string> {
+  const entriesByName = new Map(entries.map((permission) => [permission.name, permission]));
+  const nextDirect = new Set(direct);
+  const pending = [...(PERMISSION_PREREQUISITES[entry.name] || [])];
+  const visited = new Set<string>();
+
+  while (pending.length > 0) {
+    const prerequisiteName = pending.pop()!;
+    if (visited.has(prerequisiteName)) continue;
+    visited.add(prerequisiteName);
+
+    const prerequisite = entriesByName.get(prerequisiteName);
+    if (!prerequisite) continue;
+    if (
+      !denied.has(prerequisite.permissionId)
+      && !prerequisite.grantedByRole
+      && !prerequisite.grantedByGroup
+      && (nextDirect.has(prerequisite.permissionId) || prerequisite.grantedAsPrerequisite)
+    ) {
+      nextDirect.add(prerequisite.permissionId);
+    }
+    pending.push(...(PERMISSION_PREREQUISITES[prerequisite.name] || []));
+  }
+
+  return nextDirect;
+}
+
 /**
  * Permissions left out of the access list because this product has no use for them. They are
  * hidden, not removed - whatever a user already holds of them is kept when their access is saved.

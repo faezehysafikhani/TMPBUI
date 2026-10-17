@@ -1799,7 +1799,9 @@ export interface UserAccessEntry {
   name: string;
   module: string;
   description: string;
-  grantedDirectly: boolean;
+  /** Direct assignment flag (API versions may expose this as isDirect). */
+  grantedDirectly?: boolean;
+  isDirect?: boolean;
   grantedByRole: boolean;
   grantingRoles: string[];
   grantedByGroup: boolean;

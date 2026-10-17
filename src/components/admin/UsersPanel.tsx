@@ -11,7 +11,7 @@ import {
   AdminCard, SearchBox, StatusBadge, IconAction, Pagination, Field, inputClass, Notice,
   AdminDialog, PrimaryButton, SecondaryButton, toLatinDigits, useDebounced, PillTabs,
 } from './AdminUi';
-import { moduleTitle, accessIsEffective, toggleUserAccess, isListedPermission } from '../../utils/permissions';
+import { moduleTitle, toggleUserAccess, clearPrerequisiteDenials, clearPrerequisiteDenialsForPermissions, preservePrerequisitesWhenDisabling, preservePermissionPrerequisites, enabledDependentForPrerequisite, hasKnownPermissionDependents, rolePermissionNames, isListedPermission } from '../../utils/permissions';
 import { userErrorMessage } from '../../utils/errorMessages';
 import { LoadingRow } from './orgStructure/orgShared';
 import { OrgPlacementFields, useOrgPlacementData, EMPTY_PLACEMENT_DRAFT, OrgPlacementDraft } from './orgStructure/OrgPlacementFields';
@@ -191,7 +191,13 @@ export const UsersPanel: React.FC<{
           user={accessOf}
           rights={rights}
           onClose={() => setAccessOf(null)}
-          onSaved={async () => { setAccessOf(null); setMessage({ type: 'success', text: `دسترسی‌های «${accessOf.displayName}» ذخیره شد.` }); await load(); }}
+          onSaved={async (refreshError) => {
+            setAccessOf(null);
+            setMessage(refreshError
+              ? { type: 'error', text: refreshError }
+              : { type: 'success', text: `دسترسی‌های «${accessOf.displayName}» ذخیره شد.` });
+            await load();
+          }}
         />
       )}
     </AdminCard>
@@ -442,7 +448,7 @@ const UserFormDialog: React.FC<{
 // ---------------------------------------------------------------- access
 
 /** Where a permission reaches the user from, and whether it is in effect for them. */
-const AccessSourceBadges: React.FC<{ entry: UserAccessEntry; direct: ReadonlySet<string>; denied: ReadonlySet<string> }> = ({ entry, direct, denied }) => {
+const AccessSourceBadges: React.FC<{ entry: UserAccessEntry; direct: ReadonlySet<string>; denied: ReadonlySet<string>; prerequisite: boolean }> = ({ entry, direct, denied, prerequisite }) => {
   const roles = entry.grantingRoles.map(roleTitle).join('، ');
   const groups = entry.grantingGroups.join('، ');
   if (denied.has(entry.permissionId)) {
@@ -458,14 +464,14 @@ const AccessSourceBadges: React.FC<{ entry: UserAccessEntry; direct: ReadonlySet
       {direct.has(entry.permissionId) && <StatusBadge tone="green">دسترسی مستقیم</StatusBadge>}
       {entry.grantedByRole && <StatusBadge tone="indigo" title={roles}>فعال از طریق نقش {roles}</StatusBadge>}
       {entry.grantedByGroup && <StatusBadge tone="amber" title={groups}>فعال از طریق گروه {groups}</StatusBadge>}
-      {entry.grantedAsPrerequisite && !direct.has(entry.permissionId) && !entry.grantedByRole && !entry.grantedByGroup && (
+      {prerequisite && !direct.has(entry.permissionId) && !entry.grantedByRole && !entry.grantedByGroup && (
         <StatusBadge tone="slate" title="مجوز دیگری از این کاربر به آن نیاز دارد.">لازمهٔ مجوزی دیگر</StatusBadge>
       )}
     </>
   );
 };
 
-const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onClose: () => void; onSaved: () => void }> = ({ user, rights, onClose, onSaved }) => {
+const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onClose: () => void; onSaved: (refreshError?: string) => void }> = ({ user, rights, onClose, onSaved }) => {
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [access, setAccess] = useState<UserAccess | null>(null);
   const [roleIds, setRoleIds] = useState<string[]>([]);
@@ -481,7 +487,7 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
       setRoles(roleList);
       setAccess(userAccess);
       setRoleIds(roleList.filter((r) => userAccess.roles.includes(r.name)).map((r) => r.id));
-      setDirect(new Set(userAccess.permissions.filter((p) => p.grantedDirectly).map((p) => p.permissionId)));
+      setDirect(new Set(userAccess.permissions.filter((p) => p.grantedDirectly || p.isDirect).map((p) => p.permissionId)));
       setDenied(new Set(userAccess.permissions.filter((p) => p.deniedForUser).map((p) => p.permissionId)));
     }).catch((err) => setError(errorText(err, 'دریافت دسترسی‌ها ممکن نشد.')));
   }, [user.id]);
@@ -497,6 +503,17 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
     return [...groups.entries()];
   }, [access, filter]);
 
+  const selectedRoleNames = useMemo(
+    () => new Set(roles.filter((role) => roleIds.includes(role.id)).map((role) => role.name)),
+    [roles, roleIds],
+  );
+  const selectedRolePermissions = useMemo(
+    () => new Set(roles
+      .filter((role) => roleIds.includes(role.id))
+      .flatMap((role) => rolePermissionNames(role.permissions, access?.permissions || []))),
+    [access, roles, roleIds],
+  );
+
   const save = async () => {
     if (!access) return;
     setSaving(true);
@@ -506,11 +523,21 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
       if (rights.assignRoles && [...roleIds].sort().join(',') !== originalRoleIds) {
         await setUserRoles(user.id, roleIds);
       }
-      const originalDirect = access.permissions.filter((p) => p.grantedDirectly).map((p) => p.permissionId).sort().join(',');
+      const originalDirect = access.permissions.filter((p) => p.grantedDirectly || p.isDirect).map((p) => p.permissionId).sort().join(',');
       const originalDenied = access.permissions.filter((p) => p.deniedForUser).map((p) => p.permissionId).sort().join(',');
       if (rights.assignPermissions && ([...direct].sort().join(',') !== originalDirect || [...denied].sort().join(',') !== originalDenied)) {
         await setUserDirectPermissions(user.id, [...direct], [...denied]);
       }
+      let refreshedAccess: UserAccess;
+      try {
+        refreshedAccess = await getUserAccess(user.id);
+      } catch (err) {
+        onSaved(`دسترسی‌ها ذخیره شد، اما دریافت وضعیت جدید ممکن نشد: ${errorText(err, 'خطای نامشخص')}`);
+        return;
+      }
+      setAccess(refreshedAccess);
+      setDirect(new Set(refreshedAccess.permissions.filter((p) => p.grantedDirectly || p.isDirect).map((p) => p.permissionId)));
+      setDenied(new Set(refreshedAccess.permissions.filter((p) => p.deniedForUser).map((p) => p.permissionId)));
       onSaved();
     } catch (err) {
       setError(errorText(err, 'ذخیره دسترسی‌ها انجام نشد.'));
@@ -544,7 +571,21 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
             <div className="flex flex-wrap gap-2">
               {roles.map((role) => (
                 <label key={role.id} className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm ${rights.assignRoles ? 'cursor-pointer' : 'opacity-60'} ${roleIds.includes(role.id) ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-700' : 'border-slate-200 dark:border-slate-700'}`}>
-                  <input type="checkbox" disabled={!rights.assignRoles} checked={roleIds.includes(role.id)} onChange={(e) => setRoleIds((ids) => e.target.checked ? [...ids, role.id] : ids.filter((id) => id !== role.id))} />
+                  <input
+                    type="checkbox"
+                    disabled={!rights.assignRoles}
+                    checked={roleIds.includes(role.id)}
+                    onChange={(e) => {
+                      const permissionNames = rolePermissionNames(role.permissions, access.permissions);
+                      if (e.target.checked) {
+                        setRoleIds((ids) => ids.includes(role.id) ? ids : [...ids, role.id]);
+                        setDenied((current) => clearPrerequisiteDenialsForPermissions(permissionNames, access.permissions, current));
+                      } else {
+                        setRoleIds((ids) => ids.filter((id) => id !== role.id));
+                        setDirect((current) => preservePermissionPrerequisites(permissionNames, access.permissions, current, denied));
+                      }
+                    }}
+                  />
                   <span className="font-bold">{roleTitle(role.name)}</span>
                   <span className="text-xs text-slate-400">({toPersianDigits(role.permissions.length)} مجوز)</span>
                 </label>
@@ -565,26 +606,57 @@ const UserAccessDialog: React.FC<{ user: AdminUser; rights: UserAdminRights; onC
                 <div key={module} className="rounded-xl border border-slate-200 dark:border-slate-700">
                   <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-t-xl text-xs font-extrabold text-slate-600 dark:text-slate-300">{moduleTitle(module)}</div>
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {entries.map((entry) => (
-                      <label key={entry.permissionId} className={`flex items-center justify-between gap-3 px-3 py-2 ${rights.assignPermissions ? 'cursor-pointer' : ''}`}>
+                    {entries.map((entry) => {
+                      const dependent = enabledDependentForPrerequisite(
+                        entry,
+                        access.permissions,
+                        direct,
+                        denied,
+                        selectedRoleNames,
+                        selectedRolePermissions,
+                      );
+                      const grantedBySelectedRole = selectedRolePermissions.has(entry.name)
+                        || (entry.grantedByRole && entry.grantingRoles.some((roleName) => selectedRoleNames.has(roleName)));
+                      const prerequisite = !!dependent
+                        || (!!entry.grantedAsPrerequisite && !hasKnownPermissionDependents(entry.name));
+                      const effective = !denied.has(entry.permissionId) && (
+                        direct.has(entry.permissionId)
+                        || grantedBySelectedRole
+                        || entry.grantedByGroup
+                        || prerequisite
+                      );
+                      const cannotDisable = !!dependent && effective;
+                      return (
+                      <label key={entry.permissionId} className={`flex items-center justify-between gap-3 px-3 py-2 ${rights.assignPermissions && !cannotDisable ? 'cursor-pointer' : ''}`}>
                         <span className="flex items-center gap-2 min-w-0">
                           <input
                             type="checkbox"
-                            disabled={!rights.assignPermissions}
-                            checked={accessIsEffective(entry, direct, denied)}
+                            disabled={!rights.assignPermissions || cannotDisable}
+                            checked={effective}
+                            title={cannotDisable ? `ابتدا مجوز «${dependent.description}» را غیرفعال کنید.` : undefined}
                             onChange={(e) => {
                               const next = toggleUserAccess(entry, e.target.checked, direct, denied);
-                              setDirect(next.direct);
-                              setDenied(next.denied);
+                              setDirect(e.target.checked
+                                ? next.direct
+                                : preservePrerequisitesWhenDisabling(entry, access.permissions, next.direct, next.denied));
+                              setDenied(e.target.checked
+                                ? clearPrerequisiteDenials(entry, access.permissions, next.denied)
+                                : next.denied);
                             }}
                           />
                           <span className="min-w-0 text-sm text-slate-800 dark:text-slate-100">{entry.description}</span>
+                          {cannotDisable && (
+                            <span className="text-xs text-amber-600 dark:text-amber-400">
+                              پیش‌نیاز «{dependent.description}» است
+                            </span>
+                          )}
                         </span>
                         <span className="flex flex-wrap gap-1 justify-end">
-                          <AccessSourceBadges entry={entry} direct={direct} denied={denied} />
+                          <AccessSourceBadges entry={entry} direct={direct} denied={denied} prerequisite={prerequisite} />
                         </span>
                       </label>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
