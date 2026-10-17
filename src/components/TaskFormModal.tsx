@@ -86,6 +86,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
   const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState<boolean>(false);
   const assigneeDropdownRef = useRef<HTMLDivElement>(null);
+  // People from outside the chosen team who may also see the task (not responsible for it).
+  const [accessSearchQuery, setAccessSearchQuery] = useState<string>('');
+  const [isAccessDropdownOpen, setIsAccessDropdownOpen] = useState<boolean>(false);
+  const accessDropdownRef = useRef<HTMLDivElement>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>('');
   const [showTagDropdown, setShowTagDropdown] = useState(false);
@@ -181,6 +185,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       }
       if (assigneeDropdownRef.current && !assigneeDropdownRef.current.contains(event.target as Node)) {
         setIsAssigneeDropdownOpen(false);
+      }
+      if (accessDropdownRef.current && !accessDropdownRef.current.contains(event.target as Node)) {
+        setIsAccessDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -1178,11 +1185,17 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                   <Users className="w-3.5 h-3.5 text-indigo-500" />
                   <span>اعضای تیم کاری</span>
                 </span>
-                {selectedMemberIds.length > 0 && selectedTeamId && (
-                  <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
-                    {toPersianDigits(selectedMemberIds.length)} کاربر عضو تیم
-                  </span>
-                )}
+                {selectedMemberIds.length > 0 && selectedTeamId && (() => {
+                  const teamIds = new Set((availableTeams.find((t) => t.id === selectedTeamId)?.members || []).map((m) => m.userId));
+                  const inTeam = selectedMemberIds.filter((id) => teamIds.has(id)).length;
+                  const outside = selectedMemberIds.length - inTeam;
+                  return (
+                    <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
+                      {toPersianDigits(inTeam)} کاربر عضو تیم
+                      {outside > 0 && ` + ${toPersianDigits(outside)} نفر خارج از تیم`}
+                    </span>
+                  );
+                })()}
               </label>
               <select
                 value={selectedTeamId}
@@ -1192,8 +1205,15 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                   setSelectedTeamId(teamId);
                   // A chosen team's members get access by default (as when the team itself gave it);
                   // each can be taken off below. No team: the task stays with its people.
+                  // People added from outside the previous team stay when another team is chosen.
                   const team = availableTeams.find((t) => t.id === teamId);
-                  setSelectedMemberIds(team ? team.members.map((m) => m.userId) : currentUser ? [currentUser.id] : []);
+                  const previousTeamIds = new Set((availableTeams.find((t) => t.id === selectedTeamId)?.members || []).map((m) => m.userId));
+                  const addedOutside = selectedTeamId ? selectedMemberIds.filter((id) => !previousTeamIds.has(id)) : [];
+                  setSelectedMemberIds(
+                    team
+                      ? Array.from(new Set([...team.members.map((m) => m.userId), ...addedOutside]))
+                      : currentUser ? [currentUser.id] : []
+                  );
                 }}
                 className={`w-full px-3.5 py-2 bg-white dark:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all ${
                   isStatusOnlyEdit ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
@@ -1417,14 +1437,37 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               })()}
             </div>
 
-            {/* The team's members who may see the task (its access list). Responsible people always may. */}
+            {/* Who may see the task (its access list): the team's members, and anyone added from
+                outside the team. Responsible people always may. */}
             {selectedTeamId && (() => {
               const currentTeamObj = availableTeams.find((t) => t.id === selectedTeamId);
-              if (!currentTeamObj || currentTeamObj.members.length === 0) return null;
+              if (!currentTeamObj) return null;
 
               const uniqueMembersMap = new Map<string, WorkTeamMember>();
               currentTeamObj.members.forEach((m) => uniqueMembersMap.set(m.userId, m));
               const uniqueMembers: WorkTeamMember[] = Array.from(uniqueMembersMap.values());
+              const teamIds = new Set(uniqueMembers.map((m) => m.userId));
+
+              // People added from outside the team, with names from the user list (or the saved task).
+              const nameOf = (id: string): string => {
+                const user = allRegisteredUsers.find((u) => u.id === id) || (currentUser?.id === id ? currentUser : undefined);
+                if (user) return user.name || user.username;
+                const saved = (taskToEdit?.teamMemberIds || []).indexOf(id);
+                return (saved >= 0 && taskToEdit?.teamMemberNames?.[saved]) || 'کاربر';
+              };
+              const outsiders = selectedMemberIds.filter((id) => !teamIds.has(id));
+              // Anyone else active in the organization; the task's owner sees it anyway.
+              const ownerId = taskToEdit?.user || currentUser?.id;
+              const accessQuery = accessSearchQuery.trim().toLowerCase();
+              const outsideCandidates = allRegisteredUsers
+                .filter((u) => !u.disabled && u.id !== ownerId && !teamIds.has(u.id) && !selectedMemberIds.includes(u.id) && !responsibleIds.includes(u.id))
+                .filter((u) =>
+                  !accessQuery ||
+                  (u.name || '').toLowerCase().includes(accessQuery) ||
+                  (u.username || '').toLowerCase().includes(accessQuery) ||
+                  (u.email || '').toLowerCase().includes(accessQuery)
+                )
+                .sort((a, b) => (a.name || a.username).localeCompare(b.name || b.username, 'fa'));
 
               return (
                 <div className="pt-2 border-t border-slate-200/80 dark:border-slate-700/80 space-y-2" data-access-list>
@@ -1436,7 +1479,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       <div className="flex items-center gap-2 text-[10px]">
                         <button
                           type="button"
-                          onClick={() => setSelectedMemberIds(uniqueMembers.map((m) => m.userId))}
+                          onClick={() => setSelectedMemberIds(Array.from(new Set([...uniqueMembers.map((m) => m.userId), ...outsiders])))}
                           className="text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer font-semibold"
                         >
                           همه ({toPersianDigits(uniqueMembers.length)})
@@ -1493,6 +1536,97 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                         </button>
                       );
                     })}
+                  </div>
+
+                  {/* People from outside the team: they see the task too, without being responsible for it. */}
+                  <div className="pt-2 space-y-1.5" ref={accessDropdownRef} data-access-outsiders>
+                    <span className="block font-bold text-slate-700 dark:text-slate-300 text-[11px]">
+                      افراد دیگر (خارج از تیم) با دسترسی به این فعالیت:
+                    </span>
+                    {outsiders.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {outsiders.map((id) => {
+                          const name = nameOf(id);
+                          const isResponsible = responsibleIds.includes(id);
+                          return (
+                            <span
+                              key={id}
+                              data-access-outsider={id}
+                              className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-xl bg-indigo-600 text-white border border-indigo-600 text-xs font-semibold shadow-2xs"
+                            >
+                              <span className="w-4 h-4 rounded-full bg-white text-indigo-700 flex items-center justify-center">
+                                <Check className="w-3 h-3 text-indigo-600" />
+                              </span>
+                              <span>{name}</span>
+                              <span className="text-[9px] text-indigo-100">{isResponsible ? '(مسئول)' : '(خارج از تیم)'}</span>
+                              {!isStatusOnlyEdit && (
+                                <button
+                                  type="button"
+                                  aria-label={`حذف دسترسی ${name}`}
+                                  onClick={() => setSelectedMemberIds((prev) => prev.filter((x) => x !== id))}
+                                  className="p-0.5 rounded-md text-indigo-200 hover:text-white hover:bg-indigo-500 cursor-pointer"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              )}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {!isStatusOnlyEdit && (
+                      <div className="relative">
+                        <div className="relative flex items-center">
+                          <Search className="w-4 h-4 absolute right-3 text-slate-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            placeholder="افزودن شخص دیگر از خارج تیم (جستجوی نام)..."
+                            value={accessSearchQuery}
+                            onFocus={() => setIsAccessDropdownOpen(true)}
+                            onChange={(e) => {
+                              setAccessSearchQuery(e.target.value);
+                              setIsAccessDropdownOpen(true);
+                            }}
+                            className="w-full pl-3 pr-9 py-2 bg-white dark:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
+                          />
+                        </div>
+                        {isAccessDropdownOpen && (
+                          <div className="absolute z-50 top-full mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150" data-access-outsider-options>
+                            {outsideCandidates.length === 0 ? (
+                              <div className="py-4 text-center text-xs text-slate-400">کاربر دیگری برای افزودن یافت نشد.</div>
+                            ) : (
+                              outsideCandidates.map((user) => {
+                                const name = user.name || user.username;
+                                return (
+                                  <button
+                                    key={user.id}
+                                    type="button"
+                                    data-option={user.id}
+                                    onClick={() => {
+                                      setSelectedMemberIds((prev) => (prev.includes(user.id) ? prev : [...prev, user.id]));
+                                      setAccessSearchQuery('');
+                                    }}
+                                    className="w-full flex items-center gap-2.5 p-2 rounded-lg text-xs text-right transition-colors cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200"
+                                  >
+                                    {user.avatar ? (
+                                      <img src={user.avatar} alt={name} className="w-7 h-7 rounded-lg object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
+                                    ) : (
+                                      <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                                        {name.charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div className="truncate">
+                                      <p className="font-bold text-xs truncate text-slate-800 dark:text-slate-100">{name}</p>
+                                      {user.username && <p className="text-[10px] text-slate-400 truncate">@{user.username}</p>}
+                                    </div>
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
