@@ -128,6 +128,8 @@ export const ReportsView: React.FC<{
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  // Overdue is not a status: it is applied to the loaded rows, on top of the other filters.
+  const [onlyOverdue, setOnlyOverdue] = useState(false);
   const [readOnly, setReadOnly] = useState<TaskReportRow | null>(null);
   // The cards count every status, so they come from the same filters without the status one.
   const [overview, setOverview] = useState<TaskReport['summary'] | null>(null);
@@ -153,11 +155,11 @@ export const ReportsView: React.FC<{
   }, [filters.personId, filters.personRole, filters.positionId, filters.tag, filters.type, filters.dueFrom, filters.dueTo, filters.status]);
 
   const set = (patch: Partial<TaskReportFilters>) => setFilters((f) => ({ ...f, ...patch }));
-  const hasFilters = !!(filters.personId || filters.positionId || filters.tag || filters.type || filters.status || filters.dueFrom || filters.dueTo);
+  const hasFilters = !!(filters.personId || filters.positionId || filters.tag || filters.type || filters.status || filters.dueFrom || filters.dueTo || onlyOverdue);
   const [printJob, setPrintJob] = useState<null | 'print' | 'pdf'>(null);
   const [pdfProgress, setPdfProgress] = useState<string | null>(null);
   const byId = useMemo(() => new Map(visibleTasks.map((t) => [t.id, t])), [visibleTasks]);
-  const rows = report?.rows || [];
+  const rows = useMemo(() => (report?.rows || []).filter((r) => !onlyOverdue || r.isOverdue), [report, onlyOverdue]);
   const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const subordinates = scope.people.filter((p) => p.relation === 'direct' || p.relation === 'indirect').length;
   const scopeText = scope.seesAll
@@ -177,6 +179,7 @@ export const ReportsView: React.FC<{
     if (filters.tag) parts.push(`برچسب: ${filters.tag}`);
     if (filters.type) parts.push(`نوع: ${REPORT_TYPE_TITLES[filters.type]}`);
     if (filters.status) parts.push(`وضعیت: ${STATUSES[filters.status].title}`);
+    if (onlyOverdue) parts.push('فقط عقب‌افتاده‌ها');
     if (filters.dueFrom) parts.push(`موعد از ${jalaliDate(filters.dueFrom)}`);
     if (filters.dueTo) parts.push(`موعد تا ${jalaliDate(filters.dueTo)}`);
     return parts.length ? parts.join(' • ') : 'بدون فیلتر';
@@ -244,7 +247,7 @@ export const ReportsView: React.FC<{
           </div>
           <div className="flex items-center gap-2">
             {hasFilters && (
-              <SecondaryButton onClick={() => setFilters({ personRole: 'responsible' })}><FilterX className="w-4 h-4" /> پاک کردن فیلترها</SecondaryButton>
+              <SecondaryButton onClick={() => { setFilters({ personRole: 'responsible' }); setOnlyOverdue(false); }}><FilterX className="w-4 h-4" /> پاک کردن فیلترها</SecondaryButton>
             )}
             <SecondaryButton onClick={() => exportExcel(rows)} disabled={!report || loading || !!printJob || rows.length === 0}><FileSpreadsheet className="w-4 h-4 text-emerald-600" /> دانلود Excel</SecondaryButton>
             <SecondaryButton onClick={() => setPrintJob('pdf')} disabled={!report || loading || !!printJob}>
@@ -314,12 +317,12 @@ export const ReportsView: React.FC<{
 
       {s && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-x-2 justify-items-center">
-          <SummaryCard label="کل فعالیت‌ها" value={s.total} theme="indigo" icon={ListChecks} active={!filters.status} onClick={() => set({ status: undefined })} />
-          <SummaryCard label="شروع نشده" value={s.todo} theme="slate" icon={Clock} active={filters.status === 'todo'} onClick={() => set({ status: 'todo' })} />
-          <SummaryCard label="درحال اجرا" value={s.inProgress} theme="blue" icon={Play} active={filters.status === 'in_progress'} onClick={() => set({ status: 'in_progress' })} />
-          <SummaryCard label="متوقف" value={s.paused} theme="amber" icon={Pause} active={filters.status === 'paused'} onClick={() => set({ status: 'paused' })} />
-          <SummaryCard label="خاتمه یافته" value={s.completed} theme="emerald" icon={CheckCircle2} active={filters.status === 'completed'} onClick={() => set({ status: 'completed' })} />
-          <SummaryCard label="عقب‌افتاده" value={s.overdue} theme="rose" icon={AlertTriangle} />
+          <SummaryCard label="کل فعالیت‌ها" value={s.total} theme="indigo" icon={ListChecks} active={!filters.status && !onlyOverdue} onClick={() => { setOnlyOverdue(false); set({ status: undefined }); }} />
+          <SummaryCard label="شروع نشده" value={s.todo} theme="slate" icon={Clock} active={filters.status === 'todo' && !onlyOverdue} onClick={() => { setOnlyOverdue(false); set({ status: 'todo' }); }} />
+          <SummaryCard label="درحال اجرا" value={s.inProgress} theme="blue" icon={Play} active={filters.status === 'in_progress' && !onlyOverdue} onClick={() => { setOnlyOverdue(false); set({ status: 'in_progress' }); }} />
+          <SummaryCard label="متوقف" value={s.paused} theme="amber" icon={Pause} active={filters.status === 'paused' && !onlyOverdue} onClick={() => { setOnlyOverdue(false); set({ status: 'paused' }); }} />
+          <SummaryCard label="خاتمه یافته" value={s.completed} theme="emerald" icon={CheckCircle2} active={filters.status === 'completed' && !onlyOverdue} onClick={() => { setOnlyOverdue(false); set({ status: 'completed' }); }} />
+          <SummaryCard label="عقب‌افتاده" value={s.overdue} theme="rose" icon={AlertTriangle} active={onlyOverdue} onClick={() => { setOnlyOverdue((v) => !v); setPage(1); }} />
         </div>
       )}
 
