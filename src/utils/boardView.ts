@@ -169,7 +169,7 @@ function byDueDate(tasks: Task[]): TaskGroup[] {
     { key: 'due:today', title: 'امروز', description: 'موعد انجام امروز', tone: 'amber', tasks: [] },
     { key: 'due:week', title: 'هفت روز آینده', description: 'موعد انجام تا یک هفته دیگر', tone: 'blue', tasks: [] },
     { key: 'due:later', title: 'آینده', description: 'موعد انجام بیش از یک هفته دیگر', tone: 'indigo', tasks: [] },
-    { key: 'due:past', title: 'موعد گذشته', description: 'خاتمه‌یافته یا متوقف با موعد گذشته', tone: 'slate', tasks: [] },
+    { key: 'due:past', title: 'خاتمه یافته', description: 'خاتمه‌یافته یا متوقف با موعد گذشته', tone: 'slate', tasks: [] },
     { key: 'due:recurring', title: 'تکرارشونده', description: 'فعالیت‌های دوره‌ای با موعدهای تکراری', tone: 'violet', tasks: [] },
     { key: 'due:none', title: 'بدون موعد', description: 'موعد انجام ثبت نشده', tone: 'slate', tasks: [] },
   ];
