@@ -89,6 +89,8 @@ export interface TaskComment {
   userId: string;
   userName: string;
   userAvatar?: string;
+  /** Written as a stand-in for a vacant post («جانشین کارشناس · کد ۷»). */
+  actingNote?: string;
   text: string;
   attachments?: Attachment[];
   createdAt: string;
@@ -180,6 +182,10 @@ export interface Task {
   responsibleUserNames?: string[];
   assignedTeamId?: string; // the task's team: its context, not who is responsible
   assignedTeamName?: string;
+  /** Where tasks are given to posts: the responsible posts (their holders are responsibleUserIds). */
+  responsiblePostIds?: string[];
+  /** Where tasks are given to posts: every post of the task (creator's, responsible, access). */
+  posts?: TaskPostInfo[];
   teamMemberIds?: string[]; // the access list: who else may see and work on the task
   teamMemberNames?: string[]; // their names, in the same order
   allowAssigneeStatusUpdate?: boolean; // آیا مسئول امکان بروزرسانی وضعیت را دارد یا خیر
@@ -193,6 +199,17 @@ export interface Task {
   logs?: TaskLog[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** A post a task is given to: role owner / responsible / access; holderUserId null when vacant. */
+export interface TaskPostInfo {
+  postId: string;
+  role: 'owner' | 'responsible' | 'access';
+  title: string;
+  code: string;
+  place: string;
+  holderUserId: string | null;
+  holderName: string | null;
 }
 
 export interface StatusConfig {

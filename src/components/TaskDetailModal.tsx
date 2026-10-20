@@ -762,6 +762,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                           >
                             {isMyComment ? 'شما' : cmt.userName}
                           </span>
+                          {cmt.actingNote && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold" title="به‌عنوان جانشین پست خالی">
+                              {cmt.actingNote.replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)])}
+                            </span>
+                          )}
                         </div>
 
                         {/* Date & Time display in violet/indigo font */}

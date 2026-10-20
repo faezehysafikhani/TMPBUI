@@ -2,9 +2,9 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
-import { ChartCompany, ChartMember, ChartPosition, ChartUnit, PersonRef, getChart, listPositions, listUnplacedUsers } from '../../../services/orgStructureApi';
+import { ChartCompany, ChartMember, ChartPosition, ChartUnit, PersonRef, getChart, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
-import { ChartSelection, companyHeadcount, positionsOf, unitHeadcount, vacantCount } from './orgChartModel';
+import { ChartSelection, companyHeadcount, companyPostsOf, headPostOf, positionsOf, unitHeadcount, vacantCount } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
@@ -352,6 +352,22 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     const hits: SearchHit[] = [];
     const people = new Set<string>();
     const openUnit = (unitId: string) => removeFrom(setCollapsedUnits, unitId);
+    for (const post of companyPostsOf(company)) {
+      const select: ChartSelection = { kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: post.unitPositionId };
+      hits.push({
+        key: `position:${post.unitPositionId}`, kind: 'position', label: postLabel(post),
+        detail: `پست مستقیم شرکت${post.holders.length === 0 ? ' · خالی' : ''}`,
+        go: () => choose(select, { force: true }),
+      });
+      for (const member of post.holders) {
+        if (people.has(member.userId)) continue;
+        people.add(member.userId);
+        hits.push({
+          key: `person:${member.userId}`, kind: 'person', label: member.displayName, detail: `${postLabel(post)} · ${company.name}`,
+          go: () => choose({ kind: 'member', userId: member.userId }, { force: true }),
+        });
+      }
+    }
     for (const unit of company.units) {
       hits.push({
         key: `unit:${unit.unitId}`, kind: 'unit', label: unit.name, detail: `معاونت · ${toPersianDigits(unitHeadcount(unit))} نفر`,
@@ -360,8 +376,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
       for (const position of positionsOf(unit)) {
         const select: ChartSelection = { kind: 'position', companyId: company.companyId, unitId: unit.unitId, unitPositionId: position.unitPositionId };
         hits.push({
-          key: `position:${position.unitPositionId}`, kind: 'position', label: position.title,
-          detail: `سمت · ${unit.name}${position.holders.length === 0 ? ' · خالی' : ''}`,
+          key: `position:${position.unitPositionId}`, kind: 'position', label: postLabel(position),
+          detail: `پست · ${unit.name}${position.holders.length === 0 ? ' · خالی' : ''}`,
           go: () => { openUnit(unit.unitId); choose(select, { force: true }); },
         });
         for (const member of position.holders) {
@@ -441,7 +457,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
                   node={`position:${position.unitPositionId}`}
                   icon={Briefcase}
                   tone="bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300"
-                  title={position.title}
+                  title={postLabel(position)}
+                  subtitle={position.holders.length === 1 ? position.holders[0].displayName : undefined}
                   count={position.holders.length}
                   members={position.holders}
                   vacant={position.holders.length === 0}
@@ -581,7 +598,23 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
 
           {/* the head of the company, between it and its deputies */}
           <span className={`w-0.5 h-6 ${line}`} aria-hidden="true" />
-          {company.manager ? (
+          {!company.manager && headPostOf(company) ? (
+            <NodeCard
+              node={`position:${headPostOf(company)!.unitPositionId}`}
+              label={`رئیس کل: ${postLabel(headPostOf(company)!)}`}
+              selected={isSelected({ kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: headPostOf(company)!.unitPositionId })}
+              onSelect={() => choose({ kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: headPostOf(company)!.unitPositionId })}
+              className="w-64 border-dashed"
+            >
+              <div className="flex items-center gap-2.5 p-3">
+                <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300 flex items-center justify-center shrink-0"><Crown className="w-[18px] h-[18px]" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">رئیس کل · {postLabel(headPostOf(company)!)}</span>
+                  <span className="block text-xs text-slate-400">خالی</span>
+                </span>
+              </div>
+            </NodeCard>
+          ) : company.manager ? (
             <NodeCard
               node={`member:${company.manager.userId}`}
               label={`رئیس کل: ${company.manager.displayName}`}
@@ -592,7 +625,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
               <div className="flex items-center gap-2.5 p-3">
                 <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300 flex items-center justify-center shrink-0"><Crown className="w-[18px] h-[18px]" /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-300">رئیس کل</span>
+                  <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">رئیس کل{headPostOf(company)?.code ? ` · کد ${toPersianDigits(headPostOf(company)!.code!)}` : ''}</span>
                   <PersonLine person={company.manager} empty="" />
                 </span>
               </div>
@@ -604,6 +637,34 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
                 <span className="block text-[11px] font-bold text-slate-500">رئیس کل</span>
                 <span className="block text-xs text-slate-400">تعیین نشده</span>
               </span>
+            </div>
+          )}
+
+          {/* the company's other posts (board members, advisers...), right under its head */}
+          {companyPostsOf(company).some((p) => !p.isHead) && (
+            <div className="mt-2 flex flex-wrap justify-center gap-2 max-w-3xl">
+              {companyPostsOf(company).filter((p) => !p.isHead).map((post) => {
+                const select: ChartSelection = { kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: post.unitPositionId };
+                const holder = post.holders[0];
+                return (
+                  <NodeCard
+                    key={post.unitPositionId}
+                    node={`position:${post.unitPositionId}`}
+                    label={postLabel(post)}
+                    selected={isSelected(select)}
+                    onSelect={() => choose(select)}
+                    className={`w-56 ${holder ? '' : 'border-dashed'} ${post.isActive ? '' : 'opacity-70'}`}
+                  >
+                    <div className="flex items-center gap-2.5 p-2.5">
+                      <span className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300 flex items-center justify-center shrink-0"><Briefcase className="w-4 h-4" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">{postLabel(post)}</span>
+                        <span className="block text-[11px] text-slate-500 truncate">{holder ? holder.displayName : 'خالی'}</span>
+                      </span>
+                    </div>
+                  </NodeCard>
+                );
+              })}
             </div>
           )}
 

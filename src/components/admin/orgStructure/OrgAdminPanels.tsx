@@ -7,7 +7,7 @@ import { userErrorMessage } from '../../../utils/errorMessages';
 import {
   Company, CompanyUnitLink, OrgUnit, Position, createCompany, createOrgUnit, createPosition, deactivateOrgUnit,
   deleteCompany, deletePosition, linkUnitToCompany, listCompanies, listCompanyUnits, listOrgUnits,
-  listPositions, sortOrgUnits, unlinkUnit, updateCompany, updateOrgUnit, updatePosition,
+  listAssignments, listPositions, sortOrgUnits, unlinkUnit, updateCompany, updateOrgUnit, updatePosition, UserAssignment,
 } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, UserPicker, useLoad, useUserNames } from './orgShared';
 
@@ -39,7 +39,7 @@ function useAction(reload: () => void, setMessage: (m: Message) => void) {
 
 // ============================================================================ companies
 
-interface CompanyDraft { id?: string; name: string; code: string; description: string; managerUserId: string | null; managerName: string | null; isActive: boolean }
+interface CompanyDraft { id?: string; name: string; code: string; description: string; headName: string | null; isActive: boolean }
 
 export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean }> = ({ canManage, canSeeUnits }) => {
   const data = useLoad(async () => {
@@ -54,7 +54,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
 
   const save = async () => {
     if (!draft) return;
-    const input = { name: draft.name, code: draft.code, description: draft.description || null, managerUserId: draft.managerUserId };
+    const input = { name: draft.name, code: draft.code, description: draft.description || null };
     const ok = await run(
       () => (draft.id ? updateCompany(draft.id, { ...input, isActive: draft.isActive }) : createCompany(input)),
       draft.id ? 'شرکت ویرایش شد.' : 'شرکت ایجاد شد.',
@@ -73,7 +73,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
             <p className="text-xs text-slate-500 mt-0.5">شرکت‌های این سازمان و معاونت‌هایی که هر کدام در اختیار دارد.</p>
           </div>
           {canManage && (
-            <PrimaryButton onClick={() => setDraft({ name: '', code: '', description: '', managerUserId: null, managerName: null, isActive: true })}>
+            <PrimaryButton onClick={() => setDraft({ name: '', code: '', description: '', headName: null, isActive: true })}>
               <Plus className="w-4 h-4" /> شرکت جدید
             </PrimaryButton>
           )}
@@ -101,7 +101,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
                       <td className={`${td} whitespace-nowrap text-left`}>
                         {canManage && canSeeUnits && <IconAction icon={Link2} label="تعیین معاونت‌های شرکت" onClick={() => setUnitsOf(c)} />}
                         {canManage && (
-                          <IconAction icon={Pencil} label="ویرایش" onClick={() => setDraft({ id: c.id, name: c.name, code: c.code, description: c.description || '', managerUserId: c.manager?.userId || null, managerName: c.manager?.displayName || null, isActive: c.isActive })} />
+                          <IconAction icon={Pencil} label="ویرایش" onClick={() => setDraft({ id: c.id, name: c.name, code: c.code, description: c.description || '', headName: c.manager?.displayName || null, isActive: c.isActive })} />
                         )}
                         {canManage && <IconAction icon={Trash2} tone="rose" label="حذف" onClick={() => setConfirmDelete(c)} />}
                       </td>
@@ -126,9 +126,10 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
             <Field label="نام شرکت" required><input className={inputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
             <Field label="کد شرکت" required hint="کد یکتا، مثلاً TJ"><input className={`${inputClass} dir-ltr text-right`} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} /></Field>
           </div>
-          <Field label="رئیس کل (مدیرعامل)" hint="مدیر کسانی که در این شرکت مدیر دیگری ندارند.">
-            <UserPicker value={draft.managerUserId} valueLabel={draft.managerName} onChange={(id, name) => setDraft({ ...draft, managerUserId: id, managerName: name })} />
-          </Field>
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-3 text-xs leading-6 text-slate-600 dark:text-slate-300">
+            {draft.headName ? <>رئیس کل: <b className="text-slate-900 dark:text-white">{draft.headName}</b>. </> : null}
+            رئیس کل اینجا تعیین نمی‌شود: در بخش «سمت‌ها» سمتِ بدون مافوقِ این شرکت را تعریف کنید و آن را مستقیم در همین شرکت به یک کاربر بدهید.
+          </div>
           <Field label="توضیحات"><textarea rows={3} className={inputClass} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
           {draft.id && <Toggle checked={draft.isActive} onChange={(v) => setDraft({ ...draft, isActive: v })} label="شرکت فعال است" />}
         </AdminDialog>
@@ -329,18 +330,46 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
 
 // ============================================================================ positions
 
-interface PositionDraft { id?: string; title: string; parentPositionId: string | null; isActive: boolean }
+interface PositionDraft { id?: string; title: string; parentPositionId: string | null; isActive: boolean; companyIds: string[] }
+
+/**
+ * In each company the one position with no superior is the head's (رئیس کل): the only such one,
+ * or else the one its head holds. Any other position with no superior still needs one.
+ */
+function headPositionIds(positions: Position[], companies: Company[], assignments: UserAssignment[]): Set<string> {
+  const heads = new Set<string>();
+  for (const company of companies) {
+    const roots = positions.filter((p) => !p.parentPositionId && (p.companyIds || []).includes(company.id));
+    const held = assignments.find((a) => a.userId === company.manager?.userId && a.companyId === company.id && !a.unitId)?.positionId;
+    const head = roots.length === 1 ? roots[0] : roots.find((p) => p.id === held);
+    if (head) heads.add(head.id);
+  }
+  return heads;
+}
 
 export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) => {
-  const data = useLoad(listPositions, 'دریافت فهرست سمت‌ها ممکن نشد.');
+  const data = useLoad(async () => {
+    const [positions, companies, assignments] = await Promise.all([
+      listPositions(), listCompanies(), listAssignments().catch(() => [] as UserAssignment[]),
+    ]);
+    return { positions, companies, assignments };
+  }, 'دریافت فهرست سمت‌ها ممکن نشد.');
   const [message, setMessage] = useState<Message>(null);
   const [draft, setDraft] = useState<PositionDraft | null>(null);
   const { busy, run } = useAction(data.reload, setMessage);
 
+  const positions = data.data?.positions || [];
+  const companies = data.data?.companies || [];
+  const companyName = (id: string) => companies.find((c) => c.id === id)?.name || 'شرکت حذف‌شده';
+  const heads = useMemo(
+    () => headPositionIds(data.data?.positions || [], data.data?.companies || [], data.data?.assignments || []),
+    [data.data],
+  );
+
+  // A superior: not the position itself or one below it, and for every company chosen.
   const parentOptions = useMemo(() => {
-    const positions = data.data || [];
-    if (!draft?.id) return positions;
-    const descendants = new Set<string>([draft.id]);
+    if (!draft) return [];
+    const descendants = new Set<string>(draft.id ? [draft.id] : []);
     let changed = true;
     while (changed) {
       changed = false;
@@ -351,19 +380,28 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
         }
       }
     }
-    return positions.filter((position) => !descendants.has(position.id));
-  }, [data.data, draft?.id]);
+    return positions.filter((position) => !descendants.has(position.id)
+      && draft.companyIds.every((id) => (position.companyIds || []).includes(id)));
+  }, [positions, draft]);
 
   const save = async () => {
     if (!draft) return;
     const ok = await run(
       () => (draft.id
-        ? updatePosition(draft.id, draft.title, draft.parentPositionId, draft.isActive)
-        : createPosition(draft.title, draft.parentPositionId)),
+        ? updatePosition(draft.id, draft.title, draft.parentPositionId, draft.isActive, draft.companyIds)
+        : createPosition(draft.title, draft.parentPositionId, draft.companyIds)),
       draft.id ? 'سمت ویرایش شد.' : 'سمت ایجاد شد.',
       'ذخیره سمت انجام نشد.',
     );
     if (ok) setDraft(null);
+  };
+
+  const toggleCompany = (id: string) => {
+    if (!draft) return;
+    const companyIds = draft.companyIds.includes(id) ? draft.companyIds.filter((c) => c !== id) : [...draft.companyIds, id];
+    const parent = positions.find((p) => p.id === draft.parentPositionId);
+    const parentStillFits = !parent || companyIds.every((c) => (parent.companyIds || []).includes(c));
+    setDraft({ ...draft, companyIds, parentPositionId: parentStillFits ? draft.parentPositionId : null });
   };
 
   return (
@@ -373,28 +411,44 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div>
             <h3 className="text-base font-extrabold text-slate-900 dark:text-white">سمت‌ها</h3>
-            <p className="text-xs text-slate-500 mt-0.5">عنوان‌های شغلی سازمان، مثل کارشناس، رئیس اداره و معاون. (جدا از نقش‌های دسترسی)</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              عنوان‌های شغلی هر شرکت، مثل کارشناس، رئیس اداره و معاون. (جدا از نقش‌های دسترسی)
+              در هر شرکت فقط سمت رئیس کل بدون مافوق است؛ کسی که این سمت را مستقیم در شرکت بگیرد رئیس کل آن شرکت می‌شود.
+            </p>
           </div>
-          {canManage && <PrimaryButton onClick={() => setDraft({ title: '', parentPositionId: null, isActive: true })}><Plus className="w-4 h-4" /> سمت جدید</PrimaryButton>}
+          {canManage && (
+            <PrimaryButton onClick={() => setDraft({ title: '', parentPositionId: null, isActive: true, companyIds: companies.length === 1 ? [companies[0].id] : [] })}>
+              <Plus className="w-4 h-4" /> سمت جدید
+            </PrimaryButton>
+          )}
         </div>
         {data.loading ? <LoadingRow /> : data.error ? <div className="p-5"><Notice type="error">{data.error}</Notice></div>
-          : (data.data || []).length === 0 ? <EmptyRow>هنوز سمتی تعریف نشده است.</EmptyRow> : (
+          : positions.length === 0 ? <EmptyRow>هنوز سمتی تعریف نشده است.</EmptyRow> : (
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {data.data!.map((p: Position) => (
-                <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{p.title}</span>
-                    {p.parentPositionId && <span className="text-xs text-slate-500 truncate">مافوق: {data.data?.find((parent) => parent.id === p.parentPositionId)?.title || 'سمت حذف‌شده'}</span>}
-                    {!p.isActive && <StatusBadge tone="red">غیرفعال</StatusBadge>}
-                  </div>
-                  {canManage && (
-                    <div className="whitespace-nowrap">
-                      <IconAction icon={Pencil} label="ویرایش" onClick={() => setDraft({ id: p.id, title: p.title, parentPositionId: p.parentPositionId, isActive: p.isActive })} />
-                      <IconAction icon={Trash2} tone="rose" label="حذف" disabled={busy} onClick={() => run(() => deletePosition(p.id), 'سمت حذف شد.', 'حذف سمت انجام نشد.')} />
+              {positions.map((p: Position) => {
+                const companyIds = p.companyIds || [];
+                return (
+                  <div key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{p.title}</span>
+                      {heads.has(p.id) && <StatusBadge tone="amber">رئیس کل</StatusBadge>}
+                      {p.parentPositionId && <span className="text-xs text-slate-500 truncate">مافوق: {positions.find((parent) => parent.id === p.parentPositionId)?.title || 'سمت حذف‌شده'}</span>}
+                      {!p.parentPositionId && !heads.has(p.id) && companyIds.length > 0 && (
+                        <StatusBadge tone="red" title="در هر شرکت فقط سمت رئیس کل بدون مافوق است؛ برای این سمت مافوق تعیین کنید.">مافوق تعیین نشده</StatusBadge>
+                      )}
+                      {companyIds.length === 0 && <StatusBadge tone="red" title="این سمت به هیچ کاربری داده نمی‌شود تا شرکتش تعیین شود.">بدون شرکت</StatusBadge>}
+                      {companyIds.map((id) => <StatusBadge key={id} tone="indigo">{companyName(id)}</StatusBadge>)}
+                      {!p.isActive && <StatusBadge tone="red">غیرفعال</StatusBadge>}
                     </div>
-                  )}
-                </div>
-              ))}
+                    {canManage && (
+                      <div className="whitespace-nowrap">
+                        <IconAction icon={Pencil} label="ویرایش" onClick={() => setDraft({ id: p.id, title: p.title, parentPositionId: p.parentPositionId, isActive: p.isActive, companyIds })} />
+                        <IconAction icon={Trash2} tone="rose" label="حذف" disabled={busy} onClick={() => run(() => deletePosition(p.id), 'سمت حذف شد.', 'حذف سمت انجام نشد.')} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
       </AdminCard>
@@ -405,13 +459,27 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
           onClose={() => setDraft(null)}
           footer={<>
             <SecondaryButton onClick={() => setDraft(null)}>انصراف</SecondaryButton>
-            <PrimaryButton onClick={save} disabled={busy || !draft.title.trim()}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
+            <PrimaryButton onClick={save} disabled={busy || !draft.title.trim() || draft.companyIds.length === 0}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
           </>}
         >
           <Field label="عنوان سمت" required><input className={inputClass} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Field>
-          <Field label="سمت مافوق">
+          <Field label="شرکت‌ها" required hint="این سمت فقط به کاربران و معاونت‌های این شرکت‌ها داده می‌شود.">
+            {companies.length === 0 ? (
+              <p className="text-xs text-rose-600">ابتدا در بخش «شرکت‌ها» شرکت تعریف کنید.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {companies.map((c) => (
+                  <label key={c.id} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-sm cursor-pointer ${draft.companyIds.includes(c.id) ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                    <input type="checkbox" className="accent-indigo-600" checked={draft.companyIds.includes(c.id)} onChange={() => toggleCompany(c.id)} />
+                    {c.name}
+                  </label>
+                ))}
+              </div>
+            )}
+          </Field>
+          <Field label="سمت مافوق" hint="فقط سمت‌هایی که برای همهٔ شرکت‌های انتخاب‌شده هستند. بدون مافوق یعنی سمت رئیس کل (هر شرکت فقط یکی).">
             <select className={inputClass} value={draft.parentPositionId || ''} onChange={(e) => setDraft({ ...draft, parentPositionId: e.target.value || null })}>
-              <option value="">— بدون سمت مافوق —</option>
+              <option value="">— بدون مافوق (رئیس کل شرکت) —</option>
               {parentOptions.map((position) => <option key={position.id} value={position.id}>{position.title}</option>)}
             </select>
           </Field>

@@ -9,16 +9,22 @@ export type ChartSelection =
   | { kind: 'unit'; companyId: string; unitId: string }
   /** A deputy's people who hold none of its positions. */
   | { kind: 'noPosition'; companyId: string; unitId: string }
-  /** One of a deputy's positions, with whoever holds it. */
+  /** A post (of a deputy, or directly in the company: unitId ''), with whoever holds it. */
   | { kind: 'position'; companyId: string; unitId: string; unitPositionId: string }
   | { kind: 'member'; userId: string }
   /** Someone with no place in the structure yet. */
   | { kind: 'unplaced'; userId: string };
 
-/** A deputy position and where it is. */
-export interface PositionPlace { company: ChartCompany; unit: ChartUnit; position: ChartPosition }
+/** A post and where it is: in a deputy, or directly in the company (unit null). */
+export interface PositionPlace { company: ChartCompany; unit: ChartUnit | null; position: ChartPosition }
 
 export const positionsOf = (unit: ChartUnit): ChartPosition[] => unit.positions || [];
+
+/** The posts directly in the company (the head's first). */
+export const companyPostsOf = (company: ChartCompany): ChartPosition[] => company.positions || [];
+
+/** The company head's post, if it has one. */
+export const headPostOf = (company: ChartCompany): ChartPosition | undefined => companyPostsOf(company).find((p) => p.isHead);
 
 /** The people of a deputy: its own and those holding one of its positions. */
 export const unitHeadcount = (unit: ChartUnit) => unit.peopleCount ?? unit.members.length;
@@ -28,9 +34,12 @@ export const companyHeadcount = (company: ChartCompany) =>
 
 export const vacantCount = (unit: ChartUnit) => positionsOf(unit).filter((p) => p.holders.length === 0).length;
 
-/** Every deputy position of the chart, with where it is. */
+/** Every post of the chart (the companies' own too), with where it is. */
 export function allPositions(chart: ChartCompany[]): PositionPlace[] {
-  return chart.flatMap((company) => company.units.flatMap((unit) => positionsOf(unit).map((position) => ({ company, unit, position }))));
+  return chart.flatMap((company) => [
+    ...companyPostsOf(company).map((position) => ({ company, unit: null, position })),
+    ...company.units.flatMap((unit) => positionsOf(unit).map((position) => ({ company, unit, position }))),
+  ]);
 }
 
 export function findPosition(chart: ChartCompany[], unitPositionId: string): PositionPlace | null {

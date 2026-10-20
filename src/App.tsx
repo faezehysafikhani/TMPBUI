@@ -20,6 +20,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 const JalaliCalendarView = lazy(() => import('./components/JalaliCalendarView').then(m => ({ default: m.JalaliCalendarView })));
 const OverdueTasksView = lazy(() => import('./components/OverdueTasksView').then(m => ({ default: m.OverdueTasksView })));
 const ReportsView = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
+const SubstitutionInboxView = lazy(() => import('./components/SubstitutionInboxView').then(m => ({ default: m.SubstitutionInboxView })));
 const TeamChatView = lazy(() => import('./components/TeamChatView').then(m => ({ default: m.TeamChatView })));
 const PersonalNotesView = lazy(() => import('./components/PersonalNotesView').then(m => ({ default: m.PersonalNotesView })));
 const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
@@ -70,7 +71,7 @@ import { Database, PanelRightOpen } from 'lucide-react';
 import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION, withoutEditDuplicates } from './services/nexusApi';
 import { describeTaskChanges, summarizeTaskChanges, userNameLookup } from './utils/taskChangeSummary';
 import { getReportScope, ReportScope } from './services/taskReportApi';
-import { isOrgStructureAvailable, orgStructureLookupKey } from './services/orgStructureApi';
+import { isOrgStructureAvailable, orgStructureLookupKey, getSubstitutionInbox, SubstitutionInbox } from './services/orgStructureApi';
 import { refreshLookup, useLookup } from './utils/lookupCache';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
@@ -366,9 +367,16 @@ export default function App() {
   useEffect(() => {
     if (currentUserId) refreshLookup(orgStructureLookupKey(currentUserId), isOrgStructureAvailable).catch(() => {});
   }, [currentUserId]);
+  // «کارتابل جانشینی» exists only where tasks are given to posts, for those who may put a stand-in
+  // in charge of a vacant post (or have one below them with open tasks).
+  const substitution = useLookup<SubstitutionInbox | null>(
+    currentUserId ? `${currentUserId}:substitution` : null, getSubstitutionInbox, null).value;
+  const showSubstitution = !!substitution?.enabled && (substitution.canManageAll || substitution.posts.length > 0);
   const canOpenSection = useCallback(
-    (tab: ActiveTab) => canOpenTab(currentUser, tab) && (tab !== 'reports' || reportScope !== null),
-    [currentUser, reportScope],
+    (tab: ActiveTab) => canOpenTab(currentUser, tab)
+      && (tab !== 'reports' || reportScope !== null)
+      && (tab !== 'substitution' || showSubstitution),
+    [currentUser, reportScope, showSubstitution],
   );
 
   const canCreateTask = can(currentUser, PERMISSIONS.tasksCreate);
@@ -1356,6 +1364,13 @@ export default function App() {
             {activeTab === 'reports' && reportScope && canOpenTab(currentUser, 'reports') && (
               <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
                 <ReportsView scope={reportScope} visibleTasks={visibleTasks} onOpenTask={handleOpenTaskDetail} />
+              </Suspense>
+            )}
+
+            {/* The substitution inbox (only where tasks are given to posts) */}
+            {activeTab === 'substitution' && showSubstitution && (
+              <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
+                <SubstitutionInboxView onChanged={() => currentUserId && refreshLookup(`${currentUserId}:substitution`, getSubstitutionInbox).catch(() => {})} />
               </Suspense>
             )}
 
