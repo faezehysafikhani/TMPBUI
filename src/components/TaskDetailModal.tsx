@@ -24,6 +24,7 @@ import {
   Send,
   AlertCircle,
   ChevronDown,
+  ChevronLeft,
   Check,
   CheckCircle2,
   History,
@@ -73,6 +74,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     [...(task.comments || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   );
   const [logsList, setLogsList] = useState<TaskLog[]>(task.logs || []);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
   const [newCommentText, setNewCommentText] = useState('');
@@ -1079,23 +1081,38 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 هنوز هیچ لاگ رویداد یا تغییری ثبت نشده است.
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                {logsList.map((log) => (
-                  <div
-                    key={log.id}
-                    className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl text-xs flex items-start justify-between gap-2"
-                  >
-                    <div className="space-y-0.5 overflow-hidden">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-slate-800 dark:text-slate-100 bg-slate-200/60 dark:bg-slate-700/60 px-2 py-0.5 rounded-md text-[11px]">
-                          {log.userName || 'کاربر سیستم'}
-                        </span>
-                        <span className="font-bold text-indigo-700 dark:text-indigo-300">
-                          {log.action}
-                        </span>
-                      </div>
-                      {log.details && (
-                        <div className="text-[11px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed mt-1 bg-white/70 dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-700/50">
+              <div className="space-y-2">
+                {logsList.map((log) => {
+                  const isOpen = expandedLogId === log.id;
+                  return (
+                    <div
+                      key={log.id}
+                      className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl text-xs"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setExpandedLogId(isOpen ? null : log.id)}
+                        aria-expanded={isOpen}
+                        className="w-full p-3 flex items-center justify-between gap-2 text-right cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                          <ChevronLeft
+                            className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? '-rotate-90' : ''}`}
+                          />
+                          <span className="font-bold text-slate-800 dark:text-slate-100 bg-slate-200/60 dark:bg-slate-700/60 px-2 py-0.5 rounded-md text-[11px]">
+                            {log.userName || 'کاربر سیستم'}
+                          </span>
+                          <span className="font-bold text-indigo-700 dark:text-indigo-300">
+                            {log.action}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded-lg">
+                          <Clock className="w-3 h-3 text-indigo-500" />
+                          <span>{formatToJalali(log.createdAt)}</span>
+                        </div>
+                      </button>
+                      {isOpen && log.details && (
+                        <div className="mx-3 mb-3 text-[11px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed bg-white/70 dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-700/50">
                           {log.details.includes(' | ') ? (
                             <ul className="space-y-1 list-disc list-inside">
                               {log.details.split(' | ').map((item, idx) => (
@@ -1108,13 +1125,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         </div>
                       )}
                     </div>
-
-                    <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded-lg">
-                      <Clock className="w-3 h-3 text-indigo-500" />
-                      <span>{formatToJalali(log.createdAt)}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
