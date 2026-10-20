@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification, setMaxAttachmentBytes } from './types';
+import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification, setMaxAttachmentBytes, SubTaskProgress } from './types';
 import { getUploadPolicy, refreshUploadPolicy } from './utils/uploadPolicy';
 import { isOverdue, toPersianDigits, formatToJalali, getTaskLastModifiedTime, computeAutoTaskStatus } from './utils/helpers';
 import { Navbar } from './components/Navbar';
@@ -538,14 +538,25 @@ export default function App() {
     }
   }, [tasks, currentUser, loadTasks]);
 
-  // Toggle Subtask Completion
+  // Advance a subtask through its own lifecycle: not started -> in progress -> completed -> not started.
   const handleToggleSubTask = useCallback(async (taskId: string, subTaskId: string) => {
     const targetTask = tasks.find((t) => t.id === taskId);
     if (!targetTask || !targetTask.projectSubTasks) return;
 
-    const updatedSubTasks = targetTask.projectSubTasks.map((st) =>
-      st.id === subTaskId ? { ...st, completed: !st.completed } : st
-    );
+    const nowIso = new Date().toISOString();
+    const updatedSubTasks = targetTask.projectSubTasks.map((st) => {
+      if (st.id !== subTaskId) return st;
+      const current = st.status || (st.completed ? 'completed' : 'not_started');
+      const next: SubTaskProgress =
+        current === 'not_started' ? 'in_progress' : current === 'in_progress' ? 'completed' : 'not_started';
+      return {
+        ...st,
+        status: next,
+        completed: next === 'completed',
+        actualStartDate: next === 'not_started' ? st.actualStartDate : st.actualStartDate || nowIso,
+        actualCompletedDate: next === 'completed' ? st.actualCompletedDate || nowIso : st.actualCompletedDate,
+      };
+    });
 
     const autoStatus = computeAutoTaskStatus(updatedSubTasks);
 

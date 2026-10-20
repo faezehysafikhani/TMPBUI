@@ -110,14 +110,28 @@ export interface TaskLog {
 
 export type SubTaskImportance = 'low' | 'medium' | 'high';
 
+export interface SubTaskAssignee {
+  id: string;
+  name: string;
+}
+
+/** A subtask's own lifecycle, independent of its parent task's. */
+export type SubTaskProgress = 'not_started' | 'in_progress' | 'completed';
+
 export interface ProjectSubTask {
   id: string;
   title: string;
   startDate?: string;
   endDate?: string;
   importance: SubTaskImportance; // 'low' (1), 'medium' (2), 'high' (3)
-  completed: boolean;
+  completed: boolean; // derived: status === 'completed'
+  status?: SubTaskProgress;
+  /** When the subtask actually entered 'in_progress'. Set once, never cleared. */
+  actualStartDate?: string;
+  /** When the subtask actually entered 'completed'. Set once, never cleared. */
+  actualCompletedDate?: string;
   createdAt: string;
+  assignees?: SubTaskAssignee[];
 }
 
 export interface ProjectCharter {

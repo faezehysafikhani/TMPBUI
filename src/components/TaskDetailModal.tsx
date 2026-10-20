@@ -33,6 +33,8 @@ import {
   CheckSquare,
   ExternalLink,
   Loader2,
+  Circle,
+  PlayCircle,
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { userErrorMessage } from '../utils/errorMessages';
@@ -626,7 +628,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
                 {task.projectSubTasks.map((st) => {
-                  const isDone = !!st.completed;
+                  const progress = st.status || (st.completed ? 'completed' : 'not_started');
+                  const isDone = progress === 'completed';
+                  const isInProgress = progress === 'in_progress';
                   return (
                     <div
                       key={st.id}
@@ -634,22 +638,54 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all cursor-pointer ${
                         isDone
                           ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 line-through'
-                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:border-purple-300'
+                          : isInProgress
+                            ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 text-slate-800 dark:text-slate-100 hover:border-amber-300'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:border-purple-300'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-1">
-                        <input
-                          type="checkbox"
-                          checked={isDone}
-                          onChange={() => handleToggleSubTaskInModal(st.id)}
-                          className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-600 cursor-pointer shrink-0"
-                        />
-                        <span className="font-bold text-xs truncate">{st.title}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleToggleSubTaskInModal(st.id); }}
+                          title={isDone ? 'انجام شده - کلیک برای بازگشت به شروع نشده' : isInProgress ? 'درحال انجام - کلیک برای علامت زدن به انجام شده' : 'شروع نشده - کلیک برای شروع'}
+                          className="shrink-0"
+                        >
+                          {isDone ? (
+                            <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                          ) : isInProgress ? (
+                            <PlayCircle className="w-4 h-4 text-amber-500" />
+                          ) : (
+                            <Circle className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+                          )}
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-xs truncate block">{st.title}</span>
+                          {st.assignees && st.assignees.length > 0 && (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block">
+                              مسئول: {st.assignees.map((a) => a.name).join('، ')}
+                            </span>
+                          )}
+                          {isInProgress && st.actualStartDate && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 truncate block">
+                              شروع: {formatToJalali(st.actualStartDate)}
+                            </span>
+                          )}
+                          {isDone && (st.actualStartDate || st.actualCompletedDate) && (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block">
+                              {st.actualStartDate && <>شروع: {formatToJalali(st.actualStartDate)}</>}
+                              {st.actualStartDate && st.actualCompletedDate && ' · '}
+                              {st.actualCompletedDate && <>پایان: {formatToJalali(st.actualCompletedDate)}</>}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      {st.startDate && (
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 font-medium dir-rtl mr-2">
-                          {formatToJalali(st.startDate)}
+                      {(st.startDate || st.endDate) && (
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 font-medium dir-rtl mr-2 text-left">
+                          {st.startDate && <span>{formatToJalali(st.startDate)}</span>}
+                          {st.endDate && st.endDate !== st.startDate && (
+                            <span> - {formatToJalali(st.endDate)}</span>
+                          )}
                         </span>
                       )}
                     </div>
