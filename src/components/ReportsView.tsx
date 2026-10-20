@@ -62,13 +62,13 @@ const SummaryCard: React.FC<{
       type="button"
       onClick={onClick}
       disabled={!onClick}
-      className={`relative text-right px-3 py-2 rounded-xl border transition-all ${t.box} ${onClick ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} ${
+      className={`relative w-full lg:w-[68%] text-right px-2.5 py-1.5 rounded-lg border transition-all ${t.box} ${onClick ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} ${
         active ? 'ring-2 ring-indigo-500' : ''
       }`}
     >
       <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{label}</div>
-      <div className={`text-xl font-black leading-tight ${t.value}`}>{toPersianDigits(value)}</div>
-      <Icon className={`absolute bottom-1.5 left-2 w-4 h-4 ${t.icon}`} aria-hidden="true" />
+      <div className={`text-lg font-black leading-tight ${t.value}`}>{toPersianDigits(value)}</div>
+      <Icon className={`absolute bottom-1 left-1.5 w-3.5 h-3.5 ${t.icon}`} aria-hidden="true" />
     </button>
   );
 };
@@ -129,6 +129,8 @@ export const ReportsView: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [readOnly, setReadOnly] = useState<TaskReportRow | null>(null);
+  // The cards count every status, so they come from the same filters without the status one.
+  const [overview, setOverview] = useState<TaskReport['summary'] | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -140,6 +142,15 @@ export const ReportsView: React.FC<{
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [filters]);
+
+  useEffect(() => {
+    if (!filters.status) { setOverview(null); return; }
+    let alive = true;
+    getTaskReport({ ...filters, status: undefined })
+      .then((result) => { if (alive) setOverview(result.summary); })
+      .catch(() => alive && setOverview(null));
+    return () => { alive = false; };
+  }, [filters.personId, filters.personRole, filters.positionId, filters.tag, filters.type, filters.dueFrom, filters.dueTo, filters.status]);
 
   const set = (patch: Partial<TaskReportFilters>) => setFilters((f) => ({ ...f, ...patch }));
   const hasFilters = !!(filters.personId || filters.positionId || filters.tag || filters.type || filters.status || filters.dueFrom || filters.dueTo);
@@ -217,7 +228,7 @@ export const ReportsView: React.FC<{
     if (task) onOpenTask(task); else setReadOnly(row);
   };
 
-  const s = report?.summary;
+  const s = filters.status ? overview ?? report?.summary : report?.summary;
   const th = 'px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap';
   const td = 'px-3 py-2.5 align-middle text-xs';
 
@@ -302,7 +313,7 @@ export const ReportsView: React.FC<{
       {error && <Notice type="error" onClose={() => setError(null)}>{error}</Notice>}
 
       {s && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 lg:gap-x-2 justify-items-center">
           <SummaryCard label="کل فعالیت‌ها" value={s.total} theme="indigo" icon={ListChecks} active={!filters.status} onClick={() => set({ status: undefined })} />
           <SummaryCard label="شروع نشده" value={s.todo} theme="slate" icon={Clock} active={filters.status === 'todo'} onClick={() => set({ status: 'todo' })} />
           <SummaryCard label="درحال اجرا" value={s.inProgress} theme="blue" icon={Play} active={filters.status === 'in_progress'} onClick={() => set({ status: 'in_progress' })} />

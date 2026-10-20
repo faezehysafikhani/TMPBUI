@@ -1,16 +1,16 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Smile, Mic, Square } from 'lucide-react';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { toPersianDigits } from '../utils/helpers';
 
 export const CHAT_EMOJIS = [
   '👍', '😂', '😭', '👏', '🤞', '🙏', '😊', '🥰', '😮', '🙌',
-  '🙃', '😉', '🥳', '🤪', '💀', '😱', '🎉', '😎', '😴', '✌️',
-  '😁', '👌', '🤭', '😐', '🙋', '😋', '💰', '🥴', '🥹', '😢',
-  '🙋‍♂️', '😜', '🤗', '💯', '🤢', '😏', '🌹', '🤫', '😬',
-  '😳', '🎂', '🎈', '😵‍💫', '😷', '🤔', '😡', '🤬', '😤',
+  '🙃', '😉', '🥳', '🤪', '💀', '😱', '🎉', '😎', '😴', '✌',
+  '😁', '👌', '🤭', '😐', '🙋', '😋', '💰', '🥴', '🥺', '😢',
+  '😜', '🤗', '💯', '🤢', '😏', '🌹', '🤫', '😬',
+  '😳', '🎂', '🎈', '😵', '😷', '🤔', '😡', '🤬', '😤',
   '🤕', '🥱', '🤮', '🤯', '🥵', '🥶', '🤠', '🧐', '👻',
-  '🫰', '☝️', '🤝', '🙍‍♀️', '🧑‍💻', '🏃',
+  '🤙', '☝', '🤝', '🙍', '💻', '🏃',
 ];
 
 const VOICE_NAME = /^voice-.*\.(webm|ogg|m4a|mp4|wav|mp3)$/i;
@@ -30,8 +30,27 @@ interface EmojiButtonProps {
 /** A smiley button that opens a grid of emojis above it. */
 export const EmojiButton: React.FC<EmojiButtonProps> = ({ onPick, className = '', iconClassName = 'w-5 h-5' }) => {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // A click anywhere outside (or Escape) closes the list.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="relative shrink-0">
+    <div ref={rootRef} className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -44,13 +63,14 @@ export const EmojiButton: React.FC<EmojiButtonProps> = ({ onPick, className = ''
       {open && (
         <div className="absolute bottom-full mb-2 right-0 z-40 w-72 max-h-60 overflow-y-auto p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
           <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">انتخاب ایموجی</p>
-          <div className="grid grid-cols-8 gap-1">
+          <div className="grid grid-cols-8 gap-1 justify-items-center">
             {CHAT_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
                 type="button"
                 onClick={() => onPick(emoji)}
-                className="text-xl p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+                className="w-8 h-8 flex items-center justify-center text-xl leading-none rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
+                style={{ fontFamily: "'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif" }}
               >
                 {emoji}
               </button>

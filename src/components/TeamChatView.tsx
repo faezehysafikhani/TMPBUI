@@ -20,6 +20,7 @@ import {
   Copy,
   ExternalLink,
   ChevronDown,
+  CornerUpLeft,
 } from 'lucide-react';
 import { User, WorkTeam, DirectMessage, AppColorPalette, Task, TaskStatus, STATUSES, PRIORITIES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { toPersianDigits, formatTime24h, formatToJalali } from '../utils/helpers';
@@ -42,6 +43,7 @@ import {
 import { userErrorMessage } from '../utils/errorMessages';
 import { canSeeWorkTeams } from '../utils/permissions';
 import { EmojiButton, VoiceButton, isVoiceName } from './ChatExtras';
+import { ReplyRef, splitReply, withReply } from '../utils/chatReply';
 import { useMyPermissions } from './admin/SystemAdministration';
 import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
 
@@ -134,10 +136,11 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
   // Message Editing State
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>('');
+  const [replyTo, setReplyTo] = useState<ReplyRef | null>(null);
 
   const handleStartEdit = (msg: DirectMessage) => {
     setEditingMessageId(msg.id);
-    setEditingText(msg.text || '');
+    setEditingText(splitReply(msg.text).body);
   };
 
   const handleCancelEdit = () => {
@@ -149,7 +152,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     const msg = messages.find((m) => m.id === messageId);
     if (!msg || msg.senderId !== currentUser?.id) return;
     if (!editingText.trim()) return;
-    const newText = editingText.trim();
+    const newText = withReply(splitReply(msg.text).reply, editingText.trim());
     try {
       await updateDirectMessagePB(messageId, newText);
       setMessages((prev) =>
@@ -536,6 +539,8 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     };
   }, [currentUser?.id, conversationKey]);
 
+  useEffect(() => { setReplyTo(null); }, [conversationKey]);
+
   // Handle File Upload Attachment
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -566,7 +571,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     e?.preventDefault();
     if ((!inputMessage.trim() && !attachedFile) || !currentUser || !hasConversation || isSending) return;
 
-    const textToSend = inputMessage.trim();
+    const textToSend = withReply(replyTo || undefined, inputMessage.trim());
     const fileToSend = attachedFile;
     setIsSending(true);
     setSendError(null);
@@ -585,6 +590,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
           });
       setInputMessage('');
       setAttachedFile(null);
+      setReplyTo(null);
       scrollOnNextRenderRef.current = 'smooth';
       setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
     } catch (err) {
@@ -841,6 +847,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                           </div>
                         )}
                         <div
+                          data-msg-id={msg.id}
                           className={`max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-2xs space-y-1.5 ${
                             isMine
                               ? `${palette.accentBg} text-white rounded-br-md`
@@ -892,7 +899,26 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                               </div>
                             </div>
                           ) : (
-                            msg.text && <p className="whitespace-pre-wrap break-words" dir="auto">{msg.text}</p>
+                            (() => {
+                              const { reply, body } = splitReply(msg.text);
+                              return (
+                                <>
+                                  {reply && (
+                                    <button
+                                      type="button"
+                                      onClick={() => document.querySelector(`[data-msg-id="${reply.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}
+                                      className={`block w-full text-right border-r-2 pr-2 py-0.5 rounded-sm text-[11px] cursor-pointer ${
+                                        isMine ? 'border-white/60 bg-white/10 text-white/90' : 'border-indigo-400 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+                                      }`}
+                                    >
+                                      <span className="block font-bold truncate">{reply.name}</span>
+                                      <span className="block truncate">{reply.snippet}</span>
+                                    </button>
+                                  )}
+                                  {body && <p className="whitespace-pre-wrap break-words" dir="auto">{body}</p>}
+                                </>
+                              );
+                            })()
                           )}
 
                           {/* File Attachment */}
@@ -915,16 +941,36 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                           {/* Footer: actions and time */}
                           <div className={`flex items-center justify-between gap-2 text-[10px] ${isMine ? 'text-white/80' : 'text-slate-400'}`}>
                             <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const plain = splitReply(msg.text).body;
+                                  setReplyTo({
+                                    id: msg.id,
+                                    name: senderName,
+                                    snippet: isVoiceName(msg.attachmentName) ? '🎤 پیام صوتی' : plain || msg.attachmentName || 'پیوست',
+                                  });
+                                }}
+                                className={`p-1 rounded-md transition-colors cursor-pointer ${
+                                  isMine
+                                    ? 'hover:bg-white/20 text-white/90 hover:text-white'
+                                    : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400'
+                                }`}
+                                title="پاسخ به این پیام"
+                              >
+                                <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
+                              </button>
                               {onConvertToTask && !isVoiceName(msg.attachmentName) && (
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const title = msg.text
-                                      ? msg.text.length > 50
-                                        ? msg.text.substring(0, 50) + '...'
-                                        : msg.text
+                                    const plain = splitReply(msg.text).body;
+                                    const title = plain
+                                      ? plain.length > 50
+                                        ? plain.substring(0, 50) + '...'
+                                        : plain
                                       : 'وظیفه جدید از پیام چت';
-                                    const desc = `برگرفته از پیام گفتگو ${isGroup ? `تیم ${conversationTitle}` : `با ${conversationTitle}`}:\n${msg.text || ''}`;
+                                    const desc = `برگرفته از پیام گفتگو ${isGroup ? `تیم ${conversationTitle}` : `با ${conversationTitle}`}:\n${plain || ''}`;
                                     onConvertToTask(title, desc);
                                   }}
                                   className={`p-1 rounded-md transition-colors cursor-pointer ${
@@ -983,6 +1029,18 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 </button>
               )}
             </div>
+
+            {replyTo && (
+              <div className="px-4 py-2 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3 text-xs shrink-0">
+                <div className="min-w-0 border-r-2 border-indigo-400 pr-2">
+                  <div className="font-bold text-indigo-600 dark:text-indigo-300 truncate">پاسخ به {replyTo.name}</div>
+                  <div className="text-slate-500 dark:text-slate-400 truncate">{replyTo.snippet}</div>
+                </div>
+                <button type="button" onClick={() => setReplyTo(null)} className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer" aria-label="لغو پاسخ">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
 
             {/* Attachment Preview Bar */}
             {attachedFile && (
