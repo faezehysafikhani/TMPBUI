@@ -83,7 +83,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px]">
                 <thead className="bg-slate-50 dark:bg-slate-800/60"><tr>
-                  <th className={th}>نام شرکت</th><th className={th}>کد</th><th className={th}>مدیر ارشد</th><th className={th}>معاونت‌ها</th><th className={th}>وضعیت</th><th className={th} />
+                  <th className={th}>نام شرکت</th><th className={th}>کد</th><th className={th}>رئیس کل</th><th className={th}>معاونت‌ها</th><th className={th}>وضعیت</th><th className={th} />
                 </tr></thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data.data!.companies.map((c) => (
@@ -126,7 +126,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
             <Field label="نام شرکت" required><input className={inputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
             <Field label="کد شرکت" required hint="کد یکتا، مثلاً TJ"><input className={`${inputClass} dir-ltr text-right`} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} /></Field>
           </div>
-          <Field label="مدیر ارشد (مدیرعامل)" hint="مدیر کسانی که در این شرکت مدیر دیگری ندارند.">
+          <Field label="رئیس کل (مدیرعامل)" hint="مدیر کسانی که در این شرکت مدیر دیگری ندارند.">
             <UserPicker value={draft.managerUserId} valueLabel={draft.managerName} onChange={(id, name) => setDraft({ ...draft, managerUserId: id, managerName: name })} />
           </Field>
           <Field label="توضیحات"><textarea rows={3} className={inputClass} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>

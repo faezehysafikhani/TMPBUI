@@ -76,7 +76,7 @@ export const OrgPlacementFields: React.FC<{
         />
         <p className="text-[11px] text-slate-500 dark:text-slate-400">با + فهرست زیرمجموعه باز می‌شود؛ روی هر ردیف بزنید تا انتخاب شود.</p>
       </div>
-      <Field label="مدیر مستقیم (اختیاری)" hint="خالی بگذارید تا مدیر از مدیر واحد یا مدیر ارشد شرکت گرفته شود.">
+      <Field label="مدیر مستقیم (اختیاری)" hint="خالی بگذارید تا مدیر از مدیر واحد یا رئیس کل شرکت گرفته شود.">
         <UserPicker
           value={draft.managerUserId}
           valueLabel={draft.managerName}
