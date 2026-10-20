@@ -5,8 +5,8 @@ import { toPersianDigits } from '../utils/helpers';
 import { REPORT_TYPE_TITLES, TaskReportRow, TaskReportSummary } from '../services/taskReportApi';
 
 /** Rows on the first page (under the title) and on each following page. */
-const FIRST_PAGE_ROWS = 16;
-const PAGE_ROWS = 20;
+const FIRST_PAGE_ROWS = 28;
+const PAGE_ROWS = 31;
 
 // Plain hex colours and inline styles only: html2canvas (PDF) cannot read Tailwind's oklch()
 // colours, and print must look the same in dark mode.
@@ -22,22 +22,22 @@ const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0
 
 const COLUMNS: { title: string; width: string; value: (r: PrintableRow, i: number) => React.ReactNode }[] = [
   { title: 'ردیف', width: '5%', value: (_r, i) => toPersianDigits(i + 1) },
-  { title: 'عنوان', width: '23%', value: (r) => clip(r.title, 42) },
+  { title: 'عنوان', width: '20%', value: (r) => clip(r.title, 30) },
   { title: 'نوع', width: '7%', value: (r) => REPORT_TYPE_TITLES[r.type] },
-  { title: 'وضعیت', width: '8%', value: (r) => STATUSES[r.status]?.title || r.status },
-  { title: 'مسئول', width: '17%', value: (r) => clip(r.responsible.map((p) => (p.positionTitle ? `${p.displayName} (${p.positionTitle})` : p.displayName)).join('، '), 34) || '—' },
-  { title: 'ایجادکننده', width: '10%', value: (r) => clip(r.owner?.displayName || '—', 20) },
+  { title: 'وضعیت', width: '9%', value: (r) => STATUSES[r.status]?.title || r.status },
+  { title: 'مسئول', width: '17%', value: (r) => clip(r.responsible.map((p) => (p.positionTitle ? `${p.displayName} (${p.positionTitle})` : p.displayName)).join('، '), 26) || '—' },
+  { title: 'ایجادکننده', width: '11%', value: (r) => clip(r.owner?.displayName || '—', 14) },
   { title: 'موعد انجام', width: '9%', value: (r) => r.dueDateText },
   { title: 'تکمیل', width: '9%', value: (r) => r.completedText || '—' },
-  { title: 'برچسب‌ها', width: '12%', value: (r) => clip(r.tags.join('، '), 24) || '—' },
+  { title: 'برچسب‌ها', width: '13%', value: (r) => clip(r.tags.join('، '), 16) || '—' },
 ];
 
 const cell: React.CSSProperties = {
-  padding: '0 6px', height: 30, lineHeight: '30px', verticalAlign: 'middle', borderBottom: `1px solid ${C.line}`, overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'right',
+  padding: '0 4px', height: 30, lineHeight: '30px', verticalAlign: 'middle', borderBottom: `1px solid ${C.line}`, overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'right',
 };
 
 /**
- * The report as A4 landscape pages, rendered off screen into document.body. Printing shows only
+ * The report as A4 portrait pages, rendered off screen into document.body. Printing shows only
  * these pages (see `.report-print-root` in index.css); the PDF export captures each page.
  */
 export const ReportPrintPages: React.FC<{
@@ -57,7 +57,7 @@ export const ReportPrintPages: React.FC<{
         <div
           key={p}
           className="report-page"
-          style={{ width: '297mm', height: '210mm', padding: '10mm', boxSizing: 'border-box', background: '#ffffff', color: C.ink, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+          style={{ width: '210mm', height: '297mm', padding: '10mm', boxSizing: 'border-box', background: '#ffffff', color: C.ink, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         >
           {p === 0 ? (
             <div style={{ marginBottom: 10 }}>
@@ -72,7 +72,7 @@ export const ReportPrintPages: React.FC<{
             <div style={{ fontSize: 11, fontWeight: 700, color: C.head, marginBottom: 6 }}>گزارش فعالیت‌ها (ادامه)</div>
           )}
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 10.5 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontSize: 9 }}>
             <colgroup>{COLUMNS.map((c) => <col key={c.title} style={{ width: c.width }} />)}</colgroup>
             <thead>
               <tr>
