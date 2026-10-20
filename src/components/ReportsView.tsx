@@ -120,7 +120,9 @@ export const ReportsView: React.FC<{
   scope: ReportScope;
   visibleTasks: Task[];
   onOpenTask: (task: Task) => void;
-}> = ({ scope, visibleTasks, onOpenTask }) => {
+  /** Name of the signed-in user, printed next to the date on the PDF / printout. */
+  generatedBy?: string;
+}> = ({ scope, visibleTasks, onOpenTask, generatedBy }) => {
   const [filters, setFilters] = useState<TaskReportFilters>({ personRole: 'responsible' });
   const [report, setReport] = useState<TaskReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -391,7 +393,7 @@ export const ReportsView: React.FC<{
           summary={report.summary}
           scopeText={scopeText}
           filtersText={filtersText}
-          generatedText={`تاریخ تهیه: ${jalaliDate(iranDay(new Date().toISOString()))}`}
+          generatedText={`تاریخ تهیه: ${jalaliDate(iranDay(new Date().toISOString()))}${generatedBy ? ` | تهیه‌کننده: ${generatedBy}` : ''}`}
         />
       )}
     </div>
