@@ -20,9 +20,6 @@ import {
   Copy,
   ExternalLink,
   ChevronDown,
-  Smile,
-  Mic,
-  Square,
 } from 'lucide-react';
 import { User, WorkTeam, DirectMessage, AppColorPalette, Task, TaskStatus, STATUSES, PRIORITIES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { toPersianDigits, formatTime24h, formatToJalali } from '../utils/helpers';
@@ -44,6 +41,7 @@ import {
 } from '../services/dataService';
 import { userErrorMessage } from '../utils/errorMessages';
 import { canSeeWorkTeams } from '../utils/permissions';
+import { EmojiButton, VoiceButton, isVoiceName } from './ChatExtras';
 import { useMyPermissions } from './admin/SystemAdministration';
 import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
 
@@ -55,24 +53,6 @@ interface TeamChatViewProps {
   tasks?: Task[];
   onViewTaskDetails?: (task: Task) => void;
 }
-
-const CHAT_EMOJIS = [
-  '👍', '😂', '😭', '👏', '🤞', '🙏', '😊', '🥰', '😮', '🙌',
-  '🙃', '😉', '🥳', '🤪', '💀', '😱', '🎉', '😎', '😴', '✌️',
-  '😁', '👌', '🤭', '😐', '🙋', '😋', '💰', '🥴', '🥹', '😢',
-  '🙋‍♂️', '😜', '🤗', '💯', '🤢', '😏', '🌹', '🤫', '😬',
-  '😳', '🎂', '🎈', '😵‍💫', '😷', '🤔', '😡', '🤬', '😤',
-  '🤕', '🥱', '🤮', '🤯', '🥵', '🥶', '🤠', '🧐', '👻',
-  '🫰', '☝️', '🤝', '🙍‍♀️', '🧑‍💻', '🏃',
-];
-
-const VOICE_NAME = /^voice-.*\.(webm|ogg|m4a|mp4|wav|mp3)$/i;
-
-/** A voice message is an audio attachment recorded in the chat; it cannot become a task. */
-const isVoiceMessage = (msg: { attachmentName?: string }) => !!msg.attachmentName && VOICE_NAME.test(msg.attachmentName);
-
-const formatDuration = (seconds: number) =>
-  `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 
 export interface ChatContact {
   userId: string;
@@ -145,11 +125,6 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
   // Attached file payload
   const [attachedFile, setAttachedFile] = useState<{ name: string; url: string } | null>(null);
-  const [showEmojis, setShowEmojis] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordSeconds, setRecordSeconds] = useState(0);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const recordTimerRef = useRef<number | null>(null);
 
   // Loading and sending state
   const [isLoadingMessages, setIsLoadingMessages] = useState<boolean>(false);
@@ -561,40 +536,6 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     };
   }, [currentUser?.id, conversationKey]);
 
-  const startRecording = async () => {
-    setSendError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (ev) => { if (ev.data.size > 0) chunks.push(ev.data); };
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        if (recordTimerRef.current) window.clearInterval(recordTimerRef.current);
-        setIsRecording(false);
-        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-        if (blob.size === 0) return;
-        if (blob.size > MAX_ATTACHMENT_BYTES) {
-          alert(`حجم پیام صوتی بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
-          return;
-        }
-        const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm';
-        const reader = new FileReader();
-        reader.onload = () => setAttachedFile({ name: `voice-${Date.now()}.${ext}`, url: reader.result as string });
-        reader.readAsDataURL(blob);
-      };
-      recorderRef.current = recorder;
-      recorder.start();
-      setRecordSeconds(0);
-      setIsRecording(true);
-      recordTimerRef.current = window.setInterval(() => setRecordSeconds((n) => n + 1), 1000);
-    } catch {
-      setSendError('دسترسی به میکروفون ممکن نشد.');
-    }
-  };
-
-  const stopRecording = () => recorderRef.current?.state === 'recording' && recorderRef.current.stop();
-
   // Handle File Upload Attachment
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -955,10 +896,10 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                           )}
 
                           {/* File Attachment */}
-                          {msg.attachmentUrl && isVoiceMessage(msg) && (
+                          {msg.attachmentUrl && isVoiceName(msg.attachmentName) && (
                             <audio controls src={msg.attachmentUrl} className="max-w-[220px] h-9" />
                           )}
-                          {msg.attachmentUrl && !isVoiceMessage(msg) && (
+                          {msg.attachmentUrl && !isVoiceName(msg.attachmentName) && (
                             <div
                               className={`p-2 rounded-xl flex items-center gap-2 border ${
                                 isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
@@ -974,7 +915,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                           {/* Footer: actions and time */}
                           <div className={`flex items-center justify-between gap-2 text-[10px] ${isMine ? 'text-white/80' : 'text-slate-400'}`}>
                             <div className="flex items-center gap-1">
-                              {onConvertToTask && !isVoiceMessage(msg) && (
+                              {onConvertToTask && !isVoiceName(msg.attachmentName) && (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1048,7 +989,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
               <div className="px-4 py-2 bg-indigo-50 dark:bg-indigo-950/80 border-t border-indigo-200 dark:border-indigo-800 flex items-center justify-between text-xs text-indigo-900 dark:text-indigo-200 shrink-0">
                 <div className="flex items-center gap-2 truncate">
                   <Paperclip className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                  <span className="truncate">{isVoiceMessage({ attachmentName: attachedFile.name }) ? 'پیام صوتی آماده ارسال' : `پیوست: ${attachedFile.name}`}</span>
+                  <span className="truncate">{isVoiceName(attachedFile.name) ? 'پیام صوتی آماده ارسال' : `پیوست: ${attachedFile.name}`}</span>
                 </div>
                 <button type="button" onClick={() => setAttachedFile(null)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer" aria-label="حذف پیوست">
                   <X className="w-4 h-4" />
@@ -1075,51 +1016,13 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 <input type="file" accept={ALLOWED_UPLOAD_ACCEPT} className="hidden" onChange={handleFileUpload} />
               </label>
 
-              <div className="relative shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowEmojis((v) => !v)}
-                  title="ایموجی"
-                  aria-label="انتخاب ایموجی"
-                  className="p-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-xl cursor-pointer transition-colors"
-                >
-                  <Smile className="w-5 h-5" />
-                </button>
-                {showEmojis && (
-                  <div className="absolute bottom-12 right-0 z-40 w-72 max-h-60 overflow-y-auto p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
-                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">انتخاب ایموجی</p>
-                    <div className="grid grid-cols-8 gap-1">
-                      {CHAT_EMOJIS.map((emoji) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => setInputMessage((t) => t + emoji)}
-                          className="text-xl p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer"
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <EmojiButton onPick={(emoji) => setInputMessage((t) => t + emoji)} className="p-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-xl cursor-pointer transition-colors shrink-0" />
 
-              {isGroup && (
-                <button
-                  type="button"
-                  onClick={isRecording ? stopRecording : startRecording}
-                  title={isRecording ? 'توقف ضبط' : 'ضبط پیام صوتی'}
-                  aria-label={isRecording ? 'توقف ضبط' : 'ضبط پیام صوتی'}
-                  className={`p-2.5 rounded-xl cursor-pointer transition-colors shrink-0 flex items-center gap-1 text-xs font-bold ${
-                    isRecording
-                      ? 'text-rose-600 bg-rose-50 dark:bg-rose-950/60 animate-pulse'
-                      : 'text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60'
-                  }`}
-                >
-                  {isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                  {isRecording && <span>{toPersianDigits(formatDuration(recordSeconds))}</span>}
-                </button>
-              )}
+              <VoiceButton
+                onRecorded={(v) => setAttachedFile({ name: v.name, url: v.url })}
+                onError={setSendError}
+                className="p-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-xl cursor-pointer transition-colors shrink-0"
+              />
 
               <textarea
                 value={inputMessage}
