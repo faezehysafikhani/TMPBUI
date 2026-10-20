@@ -20,6 +20,25 @@ export interface PositionPlace { company: ChartCompany; unit: ChartUnit | null; 
 
 export const positionsOf = (unit: ChartUnit): ChartPosition[] => unit.positions || [];
 
+/**
+ * Posts as a tree: each post followed by the posts under it (parentPostId), at any depth, keeping
+ * the given order among siblings. A post whose parent is not in the list is a root.
+ */
+export function postTree<T extends { unitPositionId: string; parentPostId?: string | null }>(posts: T[]): { position: T; depth: number }[] {
+  const ids = new Set(posts.map((p) => p.unitPositionId));
+  const out: { position: T; depth: number }[] = [];
+  const seen = new Set<string>();
+  const visit = (post: T, depth: number) => {
+    if (seen.has(post.unitPositionId)) return;
+    seen.add(post.unitPositionId);
+    out.push({ position: post, depth });
+    posts.filter((p) => p.parentPostId === post.unitPositionId).forEach((child) => visit(child, depth + 1));
+  };
+  posts.filter((p) => !p.parentPostId || !ids.has(p.parentPostId)).forEach((root) => visit(root, 0));
+  posts.forEach((p) => visit(p, 0)); // anything left (a loop): flat
+  return out;
+}
+
 /** The posts directly in the company (the head's first). */
 export const companyPostsOf = (company: ChartCompany): ChartPosition[] => company.positions || [];
 

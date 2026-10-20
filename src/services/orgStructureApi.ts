@@ -31,7 +31,7 @@ export interface Position { id: string; title: string; parentPositionId: string 
 export const positionsForCompany = (positions: Position[], companyId: string) =>
   positions.filter((p) => (p.companyIds || []).includes(companyId));
 
-export type ManagerSource = 'Explicit' | 'UnitManager' | 'CompanyManager';
+export type ManagerSource = 'Explicit' | 'UnitManager' | 'CompanyManager' | 'PostSuperior';
 
 export interface Manager { userId: string; displayName: string; isActive: boolean; source: ManagerSource }
 
@@ -81,6 +81,8 @@ export interface UnitPosition {
   code?: string;
   companyId?: string;
   companyName?: string | null;
+  /** The post above this one in its place (its holder manages this post's holder). */
+  parentPostId?: string | null;
 }
 
 export interface Subordinate {
@@ -123,6 +125,8 @@ export interface ChartPosition {
   holders: ChartMember[];
   code?: string;
   isHead?: boolean;
+  /** The post above this one in its place (its holder manages this post's holder). */
+  parentPostId?: string | null;
 }
 
 /** «کارشناس · کد ۷»: a post's title with its code. */
@@ -169,6 +173,7 @@ export const MANAGER_SOURCE_TITLES: Record<ManagerSource, string> = {
   Explicit: 'تعیین‌شده مستقیم',
   UnitManager: 'مدیر واحد',
   CompanyManager: 'رئیس کل شرکت',
+  PostSuperior: 'پست مافوق',
 };
 
 export const ORG_STRUCTURE_PERMISSIONS = {
@@ -227,13 +232,16 @@ export const deletePosition = (id: string) => apiRequest<void>('DELETE', `${BASE
 
 /** A deputy's positions (or every deputy's), each with its holders. */
 export const listUnitPositions = (unitId?: string) => apiRequest<UnitPosition[]>('GET', `${BASE}/unit-positions`, { query: { unitId } });
-export const addUnitPosition = (unitId: string, positionId: string, code?: string) =>
-  apiRequest<UnitPosition>('POST', `${BASE}/units/${unitId}/positions`, { body: { positionId, code: code || null } });
+export const addUnitPosition = (unitId: string, positionId: string, code?: string, parentPostId?: string | null) =>
+  apiRequest<UnitPosition>('POST', `${BASE}/units/${unitId}/positions`, { body: { positionId, code: code || null, parentPostId: parentPostId || null } });
 /** A post directly in the company (the head's, a board member's...). */
-export const addCompanyPosition = (companyId: string, positionId: string, code?: string) =>
-  apiRequest<UnitPosition>('POST', `${BASE}/companies/${companyId}/positions`, { body: { positionId, code: code || null } });
+export const addCompanyPosition = (companyId: string, positionId: string, code?: string, parentPostId?: string | null) =>
+  apiRequest<UnitPosition>('POST', `${BASE}/companies/${companyId}/positions`, { body: { positionId, code: code || null, parentPostId: parentPostId || null } });
 export const updateUnitPositionCode = (unitPositionId: string, code: string) =>
   apiRequest<UnitPosition>('PUT', `${BASE}/unit-positions/${unitPositionId}`, { body: { code } });
+/** Puts a post under another post of its place (null: under none). */
+export const setPostParent = (unitPositionId: string, parentPostId: string | null) =>
+  apiRequest<UnitPosition>('PUT', `${BASE}/unit-positions/${unitPositionId}/parent`, { body: { parentPostId } });
 /** Every position of the deputy, in the new order. */
 export const orderUnitPositions = (unitId: string, unitPositionIds: string[]) =>
   apiRequest<UnitPosition[]>('PUT', `${BASE}/units/${unitId}/positions/order`, { body: { unitPositionIds } });

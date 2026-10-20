@@ -4,7 +4,7 @@ import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
 import { ChartCompany, ChartMember, ChartPosition, ChartUnit, PersonRef, getChart, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
-import { ChartSelection, companyHeadcount, companyPostsOf, headPostOf, positionsOf, unitHeadcount, vacantCount } from './orgChartModel';
+import { ChartSelection, companyHeadcount, companyPostsOf, headPostOf, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
@@ -451,9 +451,9 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         {open && (positions.length > 0 || unit.members.length > 0) && (
           <div className="self-stretch flex justify-center">
             <div className="relative mt-0 ms-8 ps-4 pt-4 space-y-3 border-s-2 border-slate-200 dark:border-slate-700">
-              {positions.map((position: ChartPosition) => (
+              {postTree(positions).map(({ position, depth }: { position: ChartPosition; depth: number }) => (
+                <div key={position.unitPositionId} style={depth ? { marginInlineStart: `${depth * 1.25}rem` } : undefined} className={depth ? 'relative before:absolute before:-start-3 before:top-5 before:w-2.5 before:h-0.5 before:bg-slate-300 dark:before:bg-slate-600' : undefined} data-post-depth={depth}>
                 <BranchCard
-                  key={position.unitPositionId}
                   node={`position:${position.unitPositionId}`}
                   icon={Briefcase}
                   tone="bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300"
@@ -470,6 +470,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
                   selectedUserId={selectedUserId}
                   onSelectMember={selectMember}
                 />
+                </div>
               ))}
               {unit.members.length > 0 && (
                 <BranchCard

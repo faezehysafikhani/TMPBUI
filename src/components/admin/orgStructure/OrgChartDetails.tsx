@@ -11,10 +11,10 @@ import {
   ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
   orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, unlinkUnit, updateCompany, updateOrgUnit,
-  addCompanyPosition, postLabel, updateUnitPositionCode,
+  addCompanyPosition, postLabel, setPostParent, updateUnitPositionCode,
 } from '../../../services/orgStructureApi';
 import { UserPicker } from './orgShared';
-import { ChartSelection, companyHeadcount, companyPostsOf, findMember, findPosition, findUnit, positionsOf, unitHeadcount, vacantCount } from './orgChartModel';
+import { ChartSelection, companyHeadcount, companyPostsOf, findMember, findPosition, findUnit, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
 
 type Dialog =
@@ -322,6 +322,19 @@ export const OrgChartDetails: React.FC<{
     if (place) {
       const { company, unit, position } = place;
       const placeName = unit ? unit.name : `مستقیم در ${company.name}`;
+      // Posts of the same place: the one above it may be any of them but itself and those below it.
+      const samePlace = unit ? positionsOf(unit) : companyPostsOf(company);
+      const below = new Set<string>([position.unitPositionId]);
+      for (let grew = true; grew;) {
+        grew = false;
+        for (const p of samePlace) {
+          if (p.parentPostId && below.has(p.parentPostId) && !below.has(p.unitPositionId)) { below.add(p.unitPositionId); grew = true; }
+        }
+      }
+      const parentChoices = postTree(samePlace).filter(({ position: p }) => !below.has(p.unitPositionId));
+      const parentPost = samePlace.find((p) => p.unitPositionId === position.parentPostId);
+      const children = samePlace.filter((p) => p.parentPostId === position.unitPositionId);
+      const holderLabel = (p: ChartPosition) => (p.holders.length ? p.holders.map((h) => h.displayName).join('، ') : 'خالی');
       const changeCode = () => {
         const code = window.prompt(`کد جدید پست «${position.title}» (در این شرکت یکتا):`, position.code || '');
         if (code && code.trim() && code.trim() !== position.code) {
@@ -343,8 +356,42 @@ export const OrgChartDetails: React.FC<{
                 {can(P.managePositions) && <button type="button" onClick={changeCode} disabled={busy} className="text-[11px] text-indigo-600 hover:underline cursor-pointer">تغییر</button>}
               </span>
             </InfoRow>
+            {!position.isHead && (
+              <InfoRow label="پست مافوق">
+                {can(P.managePositions) ? (
+                  <select
+                    className={`${inputClass} max-w-[14rem] py-1 text-xs`}
+                    value={position.parentPostId || ''}
+                    disabled={busy}
+                    aria-label="پست مافوق"
+                    onChange={(e) => run(() => setPostParent(position.unitPositionId, e.target.value || null), 'پست مافوق تغییر کرد.', 'تغییر پست مافوق انجام نشد.')}
+                  >
+                    <option value="">{unit ? 'ندارد (زیر مدیر معاونت)' : 'ندارد'}</option>
+                    {parentChoices.map(({ position: p, depth }) => (
+                      <option key={p.unitPositionId} value={p.unitPositionId}>{'— '.repeat(depth)}{postLabel(p)} ({holderLabel(p)})</option>
+                    ))}
+                  </select>
+                ) : parentPost ? `${postLabel(parentPost)} (${holderLabel(parentPost)})` : 'ندارد'}
+              </InfoRow>
+            )}
             {!position.isActive && <InfoRow label="وضعیت"><span className="text-rose-600">سمت غیرفعال است</span></InfoRow>}
           </div>
+          {!position.isHead && (
+            <p className="text-[11px] leading-5 text-slate-500">
+              دارندهٔ پست مافوق، مدیر دارندهٔ این پست است (فعالیت‌ها، گزارش و کارتابل جانشینی). اگر پست مافوق خالی باشد، پست بالاترِ آن و در نهایت مدیر {unit ? 'معاونت' : 'شرکت'} جای آن را می‌گیرد.
+            </p>
+          )}
+          {children.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-500">پست‌های زیرمجموعه</p>
+              {children.map((child) => (
+                <button key={child.unitPositionId} type="button" onClick={() => onSelect({ ...selection, unitPositionId: child.unitPositionId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
+                  <span className="flex items-center gap-2 min-w-0 text-sm font-bold text-slate-800 dark:text-slate-100"><Briefcase className="w-4 h-4 shrink-0 text-sky-600" /> <span className="truncate">{postLabel(child)}</span></span>
+                  <span className={`text-[11px] truncate shrink-0 max-w-[45%] ${child.holders.length ? 'text-slate-500' : 'text-amber-600'}`}>{holderLabel(child)}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="space-y-1">
             <p className="text-xs font-bold text-slate-500">دارندهٔ این پست</p>
             <PeopleList
@@ -366,7 +413,7 @@ export const OrgChartDetails: React.FC<{
                 icon={Trash2}
                 tone="rose"
                 label="حذف پست"
-                disabled={busy || position.holders.length > 0}
+                disabled={busy || position.holders.length > 0 || children.length > 0}
                 onClick={() => window.confirm(`پست «${postLabel(position)}» از «${placeName}» حذف شود؟`)
                   && run(async () => {
                     await removeUnitPosition(position.unitPositionId);
@@ -564,6 +611,7 @@ const ChartDialog: React.FC<{
   const [newTitle, setNewTitle] = useState('');
   const [newParent, setNewParent] = useState<string | null>(null);
   const [newCode, setNewCode] = useState('');
+  const [parentPost, setParentPost] = useState('');
   // A person's positions: every deputy position, and those they hold.
   const [allSeats, setAllSeats] = useState<UnitPosition[] | null>(null);
   const [chosenSeats, setChosenSeats] = useState<string[]>([]);
@@ -683,7 +731,7 @@ const ChartDialog: React.FC<{
           const existing = positions.find((p) => p.title === newTitle.trim());
           id = existing ? existing.id : (await createPosition(newTitle.trim(), parent || null, companyId ? [companyId] : [])).id;
         }
-        await addUnitPosition(unitId, id, newCode.trim() || undefined);
+        await addUnitPosition(unitId, id, newCode.trim() || undefined, parentPost || null);
       }, 'پست به معاونت اضافه شد.', 'افزودن پست انجام نشد.'));
       content = (
         <>
@@ -701,6 +749,16 @@ const ChartDialog: React.FC<{
               <select className={inputClass} value={parent} onChange={(e) => setNewParent(e.target.value)}>
                 <option value="" disabled>— انتخاب کنید —</option>
                 {ofCompany.filter((p) => p.isActive).map((p) => <option key={p.id} value={p.id}>{p.title}{p.parentPositionId ? '' : ' (بدون مافوق)'}</option>)}
+              </select>
+            </Field>
+          )}
+          {positionsOf(dialog.unit).length > 0 && (
+            <Field label="پست مافوق (اختیاری)" hint="دارندهٔ پست مافوق، مدیر دارندهٔ این پست می‌شود. خالی: زیر مدیر معاونت.">
+              <select className={inputClass} value={parentPost} onChange={(e) => setParentPost(e.target.value)}>
+                <option value="">ندارد (زیر مدیر معاونت)</option>
+                {postTree(positionsOf(dialog.unit)).map(({ position: p, depth }) => (
+                  <option key={p.unitPositionId} value={p.unitPositionId}>{'— '.repeat(depth)}{postLabel(p)} ({p.holders.length ? p.holders.map((h) => h.displayName).join('، ') : 'خالی'})</option>
+                ))}
               </select>
             </Field>
           )}
