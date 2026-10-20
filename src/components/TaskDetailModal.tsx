@@ -899,7 +899,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       {/* Actions Footer for Comments */}
                       {!isEditingThis && (
                         <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-700/50 text-[11px]">
-                          {onConvertToTask && (
+                          {onConvertToTask && !cmt.attachments?.some((att) => isVoiceName(att.name)) && (
                             <button
                               type="button"
                               onClick={() => {
