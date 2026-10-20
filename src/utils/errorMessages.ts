@@ -202,6 +202,7 @@ const KNOWN_MESSAGES: Record<string, string> = {
   'People hold this position. Change their position first, or deactivate it instead.': 'این سمت به کارکنانی داده شده است. ابتدا سمتشان را تغییر دهید یا سمت را غیرفعال کنید.',
   'Units have this position. Remove it from them first, or deactivate it instead.': 'این سمت برای معاونت‌هایی تعریف شده است. ابتدا آن را از معاونت‌ها حذف کنید یا سمت را غیرفعال کنید.',
   'This unit already has this position.': 'این سمت در این معاونت از قبل وجود دارد.',
+  'You can give tasks only to people at your own level or below in the organization.': 'فعالیت را فقط می‌توانید به افراد هم‌سطح خود یا زیرمجموعه‌تان ارجاع دهید.',
   'Send every position of the unit once, in the new order.': 'ترتیب سمت‌ها تغییر کرده است؛ صفحه را تازه کنید و دوباره امتحان کنید.',
   'Unit position was not found.': 'این سمت در معاونت پیدا نشد؛ صفحه را تازه کنید.',
   'People hold this position. Change their positions first.': 'کسانی در این سمت هستند؛ ابتدا آن‌ها را از این سمت بردارید.',

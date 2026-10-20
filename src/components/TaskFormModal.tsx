@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleIdsOf } from '../utils/taskPeople';
+import { getAssignmentLimit } from '../services/nexusApi';
 
 /** One person the responsible-people picker offers. */
 interface PersonOption {
@@ -83,6 +84,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [responsibleIds, setResponsibleIds] = useState<string[]>([]);
   const [allowAssigneeStatusUpdate, setAllowAssigneeStatusUpdate] = useState<boolean>(true);
   const [allRegisteredUsers, setAllRegisteredUsers] = useState<User[]>(registeredUsers);
+  // Where the organization limits it: the people this user may not make responsible (above them).
+  const [assignmentLimited, setAssignmentLimited] = useState(false);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
   const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState<boolean>(false);
   const assigneeDropdownRef = useRef<HTMLDivElement>(null);
@@ -193,6 +197,19 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let alive = true;
+    getAssignmentLimit()
+      .then((limit) => {
+        if (!alive) return;
+        setAssignmentLimited(!!limit?.limited);
+        setBlockedIds(new Set(limit?.blockedUserIds || []));
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [isOpen, currentUser?.id]);
 
   // Fetch all registered users for quick search & assignment
   useEffect(() => {
@@ -1273,7 +1290,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                   }
                 });
 
-                const candidates = Array.from(byId.values()).sort((a, b) => {
+                // Someone the user may not give tasks to is not offered - unless already responsible.
+                const candidates = Array.from(byId.values()).filter((p) => !blockedIds.has(p.id) || responsibleIds.includes(p.id)).sort((a, b) => {
                   const rank = (p: PersonOption) => (p.id === currentUser?.id ? 0 : teamIds.has(p.id) ? 1 : 2);
                   return rank(a) - rank(b) || a.name.localeCompare(b.name, 'fa');
                 });
@@ -1404,6 +1422,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                           </div>
                         )}
                       </div>
+                    )}
+
+                    {assignmentLimited && !isStatusOnlyEdit && (
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">فقط افراد هم‌سطح شما و زیرمجموعه‌تان در چارت سازمانی نمایش داده می‌شوند.</p>
                     )}
 
                     {errors.assignee && (
