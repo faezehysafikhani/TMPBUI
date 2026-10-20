@@ -52,7 +52,8 @@ export interface UserAssignment {
 }
 
 /** One of a deputy's positions that someone holds. */
-export interface HeldPosition { unitPositionId: string; unitId: string; unitName: string; positionId: string; title: string }
+/** A post someone holds. unitId null: directly in the company (unitName is then the company's). */
+export interface HeldPosition { unitPositionId: string; unitId: string | null; unitName: string; positionId: string; title: string; code?: string | null }
 
 /**
  * unitPositionIds, when sent, is every deputy position the person holds (replacing the list);
@@ -67,15 +68,19 @@ export interface AssignmentInput {
 }
 
 /** A position a deputy has, in the deputy's order, with whoever holds it (none: vacant). */
+/** A post: one person at most (holders). unitId null: directly in the company. */
 export interface UnitPosition {
   id: string;
-  unitId: string;
-  unitName: string;
+  unitId: string | null;
+  unitName: string | null;
   positionId: string;
   title: string;
   sortOrder: number;
   isPositionActive: boolean;
   holders: PersonRef[];
+  code?: string;
+  companyId?: string;
+  companyName?: string | null;
 }
 
 export interface Subordinate {
@@ -108,7 +113,21 @@ export interface ChartMember {
 export interface ChartTeam { teamId: string; name: string; description: string | null; owner: PersonRef; members: ChartMember[] }
 
 /** A deputy's position in the chart; no holders: vacant. */
-export interface ChartPosition { unitPositionId: string; positionId: string; title: string; sortOrder: number; isActive: boolean; holders: ChartMember[] }
+/** A post in the chart: at most one holder; code unique in its company; isHead: the company head's post. */
+export interface ChartPosition {
+  unitPositionId: string;
+  positionId: string;
+  title: string;
+  sortOrder: number;
+  isActive: boolean;
+  holders: ChartMember[];
+  code?: string;
+  isHead?: boolean;
+}
+
+/** «کارشناس · کد ۷»: a post's title with its code. */
+export const postLabel = (post: { title: string; code?: string | null }) =>
+  post.code ? `${post.title} · کد ${post.code.replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)])}` : post.title;
 
 /**
  * positions: the deputy's positions in its order, vacant ones too (absent on an older backend).
@@ -135,6 +154,8 @@ export interface ChartCompany {
   units: ChartUnit[];
   /** How many people the company has (its people in a deputy and those directly under it). */
   peopleCount?: number;
+  /** Posts directly in the company (the head's first); absent on an older backend. */
+  positions?: ChartPosition[];
 }
 
 /** An organization unit (a deputy, a department...) from Nexus.Organization. */
@@ -206,8 +227,13 @@ export const deletePosition = (id: string) => apiRequest<void>('DELETE', `${BASE
 
 /** A deputy's positions (or every deputy's), each with its holders. */
 export const listUnitPositions = (unitId?: string) => apiRequest<UnitPosition[]>('GET', `${BASE}/unit-positions`, { query: { unitId } });
-export const addUnitPosition = (unitId: string, positionId: string) =>
-  apiRequest<UnitPosition>('POST', `${BASE}/units/${unitId}/positions`, { body: { positionId } });
+export const addUnitPosition = (unitId: string, positionId: string, code?: string) =>
+  apiRequest<UnitPosition>('POST', `${BASE}/units/${unitId}/positions`, { body: { positionId, code: code || null } });
+/** A post directly in the company (the head's, a board member's...). */
+export const addCompanyPosition = (companyId: string, positionId: string, code?: string) =>
+  apiRequest<UnitPosition>('POST', `${BASE}/companies/${companyId}/positions`, { body: { positionId, code: code || null } });
+export const updateUnitPositionCode = (unitPositionId: string, code: string) =>
+  apiRequest<UnitPosition>('PUT', `${BASE}/unit-positions/${unitPositionId}`, { body: { code } });
 /** Every position of the deputy, in the new order. */
 export const orderUnitPositions = (unitId: string, unitPositionIds: string[]) =>
   apiRequest<UnitPosition[]>('PUT', `${BASE}/units/${unitId}/positions/order`, { body: { unitPositionIds } });

@@ -11,9 +11,10 @@ import {
   ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
   orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, unlinkUnit, updateCompany, updateOrgUnit,
+  addCompanyPosition, postLabel, updateUnitPositionCode,
 } from '../../../services/orgStructureApi';
 import { UserPicker } from './orgShared';
-import { ChartSelection, companyHeadcount, findMember, findPosition, findUnit, positionsOf, unitHeadcount, vacantCount } from './orgChartModel';
+import { ChartSelection, companyHeadcount, companyPostsOf, findMember, findPosition, findUnit, positionsOf, unitHeadcount, vacantCount } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
 
 type Dialog =
@@ -22,7 +23,8 @@ type Dialog =
   | { kind: 'editUnit'; unit: ChartUnit }
   | { kind: 'addUnitMember'; company: ChartCompany; unit: ChartUnit }
   | { kind: 'addUnitPosition'; unit: ChartUnit }
-  | { kind: 'addHolder'; company: ChartCompany; unit: ChartUnit; position: ChartPosition }
+  | { kind: 'addHolder'; company: ChartCompany; unit: ChartUnit | null; position: ChartPosition }
+  | { kind: 'addCompanyPost'; company: ChartCompany }
   | { kind: 'memberPositions'; userId: string; name: string }
   | { kind: 'placeUser'; userId: string; name: string };
 
@@ -111,13 +113,13 @@ const PeopleList: React.FC<{
  * Gives someone one more deputy position, keeping where they sit and what else they hold; someone
  * with no place yet is placed in the position's deputy.
  */
-async function addToPosition(userId: string, company: ChartCompany, unit: ChartUnit, position: ChartPosition) {
+async function addToPosition(userId: string, company: ChartCompany, unit: ChartUnit | null, position: ChartPosition) {
   const current = await getAssignment(userId);
   const held = current?.positions?.map((p) => p.unitPositionId) || [];
   if (held.includes(position.unitPositionId)) return;
   await setAssignment(userId, {
     companyId: current?.companyId ?? company.companyId,
-    unitId: current ? current.unitId : unit.unitId,
+    unitId: current ? current.unitId : unit?.unitId ?? null,
     positionId: current ? current.positionId : position.positionId,
     managerUserId: current?.explicitManagerUserId ?? null,
     unitPositionIds: [...held, position.unitPositionId],
@@ -194,6 +196,17 @@ export const OrgChartDetails: React.FC<{
             <InfoRow label="سمت‌ها">{toPersianDigits(positionCount)}{vacant > 0 ? ` (${toPersianDigits(vacant)} خالی)` : ''}</InfoRow>
             <InfoRow label="تعداد افراد">{toPersianDigits(companyHeadcount(company))} نفر</InfoRow>
           </div>
+          {companyPostsOf(company).length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-500">پست‌های مستقیم شرکت</p>
+              {companyPostsOf(company).map((post) => (
+                <button key={post.unitPositionId} type="button" onClick={() => onSelect({ kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: post.unitPositionId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
+                  <span className="flex items-center gap-2 min-w-0 text-sm font-bold text-slate-800 dark:text-slate-100"><Briefcase className={`w-4 h-4 shrink-0 ${post.isHead ? 'text-amber-600' : 'text-sky-600'}`} /> <span className="truncate">{postLabel(post)}</span></span>
+                  <span className={`text-[11px] truncate shrink-0 max-w-[45%] ${post.holders.length ? 'text-slate-500' : 'text-amber-600'}`}>{post.holders.length ? post.holders.map((h) => h.displayName).join('، ') : 'خالی'}</span>
+                </button>
+              ))}
+            </div>
+          )}
           {company.units.length > 0 && (
             <div className="space-y-1">
               <p className="text-xs font-bold text-slate-500">معاونت‌ها</p>
@@ -208,6 +221,7 @@ export const OrgChartDetails: React.FC<{
           <QuickActions>
             {can(P.manageCompanies) && <ActionTile icon={Pencil} label="ویرایش شرکت" onClick={() => setDialog({ kind: 'editCompany', company })} />}
             {can(P.manageCompanies) && can(U.create) && <ActionTile icon={Plus} label="افزودن معاونت" onClick={() => setDialog({ kind: 'addUnit', company })} />}
+            {can(P.managePositions) && positions.some((p) => p.companyIds !== undefined) && <ActionTile icon={Briefcase} label="افزودن پست در شرکت" onClick={() => setDialog({ kind: 'addCompanyPost', company })} />}
           </QuickActions>
         </>
       ) : (
@@ -249,9 +263,9 @@ export const OrgChartDetails: React.FC<{
                   className="flex items-center gap-2 min-w-0 flex-1 text-right cursor-pointer"
                 >
                   <Briefcase className="w-4 h-4 text-sky-600 shrink-0" />
-                  <span className={`text-sm font-bold truncate ${pos.isActive ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 line-through'}`}>{pos.title}</span>
-                  <span className={`text-[11px] whitespace-nowrap shrink-0 ${pos.holders.length === 0 ? 'text-amber-600' : 'text-slate-500'}`}>
-                    {pos.holders.length === 0 ? 'خالی' : `${toPersianDigits(pos.holders.length)} نفر`}
+                  <span className={`text-sm font-bold truncate ${pos.isActive ? 'text-slate-800 dark:text-slate-100' : 'text-slate-400 line-through'}`}>{postLabel(pos)}</span>
+                  <span className={`text-[11px] truncate shrink-0 max-w-[45%] ${pos.holders.length === 0 ? 'text-amber-600' : 'text-slate-500'}`}>
+                    {pos.holders.length === 0 ? 'خالی' : pos.holders.map((h) => h.displayName).join('، ')}
                   </span>
                 </button>
                 {canArrange && (
@@ -307,20 +321,32 @@ export const OrgChartDetails: React.FC<{
     const place = findPosition(chart, selection.unitPositionId);
     if (place) {
       const { company, unit, position } = place;
+      const placeName = unit ? unit.name : `مستقیم در ${company.name}`;
+      const changeCode = () => {
+        const code = window.prompt(`کد جدید پست «${position.title}» (در این شرکت یکتا):`, position.code || '');
+        if (code && code.trim() && code.trim() !== position.code) {
+          run(() => updateUnitPositionCode(position.unitPositionId, code.trim()), 'کد پست تغییر کرد.', 'تغییر کد پست انجام نشد.');
+        }
+      };
       body = (
         <>
-          <Header icon={Briefcase} tone="bg-sky-600 text-white" title={position.title} subtitle={`سمت · ${unit.name}`} badge={position.holders.length === 0 ? <StatusBadge tone="amber">خالی</StatusBadge> : undefined} />
+          <Header icon={Briefcase} tone="bg-sky-600 text-white" title={postLabel(position)} subtitle={`${position.isHead ? 'پست رئیس کل' : 'پست'} · ${placeName}`} badge={position.holders.length === 0 ? <StatusBadge tone="amber">خالی</StatusBadge> : undefined} />
           <div>
-            <InfoRow label="معاونت">
-              <button type="button" className="text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer" onClick={() => onSelect({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}>
-                {unit.name}
+            <InfoRow label={unit ? 'معاونت' : 'شرکت'}>
+              <button type="button" className="text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer" onClick={() => onSelect(unit ? { kind: 'unit', companyId: company.companyId, unitId: unit.unitId } : { kind: 'company', companyId: company.companyId })}>
+                {unit ? unit.name : company.name}
               </button>
             </InfoRow>
-            <InfoRow label="تعداد افراد">{toPersianDigits(position.holders.length)} نفر</InfoRow>
+            <InfoRow label="کد پست">
+              <span className="flex items-center gap-2 justify-end">
+                {toPersianDigits(position.code || '—')}
+                {can(P.managePositions) && <button type="button" onClick={changeCode} disabled={busy} className="text-[11px] text-indigo-600 hover:underline cursor-pointer">تغییر</button>}
+              </span>
+            </InfoRow>
             {!position.isActive && <InfoRow label="وضعیت"><span className="text-rose-600">سمت غیرفعال است</span></InfoRow>}
           </div>
           <div className="space-y-1">
-            <p className="text-xs font-bold text-slate-500">افراد در این سمت</p>
+            <p className="text-xs font-bold text-slate-500">دارندهٔ این پست</p>
             <PeopleList
               members={position.holders}
               onOpen={openMember}
@@ -334,22 +360,22 @@ export const OrgChartDetails: React.FC<{
             />
           </div>
           <QuickActions>
-            {can(P.manageAssignments) && position.isActive && <ActionTile icon={UserPlus} label="افزودن فرد به سمت" onClick={() => setDialog({ kind: 'addHolder', company, unit, position })} />}
+            {can(P.manageAssignments) && position.isActive && position.holders.length === 0 && <ActionTile icon={UserPlus} label="گذاشتن فرد در این پست" onClick={() => setDialog({ kind: 'addHolder', company, unit, position })} />}
             {can(P.managePositions) && (
               <ActionTile
                 icon={Trash2}
                 tone="rose"
-                label="حذف سمت از معاونت"
+                label="حذف پست"
                 disabled={busy || position.holders.length > 0}
-                onClick={() => window.confirm(`سمت «${position.title}» از معاونت «${unit.name}» حذف شود؟`)
+                onClick={() => window.confirm(`پست «${postLabel(position)}» از «${placeName}» حذف شود؟`)
                   && run(async () => {
                     await removeUnitPosition(position.unitPositionId);
-                    onSelect({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId });
-                  }, 'سمت از معاونت حذف شد.', 'حذف سمت انجام نشد.')}
+                    onSelect(unit ? { kind: 'unit', companyId: company.companyId, unitId: unit.unitId } : { kind: 'company', companyId: company.companyId });
+                  }, 'پست حذف شد.', 'حذف پست انجام نشد.')}
               />
             )}
           </QuickActions>
-          {can(P.managePositions) && position.holders.length > 0 && <p className="text-[11px] text-slate-400">برای حذف این سمت از معاونت، ابتدا افراد آن را بردارید.</p>}
+          {position.holders.length > 0 && <p className="text-[11px] text-slate-400">هر پست فقط یک نفر دارد؛ برای گذاشتن فرد دیگر یا حذف پست، ابتدا دارندهٔ فعلی را بردارید.</p>}
         </>
       );
     }
@@ -444,7 +470,7 @@ const MemberDetails: React.FC<{
   const held = assignment?.positions
     || place.positions.map((p) => ({ unitPositionId: p.position.unitPositionId, unitId: p.unit.unitId, unitName: p.unit.name, positionId: p.position.positionId, title: p.position.title }));
   // A position held directly in the company (e.g. the head's), outside any deputy.
-  const companyPosition = assignment && !assignment.unitId && assignment.positionTitle ? assignment.positionTitle : null;
+  const companyPosition = assignment && !assignment.unitId && assignment.positionTitle && !held.some((h) => !h.unitId) ? assignment.positionTitle : null;
   const heldCount = held.length + (companyPosition ? 1 : 0);
 
   return (
@@ -482,17 +508,17 @@ const MemberDetails: React.FC<{
           </div>
         )}
         {heldCount === 0 ? <p className="text-xs text-slate-400">هیچ سمتی ندارد.</p> : held.map((h, i) => {
-          const where = findUnit(chart, h.unitId);
+          const where = findPosition(chart, h.unitPositionId);
           return (
             <button
               key={h.unitPositionId}
               type="button"
               disabled={!where}
-              onClick={() => where && onSelect({ kind: 'position', companyId: where.company.companyId, unitId: h.unitId, unitPositionId: h.unitPositionId })}
+              onClick={() => where && onSelect({ kind: 'position', companyId: where.company.companyId, unitId: where.unit?.unitId ?? '', unitPositionId: h.unitPositionId })}
               className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer disabled:cursor-default"
             >
-              <span className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100 min-w-0"><Briefcase className="w-4 h-4 text-sky-600 shrink-0" /> <span className="truncate">{h.title}</span></span>
-              <span className="text-[11px] text-slate-500 whitespace-nowrap shrink-0">{h.unitName}{i === 0 && held.length > 1 ? ' · اصلی' : ''}</span>
+              <span className="flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-slate-100 min-w-0"><Briefcase className="w-4 h-4 text-sky-600 shrink-0" /> <span className="truncate">{postLabel(h)}</span></span>
+              <span className="text-[11px] text-slate-500 whitespace-nowrap shrink-0">{h.unitId ? h.unitName : `مستقیم در ${h.unitName}`}{i === 0 && held.length > 1 ? ' · اصلی' : ''}</span>
             </button>
           );
         })}
@@ -537,6 +563,7 @@ const ChartDialog: React.FC<{
   // Adding a position to a deputy: one from the list, or a new title (under a chosen superior).
   const [newTitle, setNewTitle] = useState('');
   const [newParent, setNewParent] = useState<string | null>(null);
+  const [newCode, setNewCode] = useState('');
   // A person's positions: every deputy position, and those they hold.
   const [allSeats, setAllSeats] = useState<UnitPosition[] | null>(null);
   const [chosenSeats, setChosenSeats] = useState<string[]>([]);
@@ -656,8 +683,8 @@ const ChartDialog: React.FC<{
           const existing = positions.find((p) => p.title === newTitle.trim());
           id = existing ? existing.id : (await createPosition(newTitle.trim(), parent || null, companyId ? [companyId] : [])).id;
         }
-        await addUnitPosition(unitId, id);
-      }, 'سمت به معاونت اضافه شد.', 'افزودن سمت انجام نشد.'));
+        await addUnitPosition(unitId, id, newCode.trim() || undefined);
+      }, 'پست به معاونت اضافه شد.', 'افزودن پست انجام نشد.'));
       content = (
         <>
           <Field label="سمت از فهرست سمت‌ها">
@@ -677,14 +704,17 @@ const ChartDialog: React.FC<{
               </select>
             </Field>
           )}
-          <p className="text-[11px] text-slate-500">سمت به انتهای سمت‌های معاونت اضافه می‌شود و تا کسی در آن قرار نگیرد «خالی» نمایش داده می‌شود.</p>
+          <Field label="کد پست (اختیاری)" hint="خالی بگذارید تا شمارهٔ بعدی شرکت داده شود. کد در هر شرکت یکتاست.">
+            <input className={`${inputClass} dir-ltr text-right`} value={newCode} onChange={(e) => setNewCode(e.target.value)} maxLength={40} />
+          </Field>
+          <p className="text-[11px] text-slate-500">هر پست یک نفر دارد؛ برای چند نفر با یک سمت، چند پست اضافه کنید. تا کسی در پست قرار نگیرد «خالی» نمایش داده می‌شود.</p>
         </>
       );
       break;
     }
     case 'addHolder': {
       const { company, unit, position } = dialog;
-      title = `افزودن فرد به سمت «${position.title}»`;
+      title = `گذاشتن فرد در پست «${postLabel(position)}»`;
       canSave = canSave && !!personId;
       save = async () => done(await run(() => addToPosition(personId!, company, unit, position), `«${personName}» در سمت «${position.title}» قرار گرفت.`, 'افزودن فرد به سمت انجام نشد.'));
       content = (
@@ -693,7 +723,7 @@ const ChartDialog: React.FC<{
           personId={personId}
           personName={personName}
           onChange={(id, n) => { setPersonId(id); setPersonName(n); }}
-          hint={`سمت‌های دیگرش حفظ می‌شود. اگر هنوز جایگاهی ندارد، در «${unit.name}» قرار می‌گیرد.`}
+          hint={`پست‌های دیگرش حفظ می‌شود. اگر هنوز جایگاهی ندارد، در «${unit ? unit.name : company.name}» قرار می‌گیرد.`}
         />
       );
       break;
@@ -702,7 +732,10 @@ const ChartDialog: React.FC<{
       title = `سمت‌های «${dialog.name}»`;
       canSave = canSave && !!memberAssignment && allSeats !== null;
       const byUnit = new Map<string, UnitPosition[]>();
-      for (const seat of allSeats || []) byUnit.set(seat.unitName, [...(byUnit.get(seat.unitName) || []), seat]);
+      for (const seat of allSeats || []) {
+        const where = seat.unitName ?? `${seat.companyName || ''} (مستقیم در شرکت)`;
+        byUnit.set(where, [...(byUnit.get(where) || []), seat]);
+      }
       const toggle = (id: string) => setChosenSeats((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
       save = async () => {
         if (!memberAssignment) return;
@@ -718,24 +751,47 @@ const ChartDialog: React.FC<{
         <p className="text-sm text-slate-500">هنوز برای هیچ معاونتی سمتی تعریف نشده است. ابتدا از بخش معاونت، «افزودن سمت» را بزنید.</p>
       ) : (
         <div className="space-y-3 max-h-[55vh] overflow-y-auto">
-          <p className="text-[11px] text-slate-500">هر تعداد سمت را می‌توانید انتخاب کنید، از هر معاونتی. سمت اول در معاونت خودش، سمت اصلی او حساب می‌شود.</p>
+          <p className="text-[11px] text-slate-500">هر تعداد پست خالی را می‌توانید انتخاب کنید، از هر معاونتی. پستی که فرد دیگری دارد قابل انتخاب نیست. پست اول در معاونت خودش، سمت اصلی او حساب می‌شود.</p>
           {[...byUnit.entries()].map(([unitName, seats]) => (
             <div key={unitName} className="space-y-1">
               <p className="text-xs font-bold text-slate-600 dark:text-slate-300">{unitName}</p>
               {seats.map((seat) => {
                 const chosen = chosenSeats.includes(seat.id);
-                const disabled = !chosen && !seat.isPositionActive;
+                const heldByOther = seat.holders.some((h) => h.userId !== dialog.userId);
+                const disabled = !chosen && (!seat.isPositionActive || heldByOther);
                 return (
                   <label key={seat.id} className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${chosen ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-700' : 'border-slate-200 dark:border-slate-700'} ${disabled ? 'opacity-50' : 'cursor-pointer'}`}>
                     <input type="checkbox" checked={chosen} disabled={disabled} onChange={() => toggle(seat.id)} />
-                    <span className="font-bold flex-1">{seat.title}</span>
-                    <span className="text-[11px] text-slate-500">{seat.holders.length === 0 ? 'خالی' : `${toPersianDigits(seat.holders.length)} نفر`}</span>
+                    <span className="font-bold flex-1">{postLabel(seat)}</span>
+                    <span className="text-[11px] text-slate-500">{seat.holders.length === 0 ? 'خالی' : seat.holders.map((h) => h.displayName).join('، ')}</span>
                   </label>
                 );
               })}
             </div>
           ))}
         </div>
+      );
+      break;
+    }
+    case 'addCompanyPost': {
+      const company = dialog.company;
+      const hasHead = companyPostsOf(company).some((p) => p.isHead);
+      const options = positionsForCompany(positions, company.companyId).filter((p) => p.isActive && !(hasHead && !p.parentPositionId));
+      title = `افزودن پست مستقیم در «${company.name}»`;
+      canSave = canSave && !!positionId;
+      save = async () => done(await run(() => addCompanyPosition(company.companyId, positionId, newCode.trim() || undefined), 'پست به شرکت اضافه شد.', 'افزودن پست انجام نشد.'));
+      content = (
+        <>
+          <Field label="سمت" required hint="پستی که سمتش بدون مافوق است، پست رئیس کل است (هر شرکت یکی).">
+            <select className={inputClass} value={positionId} onChange={(e) => setPositionId(e.target.value)}>
+              <option value="">— انتخاب کنید —</option>
+              {options.map((p) => <option key={p.id} value={p.id}>{p.title}{p.parentPositionId ? '' : ' (رئیس کل)'}</option>)}
+            </select>
+          </Field>
+          <Field label="کد پست (اختیاری)" hint="خالی بگذارید تا شمارهٔ بعدی شرکت داده شود.">
+            <input className={`${inputClass} dir-ltr text-right`} value={newCode} onChange={(e) => setNewCode(e.target.value)} maxLength={40} />
+          </Field>
+        </>
       );
       break;
     }
@@ -777,11 +833,11 @@ const ChartDialog: React.FC<{
             </Field>
           )}
           {target?.unit && (
-            <Field label="سمت در این معاونت (اختیاری)">
+            <Field label="پست خالی در این معاونت (اختیاری)">
               <select className={inputClass} value={positionId} onChange={(e) => setPositionId(e.target.value)}>
                 <option value="">— بدون سمت —</option>
-                {positionsOf(target.unit).filter((p) => p.isActive).map((p) => (
-                  <option key={p.unitPositionId} value={p.unitPositionId}>{p.title}{p.holders.length === 0 ? ' (خالی)' : ''}</option>
+                {positionsOf(target.unit).filter((p) => p.isActive && p.holders.length === 0).map((p) => (
+                  <option key={p.unitPositionId} value={p.unitPositionId}>{postLabel(p)} (خالی)</option>
                 ))}
               </select>
             </Field>
