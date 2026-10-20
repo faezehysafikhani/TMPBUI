@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { userErrorMessage } from '../utils/errorMessages';
+import { EmojiButton, VoiceButton, isVoiceName } from './ChatExtras';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
 
 interface TaskDetailModalProps {
@@ -858,6 +859,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                           {cmt.attachments && cmt.attachments.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                               {cmt.attachments.map((att) => {
+                                if (isVoiceName(att.name)) {
+                                  return <audio key={att.id} controls src={att.dataUrl} className="w-full h-9 sm:col-span-2" />;
+                                }
                                 const isImg = att.type.startsWith('image/') || att.dataUrl.startsWith('data:image/');
                                 return (
                                   <div
@@ -1050,6 +1054,25 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               {/* Toolbar Controls: Side-by-side icon-only Send & Attachment buttons without extra labels or text */}
               <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 mt-1">
+                <EmojiButton onPick={(emoji) => setNewCommentText((t) => t + emoji)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors cursor-pointer shrink-0" iconClassName="w-4 h-4" />
+                <VoiceButton
+                  onRecorded={(v) =>
+                    setCommentAttachments((prev) => [
+                      ...prev,
+                      {
+                        id: `att-cmt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                        name: v.name,
+                        size: v.size,
+                        type: v.type,
+                        dataUrl: v.url,
+                        createdAt: new Date().toISOString(),
+                      },
+                    ])
+                  }
+                  onError={(msg) => alert(msg)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors cursor-pointer shrink-0"
+                  iconClassName="w-4 h-4"
+                />
                 <button
                   type="button"
                   onClick={() => commentFileInputRef.current?.click()}
