@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Minus } from 'lucide-react';
 import { Task, TaskStatus, Attachment, User } from '../types';
-import { TaskCard } from './TaskCard';
+import { TaskCardList } from './TaskCardList';
 import { toPersianDigits } from '../utils/helpers';
 import { GROUP_TONES, TaskGroup } from '../utils/boardView';
 
@@ -83,21 +83,18 @@ const TaskGroupColumnBase: React.FC<TaskGroupColumnProps> = ({
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">هیچ فعالیتی در این بخش وجود ندارد</p>
               </div>
             ) : (
-              group.tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  currentUser={currentUser}
-                  showDetails={showDetails}
-                  onEdit={onEditTask}
-                  onDelete={onDeleteTask}
-                  onStatusChange={onStatusChange}
-                  onPreviewAttachment={onPreviewAttachment}
-                  onViewDetails={onViewDetails}
-                  onOpenProjectDetails={onOpenProjectDetails}
-                  onToggleSubTask={onToggleSubTask}
-                />
-              ))
+              <TaskCardList
+                tasks={group.tasks}
+                currentUser={currentUser}
+                showDetails={showDetails}
+                onEdit={onEditTask}
+                onDelete={onDeleteTask}
+                onStatusChange={onStatusChange}
+                onPreviewAttachment={onPreviewAttachment}
+                onViewDetails={onViewDetails}
+                onOpenProjectDetails={onOpenProjectDetails}
+                onToggleSubTask={onToggleSubTask}
+              />
             )}
           </div>
         </div>

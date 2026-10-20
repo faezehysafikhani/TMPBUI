@@ -56,6 +56,8 @@ interface TaskFormModalProps {
   initialDueDate?: string;
   initialTitle?: string;
   initialDescription?: string;
+  /** Set when the task is made from a comment of this activity: offers the «sub-activity» type. */
+  parentTask?: { id: string; title: string } | null;
   appColorPalette?: AppColorPalette;
   currentUser?: User | null;
   existingTasks?: Task[];
@@ -71,6 +73,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   initialDueDate,
   initialTitle = '',
   initialDescription = '',
+  parentTask = null,
   appColorPalette = 'indigo',
   currentUser,
   existingTasks = [],
@@ -108,6 +111,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [isProject, setIsProject] = useState<boolean>(false);
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  // A sub-activity has the project's form and is linked to the activity it was made from.
+  const [isSub, setIsSub] = useState<boolean>(false);
 
   // Project inline options state
   const [projectCharterManager, setProjectCharterManager] = useState<string>('');
@@ -633,6 +638,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         teamMemberIds: finalTeamMemberIds,
         allowAssigneeStatusUpdate: responsibleIds.length > 0 ? allowAssigneeStatusUpdate : true,
         isProject: finalIsProject,
+        parentTaskId: isSub && parentTask ? parentTask.id : taskToEdit?.parentTaskId,
         isRecurring: finalIsRecurring,
         recurringConfig,
         projectCharter,
@@ -689,6 +695,44 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </div>
           )}
 
+          {/* Activity type: each choice shows only its own form below. */}
+          <div role="radiogroup" aria-label="نوع فعالیت" className={`grid grid-cols-1 gap-2 ${parentTask && !taskToEdit ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+            {([
+              { id: 'simple', label: 'فعالیت ساده', accent: 'accent-indigo-600', hover: 'hover:border-indigo-300' },
+              { id: 'project', label: 'پروژه', accent: 'accent-emerald-600', hover: 'hover:border-emerald-300' },
+              { id: 'recurring', label: 'فعالیت تکرارشونده', accent: 'accent-purple-600', hover: 'hover:border-purple-300' },
+              ...(parentTask && !taskToEdit ? [{ id: 'sub', label: 'زیرمجموعه‌ی این فعالیت', accent: 'accent-amber-600', hover: 'hover:border-amber-300' }] : []),
+            ] as const).map((opt) => {
+              const current = isSub ? 'sub' : isProject ? 'project' : isRecurring ? 'recurring' : 'simple';
+              return (
+                <label
+                  key={opt.id}
+                  className={`flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-900 border transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200 ${opt.hover} ${
+                    current === opt.id ? 'border-indigo-400 ring-1 ring-indigo-300' : 'border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="task-kind"
+                    checked={current === opt.id}
+                    onChange={() => {
+                      setIsSub(opt.id === 'sub');
+                      setIsProject(opt.id === 'project' || opt.id === 'sub');
+                      setIsRecurring(opt.id === 'recurring');
+                    }}
+                    className={`w-4 h-4 cursor-pointer ${opt.accent}`}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          {isSub && parentTask && (
+            <div className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+              این فعالیت (با فرم پروژه) به‌عنوان زیرمجموعه‌ی «{parentTask.title}» ثبت می‌شود و کنار آن نمایش داده می‌شود.
+            </div>
+          )}
+
           {/* Title Input */}
           <div className="flex items-center gap-3 pt-1"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-black shadow-md shadow-indigo-500/25">۱</span><div><p className="text-sm font-black text-slate-900 dark:text-white">شرح فعالیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">ابتدا عنوان روشن و توضیح کوتاه بنویسید.</p></div></div>
           <div className="rounded-2xl border border-indigo-100/80 dark:border-indigo-900/50 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(79,70,229,0.55)]">
@@ -742,43 +786,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           {/* Jalali Date Time Picker & Status Grid */}
           <div className="flex items-center gap-3 pt-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white text-xs font-black shadow-md shadow-violet-500/25">۲</span><div><p className="text-sm font-black text-slate-900 dark:text-white">زمان‌بندی و مسئولیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">موعد، وضعیت و افراد مسئول را مشخص کنید.</p></div></div>
           {/* Project or recurring first: either one decides the dates (and hides the plain due date). */}
-          <div className="p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2">
-            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              نوع فعالیت
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {/* Checkbox: Project */}
-              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={isProject}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsProject(checked);
-                    if (checked) setIsRecurring(false);
-                  }}
-                  className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
-                />
-                <span>پروژه است</span>
-              </label>
-
-              {/* Checkbox: Recurring */}
-              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-purple-300 transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={isRecurring}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsRecurring(checked);
-                    if (checked) setIsProject(false);
-                  }}
-                  className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
-                />
-                <span>فعالیت تکرارشونده است</span>
-              </label>
-            </div>
-
+          <div className={`p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2 ${hideDueDate ? '' : 'hidden'}`}>
             {/* Project Options Inline Panel */}
             {isProject && (
               <div className="mt-3 p-3.5 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800/70 space-y-4 animate-in fade-in zoom-in-98">

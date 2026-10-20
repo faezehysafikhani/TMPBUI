@@ -194,6 +194,7 @@ interface TaskDto {
   title: string;
   description: string | null;
   isProject: boolean;
+  parentTaskId?: string | null;
   isRecurring: boolean;
   status: string;
   priority: string;
@@ -835,6 +836,7 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     allowAssigneeStatusUpdate: dto.allowAssigneeStatusUpdate,
     tags: (dto.tags || []).map((t) => t.name),
     isProject: dto.isProject,
+    parentTaskId: dto.parentTaskId || undefined,
     isRecurring: dto.isRecurring,
     recurringConfig: dto.recurrence ? mapRecurrence(dto.recurrence) : undefined,
     projectCharter: hasCharter
@@ -1264,6 +1266,7 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
       priority: LEVEL_TO_API[taskData.priority] || 'Medium',
       description: taskData.description || null,
       isProject: !!taskData.isProject,
+      parentTaskId: taskData.parentTaskId || null,
       assignedUserId: requireGuid(responsibleIdsOf(taskData)[0], 'کاربر مسئول'),
       responsibleUserIds: responsibleIdsOf(taskData).map((id) => requireGuid(id, 'کاربر مسئول')),
       // Where tasks are given to posts: these posts (their holders are the people above).
