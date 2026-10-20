@@ -4,8 +4,8 @@ import { STATUSES } from '../types';
 import { toPersianDigits } from '../utils/helpers';
 import { REPORT_TYPE_TITLES, TaskReportRow, TaskReportSummary } from '../services/taskReportApi';
 
-/** Rows on the first page (under the title and summary) and on each following page. */
-const FIRST_PAGE_ROWS = 15;
+/** Rows on the first page (under the title) and on each following page. */
+const FIRST_PAGE_ROWS = 16;
 const PAGE_ROWS = 20;
 
 // Plain hex colours and inline styles only: html2canvas (PDF) cannot read Tailwind's oklch()
@@ -46,16 +46,10 @@ export const ReportPrintPages: React.FC<{
   scopeText: string;
   filtersText: string;
   generatedText: string;
-}> = ({ rows, summary, scopeText, filtersText, generatedText }) => {
+}> = ({ rows, scopeText, filtersText, generatedText }) => {
   const pages: PrintableRow[][] = [rows.slice(0, FIRST_PAGE_ROWS)];
   for (let i = FIRST_PAGE_ROWS; i < rows.length; i += PAGE_ROWS) pages.push(rows.slice(i, i + PAGE_ROWS));
   const offsets = pages.map((_, p) => (p === 0 ? 0 : FIRST_PAGE_ROWS + (p - 1) * PAGE_ROWS));
-
-  const stats: [string, number, string][] = [
-    ['کل', summary.total, C.ink], ['شروع نشده', summary.todo, '#475569'], ['درحال اجرا', summary.inProgress, '#1d4ed8'],
-    ['متوقف', summary.paused, '#b45309'], ['خاتمه یافته', summary.completed, '#047857'], ['عقب‌افتاده', summary.overdue, C.red],
-    ['عادی', summary.normal, C.muted], ['پروژه', summary.project, C.muted], ['تکرارشونده', summary.recurring, C.muted],
-  ];
 
   return createPortal(
     <div className="report-print-root" dir="rtl" aria-hidden="true" style={{ fontFamily: "'Vazirmatn Variable', Tahoma, sans-serif", color: C.ink, background: '#ffffff' }}>
@@ -73,14 +67,6 @@ export const ReportPrintPages: React.FC<{
               </div>
               <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>{scopeText}</div>
               <div style={{ fontSize: 11, color: C.ink, marginTop: 2 }}>فیلترها: {filtersText}</div>
-              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                {stats.map(([label, value, color]) => (
-                  <div key={label} style={{ flex: 1, border: `1px solid ${C.line}`, borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: C.muted }}>{label}</div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color }}>{toPersianDigits(value)}</div>
-                  </div>
-                ))}
-              </div>
             </div>
           ) : (
             <div style={{ fontSize: 11, fontWeight: 700, color: C.head, marginBottom: 6 }}>گزارش فعالیت‌ها (ادامه)</div>
