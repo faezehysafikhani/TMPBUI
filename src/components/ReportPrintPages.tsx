@@ -62,7 +62,10 @@ export const ReportPrintPages: React.FC<{
           {p === 0 ? (
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: `2px solid ${C.head}`, paddingBottom: 6 }}>
-                <div style={{ fontSize: 20, fontWeight: 800, color: C.head }}>گزارش فعالیت‌ها</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <img src="/tm-logo.png" alt="" style={{ width: 34, height: 34, objectFit: 'contain' }} />
+                  <div style={{ fontSize: 20, fontWeight: 800, color: C.head }}>گزارش فعالیت‌ها</div>
+                </div>
                 <div style={{ fontSize: 11, color: C.muted }}>{generatedText}</div>
               </div>
               <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>{scopeText}</div>

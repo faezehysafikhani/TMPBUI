@@ -51,6 +51,9 @@ export function saveBlob(blob: Blob, fileName: string): void {
 export async function pagesToPdf(pages: HTMLElement[], onProgress?: (done: number, total: number) => void): Promise<Blob> {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
   if (document.fonts?.ready) await document.fonts.ready;
+  // Images (the logo) must be loaded before a page is captured.
+  await Promise.all(pages.flatMap((page) => Array.from(page.querySelectorAll('img'))).map((img) =>
+    img.complete ? Promise.resolve() : new Promise<void>((resolve) => { img.onload = img.onerror = () => resolve(); })));
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   // html2canvas reads the background of <html> and <body> in its copy of the document, and cannot
   // parse the oklch() colours Tailwind gives them (bg-slate-50, dark mode) - it throws. The copy

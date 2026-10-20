@@ -1344,7 +1344,7 @@ export default function App() {
             {/* Task reports (only where the backend offers them) */}
             {activeTab === 'reports' && reportScope && canOpenTab(currentUser, 'reports') && (
               <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
-                <ReportsView scope={reportScope} visibleTasks={visibleTasks} onOpenTask={handleOpenTaskDetail} />
+                <ReportsView scope={reportScope} visibleTasks={visibleTasks} onOpenTask={handleOpenTaskDetail} generatedBy={currentUser?.name || currentUser?.username} />
               </Suspense>
             )}
 
