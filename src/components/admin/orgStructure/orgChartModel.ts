@@ -1,45 +1,56 @@
-// What the interactive org chart shows and what is selected in it, built from GET /chart.
-import type { ChartCompany, ChartMember, ChartTeam, ChartUnit } from '../../../services/orgStructureApi';
+// What the interactive org chart shows and what is selected in it, built from GET /chart:
+// the company, its head, its deputies, each deputy's positions (vacant ones too) and who holds them.
+import type { ChartCompany, ChartMember, ChartPosition, ChartUnit } from '../../../services/orgStructureApi';
 
 export type ChartSelection =
   | { kind: 'company'; companyId: string }
   /** The company's people in no deputy. */
   | { kind: 'direct'; companyId: string }
   | { kind: 'unit'; companyId: string; unitId: string }
-  /** A deputy's people in no work team. */
-  | { kind: 'noTeam'; companyId: string; unitId: string }
-  /** A work team, under its builder's deputy or among the teams outside the deputies. */
-  | { kind: 'team'; teamId: string }
+  /** A deputy's people who hold none of its positions. */
+  | { kind: 'noPosition'; companyId: string; unitId: string }
+  /** One of a deputy's positions, with whoever holds it. */
+  | { kind: 'position'; companyId: string; unitId: string; unitPositionId: string }
   | { kind: 'member'; userId: string }
   /** Someone with no place in the structure yet. */
   | { kind: 'unplaced'; userId: string };
 
-/** A work team and where the chart shows it (no unit: among the teams outside the deputies). */
-export interface TeamPlace { team: ChartTeam; company: ChartCompany | null; unit: ChartUnit | null }
+/** A deputy position and where it is. */
+export interface PositionPlace { company: ChartCompany; unit: ChartUnit; position: ChartPosition }
 
-export const teamsOf = (unit: ChartUnit): ChartTeam[] => unit.teams || [];
+export const positionsOf = (unit: ChartUnit): ChartPosition[] => unit.positions || [];
 
-/** The people of a deputy (its teams can also hold people of other deputies, so they are not counted). */
+/** The people of a deputy: its own and those holding one of its positions. */
 export const unitHeadcount = (unit: ChartUnit) => unit.peopleCount ?? unit.members.length;
 
 export const companyHeadcount = (company: ChartCompany) =>
   company.peopleCount ?? company.members.length + company.units.reduce((sum, unit) => sum + unitHeadcount(unit), 0);
 
-/** Every work team of the chart, with where it is shown. */
-export function allTeams(chart: ChartCompany[], outside: ChartTeam[]): TeamPlace[] {
-  return [
-    ...chart.flatMap((company) => company.units.flatMap((unit) => teamsOf(unit).map((team) => ({ team, company, unit })))),
-    ...outside.map((team) => ({ team, company: null, unit: null })),
-  ];
+export const vacantCount = (unit: ChartUnit) => positionsOf(unit).filter((p) => p.holders.length === 0).length;
+
+/** Every deputy position of the chart, with where it is. */
+export function allPositions(chart: ChartCompany[]): PositionPlace[] {
+  return chart.flatMap((company) => company.units.flatMap((unit) => positionsOf(unit).map((position) => ({ company, unit, position }))));
 }
 
-/** A person as the chart shows them (from wherever they appear), and the work teams they are in. */
-export function findMember(chart: ChartCompany[], outside: ChartTeam[], userId: string): { member: ChartMember; teams: TeamPlace[] } | null {
-  const teams = allTeams(chart, outside).filter((p) => p.team.members.some((m) => m.userId === userId));
+export function findPosition(chart: ChartCompany[], unitPositionId: string): PositionPlace | null {
+  return allPositions(chart).find((p) => p.position.unitPositionId === unitPositionId) || null;
+}
+
+/** A person as the chart shows them (from wherever they appear), and the positions they hold. */
+export function findMember(chart: ChartCompany[], userId: string): { member: ChartMember; positions: PositionPlace[] } | null {
+  const positions = allPositions(chart).filter((p) => p.position.holders.some((m) => m.userId === userId));
   const member =
     chart.flatMap((c) => [...c.members, ...c.units.flatMap((u) => u.members)]).find((m) => m.userId === userId)
-    || teams[0]?.team.members.find((m) => m.userId === userId);
-  return member ? { member, teams } : null;
+    || positions[0]?.position.holders.find((m) => m.userId === userId)
+    || headAsMember(chart, userId);
+  return member ? { member, positions } : null;
+}
+
+/** A company's head who has no place in the structure: shown from the company. */
+function headAsMember(chart: ChartCompany[], userId: string): ChartMember | undefined {
+  const head = chart.map((c) => c.manager).find((m) => m?.userId === userId);
+  return head ? { userId: head.userId, displayName: head.displayName, isActive: head.isActive, positionTitle: null, managerUserId: null, avatarUrl: head.avatarUrl } : undefined;
 }
 
 export function findUnit(chart: ChartCompany[], unitId: string): { company: ChartCompany; unit: ChartUnit } | null {

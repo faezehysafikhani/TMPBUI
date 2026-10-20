@@ -38,9 +38,36 @@ export interface UserAssignment {
   positionTitle: string | null;
   explicitManagerUserId: string | null;
   manager: Manager | null;
+  /** Every deputy position the person holds, the main one first (absent on an older backend). */
+  positions?: HeldPosition[];
 }
 
-export interface AssignmentInput { companyId: string; unitId: string | null; positionId: string | null; managerUserId: string | null }
+/** One of a deputy's positions that someone holds. */
+export interface HeldPosition { unitPositionId: string; unitId: string; unitName: string; positionId: string; title: string }
+
+/**
+ * unitPositionIds, when sent, is every deputy position the person holds (replacing the list);
+ * without it, positionId is their main position in unitId and their other positions stay.
+ */
+export interface AssignmentInput {
+  companyId: string;
+  unitId: string | null;
+  positionId: string | null;
+  managerUserId: string | null;
+  unitPositionIds?: string[];
+}
+
+/** A position a deputy has, in the deputy's order, with whoever holds it (none: vacant). */
+export interface UnitPosition {
+  id: string;
+  unitId: string;
+  unitName: string;
+  positionId: string;
+  title: string;
+  sortOrder: number;
+  isPositionActive: boolean;
+  holders: PersonRef[];
+}
 
 export interface Subordinate {
   userId: string;
@@ -71,8 +98,23 @@ export interface ChartMember {
  */
 export interface ChartTeam { teamId: string; name: string; description: string | null; owner: PersonRef; members: ChartMember[] }
 
-/** members: the unit's people in no work team. teams: the work teams its people built (absent on an older backend). */
-export interface ChartUnit { unitId: string; name: string; manager: PersonRef | null; members: ChartMember[]; teams?: ChartTeam[]; isActive?: boolean; peopleCount?: number }
+/** A deputy's position in the chart; no holders: vacant. */
+export interface ChartPosition { unitPositionId: string; positionId: string; title: string; sortOrder: number; isActive: boolean; holders: ChartMember[] }
+
+/**
+ * positions: the deputy's positions in its order, vacant ones too (absent on an older backend).
+ * members: the deputy's people who hold none of its positions. teams: no longer shown.
+ */
+export interface ChartUnit {
+  unitId: string;
+  name: string;
+  manager: PersonRef | null;
+  members: ChartMember[];
+  teams?: ChartTeam[];
+  isActive?: boolean;
+  peopleCount?: number;
+  positions?: ChartPosition[];
+}
 
 export interface ChartCompany {
   companyId: string;
@@ -96,7 +138,7 @@ const BASE = '/api/org-structure';
 export const MANAGER_SOURCE_TITLES: Record<ManagerSource, string> = {
   Explicit: 'تعیین‌شده مستقیم',
   UnitManager: 'مدیر واحد',
-  CompanyManager: 'مدیر ارشد شرکت',
+  CompanyManager: 'رئیس کل شرکت',
 };
 
 export const ORG_STRUCTURE_PERMISSIONS = {
@@ -152,6 +194,15 @@ export const createPosition = (title: string, parentPositionId: string | null) =
 export const updatePosition = (id: string, title: string, parentPositionId: string | null, isActive: boolean) =>
   apiRequest<Position>('PUT', `${BASE}/positions/${id}`, { body: { title, parentPositionId, isActive } });
 export const deletePosition = (id: string) => apiRequest<void>('DELETE', `${BASE}/positions/${id}`);
+
+/** A deputy's positions (or every deputy's), each with its holders. */
+export const listUnitPositions = (unitId?: string) => apiRequest<UnitPosition[]>('GET', `${BASE}/unit-positions`, { query: { unitId } });
+export const addUnitPosition = (unitId: string, positionId: string) =>
+  apiRequest<UnitPosition>('POST', `${BASE}/units/${unitId}/positions`, { body: { positionId } });
+/** Every position of the deputy, in the new order. */
+export const orderUnitPositions = (unitId: string, unitPositionIds: string[]) =>
+  apiRequest<UnitPosition[]>('PUT', `${BASE}/units/${unitId}/positions/order`, { body: { unitPositionIds } });
+export const removeUnitPosition = (unitPositionId: string) => apiRequest<void>('DELETE', `${BASE}/unit-positions/${unitPositionId}`);
 
 export const listAssignments = (filter: { companyId?: string; unitId?: string } = {}) =>
   apiRequest<UserAssignment[]>('GET', `${BASE}/assignments`, { query: filter });

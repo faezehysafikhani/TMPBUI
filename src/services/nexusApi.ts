@@ -2091,6 +2091,19 @@ export async function getTaskReminderSettings(): Promise<TaskReminderSettings | 
   }
 }
 
+/** Whom the signed-in user may not make responsible for a task. */
+export interface AssignmentLimit { limited: boolean; blockedUserIds: string[] }
+
+/** Null on a server that does not limit it (an older version). The server checks again on saving. */
+export async function getAssignmentLimit(): Promise<AssignmentLimit | null> {
+  try {
+    return await request<AssignmentLimit>('GET', '/api/task-management/assignment-limit');
+  } catch (err) {
+    if (err instanceof NexusApiError && (err.httpStatus === 404 || err.httpStatus === 405)) return null;
+    throw err;
+  }
+}
+
 export async function saveTaskReminderSettings(value: TaskReminderSettings): Promise<TaskReminderSettings> {
   return request<TaskReminderSettings>('PUT', '/api/task-management/reminder-settings', { body: value });
 }
