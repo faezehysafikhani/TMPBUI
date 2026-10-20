@@ -50,6 +50,8 @@ interface TaskFormModalProps {
   initialDueDate?: string;
   initialTitle?: string;
   initialDescription?: string;
+  /** Set when the task is made from a comment of this activity: offers the «sub-activity» type. */
+  parentTask?: { id: string; title: string } | null;
   appColorPalette?: AppColorPalette;
   currentUser?: User | null;
   existingTasks?: Task[];
@@ -65,6 +67,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   initialDueDate,
   initialTitle = '',
   initialDescription = '',
+  parentTask = null,
   appColorPalette = 'indigo',
   currentUser,
   existingTasks = [],
@@ -95,6 +98,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [isProject, setIsProject] = useState<boolean>(false);
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  // A sub-activity has the project's form and is linked to the activity it was made from.
+  const [isSub, setIsSub] = useState<boolean>(false);
 
   // Project inline options state
   const [projectCharterManager, setProjectCharterManager] = useState<string>('');
@@ -533,6 +538,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         teamMemberIds: finalTeamMemberIds,
         allowAssigneeStatusUpdate: responsibleIds.length > 0 ? allowAssigneeStatusUpdate : true,
         isProject: finalIsProject,
+        parentTaskId: isSub && parentTask ? parentTask.id : taskToEdit?.parentTaskId,
         isRecurring: finalIsRecurring,
         recurringConfig,
         projectCharter,
@@ -590,13 +596,14 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           )}
 
           {/* Activity type: each choice shows only its own form below. */}
-          <div role="radiogroup" aria-label="نوع فعالیت" className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div role="radiogroup" aria-label="نوع فعالیت" className={`grid grid-cols-1 gap-2 ${parentTask && !taskToEdit ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
             {([
               { id: 'simple', label: 'فعالیت ساده', accent: 'accent-indigo-600', hover: 'hover:border-indigo-300' },
               { id: 'project', label: 'پروژه', accent: 'accent-emerald-600', hover: 'hover:border-emerald-300' },
               { id: 'recurring', label: 'فعالیت تکرارشونده', accent: 'accent-purple-600', hover: 'hover:border-purple-300' },
+              ...(parentTask && !taskToEdit ? [{ id: 'sub', label: 'زیرمجموعه‌ی این فعالیت', accent: 'accent-amber-600', hover: 'hover:border-amber-300' }] : []),
             ] as const).map((opt) => {
-              const current = isProject ? 'project' : isRecurring ? 'recurring' : 'simple';
+              const current = isSub ? 'sub' : isProject ? 'project' : isRecurring ? 'recurring' : 'simple';
               return (
                 <label
                   key={opt.id}
@@ -609,7 +616,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                     name="task-kind"
                     checked={current === opt.id}
                     onChange={() => {
-                      setIsProject(opt.id === 'project');
+                      setIsSub(opt.id === 'sub');
+                      setIsProject(opt.id === 'project' || opt.id === 'sub');
                       setIsRecurring(opt.id === 'recurring');
                     }}
                     className={`w-4 h-4 cursor-pointer ${opt.accent}`}
@@ -619,6 +627,11 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               );
             })}
           </div>
+          {isSub && parentTask && (
+            <div className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+              این فعالیت (با فرم پروژه) به‌عنوان زیرمجموعه‌ی «{parentTask.title}» ثبت می‌شود و کنار آن نمایش داده می‌شود.
+            </div>
+          )}
 
           {/* Title Input */}
           <div className="flex items-center gap-3 pt-1"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-black shadow-md shadow-indigo-500/25">۱</span><div><p className="text-sm font-black text-slate-900 dark:text-white">شرح فعالیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">ابتدا عنوان روشن و توضیح کوتاه بنویسید.</p></div></div>
