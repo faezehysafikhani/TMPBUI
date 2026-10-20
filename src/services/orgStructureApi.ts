@@ -16,11 +16,20 @@ export interface Company {
   linkedUnitIds: string[];
 }
 
-export interface CompanyInput { name: string; code: string; description?: string | null; managerUserId?: string | null }
+/** The head is not chosen here: it is whoever holds the company's position with no superior. */
+export interface CompanyInput { name: string; code: string; description?: string | null }
 
 export interface CompanyUnitLink { unitId: string; unitName: string; companyId: string; companyName: string }
 
-export interface Position { id: string; title: string; parentPositionId: string | null; isActive: boolean }
+/**
+ * companyIds: the companies the position is for (given only there). In each company the one
+ * position with no superior is the head's (رئیس کل).
+ */
+export interface Position { id: string; title: string; parentPositionId: string | null; isActive: boolean; companyIds?: string[] }
+
+/** Positions for a company: those it is for. */
+export const positionsForCompany = (positions: Position[], companyId: string) =>
+  positions.filter((p) => (p.companyIds || []).includes(companyId));
 
 export type ManagerSource = 'Explicit' | 'UnitManager' | 'CompanyManager';
 
@@ -189,10 +198,10 @@ export const linkUnitToCompany = (unitId: string, companyId: string) =>
 export const unlinkUnit = (unitId: string) => apiRequest<void>('DELETE', `${BASE}/company-units/${unitId}`);
 
 export const listPositions = () => apiRequest<Position[]>('GET', `${BASE}/positions`);
-export const createPosition = (title: string, parentPositionId: string | null) =>
-  apiRequest<Position>('POST', `${BASE}/positions`, { body: { title, parentPositionId } });
-export const updatePosition = (id: string, title: string, parentPositionId: string | null, isActive: boolean) =>
-  apiRequest<Position>('PUT', `${BASE}/positions/${id}`, { body: { title, parentPositionId, isActive } });
+export const createPosition = (title: string, parentPositionId: string | null, companyIds: string[]) =>
+  apiRequest<Position>('POST', `${BASE}/positions`, { body: { title, parentPositionId, companyIds } });
+export const updatePosition = (id: string, title: string, parentPositionId: string | null, isActive: boolean, companyIds: string[]) =>
+  apiRequest<Position>('PUT', `${BASE}/positions/${id}`, { body: { title, parentPositionId, isActive, companyIds } });
 export const deletePosition = (id: string) => apiRequest<void>('DELETE', `${BASE}/positions/${id}`);
 
 /** A deputy's positions (or every deputy's), each with its holders. */
