@@ -54,6 +54,8 @@ interface TaskDetailModalProps {
   onConvertToTask?: (title: string, description?: string) => void;
 }
 
+const LOGS_PAGE_SIZE = 10;
+
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   isOpen,
   task,
@@ -75,6 +77,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   );
   const [logsList, setLogsList] = useState<TaskLog[]>(task.logs || []);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [visibleLogCount, setVisibleLogCount] = useState(LOGS_PAGE_SIZE);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
   const [newCommentText, setNewCommentText] = useState('');
@@ -1065,10 +1069,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           {/* Activity Log / Change History Timeline */}
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setLogsOpen((v) => !v)}
+                aria-expanded={logsOpen}
+                className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 cursor-pointer"
+              >
+                <ChevronLeft
+                  className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${logsOpen ? '-rotate-90' : ''}`}
+                />
                 <History className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 <span>تاریخچه و لاگ تغییرات فعالیت ({toPersianDigits(logsList.length)})</span>
-              </h4>
+              </button>
               {isLoadingLogs && (
                 <span className="text-[10px] text-indigo-600 dark:text-indigo-400 animate-pulse font-medium">
                   در حال بارگذاری تغییرات...
@@ -1076,13 +1088,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               )}
             </div>
 
-            {logsList.length === 0 ? (
+            {!logsOpen ? null : logsList.length === 0 ? (
               <div className="p-4 text-center text-xs text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
                 هنوز هیچ لاگ رویداد یا تغییری ثبت نشده است.
               </div>
             ) : (
-              <div className="space-y-2">
-                {logsList.map((log) => {
+              <div
+                className="space-y-2 max-h-80 overflow-y-auto pr-1"
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) {
+                    setVisibleLogCount((n) => Math.min(n + LOGS_PAGE_SIZE, logsList.length));
+                  }
+                }}
+              >
+                {logsList.slice(0, visibleLogCount).map((log) => {
                   const isOpen = expandedLogId === log.id;
                   return (
                     <div
