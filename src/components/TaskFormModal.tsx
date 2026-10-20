@@ -28,10 +28,11 @@ import {
   Calendar,
   FolderKanban,
   ListChecks,
+  Briefcase,
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleIdsOf } from '../utils/taskPeople';
-import { getAssignmentLimit } from '../services/nexusApi';
+import { getAssignmentLimit, getAssignablePosts, AssignablePosts } from '../services/nexusApi';
 
 /** One person the responsible-people picker offers. */
 interface PersonOption {
@@ -82,6 +83,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   // Everyone responsible for doing the task (one or more); the first is sent as assignedUserId too.
   const [responsibleIds, setResponsibleIds] = useState<string[]>([]);
+  // Where tasks are given to posts: the posts to choose from (null: give tasks to people) and the
+  // responsible posts chosen; responsibleIds then follows their holders.
+  const [postMode, setPostMode] = useState<AssignablePosts | null>(null);
+  const [responsiblePostIds, setResponsiblePostIds] = useState<string[]>([]);
   const [allowAssigneeStatusUpdate, setAllowAssigneeStatusUpdate] = useState<boolean>(true);
   const [allRegisteredUsers, setAllRegisteredUsers] = useState<User[]>(registeredUsers);
   // Where the organization limits it: the people this user may not make responsible (above them).
@@ -208,8 +213,21 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         setBlockedIds(new Set(limit?.blockedUserIds || []));
       })
       .catch(() => {});
+    getAssignablePosts()
+      .then((posts) => { if (alive) setPostMode(posts?.enabled ? posts : null); })
+      .catch(() => {});
     return () => { alive = false; };
   }, [isOpen, currentUser?.id]);
+
+  // Given to posts: the responsible people are the chosen posts' holders.
+  useEffect(() => {
+    if (!postMode) return;
+    const holderOf = new Map<string, string | null>([
+      ...(taskToEdit?.posts || []).map((p) => [p.postId, p.holderUserId] as [string, string | null]),
+      ...postMode.posts.map((p) => [p.postId, p.holderUserId] as [string, string | null]),
+    ]);
+    setResponsibleIds(Array.from(new Set(responsiblePostIds.map((id) => holderOf.get(id)).filter((id): id is string => !!id))));
+  }, [postMode, responsiblePostIds, taskToEdit]);
 
   // Fetch all registered users for quick search & assignment
   useEffect(() => {
@@ -255,6 +273,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       // taking someone off the responsible list does not silently leave them with access.
       const responsible = responsibleIdsOf(taskToEdit);
       setResponsibleIds(responsible);
+      setResponsiblePostIds(taskToEdit.responsiblePostIds || []);
       setSelectedMemberIds((taskToEdit.teamMemberIds || []).filter((id) => !responsible.includes(id)));
       setAllowAssigneeStatusUpdate(taskToEdit.allowAssigneeStatusUpdate !== false);
       setTags(taskToEdit.tags || []);
@@ -451,7 +470,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       return;
     }
     // Every new task needs someone responsible for doing it (the server enforces this too).
-    if (!taskToEdit && responsibleIds.length === 0) {
+    if (!taskToEdit && (postMode ? responsiblePostIds.length === 0 : responsibleIds.length === 0)) {
       setErrors({ assignee: 'لطفاً مسئول اجرای فعالیت را انتخاب کنید.' });
       assigneeDropdownRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       return;
@@ -461,8 +480,13 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     let finalTeamMemberIds: string[] = [];
     if (selectedMemberIds.length > 0) {
       finalTeamMemberIds = [...selectedMemberIds];
-    } else if (currentUser && !selectedTeamId) {
+    } else if (currentUser && !selectedTeamId && !postMode) {
       finalTeamMemberIds = [currentUser.id];
+    }
+    // Given to posts: access goes to people's posts, so only people who hold one are given it.
+    if (postMode) {
+      const holders = new Set(postMode.posts.map((p) => p.holderUserId).filter(Boolean));
+      finalTeamMemberIds = finalTeamMemberIds.filter((id) => holders.has(id));
     }
 
     // Names of the responsible people, for display until the server's copy arrives. They are not
@@ -542,6 +566,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         ownerAvatar: taskToEdit?.ownerAvatar || (currentUser ? currentUser.avatar : undefined),
         assignedUserId: responsibleIds[0] || undefined,
         responsibleUserIds: responsibleIds,
+        responsiblePostIds: postMode ? responsiblePostIds : undefined,
         responsibleUserNames: responsibleNames,
         assignedUserName: assignedName,
         assignedUserAvatar: assignedAvatar,
@@ -1262,7 +1287,94 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 </span>
               </div>
 
-              {(() => {
+              {postMode ? (() => {
+                // Given to posts: a post someone holds (and the user may give tasks to) - or one the task has.
+                const known = new Map<string, { postId: string; title: string; code: string; place: string; holderName: string | null; blocked?: boolean; vacant: boolean }>();
+                for (const p of taskToEdit?.posts || []) {
+                  if (p.role === 'responsible') known.set(p.postId, { ...p, vacant: !p.holderUserId });
+                }
+                for (const p of postMode.posts) known.set(p.postId, { ...p, vacant: !p.holderUserId });
+                const label = (p: { title: string; code: string }) => `${p.title} · کد ${toPersianDigits(p.code)}`;
+                const candidates = Array.from(known.values())
+                  .filter((p) => responsiblePostIds.includes(p.postId) || (!p.vacant && !p.blocked))
+                  .sort((a, b) => a.place.localeCompare(b.place, 'fa') || a.title.localeCompare(b.title, 'fa'));
+                const selected = responsiblePostIds.map((id) => known.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
+                const query = userSearchQuery.trim().toLowerCase();
+                const filtered = candidates.filter((p) => !query
+                  || [p.title, p.code, p.place, p.holderName || ''].some((v) => v.toLowerCase().includes(query)));
+                const toggle = (id: string) => {
+                  setResponsiblePostIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+                  setErrors((prev) => ({ ...prev, assignee: undefined }));
+                };
+                return (
+                  <div className="space-y-2" data-post-picker>
+                    {selected.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5" data-responsible-list>
+                        {selected.map((post) => (
+                          <span key={post.postId} data-responsible-post={post.postId} className="inline-flex items-center gap-1.5 pl-1 pr-1.5 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold text-indigo-900 dark:text-indigo-100">
+                            <Briefcase className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                            <span>{label(post)}</span>
+                            <span className={`text-[10px] ${post.vacant ? 'text-amber-600' : 'text-indigo-500 dark:text-indigo-300'}`}>{post.vacant ? '(خالی)' : `(${post.holderName})`}</span>
+                            {!isStatusOnlyEdit && (
+                              <button type="button" aria-label={`حذف ${label(post)} از مسئولان`} onClick={() => toggle(post.postId)} className="p-0.5 rounded-md text-indigo-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {!isStatusOnlyEdit && (
+                      <div className="relative">
+                        <div className="relative flex items-center">
+                          <Search className="w-4 h-4 absolute right-3 text-slate-400 pointer-events-none" />
+                          <input
+                            type="text"
+                            placeholder={selected.length > 0 ? 'افزودن پست مسئول دیگر...' : `جستجو در میان پست‌ها (${toPersianDigits(candidates.length)} پست)...`}
+                            value={userSearchQuery}
+                            onFocus={() => setIsAssigneeDropdownOpen(true)}
+                            onChange={(e) => { setUserSearchQuery(e.target.value); setIsAssigneeDropdownOpen(true); }}
+                            className="w-full pl-9 pr-9 py-2 bg-white dark:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
+                          />
+                          <button type="button" aria-label="نمایش فهرست پست‌ها" onClick={() => setIsAssigneeDropdownOpen((prev) => !prev)} className="absolute left-2.5 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer">
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isAssigneeDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                        </div>
+                        {isAssigneeDropdownOpen && (
+                          <div className="absolute z-50 top-full mt-1.5 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto p-1.5 space-y-1" data-responsible-options>
+                            <div className="px-2 py-1 text-[10px] text-slate-400 flex items-center justify-between">
+                              <span>پست‌های سازمانی:</span>
+                              <span>{toPersianDigits(filtered.length)} پست</span>
+                            </div>
+                            {filtered.length === 0 ? (
+                              <div className="py-4 text-center text-xs text-slate-400">پستی با این مشخصات یافت نشد.</div>
+                            ) : filtered.map((post) => {
+                              const isSelected = responsiblePostIds.includes(post.postId);
+                              return (
+                                <button key={post.postId} type="button" role="option" aria-selected={isSelected} data-option={post.postId} onClick={() => toggle(post.postId)}
+                                  className={`w-full flex items-center justify-between p-2 rounded-lg text-xs text-right transition-colors cursor-pointer ${isSelected ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-900 dark:text-indigo-100 border border-indigo-200 dark:border-indigo-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'}`}>
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300 flex items-center justify-center shrink-0"><Briefcase className="w-3.5 h-3.5" /></div>
+                                    <div className="truncate">
+                                      <p className="font-bold text-xs truncate text-slate-800 dark:text-slate-100">{label(post)}</p>
+                                      <p className="text-[10px] text-slate-400 truncate">{post.vacant ? 'خالی' : post.holderName} · {post.place}</p>
+                                    </div>
+                                  </div>
+                                  <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-slate-600'}`}>
+                                    {isSelected && <Check className="w-3 h-3 text-white" />}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">فعالیت به پست سازمانی داده می‌شود؛ اگر دارندهٔ پست عوض شود، فعالیت به نفر جدید می‌رسد.{assignmentLimited ? ' فقط پست‌های هم‌سطح شما و زیرمجموعه‌تان نمایش داده می‌شوند.' : ''}</p>
+                    {errors.assignee && <p className="text-xs text-red-500 font-medium">{errors.assignee}</p>}
+                  </div>
+                );
+              })() : (() => {
                 const currentTeamObj = availableTeams.find((t) => t.id === selectedTeamId);
                 const teamIds = new Set((currentTeamObj?.members || []).map((m) => m.userId));
 

@@ -216,6 +216,7 @@ interface TaskDto {
   /** Times of day on the charter dates, like dueTime. */
   charterStartTime?: string | null;
   charterEndTime?: string | null;
+  posts?: Array<{ postId: string; role: string; title: string; code: string; place: string; holderUserId: string | null; holderName: string | null }> | null;
 }
 
 interface TaskListItemDto { id: string; }
@@ -805,6 +806,8 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     assignedTeamName: dto.assignedUserGroup?.name,
     teamMemberIds: (dto.assignees || []).map((a) => a.id),
     teamMemberNames: (dto.assignees || []).map((a) => a.displayName),
+    posts: dto.posts ? dto.posts.map((p) => ({ ...p, role: p.role as 'owner' | 'responsible' | 'access' })) : undefined,
+    responsiblePostIds: dto.posts ? dto.posts.filter((p) => p.role === 'responsible').map((p) => p.postId) : undefined,
     allowAssigneeStatusUpdate: dto.allowAssigneeStatusUpdate,
     tags: (dto.tags || []).map((t) => t.name),
     isProject: dto.isProject,
@@ -1238,6 +1241,8 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
       isProject: !!taskData.isProject,
       assignedUserId: requireGuid(responsibleIdsOf(taskData)[0], 'کاربر مسئول'),
       responsibleUserIds: responsibleIdsOf(taskData).map((id) => requireGuid(id, 'کاربر مسئول')),
+      // Where tasks are given to posts: these posts (their holders are the people above).
+      responsiblePostIds: taskData.responsiblePostIds ?? null,
       assignedUserGroupId: requireGuid(taskData.assignedTeamId, 'تیم'),
       assigneeUserIds: (taskData.teamMemberIds || []).map((id) => requireGuid(id, 'عضو تیم')),
       allowAssigneeStatusUpdate: taskData.allowAssigneeStatusUpdate ?? true,
@@ -1349,6 +1354,7 @@ export async function updateTask(
           taskData.responsibleUserIds !== undefined
             ? responsibleIdsOf(taskData).map((id) => requireGuid(id, 'کاربر مسئول'))
             : null,
+        responsiblePostIds: taskData.responsiblePostIds ?? null,
         assignedUserGroupId:
           taskData.assignedTeamId !== undefined
             ? requireGuid(taskData.assignedTeamId, 'تیم')
@@ -2065,6 +2071,19 @@ export async function getTaskReminderSettings(): Promise<TaskReminderSettings | 
 export interface AssignmentLimit { limited: boolean; blockedUserIds: string[] }
 
 /** Null on a server that does not limit it (an older version). The server checks again on saving. */
+/** Where tasks are given to posts: the posts to choose from. enabled false (or null): give them to people. */
+export interface AssignablePost { postId: string; title: string; code: string; place: string; holderUserId: string | null; holderName: string | null; blocked: boolean }
+export interface AssignablePosts { enabled: boolean; posts: AssignablePost[] }
+
+export async function getAssignablePosts(): Promise<AssignablePosts | null> {
+  try {
+    return await request<AssignablePosts>('GET', '/api/task-management/assignable-posts');
+  } catch (err) {
+    if (err instanceof NexusApiError && (err.httpStatus === 404 || err.httpStatus === 405)) return null;
+    throw err;
+  }
+}
+
 export async function getAssignmentLimit(): Promise<AssignmentLimit | null> {
   try {
     return await request<AssignmentLimit>('GET', '/api/task-management/assignment-limit');
