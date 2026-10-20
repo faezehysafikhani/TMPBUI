@@ -89,6 +89,8 @@ export interface TaskComment {
   userId: string;
   userName: string;
   userAvatar?: string;
+  /** Written as a stand-in for a vacant post («جانشین کارشناس · کد ۷»). */
+  actingNote?: string;
   text: string;
   attachments?: Attachment[];
   createdAt: string;

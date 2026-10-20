@@ -230,6 +230,7 @@ interface TaskCommentDto {
   createdAtUtc: string;
   modifiedAtUtc: string | null;
   files?: TaskFileDto[] | null;
+  actingNote?: string | null;
 }
 
 interface TaskActivityDto {
@@ -766,6 +767,7 @@ function mapComment(c: TaskCommentDto, attachments?: Attachment[]): TaskComment 
     taskId: c.taskId,
     userId: c.userId,
     userName: c.userDisplayName || 'کاربر',
+    actingNote: c.actingNote || undefined,
     text: c.text,
     attachments: attachments && attachments.length > 0 ? attachments : undefined,
     createdAt: c.createdAtUtc,

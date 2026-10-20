@@ -239,6 +239,25 @@ export const orderUnitPositions = (unitId: string, unitPositionIds: string[]) =>
   apiRequest<UnitPosition[]>('PUT', `${BASE}/units/${unitId}/positions/order`, { body: { unitPositionIds } });
 export const removeUnitPosition = (unitPositionId: string) => apiRequest<void>('DELETE', `${BASE}/unit-positions/${unitPositionId}`);
 
+/** The substitution inbox (کارتابل جانشینی): vacant posts' open tasks and who stands in for them. */
+export interface ActingPost { postId: string; title: string; code: string; place: string; holderUserId: string | null; holderName: string | null }
+export interface SubstitutionTask { taskId: string; title: string; dueDate: string; status: string }
+export interface VacantPost { postId: string; title: string; code: string; place: string; acting: ActingPost | null; tasks: SubstitutionTask[]; candidates: ActingPost[] }
+export interface SubstitutionInbox { enabled: boolean; canManageAll: boolean; posts: VacantPost[] }
+
+/** Null where the backend has no inbox (404). */
+export async function getSubstitutionInbox(): Promise<SubstitutionInbox | null> {
+  try {
+    return await apiRequest<SubstitutionInbox>('GET', `${BASE}/substitution`);
+  } catch (err) {
+    if (err instanceof NexusApiError && (err.httpStatus === 404 || err.httpStatus === 405)) return null;
+    throw err;
+  }
+}
+export const setActingPost = (vacantPostId: string, actingPostId: string) =>
+  apiRequest<void>('PUT', `${BASE}/substitution/${vacantPostId}`, { body: { actingPostId } });
+export const clearActingPost = (vacantPostId: string) => apiRequest<void>('DELETE', `${BASE}/substitution/${vacantPostId}`);
+
 export const listAssignments = (filter: { companyId?: string; unitId?: string } = {}) =>
   apiRequest<UserAssignment[]>('GET', `${BASE}/assignments`, { query: filter });
 
