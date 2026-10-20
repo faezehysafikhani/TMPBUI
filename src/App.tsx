@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { TaskTitleContext } from './components/TaskCardList';
 import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification, setMaxAttachmentBytes } from './types';
 import { getUploadPolicy, refreshUploadPolicy } from './utils/uploadPolicy';
 import { isOverdue, toPersianDigits, formatToJalali, getTaskLastModifiedTime, computeAutoTaskStatus } from './utils/helpers';
@@ -208,6 +209,7 @@ export default function App() {
   const [initialStatusForNewTask, setInitialStatusForNewTask] = useState<TaskStatus>('todo');
   const [initialDueDateForNewTask, setInitialDueDateForNewTask] = useState<string | undefined>(undefined);
   const [initialTitleForNewTask, setInitialTitleForNewTask] = useState<string>('');
+  const [parentForNewTask, setParentForNewTask] = useState<{ id: string; title: string } | null>(null);
   const [initialDescriptionForNewTask, setInitialDescriptionForNewTask] = useState<string>('');
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
 
@@ -680,7 +682,8 @@ export default function App() {
     status: TaskStatus = 'todo',
     isoDate?: string,
     initialTitle: string = '',
-    initialDescription: string = ''
+    initialDescription: string = '',
+    parent?: { id: string; title: string }
   ) => {
     if (!can(currentUser, PERMISSIONS.tasksCreate)) return;
     setTaskToEdit(null);
@@ -688,12 +691,13 @@ export default function App() {
     setInitialDueDateForNewTask(isoDate || new Date().toISOString());
     setInitialTitleForNewTask(initialTitle);
     setInitialDescriptionForNewTask(initialDescription);
+    setParentForNewTask(parent || null);
     setIsFormModalOpen(true);
   }, [currentUser]);
 
   // Handler to convert chat messages, activity comments, or personal notes into a new task
-  const handleConvertToTask = useCallback((title: string, description?: string) => {
-    handleOpenCreateModal('todo', undefined, title, description || '');
+  const handleConvertToTask = useCallback((title: string, description?: string, parent?: { id: string; title: string }) => {
+    handleOpenCreateModal('todo', undefined, title, description || '', parent);
   }, [handleOpenCreateModal]);
 
   // Open Form Modal for Editing Task
@@ -702,6 +706,7 @@ export default function App() {
     setInitialDueDateForNewTask(undefined);
     setInitialTitleForNewTask('');
     setInitialDescriptionForNewTask('');
+    setParentForNewTask(null);
     setIsFormModalOpen(true);
   }, []);
 
@@ -711,6 +716,8 @@ export default function App() {
     if (!currentUser) return tasks;
     return tasks.filter((task) => isTaskVisibleTo(task, currentUser));
   }, [tasks, currentUser]);
+
+  const taskTitleById = useMemo(() => new Map(visibleTasks.map((t) => [t.id, t.title])), [visibleTasks]);
 
   // Current User Team Members for Assignee Filter
   const currentUserTeamMembers = useMemo(() => {
@@ -1163,6 +1170,7 @@ export default function App() {
   }
 
   return (
+    <TaskTitleContext.Provider value={taskTitleById}>
     <div className={`min-h-screen bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans pb-24 lg:pb-0 transition-colors duration-200`}>
       
       {/* Startup Summary Welcome Modal (Priority 1 Overlay) */}
@@ -1428,6 +1436,7 @@ export default function App() {
             initialDueDate={initialDueDateForNewTask}
             initialTitle={initialTitleForNewTask}
             initialDescription={initialDescriptionForNewTask}
+            parentTask={parentForNewTask}
             appColorPalette={appColorPalette}
             currentUser={currentUser}
             existingTasks={visibleTasks}
@@ -1567,6 +1576,7 @@ export default function App() {
 
 
     </div>
+    </TaskTitleContext.Provider>
   );
 }
 

@@ -171,6 +171,8 @@ export interface Task {
   allowAssigneeStatusUpdate?: boolean; // آیا مسئول امکان بروزرسانی وضعیت را دارد یا خیر
   tags?: string[];
   isProject?: boolean;
+  /** The activity this one was created under (a sub-activity), when it has a parent. */
+  parentTaskId?: string;
   isRecurring?: boolean;
   recurringConfig?: RecurringConfig;
   projectCharter?: ProjectCharter;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Task, TaskStatus, STATUSES, Attachment, User } from '../types';
-import { TaskCard } from './TaskCard';
+import { TaskCardList } from './TaskCardList';
 import { toPersianDigits } from '../utils/helpers';
 import { Plus, Minus, Move } from 'lucide-react';
 import { can, PERMISSIONS } from '../utils/permissions';
@@ -153,21 +153,18 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
                 )}
               </div>
             ) : (
-              tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  currentUser={currentUser}
-                  showDetails={showDetails}
-                  onEdit={onEditTask}
-                  onDelete={onDeleteTask}
-                  onStatusChange={onStatusChange}
-                  onPreviewAttachment={onPreviewAttachment}
-                  onViewDetails={onViewDetails}
-                  onOpenProjectDetails={onOpenProjectDetails}
-                  onToggleSubTask={onToggleSubTask}
-                />
-              ))
+              <TaskCardList
+                tasks={tasks}
+                currentUser={currentUser}
+                showDetails={showDetails}
+                onEdit={onEditTask}
+                onDelete={onDeleteTask}
+                onStatusChange={onStatusChange}
+                onPreviewAttachment={onPreviewAttachment}
+                onViewDetails={onViewDetails}
+                onOpenProjectDetails={onOpenProjectDetails}
+                onToggleSubTask={onToggleSubTask}
+              />
             )}
           </div>
         </div>

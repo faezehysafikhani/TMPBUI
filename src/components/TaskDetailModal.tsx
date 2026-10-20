@@ -52,7 +52,7 @@ interface TaskDetailModalProps {
   onPreviewAttachment: (attachment: Attachment) => void;
   onOpenProjectDetails?: (task: Task) => void;
   onToggleSubTask?: (taskId: string, subTaskId: string) => void;
-  onConvertToTask?: (title: string, description?: string) => void;
+  onConvertToTask?: (title: string, description?: string, parent?: { id: string; title: string }) => void;
 }
 
 const LOGS_PAGE_SIZE = 10;
@@ -910,7 +910,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                   : 'وظیفه جدید از گفتگو';
                                 const desc = `برگرفته از گفتگو و نظر روی فعالیت «${task.title}» (نویسنده: ${cmt.userName || 'کاربر'}):\n${cmt.text}`;
                                 onClose();
-                                onConvertToTask(title, desc);
+                                onConvertToTask(title, desc, { id: task.id, title: task.title });
                               }}
                               className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold cursor-pointer"
                               title="تبدیل این نظر به یک وظیفه جدید"
