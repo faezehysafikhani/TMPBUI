@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, FileSpreadsheet, FileDown, Printer, Eye, FilterX, Loader2, Repeat, FolderKanban, AlertCircle, Tag } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, FileDown, Printer, Eye, FilterX, Loader2, Repeat, FolderKanban, AlertCircle, Tag, ListChecks, Clock, Play, Pause, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Task, TaskStatus, STATUSES, PRIORITIES } from '../types';
 import { AdminCard, AdminDialog, Field, Notice, Pagination, SecondaryButton, StatusBadge, inputClass } from './admin/AdminUi';
 import { toPersianDigits } from '../utils/helpers';
@@ -42,19 +42,36 @@ const FieldGroup: React.FC<{ label: string; hint?: string; children: React.React
   </div>
 );
 
-const SummaryCard: React.FC<{ label: string; value: number; tone: string; active?: boolean; onClick?: () => void }> = ({ label, value, tone, active, onClick }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={!onClick}
-    className={`text-right p-3.5 rounded-2xl border transition-all ${onClick ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} ${
-      active ? 'ring-2 ring-indigo-500 border-indigo-300 bg-indigo-50/60 dark:bg-indigo-950/40' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900'
-    }`}
-  >
-    <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{label}</div>
-    <div className={`text-2xl font-black mt-1 ${tone}`}>{toPersianDigits(value)}</div>
-  </button>
-);
+type CardTheme = 'indigo' | 'slate' | 'blue' | 'amber' | 'emerald' | 'rose';
+
+const CARD_THEMES: Record<CardTheme, { box: string; value: string; icon: string }> = {
+  indigo: { box: 'bg-indigo-50 border-indigo-200 dark:bg-indigo-950/40 dark:border-indigo-900', value: 'text-indigo-700 dark:text-indigo-300', icon: 'text-indigo-400 dark:text-indigo-500' },
+  slate: { box: 'bg-slate-50 border-slate-200 dark:bg-slate-800/60 dark:border-slate-700', value: 'text-slate-700 dark:text-slate-200', icon: 'text-slate-400 dark:text-slate-500' },
+  blue: { box: 'bg-sky-50 border-sky-200 dark:bg-sky-950/40 dark:border-sky-900', value: 'text-sky-700 dark:text-sky-300', icon: 'text-sky-400 dark:text-sky-500' },
+  amber: { box: 'bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-900', value: 'text-amber-700 dark:text-amber-300', icon: 'text-amber-400 dark:text-amber-500' },
+  emerald: { box: 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900', value: 'text-emerald-700 dark:text-emerald-300', icon: 'text-emerald-400 dark:text-emerald-500' },
+  rose: { box: 'bg-rose-50 border-rose-200 dark:bg-rose-950/40 dark:border-rose-900', value: 'text-rose-700 dark:text-rose-300', icon: 'text-rose-400 dark:text-rose-500' },
+};
+
+const SummaryCard: React.FC<{
+  label: string; value: number; theme: CardTheme; icon: React.ElementType; active?: boolean; onClick?: () => void;
+}> = ({ label, value, theme, icon: Icon, active, onClick }) => {
+  const t = CARD_THEMES[theme];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
+      className={`relative text-right px-3 py-2 rounded-xl border transition-all ${t.box} ${onClick ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} ${
+        active ? 'ring-2 ring-indigo-500' : ''
+      }`}
+    >
+      <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{label}</div>
+      <div className={`text-xl font-black leading-tight ${t.value}`}>{toPersianDigits(value)}</div>
+      <Icon className={`absolute bottom-1.5 left-2 w-4 h-4 ${t.icon}`} aria-hidden="true" />
+    </button>
+  );
+};
 
 /** The report as an .xlsx workbook (right to left, header row frozen, auto-filter). */
 function exportExcel(rows: TaskReportRow[]) {
@@ -284,12 +301,12 @@ export const ReportsView: React.FC<{
 
       {s && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <SummaryCard label="کل فعالیت‌ها" value={s.total} tone="text-slate-900 dark:text-white" active={!filters.status} onClick={() => set({ status: undefined })} />
-          <SummaryCard label="شروع نشده" value={s.todo} tone="text-slate-600" active={filters.status === 'todo'} onClick={() => set({ status: 'todo' })} />
-          <SummaryCard label="درحال اجرا" value={s.inProgress} tone="text-blue-600" active={filters.status === 'in_progress'} onClick={() => set({ status: 'in_progress' })} />
-          <SummaryCard label="متوقف" value={s.paused} tone="text-amber-600" active={filters.status === 'paused'} onClick={() => set({ status: 'paused' })} />
-          <SummaryCard label="خاتمه یافته" value={s.completed} tone="text-emerald-600" active={filters.status === 'completed'} onClick={() => set({ status: 'completed' })} />
-          <SummaryCard label="عقب‌افتاده" value={s.overdue} tone="text-rose-600" />
+          <SummaryCard label="کل فعالیت‌ها" value={s.total} theme="indigo" icon={ListChecks} active={!filters.status} onClick={() => set({ status: undefined })} />
+          <SummaryCard label="شروع نشده" value={s.todo} theme="slate" icon={Clock} active={filters.status === 'todo'} onClick={() => set({ status: 'todo' })} />
+          <SummaryCard label="درحال اجرا" value={s.inProgress} theme="blue" icon={Play} active={filters.status === 'in_progress'} onClick={() => set({ status: 'in_progress' })} />
+          <SummaryCard label="متوقف" value={s.paused} theme="amber" icon={Pause} active={filters.status === 'paused'} onClick={() => set({ status: 'paused' })} />
+          <SummaryCard label="خاتمه یافته" value={s.completed} theme="emerald" icon={CheckCircle2} active={filters.status === 'completed'} onClick={() => set({ status: 'completed' })} />
+          <SummaryCard label="عقب‌افتاده" value={s.overdue} theme="rose" icon={AlertTriangle} />
         </div>
       )}
 
