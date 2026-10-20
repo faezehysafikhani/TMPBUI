@@ -45,13 +45,13 @@ export function saveBlob(blob: Blob, fileName: string): void {
 }
 
 /**
- * One PDF page (A4 landscape) per element, captured as an image so Persian text is shaped and
+ * One PDF page (A4 portrait) per element, captured as an image so Persian text is shaped and
  * drawn by the browser in the app's font. `onProgress(done, total)` reports each page.
  */
 export async function pagesToPdf(pages: HTMLElement[], onProgress?: (done: number, total: number) => void): Promise<Blob> {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
   if (document.fonts?.ready) await document.fonts.ready;
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   // html2canvas reads the background of <html> and <body> in its copy of the document, and cannot
   // parse the oklch() colours Tailwind gives them (bg-slate-50, dark mode) - it throws. The copy
   // is made plain white here; the pages themselves use hex colours only.
@@ -67,8 +67,8 @@ export async function pagesToPdf(pages: HTMLElement[], onProgress?: (done: numbe
   };
   for (let i = 0; i < pages.length; i++) {
     const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, onclone });
-    if (i > 0) pdf.addPage('a4', 'landscape');
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.88), 'JPEG', 0, 0, 297, 210, undefined, 'FAST');
+    if (i > 0) pdf.addPage('a4', 'portrait');
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.88), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
     onProgress?.(i + 1, pages.length);
     // Let the page repaint (progress) between pages.
     await new Promise((resolve) => setTimeout(resolve, 0));

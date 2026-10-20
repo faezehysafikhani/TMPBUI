@@ -424,7 +424,7 @@ button:is([class*="bg-gradient-to"], [class*=" bg-indigo-600"], [class*=" bg-eme
 
 @media print {
   @page {
-    size: A4 landscape;
+    size: A4 portrait;
     margin: 0;
   }
 
