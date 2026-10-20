@@ -56,6 +56,18 @@ interface TaskDetailModalProps {
 
 const LOGS_PAGE_SIZE = 10;
 
+// Test only: set VITE_FAKE_LOGS=30 in .env.development to pad the history with fake entries.
+const fakeLogs = (taskId: string): TaskLog[] =>
+  Array.from({ length: Number(import.meta.env.VITE_FAKE_LOGS) || 0 }, (_, i) => ({
+    id: `fake-${i}`,
+    taskId,
+    userId: 'fake',
+    userName: i % 2 ? 'علی رضایی' : 'مریم احمدی',
+    action: i % 3 ? 'ویرایش فعالیت' : 'تغییر وضعیت',
+    details: 'تغییر موعد انجام: ۱۴۰۵/۰۷/۱۰ ← ۱۴۰۵/۰۷/۲۰ | تغییر اولویت: متوسط ← زیاد',
+    createdAt: new Date(Date.now() - i * 3600_000).toISOString(),
+  }));
+
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   isOpen,
   task,
@@ -123,7 +135,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           const filtered = fetchedLogs.filter(
             (l) => !l.action.includes('نظر') && !l.action.includes('گفتگو') && !l.action.includes('پیام')
           );
-          setLogsList(filtered);
+          setLogsList([...filtered, ...fakeLogs(task.id)]);
         })
         .catch(() => {
           const filtered = (task.logs || []).filter(
