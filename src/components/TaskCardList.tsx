@@ -26,11 +26,25 @@ export const TaskCardList: React.FC<{ tasks: Task[] } & CardProps> = ({ tasks, .
     }
   }
 
+  // A sub-activity can itself have sub-activities, to any depth: each level sits inside its
+  // parent's indented block. Past a few levels the indent stops growing so cards keep their width.
+  const renderChildren = (parentId: string, depth: number): React.ReactNode =>
+    (childrenOf.get(parentId) || []).map((child) => (
+      <div
+        key={child.id}
+        className={`border-r-2 border-indigo-300 dark:border-indigo-700 space-y-1.5 ${depth <= 4 ? 'mr-4 pr-2' : 'pr-1'}`}
+      >
+        <div className="origin-top-right scale-[0.94]">
+          <TaskCard task={child} {...cardProps} />
+        </div>
+        {renderChildren(child.id, depth + 1)}
+      </div>
+    ));
+
   return (
     <>
       {topLevel.map((task) => {
         const parentTitle = task.parentTaskId ? titles.get(task.parentTaskId) : undefined;
-        const children = childrenOf.get(task.id) || [];
         return (
           <div key={task.id} className="space-y-1.5">
             {parentTitle && (
@@ -40,11 +54,7 @@ export const TaskCardList: React.FC<{ tasks: Task[] } & CardProps> = ({ tasks, .
               </div>
             )}
             <TaskCard task={task} {...cardProps} />
-            {children.map((child) => (
-              <div key={child.id} className="mr-5 pr-2 border-r-2 border-indigo-300 dark:border-indigo-700 origin-top-right scale-[0.94]">
-                <TaskCard task={child} {...cardProps} />
-              </div>
-            ))}
+            {renderChildren(task.id, 1)}
           </div>
         );
       })}
