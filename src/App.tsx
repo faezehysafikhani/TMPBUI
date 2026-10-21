@@ -314,15 +314,17 @@ export default function App() {
     }
 
     syncUserAndTasks();
+  }, [loadTasks]);
 
-    const unsubscribe = subscribeToTasksPB(() => {
+  // Live task updates need a session: connect whenever someone is signed in (also right after
+  // signing in, not only on a page load with a saved session) and disconnect on sign-out.
+  const liveUserId = currentUser?.id;
+  useEffect(() => {
+    if (!liveUserId) return undefined;
+    return subscribeToTasksPB(() => {
       loadTasks(false);
     });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [loadTasks]);
+  }, [loadTasks, liveUserId]);
 
   // The server ended the session (account disabled, tokens revoked): back to sign-in.
   useEffect(() => {
