@@ -83,7 +83,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     <div className="hidden lg:block w-48 shrink-0" aria-hidden="true" />
     <aside
       className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm fixed z-20 overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300"
-      style={{ right: fixedRight, top: HEADER_HEIGHT_PX + EDGE_GAP_PX, bottom: EDGE_GAP_PX }}
+      style={{ right: fixedRight, top: HEADER_HEIGHT_PX + EDGE_GAP_PX, maxHeight: `calc(100dvh - ${HEADER_HEIGHT_PX + EDGE_GAP_PX * 2}px)` }}
     >
 
       {onOpenCreateModal && (

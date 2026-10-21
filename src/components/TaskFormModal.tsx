@@ -383,8 +383,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   // A recurring task is scheduled by its own recurrence settings and a project by its charter's
   // dates (its end date is its deadline); neither asks for the plain due date.
   const hideDueDate = isProject || isRecurring;
-  // A sub-activity made from a comment or message keeps that text as its title.
-  const titleLocked = isSub && !!parentTask && !taskToEdit;
+  // A task made from a message or comment keeps that text as its title.
+  const titleLocked = !taskToEdit && (!!initialTitle?.trim() || (isSub && !!parentTask));
 
   useEffect(() => {
     if (isAutoStatusTask) {
@@ -671,10 +671,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               </div>
               <div>
                 <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 dark:text-white">
-                  {taskToEdit ? 'ویرایش فعالیت' : 'ثبت فعالیت جدید'}
+                  {taskToEdit ? (isProject ? 'ویرایش پروژه' : 'ویرایش فعالیت') : isProject ? 'ثبت پروژه جدید' : 'ثبت فعالیت جدید'}
                 </h2>
                 <p className="text-xs text-indigo-700/70 dark:text-indigo-200/70 hidden sm:block">
-                  مشخصات فعالیت، موعد انجام، اولویت و فایل‌های ضمیمه را وارد کنید
+                  {isProject ? 'مشخصات پروژه، زمان‌بندی، اولویت و فایل‌های ضمیمه را وارد کنید' : 'مشخصات فعالیت، موعد انجام، اولویت و فایل‌های ضمیمه را وارد کنید'}
                 </p>
               </div>
             </div>
@@ -1287,7 +1287,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           </div>
 
           {/* Title Input */}
-          <div className="flex items-center gap-3 pt-1"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-black shadow-md shadow-indigo-500/25">۱</span><div><p className="text-sm font-black text-slate-900 dark:text-white">شرح فعالیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">ابتدا عنوان روشن و توضیح کوتاه بنویسید.</p></div></div>
+          <div className="flex items-center gap-3 pt-1"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-black shadow-md shadow-indigo-500/25">۱</span><div><p className="text-sm font-black text-slate-900 dark:text-white">{isProject ? 'شرح پروژه' : 'شرح فعالیت'}</p><p className="text-[11px] text-slate-500 dark:text-slate-400">ابتدا عنوان روشن و توضیح کوتاه بنویسید.</p></div></div>
           <div className="rounded-2xl border border-indigo-100/80 dark:border-indigo-900/50 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(79,70,229,0.55)]">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
               {isProject ? 'عنوان پروژه' : 'عنوان فعالیت'} <span className="text-rose-500">*</span>
@@ -1298,7 +1298,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 value={title}
                 disabled={isStatusOnlyEdit}
                 readOnly={titleLocked}
-                title={titleLocked ? 'عنوان زیرمجموعه از متن پیام/کامنت گرفته شده و قابل تغییر نیست' : undefined}
+                title={titleLocked ? 'عنوان از متن پیام/کامنت گرفته شده و قابل تغییر نیست' : undefined}
                 onChange={(e) => {
                   if (titleLocked) return;
                   setTitle(e.target.value);
@@ -1325,14 +1325,14 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           {/* Description Input */}
           <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.45)]">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-              شرح توضیحات
+              {isProject ? 'شرح توضیحات پروژه' : 'شرح توضیحات'}
             </label>
             <textarea
               rows={3}
               value={description}
               disabled={isStatusOnlyEdit}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="جزئیات و نکات مربوط به این فعالیت..."
+              placeholder={isProject ? 'جزئیات و نکات مربوط به این پروژه...' : 'جزئیات و نکات مربوط به این فعالیت...'}
               className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none ${
                 isStatusOnlyEdit ? 'opacity-60 cursor-not-allowed' : 'focus:bg-white dark:focus:bg-slate-800'
               }`}
@@ -1360,7 +1360,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             {/* Status Field */}
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-                وضعیت فعالیت
+                {isProject ? 'وضعیت پروژه' : 'وضعیت فعالیت'}
               </label>
               <select
                 value={status}
@@ -1445,7 +1445,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
                   <UserIcon className="w-3.5 h-3.5 text-indigo-500" />
-                  <span>مسئولان اجرای فعالیت</span>
+                  <span>{isProject ? 'مسئولان اجرای پروژه' : 'مسئولان اجرای فعالیت'}</span>
                   {!taskToEdit && <span className="text-rose-500">*</span>}
                 </label>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400">
@@ -2195,7 +2195,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               className={`px-5 py-2.5 rounded-xl ${palette.accentBg} ${palette.accentHover} text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
-              <span>{taskToEdit ? 'ذخیره تغییرات' : 'ثبت فعالیت جدید'}</span>
+              <span>{taskToEdit ? 'ذخیره تغییرات' : isProject ? 'ثبت پروژه جدید' : 'ثبت فعالیت جدید'}</span>
             </button>
           </div>
 
