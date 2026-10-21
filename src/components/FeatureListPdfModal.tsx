@@ -11,8 +11,220 @@ import {
   ListTodo,
   FolderPlus,
   BookOpen,
+  BarChart3,
+  Network,
+  ShieldCheck,
+  Smartphone,
+  Repeat,
 } from 'lucide-react';
 import { toPersianDigits, formatToJalali } from '../utils/helpers';
+import pkg from '../../package.json';
+
+type Tone = 'indigo' | 'purple' | 'blue' | 'amber' | 'teal' | 'rose' | 'orange' | 'cyan' | 'slate' | 'emerald';
+
+// Full class names per tone, so Tailwind keeps them.
+const TONES: Record<Tone, { head: string; icon: string }> = {
+  indigo: { head: 'text-indigo-700 border-indigo-600 bg-indigo-50/50', icon: 'text-indigo-600' },
+  purple: { head: 'text-purple-700 border-purple-600 bg-purple-50/50', icon: 'text-purple-600' },
+  blue: { head: 'text-blue-700 border-blue-600 bg-blue-50/50', icon: 'text-blue-600' },
+  amber: { head: 'text-amber-700 border-amber-600 bg-amber-50/50', icon: 'text-amber-600' },
+  teal: { head: 'text-teal-700 border-teal-600 bg-teal-50/50', icon: 'text-teal-600' },
+  rose: { head: 'text-rose-700 border-rose-600 bg-rose-50/50', icon: 'text-rose-600' },
+  orange: { head: 'text-orange-700 border-orange-600 bg-orange-50/50', icon: 'text-orange-600' },
+  cyan: { head: 'text-cyan-700 border-cyan-600 bg-cyan-50/50', icon: 'text-cyan-600' },
+  slate: { head: 'text-slate-800 border-slate-700 bg-slate-100', icon: 'text-slate-700' },
+  emerald: { head: 'text-emerald-700 border-emerald-600 bg-emerald-50/50', icon: 'text-emerald-600' },
+};
+
+interface CatalogSection {
+  title: string;
+  icon: React.ElementType;
+  tone: Tone;
+  items: [string, string][];
+}
+
+// Every line below was checked against the code of the app. Items marked «در صورت فعال بودن»
+// depend on a module the server turns on.
+const SECTIONS: CatalogSection[] = [
+  {
+    title: 'مدیریت فعالیت‌ها (Task Management)',
+    icon: ListTodo,
+    tone: 'indigo',
+    items: [
+      ['انواع فعالیت', 'فعالیت ساده، پروژه، فعالیت تکرارشونده و «زیرمجموعه‌ی یک فعالیت دیگر» (هنگام تبدیل کامنت یا پیام به وظیفه)؛ هر نوع فرم مخصوص خودش را نشان می‌دهد'],
+      ['ثبت فعالیت', 'عنوان، شرح، موعد انجام با تقویم و ساعت شمسی، درجه اهمیت و برچسب کاری (می‌توانید از برچسب‌های قبلی استفاده کنید)'],
+      ['وضعیت‌ها', 'شروع نشده، درحال اجرا، متوقف و خاتمه یافته؛ وضعیت پروژه و فعالیت تکرارشونده از روی زیرمجموعه‌ها خودکار حساب می‌شود'],
+      ['درجه اهمیت', 'سه سطح: کم، متوسط و زیاد'],
+      ['تیم کاری فعالیت', 'فعالیت را به یک تیم کاری بدهید یا بدون تیم بگذارید؛ اعضای تیم به فعالیت دسترسی پیدا می‌کنند و هرکدام را می‌توانید کنار بگذارید'],
+      ['چند مسئول اجرا', 'یک یا چند نفر از کل سازمان (نه فقط اعضای تیم) را مسئول کنید؛ جستجو در نام‌ها دارد'],
+      ['مسئول با پست سازمانی', 'در صورت فعال بودن، فعالیت را به یک پست می‌دهید و اگر دارنده‌ی پست عوض شود، فعالیت به نفر جدید می‌رسد'],
+      ['امکان بروزرسانی', 'روشن یا خاموش کردن اجازه‌ی تغییر وضعیت و بروزرسانی فعالیت توسط مسئولان'],
+      ['افراد دیگر با دسترسی', 'افرادی خارج از تیم که فعالیت را می‌بینند ولی مسئول آن نیستند'],
+      ['پیوست فایل', 'افزودن فایل با کلیک یا کشیدن و رها کردن؛ فایل تکراری یا خالی و فایل بزرگ‌تر از سقف تعیین‌شده پذیرفته نمی‌شود'],
+      ['تبدیل به زیرفعالیت', 'کامنت یا پیام را به فعالیت جدید تبدیل کنید؛ می‌توانید آن را زیرمجموعه‌ی همان فعالیت کنید تا زیر کارت اصلی دیده شود'],
+    ],
+  },
+  {
+    title: 'فعالیت‌های تکرارشونده (Recurring Tasks)',
+    icon: Repeat,
+    tone: 'purple',
+    items: [
+      ['تکرار روزانه', 'فعالیتی که هر روز تکرار می‌شود'],
+      ['تکرار هفتگی', 'هر هفته یا هر ۲ تا ۴ هفته یک‌بار، با انتخاب روزهای هفته از شنبه تا جمعه'],
+      ['روزهای ماه', 'انتخاب یک یا چند روز از ۱ تا ۳۱ ماه'],
+      ['الگوی پیشرفته‌ی ماه', 'مثلاً «اولین / دومین / سومین / چهارمین / آخرین» روز مشخصی از هفته در هر ماه'],
+      ['ساعت برگزاری', 'ساعت شروع و پایان هر نوبت'],
+      ['بازه‌ی تکرار', 'تاریخ شروع و تاریخ پایان (اختیاری) برای دوره‌ی تکرار'],
+    ],
+  },
+  {
+    title: 'مدیریت پروژه‌ها و کنترل انحراف (Project Management & Variance)',
+    icon: FolderPlus,
+    tone: 'emerald',
+    items: [
+      ['منشور پروژه', 'شرح و اهداف کلی، مدیر پروژه، تاریخ شروع و تاریخ پایان'],
+      ['زیرفعالیت‌های پروژه', 'افزودن، ویرایش و حذف با تاریخ شروع و پایان، مسئول (جستجو در کاربران) و درجه اهمیت'],
+      ['وزن زیرفعالیت', 'اهمیت کم = وزن ۱، متوسط = وزن ۲، زیاد = وزن ۳'],
+      ['پیشرفت واقعی', 'درصد پیشرفت پروژه بر اساس وزن زیرفعالیت‌های خاتمه‌یافته'],
+      ['پیشرفت برنامه‌ای', 'پیشرفتی که طبق زمان‌بندی تا امروز باید انجام می‌شد'],
+      ['انحراف از برنامه', 'مقایسه‌ی خودکار واقعی و برنامه‌ای: جلوتر از برنامه، مطابق برنامه یا عقب‌تر از برنامه'],
+      ['داشبورد پروژه', 'کارت‌های پیشرفت و انحراف، نمودار سهم وزن‌های خاتمه‌یافته و تفکیک پیشرفت بر اساس درجه اهمیت'],
+    ],
+  },
+  {
+    title: 'جزئیات فعالیت و گفتگوی فعالیت (Task Details & Comments)',
+    icon: MessageSquare,
+    tone: 'rose',
+    items: [
+      ['نظر روی فعالیت', 'نوشتن نظر با ایموجی، ضبط پیام صوتی و پیوست فایل؛ نویسنده یا مدیر می‌تواند آن را ویرایش یا حذف کند'],
+      ['تبدیل نظر به وظیفه', 'هر نظر متنی با یک کلیک فعالیت جدید می‌شود (نظر صوتی یا دارای ایموجی قابل تبدیل نیست)'],
+      ['تاریخچه‌ی تغییرات', 'لاگ باز و بسته‌شدنی از همه‌ی تغییرات فعالیت با نام کاربر، نوع کار و جزئیات'],
+      ['جانشین', 'نمایش جانشین فعالیت و نظرهایی که جانشین پست خالی نوشته است'],
+      ['پیش‌نمایش پیوست', 'دیدن و دانلود فایل‌ها و تصاویر ضمیمه‌ی فعالیت و نظرها'],
+    ],
+  },
+  {
+    title: 'نماها، تقویم و پایش موعدها (Kanban, Calendar, List & Overdue)',
+    icon: Kanban,
+    tone: 'blue',
+    items: [
+      ['بورد کانبان', 'ستون‌های وضعیت با جابه‌جایی کارت بین ستون‌ها؛ زیرفعالیت‌ها زیر کارت اصلی و کمی کوچک‌تر نمایش داده می‌شوند'],
+      ['گروه‌بندی کارت‌ها', 'گروه‌بندی بر اساس وضعیت، مالک، مسئول، اولویت، موعد انجام یا برچسب؛ گزینه‌ی «نمایش اطلاعات» و «فقط فعالیت‌های جاری» هم دارد و انتخاب شما ذخیره می‌شود'],
+      ['نمای لیست', 'گزینه‌ی «بدون گروه‌بندی» همه‌ی فعالیت‌ها را در یک جدول ردیف‌دار با وضعیت، اولویت، مسئول و موعد نشان می‌دهد'],
+      ['تقویم شمسی', 'رفتن به ماه یا سال قبل و بعد، دکمه‌ی «امروز»، نمایش تعطیلات، افزودن فعالیت در همان روز و نمایش یا پنهان‌کردن کارهای خاتمه‌یافته و متوقف'],
+      ['موعد گذشته', 'فعالیت‌های دارای تاخیر، مرتب بر اساس بیشترین تاخیر و اولویت، با نشان «تاخیر شدید»؛ کشیدن کارت به چپ یا دکمه‌ی «تبدیل به خاتمه یافته» آن را سریع تمام می‌کند'],
+      ['منوی پایین موبایل', 'در گوشی، نوار پایین با دکمه‌های بورد، تقویم، افزودن، موعد گذشته و تنظیمات و منوی «بیشتر» برای گفتگو، یادداشت‌ها، گزارش‌ها و کارتابل جانشینی'],
+    ],
+  },
+  {
+    title: 'جستجو و فیلترها (Search & Filters)',
+    icon: Filter,
+    tone: 'amber',
+    items: [
+      ['جستجوی لحظه‌ای', 'جستجو در عنوان، شرح، نام فایل‌های پیوست و برچسب‌ها'],
+      ['فیلترهای ترکیبی', 'همزمان بر اساس وضعیت، اولویت، مسئول (از جمله «بدون مسئول») و برچسب (از جمله پروژه‌ها و تکرارشونده‌ها)'],
+      ['فیلترهای ذخیره‌شده', 'ترکیب فیلتر فعلی را با نام دلخواه ذخیره و هر وقت خواستید حذف کنید'],
+      ['فیلترهای آماده', 'کارهای با اهمیت زیاد، کارهای درحال اجرا و پروژه‌ها و زیرفعالیت‌ها'],
+    ],
+  },
+  {
+    title: 'گزارش‌ها و داشبورد (Reports & Dashboard)',
+    icon: BarChart3,
+    tone: 'teal',
+    items: [
+      ['گزارش فعالیت‌ها', 'گزارش فعالیت‌های خودتان و زیرمجموعه‌تان (یا کل سازمان برای مدیران) در جدول با جزئیات هر ردیف'],
+      ['کارت‌های خلاصه', 'کل، شروع نشده، درحال اجرا، متوقف، خاتمه یافته و موعد گذشته؛ با کلیک روی هر کارت فهرست همان‌ها فیلتر می‌شود'],
+      ['فیلتر گزارش', 'فرد، نقش فرد (مسئول یا ایجادکننده)، سمت، برچسب، نوع فعالیت، وضعیت (یا موعد گذشته) و بازه‌ی موعد انجام'],
+      ['خروجی', 'دانلود Excel، دانلود PDF (A4 عمودی با لوگو، فیلترهای فعال، تاریخ و نام تهیه‌کننده) و چاپ'],
+      ['نمودارهای آمار', 'نمودار وضعیت تاخیر و نمودار تعداد فعالیت‌ها به تفکیک مسئول؛ با کلیک روی هر بخش فهرست فعالیت‌ها باز می‌شود'],
+      ['خلاصه‌ی ورود', 'پنجره‌ی خوش‌آمد روزی یک‌بار با تعداد فعالیت‌ها، موعد گذشته‌ها، نرخ خاتمه‌یافته‌ها و پروژه‌ها (از دکمه‌ی نوار بالا هم باز می‌شود)'],
+    ],
+  },
+  {
+    title: 'گفتگو، یادداشت و اعلان‌ها (Chat, Notes & Notifications)',
+    icon: MessageSquare,
+    tone: 'rose',
+    items: [
+      ['گفتگوی تیمی و مستقیم', 'گفتگو با تیم یا یک نفر، جستجوی تیم یا فرد، ارسال فایل، ایموجی و پیام صوتی و شمارنده‌ی پیام‌های خوانده‌نشده'],
+      ['پاسخ، ویرایش و حذف', 'پاسخ به یک پیام با نقل‌قول، ویرایش و حذف پیام‌های خودتان'],
+      ['پنل توضیحات فعالیت‌ها', 'جستجو در فعالیت‌ها و دیدن توضیحات آن‌ها کنار گفتگو؛ در گفتگوی مستقیم می‌توانید فعالیت را در پیام درج کنید و توضیحاتش را کپی کنید'],
+      ['تبدیل پیام به وظیفه', 'پیام متنی با یک کلیک فعالیت می‌شود (پیام صوتی یا دارای ایموجی قابل تبدیل نیست)'],
+      ['یادداشت‌های شخصی', 'جستجو، پیوست فایل، رنگ کارت، سنجاق‌کردن، رونوشت متن و تبدیل یادداشت به وظیفه'],
+      ['مرکز اعلان‌ها', 'اعلان رخدادها با «خوانده‌شدن همه»، علامت خوانده یا خوانده‌نشده برای هر مورد و رفتن مستقیم به فعالیت'],
+      ['راهنمای کاربری تصویری', 'با دکمه‌ی «؟» نوار بالا چند صفحه‌ی تصویری درباره‌ی محیط کار و ثبت فعالیت باز می‌شود'],
+      ['ساعت و تاریخ', 'تاریخ شمسی و ساعت دستگاه شما در نوار بالا'],
+    ],
+  },
+  {
+    title: 'ساختار سازمانی و جانشینی (Organization & Substitution)',
+    icon: Network,
+    tone: 'orange',
+    items: [
+      ['شرکت‌ها', 'تعریف شرکت با نام، کد و توضیحات و تعیین معاونت‌های هر شرکت'],
+      ['معاونت‌ها و واحدها', 'تعریف واحد و تعیین مدیر آن؛ غیرفعال و فعال‌کردن واحد'],
+      ['سمت‌ها', 'عنوان سمت، شرکت‌ها و «سمت مافوق»؛ سمتی که مافوق ندارد بالاترین سمت شرکت است'],
+      ['عناوین', 'عناوینی مثل «جناب مهندس» که قبل از نام کاربر نمایش داده می‌شود؛ با ترتیب، ویرایش و حذف'],
+      ['جایگاه من', 'شرکت، واحد، سمت و مدیر مستقیم خودتان و فهرست کارکنان تحت سرپرستی (مستقیم یا همه‌ی سطوح)'],
+      ['چارت سازمانی', 'نمودار قابل بزرگ‌نمایی و جابه‌جایی با جستجو، باز و بسته‌کردن همه، تمام‌صفحه و دریافت PDF'],
+      ['پست‌ها و پست خالی', 'هر پست یک نفر دارد؛ پست بدون دارنده «خالی» نشان داده می‌شود'],
+      ['کارتابل جانشینی', 'مدیران بالادست فعالیت‌های باز پست‌های خالی را می‌بینند و می‌توانند پستی را سرپرست آن کنند یا سرپرستی را پایان دهند'],
+    ],
+  },
+  {
+    title: 'حساب کاربری و مدیریت کاربران (Account & Users)',
+    icon: Users,
+    tone: 'cyan',
+    items: [
+      ['ورود', 'ورود با نام کاربری یا شماره موبایل؛ پس از ورود ناموفق کد امنیتی تصویری خواسته می‌شود'],
+      ['بازیابی رمز عبور', 'ارسال کد تأیید پیامکی به موبایل ثبت‌شده، بررسی کد و تعیین رمز جدید'],
+      ['تغییر رمز عبور', 'تغییر رمز با وارد کردن رمز فعلی (رمز جدید حداقل ۸ کاراکتر)'],
+      ['آواتار', 'انتخاب از آلبوم ۲۴ آواتار آماده یا آپلود عکس خودتان؛ عکس بزرگ خودکار کوچک می‌شود'],
+      ['پیامک شخصی', 'روشن یا خاموش‌کردن اطلاع‌رسانی با پیامک و ثبت شماره موبایل'],
+      ['تیم کاری من', 'ساخت تیم، افزودن و حذف اعضا (از افراد محدوده‌ی خودتان)، حذف تیم و گفتگو با تیم'],
+      ['مدیریت کاربران', 'جستجو، ایجاد، ویرایش، فعال و غیرفعال‌کردن کاربر و دیدن زمان آخرین ورود'],
+      ['نقش و مجوز', 'اختصاص نقش‌ها و مجوزهای مستقیم به کاربر با نشان منبع هر مجوز (مستقیم، از نقش یا از گروه) و رعایت مجوزهای وابسته'],
+      ['جایگاه سازمانی کاربر', 'در صورت فعال بودن، شرکت، واحد، سمت و مدیر مستقیم کاربر هنگام ویرایش تعیین می‌شود'],
+    ],
+  },
+  {
+    title: 'امنیت و یکپارچه‌سازی (LDAP / SSO / تاریخچه ورود)',
+    icon: ShieldCheck,
+    tone: 'slate',
+    items: [
+      ['تاریخچه ورود', 'فهرست ورودهای موفق، ناموفق، مسدود و کد امنیتی نادرست با کاربر، زمان، علت و IP و امکان جستجو'],
+      ['اتصال LDAP / Active Directory', 'تنظیم سرور، پورت، دامنه، Base DN، حساب اتصال، فیلتر کاربران، SSL یا StartTLS و مهلت اتصال؛ رمز اتصال رمزشده ذخیره می‌شود'],
+      ['تست اتصال', 'دکمه‌ی «تست اتصال» نتیجه و زمان پاسخ را نشان می‌دهد'],
+      ['آماده‌سازی SSO', 'ثبت پیش‌نویس تنظیمات (پروتکل OIDC یا SAML، شناسه‌ی برنامه، نشانی صادرکننده و بازگشت)؛ ورود با SSO هنوز فعال نیست'],
+      ['سقف حجم فایل', 'مدیر حداکثر حجم فایل آپلودی را تنظیم می‌کند (پیش‌فرض ۲۰۰ کیلوبایت) و در فعالیت‌ها، گفتگو و یادداشت‌ها اعمال می‌شود'],
+      ['نوع فایل مجاز', 'فقط فایل‌های Excel، Word، PDF و تصویر؛ پیام صوتی هم پذیرفته می‌شود'],
+    ],
+  },
+  {
+    title: 'تنظیمات پیامک (SMS Settings)',
+    icon: Smartphone,
+    tone: 'emerald',
+    items: [
+      ['سرویس‌دهنده‌ی پیامک', 'تعریف چند سرویس با نام، آدرس سرویس (Base URL)، کلید API، نام کاربری و رمز اختیاری و شماره فرستنده؛ در هر زمان یک سرویس فعال است'],
+      ['متن پیامک‌ها', 'ویرایش متن هر پیامک (رمز عبور، ارجاع فعالیت، تغییر موعد، نزدیک شدن موعد، گذشتن موعد، یادآوری و نوبت تکرارشونده) با متغیرهای آماده و روشن یا خاموش‌کردن هرکدام'],
+      ['ساعات سکوت', 'در بازه‌ی سکوت پیامک نگه داشته می‌شود و پس از پایان آن ارسال می‌شود'],
+      ['یادآوری پیش از موعد', 'ارسال پیامک چند ساعت قبل از موعد و ساعت یادآوری برای فعالیت‌های بدون ساعت'],
+      ['اطلاع گذشتن موعد', 'یک‌بار پیامک به مسئولان و ایجادکننده وقتی موعد گذشت'],
+      ['یادآوری تکرارشونده', 'ارسال پیامک چند دقیقه پیش از هر نوبت فعالیت تکرارشونده'],
+      ['ارسال آزمایشی', 'ارسال یک پیامک تست به شماره‌ی دلخواه برای اطمینان از تنظیمات'],
+    ],
+  },
+  {
+    title: 'ظاهر و شخصی‌سازی (Appearance)',
+    icon: BookOpen,
+    tone: 'slate',
+    items: [
+      ['حالت روز و شب', 'طرح روشن یا تیره برای همه‌ی صفحه‌ها'],
+      ['۶ پالت رنگی', 'نیلی / بنفش، زمردی / سبز، سرخ / گلبهی، طلایی / کهربایی، فیروزه‌ای / آبی و زغالی / تیره'],
+      ['۱۴ طرح بافت زمینه', 'ساده و مدرن، شطرنجی، خطوط مورب، شبکه‌ای، نقطه‌ای، چهارخانه، موجی، شیشه‌ای، حبابی، بارانی، قاصدکی، برفی، برگی پاییزی و بهاری؛ پالت رنگی روی طرح‌های هندسی اثر دارد'],
+      ['ذخیره‌ی انتخاب', 'حالت، پالت و بافت انتخابی شما در حساب کاربری ذخیره می‌شود'],
+    ],
+  },
+];
 
 interface FeatureListPdfModalProps {
   isOpen: boolean;
@@ -134,7 +346,7 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
                   <strong>تاریخ انتشار:</strong> {toPersianDigits(currentDateJalali)}
                 </div>
                 <div>
-                  <strong>نسخه سامانه:</strong> ۳.۰.۰ Pro
+                  <strong>نسخه سامانه:</strong> {toPersianDigits(pkg.version)}
                 </div>
                 <div>
                   <strong>پایگاه داده:</strong> NexusCore / SQL Server
@@ -142,219 +354,26 @@ export const FeatureListPdfModal: React.FC<FeatureListPdfModalProps> = ({
               </div>
             </div>
 
-            {/* Category 1: مدیریت وظایف */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-2.5 text-indigo-700 font-black text-base border-r-4 border-indigo-600 pr-3 py-1 bg-indigo-50/50 rounded-l-xl">
-                <ListTodo className="w-5 h-5 text-indigo-600 shrink-0" />
-                <h2>۱. مدیریت هوشمند وظایف و زیرفعالیت‌ها (Task Management)</h2>
-              </div>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>ثبت کار جدید:</strong> با عنوان، شرح کامل، زمان‌بندی دقیق، برچسب‌ها و تعیین اولویت</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>تایپ و ورودی صوتی (Voice-to-Text):</strong> قابلیت ضبط صدا و تبدیل خودکار گفتار به متن فارسی با هوش مصنوعی برای ثبت سریع عنوان و شرح کار</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>تخصیص چندگانه هوشمند (Multi-Assignee):</strong> ارجاع همزمان کار به چندین همکار همراه با کلیدهای اقدام سریع («انتخاب همه»، «هیچ‌کدام»، «فقط من»)</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>سطوح اهمیت ۴گانه:</strong> اولویت‌بندی کارها به صورت (کم، متوسط، زیاد، فوری)</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>وضعیت‌های ۴گانه کار:</strong> (در انتظار، در حال اجرا، بررسی، تکمیل شده)</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>چک‌لیست زیرکارها (Sub-tasks):</strong> ثبت زیرفعالیت‌ها با زمان‌بندی و محاسبه خودکار درصد پیشرفت</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>کارهای تکرارشونده:</strong> تعریف وظایف با دوره‌های تکرار روزانه، هفتگی و ماهانه</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>پیوست فایل، تصویر و صوت:</strong> آپلود و پخش مستقیم فایل‌های صوتی، اسناد و تصاویر روی هر فعالیت</span>
-                </li>
-              </ul>
-            </section>
-
-            {/* Category 2: پروژه‌ها */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-2.5 text-purple-700 font-black text-base border-r-4 border-purple-600 pr-3 py-1 bg-purple-50/50 rounded-l-xl">
-                <FolderPlus className="w-5 h-5 text-purple-600 shrink-0" />
-                <h2>۲. مدیریت پروژه‌ها و کنترل انحراف زمان‌بندی (Project Management & Variance Analysis)</h2>
-              </div>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>تعریف پروژه مادر:</strong> ثبت پروژه‌های کلان با کد پروژه و بازه زمانی شمسی</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>اتصال کارها به پروژه:</strong> ارتباط مستقیم فعالیت‌ها به پروژه مربوطه و رصد دسته‌بندی‌شده</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>محاسبه پیشرفت واقعی وزنی:</strong> محاسبه درصد پیشرفت دقیق پروژه بر اساس وزن زیرفعالیت‌ها</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>پیشرفت برنامه‌ای و سنجش انحراف:</strong> مقایسه خودکار پیشرفت واقعی و برنامه‌ای تا امروز و تعیین وضعیت انحراف (جلوتر، مطابق یا عقب‌تر از برنامه)</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>تعیین تیم مسئول پروژه:</strong> ارجاع پروژه به گروه‌های کاری تخصصی سازمان</span>
-                </li>
-              </ul>
-            </section>
-
-            {/* Category 3: نماهای عملیاتی و هوشمند */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-2.5 text-blue-700 font-black text-base border-r-4 border-blue-600 pr-3 py-1 bg-blue-50/50 rounded-l-xl">
-                <Kanban className="w-5 h-5 text-blue-600 shrink-0" />
-                <h2>۳. نماهای عملیاتی، تقویم جلالی و ناوبری (Kanban, Jalali Calendar & Overdue View)</h2>
-              </div>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>بورد کانبان تعاملی (Kanban Board):</strong> جابه‌جایی سریع و بصری وضعیت کارها</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>تقویم شمسی کامل (Jalali Calendar):</strong> پایش بار کاری روزانه و ماهانه با نشانگر روز جاری</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>پایش کارهای معوقه (Overdue Tasks):</strong> مرتب‌سازی بر اساس بیشترین تاخیر و اولویت، تفکیک تاخیر شدید و کشیدن به چپ (Swipe) جهت تکمیل سریع</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>انیمیشن بارگذاری مدرن (Loading Spinner):</strong> دایره چرخان ساده و شیک در مرکز صفحه با رنگبندی هماهنگ با تم فعال هنگام جابجایی بین صفحات</span>
-                </li>
-              </ul>
-            </section>
-
-            {/* Category 4: فیلترها و جستجو */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-2.5 text-amber-700 font-black text-base border-r-4 border-amber-600 pr-3 py-1 bg-amber-50/50 rounded-l-xl">
-                <Filter className="w-5 h-5 text-amber-600 shrink-0" />
-                <h2>۴. جستجو، فیلترهای ترکیبی و فیلترهای سفارشی کاربر</h2>
-              </div>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>جستجوی متنی لحظه‌ای:</strong> جستجو در عنوان، شرح و کد شناسه فعالیت‌ها</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>فیلترهای آیکونی چندگانه:</strong> فیلتر همزمان بر اساس وضعیت، اولویت، مسئول و برچسب</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>ذخیره فیلترهای سفارشی:</strong> ذخیره‌سازی ترکیب فیلترهای دلخواه با نام اختصاصی</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>پیش‌فرض‌های آماده:</strong> دسترسی سریع به کارهای فوری، کارهای من و پروژه‌ها</span>
-                </li>
-              </ul>
-            </section>
-
-            {/* Category 5: گفتگوی تیمی و اطلاع‌رسانی */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-2.5 text-rose-700 font-black text-base border-r-4 border-rose-600 pr-3 py-1 bg-rose-50/50 rounded-l-xl">
-                <MessageSquare className="w-5 h-5 text-rose-600 shrink-0" />
-                <h2>۵. گفتگوی تیمی، پیام‌رسان و سیستم اطلاع‌رسانی (Notifications & Chat)</h2>
-              </div>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>چت مستقیم (Direct Message):</strong> گفتگوی ۲نفره بین اعضای تیم با ارسال فایل و پیوست</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>اطلاع‌رسانی پیامکی کاوه‌نگار (Kavenegar SMS):</strong> ارسال هشدارهای پیامکی زمان‌بندی‌شده به همراه کد تایید ورود</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>تبدیل پیام به وظیفه:</strong> تبدیل مستقیم هر پیام چت به یک کار جدید با ۱ کلیک</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>نشانگر پیام‌های خوانده‌نشده:</strong> اعلان و شمارش تعداد پیام‌های جدید و هشدار معوقات</span>
-                </li>
-              </ul>
-            </section>
-
-            {/* Category 6: کاربران، امنیت و استقرار ابری */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-2.5 text-cyan-700 font-black text-base border-r-4 border-cyan-600 pr-3 py-1 bg-cyan-50/50 rounded-l-xl">
-                <Users className="w-5 h-5 text-cyan-600 shrink-0" />
-                <h2>۶. مدیریت کاربران، امنیت، زیرساخت Vercel و پایگاه‌داده</h2>
-              </div>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>پشتیبانی کامل از Vercel & Express API:</strong> معماری کامل سرور و کلاینت (Full-Stack) سازگار با Vercel و پروکسی ایمن API Key</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>پایگاه داده NexusCore / SQL Server & کش محلی:</strong> ذخیره‌سازی همگام‌سازی‌شده داده‌ها با کارکرد آفلاین</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>احراز هویت و ورود ایمن:</strong> ورود با نام کاربری یا شماره موبایل، همراه با کد امنیتی (CAPTCHA) پس از ورود ناموفق</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>پنل مدیریت کاربران (Admin):</strong> مدیریت نقش‌ها، تنظیمات پیامک و سطح دسترسی کاربران</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>مدیریت تیم‌های کاری:</strong> ایجاد گروه و ساختار تیم‌های سازمانی و تخصیص پروژه</span>
-                </li>
-              </ul>
-            </section>
-
-            {/* Category 7: ویدجت خلاصه ورود، یادداشت‌ها، اعلان‌ها و شخصی‌سازی */}
-            <section className="space-y-3">
-              <div className="flex items-center gap-2.5 text-slate-800 font-black text-base border-r-4 border-slate-700 pr-3 py-1 bg-slate-100 rounded-l-xl">
-                <BookOpen className="w-5 h-5 text-slate-700 shrink-0" />
-                <h2>۷. ویدجت خلاصه ورود، یادداشت‌ها، تم‌ها و بافت‌های گرافیکی</h2>
-              </div>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>ویدجت پاپ‌آپ خلاصه وضعیت ورود (Welcome Summary Widget):</strong> نمایش پنجره خلاصه عملکرد با آمار کارهای انجام‌شده، معوقات و کارهای فوری در ابتدای ورود</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>۶ پالت رنگی اختصاصی:</strong> انتخاب تم اصلی برنامه از بین ۶ پالت نیلی، زمردی، گلبهی، کهربایی، فیروزه‌ای و زغالی با اعمال خودکار در تمام عناصر</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>۷ طرح بافت گرافیکی پس‌زمینه (Background Patterns):</strong> انتخاب طرح زمینه از بین حالت ساده، شطرنجی، خطوط مورب، شبکه‌ای، نقطه‌ای، چهارخانه و موجی</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>حالت روز و شب (Light / Dark Mode):</strong> تطبیق کامل و آنی تمام صفحات و المان‌ها با حالت شب و تاریک جهت راحتی دید کاربر</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>دفترچه یادداشت‌های دیجیتال شخصی:</strong> ثبت یادداشت‌های روزانه با امکان سنجاق کردن و دسته‌بندی رنگی</span>
-                </li>
-                <li className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>مرکز اعلان‌ها و هشدارهای موعد مقرر:</strong> مشاهده لحظه‌ای رخدادها، تغییرات وظایف و وضعیت پروژه‌ها</span>
-                </li>
-              </ul>
-            </section>
+            {SECTIONS.map((section, index) => {
+              const tone = TONES[section.tone];
+              const Icon = section.icon;
+              return (
+                <section key={section.title} className="space-y-3">
+                  <div className={`flex items-center gap-2.5 font-black text-base border-r-4 pr-3 py-1 rounded-l-xl ${tone.head}`}>
+                    <Icon className={`w-5 h-5 shrink-0 ${tone.icon}`} />
+                    <h2>{toPersianDigits(index + 1)}. {section.title}</h2>
+                  </div>
+                  <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-700">
+                    {section.items.map(([name, text]) => (
+                      <li key={name} className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span><strong>{name}:</strong> {text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              );
+            })}
 
             {/* Document Footer */}
             <div className="border-t border-slate-200 pt-4 text-center text-xs text-slate-500 space-y-1">
