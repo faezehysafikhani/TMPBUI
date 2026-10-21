@@ -1,14 +1,16 @@
 import { formatISOToJalaliDateTime, iranDayNumber, parseDateSafely } from './jalali';
 import { TaskStatus } from '../types';
 
-// Compute automatic task status based on subtasks completion
+// Compute automatic task status based on subtasks' own progress (not started / in progress / completed).
 export function computeAutoTaskStatus(
-  subtasks?: Array<{ completed?: boolean }> | null
+  subtasks?: Array<{ completed?: boolean; status?: string }> | null
 ): TaskStatus {
   if (!subtasks || subtasks.length === 0) return 'todo';
-  const completedCount = subtasks.filter((st) => Boolean(st.completed)).length;
+  const isDone = (st: { completed?: boolean; status?: string }) => st.status ? st.status === 'completed' : Boolean(st.completed);
+  const isStarted = (st: { completed?: boolean; status?: string }) => isDone(st) || st.status === 'in_progress';
+  const completedCount = subtasks.filter(isDone).length;
   if (completedCount === subtasks.length) return 'completed';
-  if (completedCount > 0) return 'in_progress';
+  if (subtasks.some(isStarted)) return 'in_progress';
   return 'todo';
 }
 

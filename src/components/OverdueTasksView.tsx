@@ -243,7 +243,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
               title="خاتمه یافته (تکمیل سریع)"
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="hidden sm:inline">خاتمه یافته</span>
+              <span className="hidden sm:inline">تبدیل به خاتمه یافته</span>
             </button>
           )}
 

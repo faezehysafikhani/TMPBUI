@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Task, TaskStatus, Priority, Attachment, STATUSES, PRIORITIES, AppColorPalette, User, WorkTeam, WorkTeamMember, RecurringFrequency, RecurringConfig, OccurrenceNth, ProjectCharter, ProjectSubTask, SubTaskImportance, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
+import { Task, TaskStatus, Priority, Attachment, STATUSES, PRIORITIES, AppColorPalette, User, WorkTeam, WorkTeamMember, RecurringFrequency, RecurringConfig, OccurrenceNth, ProjectCharter, ProjectSubTask, SubTaskImportance, SubTaskProgress, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 import { readFileAsDataUrl } from '../utils/storage';
 import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
-import { formatFileSize, toPersianDigits, computeAutoTaskStatus } from '../utils/helpers';
+import { formatFileSize, toPersianDigits, computeAutoTaskStatus, formatToJalali } from '../utils/helpers';
 import { JalaliDateTimePicker } from './JalaliDateTimePicker';
 import { getNowISO, iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
 import { fetchUserTeamsPB, fetchUserTeamsAsyncPB, fetchAllUsersPB } from '../services/dataService';
@@ -28,6 +28,10 @@ import {
   Calendar,
   FolderKanban,
   ListChecks,
+  Pencil,
+  Circle,
+  PlayCircle,
+  CheckCircle2,
   Briefcase,
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
@@ -52,6 +56,8 @@ interface TaskFormModalProps {
   initialDueDate?: string;
   initialTitle?: string;
   initialDescription?: string;
+  /** Set when the task is made from a comment of this activity: offers the «sub-activity» type. */
+  parentTask?: { id: string; title: string } | null;
   appColorPalette?: AppColorPalette;
   currentUser?: User | null;
   existingTasks?: Task[];
@@ -67,6 +73,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   initialDueDate,
   initialTitle = '',
   initialDescription = '',
+  parentTask = null,
   appColorPalette = 'indigo',
   currentUser,
   existingTasks = [],
@@ -104,6 +111,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [showTagDropdown, setShowTagDropdown] = useState(false);
   const [isProject, setIsProject] = useState<boolean>(false);
   const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  // A sub-activity has the project's form and is linked to the activity it was made from.
+  const [isSub, setIsSub] = useState<boolean>(false);
 
   // Project inline options state
   const [projectCharterManager, setProjectCharterManager] = useState<string>('');
@@ -113,6 +122,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [projectSubTasks, setProjectSubTasks] = useState<ProjectSubTask[]>([]);
   const [newSubTaskTitle, setNewSubTaskTitle] = useState<string>('');
   const [newSubTaskImportance, setNewSubTaskImportance] = useState<SubTaskImportance>('medium');
+  const [newSubTaskStartDate, setNewSubTaskStartDate] = useState<string>('');
+  const [newSubTaskEndDate, setNewSubTaskEndDate] = useState<string>('');
+  const [newSubTaskAssigneeIds, setNewSubTaskAssigneeIds] = useState<string[]>([]);
+  const [editingSubTaskId, setEditingSubTaskId] = useState<string | null>(null);
 
   // Recurring options state
   const [recurringFrequency, setRecurringFrequency] = useState<RecurringFrequency>('daily');
@@ -292,6 +305,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setProjectSubTasks(taskToEdit.projectSubTasks || []);
       setNewSubTaskTitle('');
       setNewSubTaskImportance('medium');
+      setNewSubTaskStartDate('');
+      setNewSubTaskEndDate('');
+      setNewSubTaskAssigneeIds([]);
       if (taskToEdit.recurringConfig) {
         setRecurringFrequency(taskToEdit.recurringConfig.frequency || 'daily');
         setRecurringIntervalWeeks(taskToEdit.recurringConfig.intervalWeeks || 1);
@@ -339,6 +355,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setProjectSubTasks([]);
       setNewSubTaskTitle('');
       setNewSubTaskImportance('medium');
+      setNewSubTaskStartDate('');
+      setNewSubTaskEndDate('');
+      setNewSubTaskAssigneeIds([]);
       setIsRecurring(false);
       setRecurringFrequency('daily');
       setRecurringIntervalWeeks(1);
@@ -439,18 +458,24 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   };
 
   const handleAddProjectSubTask = () => {
-    if (!newSubTaskTitle.trim()) return;
+    if (!newSubTaskTitle.trim() || newSubTaskAssigneeIds.length === 0) return;
     const newSub: ProjectSubTask = {
       id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       title: newSubTaskTitle.trim(),
-      startDate: projectCharterStartDate || dueDateISO || getNowISO(),
-      endDate: projectCharterEndDate || dueDateISO || getNowISO(),
+      startDate: newSubTaskStartDate || projectCharterStartDate || dueDateISO || getNowISO(),
+      endDate: newSubTaskEndDate || projectCharterEndDate || dueDateISO || getNowISO(),
       importance: newSubTaskImportance,
       completed: false,
       createdAt: getNowISO(),
+      assignees: allRegisteredUsers
+        .filter((u) => newSubTaskAssigneeIds.includes(u.id))
+        .map((u) => ({ id: u.id, name: u.name || u.username })),
     };
     setProjectSubTasks((prev) => [...prev, newSub]);
     setNewSubTaskTitle('');
+    setNewSubTaskStartDate('');
+    setNewSubTaskEndDate('');
+    setNewSubTaskAssigneeIds([]);
   };
 
   const handleRemoveProjectSubTask = (subId: string) => {
@@ -458,8 +483,41 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   };
 
   const handleToggleModalSubTask = (subId: string) => {
+    const nowIso = new Date().toISOString();
     setProjectSubTasks((prev) =>
-      prev.map((s) => (s.id === subId ? { ...s, completed: !s.completed } : s))
+      prev.map((s) => {
+        if (s.id !== subId) return s;
+        const current = s.status || (s.completed ? 'completed' : 'not_started');
+        const next: SubTaskProgress =
+          current === 'not_started' ? 'in_progress' : current === 'in_progress' ? 'completed' : 'not_started';
+        return {
+          ...s,
+          status: next,
+          completed: next === 'completed',
+          actualStartDate: next === 'not_started' ? s.actualStartDate : s.actualStartDate || nowIso,
+          actualCompletedDate: next === 'completed' ? s.actualCompletedDate || nowIso : s.actualCompletedDate,
+        };
+      })
+    );
+  };
+
+  const handleUpdateProjectSubTask = (subId: string, patch: Partial<ProjectSubTask>) => {
+    setProjectSubTasks((prev) => prev.map((s) => (s.id === subId ? { ...s, ...patch } : s)));
+  };
+
+  const handleToggleProjectSubTaskAssignee = (subId: string, userId: string) => {
+    setProjectSubTasks((prev) =>
+      prev.map((s) => {
+        if (s.id !== subId) return s;
+        const current = s.assignees || [];
+        const exists = current.some((a) => a.id === userId);
+        const user = allRegisteredUsers.find((u) => u.id === userId);
+        if (!user) return s;
+        return {
+          ...s,
+          assignees: exists ? current.filter((a) => a.id !== userId) : [...current, { id: user.id, name: user.name || user.username }],
+        };
+      })
     );
   };
 
@@ -473,6 +531,11 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     if (!taskToEdit && (postMode ? responsiblePostIds.length === 0 : responsibleIds.length === 0)) {
       setErrors({ assignee: 'لطفاً مسئول اجرای فعالیت را انتخاب کنید.' });
       assigneeDropdownRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    // Every subtask needs at least one responsible person (the server enforces this too).
+    if (isProject && projectSubTasks.some((s) => !s.assignees || s.assignees.length === 0)) {
+      setErrors({ assignee: 'لطفاً برای هر زیرفعالیت حداقل یک مسئول انتخاب کنید.' });
       return;
     }
 
@@ -575,6 +638,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         teamMemberIds: finalTeamMemberIds,
         allowAssigneeStatusUpdate: responsibleIds.length > 0 ? allowAssigneeStatusUpdate : true,
         isProject: finalIsProject,
+        parentTaskId: isSub && parentTask ? parentTask.id : taskToEdit?.parentTaskId,
         isRecurring: finalIsRecurring,
         recurringConfig,
         projectCharter,
@@ -631,6 +695,44 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </div>
           )}
 
+          {/* Activity type: each choice shows only its own form below. */}
+          <div role="radiogroup" aria-label="نوع فعالیت" className={`grid grid-cols-1 gap-2 ${parentTask && !taskToEdit ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
+            {([
+              { id: 'simple', label: 'فعالیت ساده', accent: 'accent-indigo-600', hover: 'hover:border-indigo-300' },
+              { id: 'project', label: 'پروژه', accent: 'accent-emerald-600', hover: 'hover:border-emerald-300' },
+              { id: 'recurring', label: 'فعالیت تکرارشونده', accent: 'accent-purple-600', hover: 'hover:border-purple-300' },
+              ...(parentTask && !taskToEdit ? [{ id: 'sub', label: 'زیرمجموعه‌ی این فعالیت', accent: 'accent-amber-600', hover: 'hover:border-amber-300' }] : []),
+            ] as const).map((opt) => {
+              const current = isSub ? 'sub' : isProject ? 'project' : isRecurring ? 'recurring' : 'simple';
+              return (
+                <label
+                  key={opt.id}
+                  className={`flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-slate-900 border transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200 ${opt.hover} ${
+                    current === opt.id ? 'border-indigo-400 ring-1 ring-indigo-300' : 'border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="task-kind"
+                    checked={current === opt.id}
+                    onChange={() => {
+                      setIsSub(opt.id === 'sub');
+                      setIsProject(opt.id === 'project' || opt.id === 'sub');
+                      setIsRecurring(opt.id === 'recurring');
+                    }}
+                    className={`w-4 h-4 cursor-pointer ${opt.accent}`}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              );
+            })}
+          </div>
+          {isSub && parentTask && (
+            <div className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+              این فعالیت (با فرم پروژه) به‌عنوان زیرمجموعه‌ی «{parentTask.title}» ثبت می‌شود و کنار آن نمایش داده می‌شود.
+            </div>
+          )}
+
           {/* Title Input */}
           <div className="flex items-center gap-3 pt-1"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-black shadow-md shadow-indigo-500/25">۱</span><div><p className="text-sm font-black text-slate-900 dark:text-white">شرح فعالیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">ابتدا عنوان روشن و توضیح کوتاه بنویسید.</p></div></div>
           <div className="rounded-2xl border border-indigo-100/80 dark:border-indigo-900/50 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(79,70,229,0.55)]">
@@ -684,43 +786,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           {/* Jalali Date Time Picker & Status Grid */}
           <div className="flex items-center gap-3 pt-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white text-xs font-black shadow-md shadow-violet-500/25">۲</span><div><p className="text-sm font-black text-slate-900 dark:text-white">زمان‌بندی و مسئولیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">موعد، وضعیت و افراد مسئول را مشخص کنید.</p></div></div>
           {/* Project or recurring first: either one decides the dates (and hides the plain due date). */}
-          <div className="p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2">
-            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">
-              نوع فعالیت
-            </h4>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {/* Checkbox: Project */}
-              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-emerald-300 transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={isProject}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsProject(checked);
-                    if (checked) setIsRecurring(false);
-                  }}
-                  className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
-                />
-                <span>پروژه است</span>
-              </label>
-
-              {/* Checkbox: Recurring */}
-              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-purple-300 transition-colors cursor-pointer text-xs font-bold text-slate-800 dark:text-slate-200">
-                <input
-                  type="checkbox"
-                  checked={isRecurring}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setIsRecurring(checked);
-                    if (checked) setIsProject(false);
-                  }}
-                  className="w-4 h-4 accent-purple-600 rounded cursor-pointer"
-                />
-                <span>فعالیت تکرارشونده است</span>
-              </label>
-            </div>
-
+          <div className={`p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2 ${hideDueDate ? '' : 'hidden'}`}>
             {/* Project Options Inline Panel */}
             {isProject && (
               <div className="mt-3 p-3.5 bg-emerald-50/70 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800/70 space-y-4 animate-in fade-in zoom-in-98">
@@ -803,6 +869,34 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       className="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100"
                     />
 
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">تاریخ انجام کار</label>
+                        <JalaliDateTimePicker valueISO={newSubTaskStartDate} onChangeISO={(iso) => setNewSubTaskStartDate(iso)} label="" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">تاریخ اختتامیه</label>
+                        <JalaliDateTimePicker valueISO={newSubTaskEndDate} onChangeISO={(iso) => setNewSubTaskEndDate(iso)} label="" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                        مسئولین زیرفعالیت: <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        multiple
+                        value={newSubTaskAssigneeIds}
+                        onChange={(e) => setNewSubTaskAssigneeIds(Array.from(e.target.selectedOptions, (o: HTMLOptionElement) => o.value))}
+                        className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100 cursor-pointer"
+                        size={Math.min(4, Math.max(2, allRegisteredUsers.length))}
+                      >
+                        {allRegisteredUsers.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name || u.username}</option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div className="flex items-center gap-2">
                       <select
                         value={newSubTaskImportance}
@@ -817,7 +911,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       <button
                         type="button"
                         onClick={handleAddProjectSubTask}
-                        className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                        disabled={!newSubTaskTitle.trim() || newSubTaskAssigneeIds.length === 0}
+                        className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>افزودن زیرفعالیت</span>
@@ -827,39 +922,127 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
 
                   {/* Subtasks List */}
                   {projectSubTasks.length > 0 && (
-                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                      {projectSubTasks.map((st) => (
+                    <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                      {projectSubTasks.map((st) => {
+                        const progress = st.status || (st.completed ? 'completed' : 'not_started');
+                        return (
                         <div
                           key={st.id}
-                          className="flex items-center justify-between p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-xs"
+                          className="p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-xs space-y-1.5"
                         >
-                          <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
-                            <input
-                              type="checkbox"
-                              checked={!!st.completed}
-                              onChange={() => handleToggleModalSubTask(st.id)}
-                              className="w-4 h-4 accent-emerald-600 rounded cursor-pointer shrink-0"
-                            />
-                            <span className={`font-semibold truncate ${st.completed ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
-                              {st.title}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              st.importance === 'high' ? 'bg-rose-100 text-rose-800' : st.importance === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                            }`}>
-                              {st.importance === 'high' ? 'وزن ۳' : st.importance === 'medium' ? 'وزن ۲' : 'وزن ۱'}
-                            </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleModalSubTask(st.id)}
+                                title={progress === 'completed' ? 'انجام شده - کلیک برای بازگشت به شروع نشده' : progress === 'in_progress' ? 'درحال انجام - کلیک برای علامت زدن به انجام شده' : 'شروع نشده - کلیک برای شروع'}
+                                className="shrink-0"
+                              >
+                                {progress === 'completed' ? (
+                                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                ) : progress === 'in_progress' ? (
+                                  <PlayCircle className="w-4 h-4 text-amber-500" />
+                                ) : (
+                                  <Circle className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+                                )}
+                              </button>
+                              <span className={`font-semibold truncate ${progress === 'completed' ? 'line-through text-slate-400' : 'text-slate-800 dark:text-slate-200'}`}>
+                                {st.title}
+                              </span>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                st.importance === 'high' ? 'bg-rose-100 text-rose-800' : st.importance === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {st.importance === 'high' ? 'وزن ۳' : st.importance === 'medium' ? 'وزن ۲' : 'وزن ۱'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setEditingSubTaskId(editingSubTaskId === st.id ? null : st.id)}
+                                className="p-1 text-slate-400 hover:text-emerald-600 transition-colors cursor-pointer"
+                                title="ویرایش تاریخ و مسئولین"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveProjectSubTask(st.id)}
+                                className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                title="حذف زیرفعالیت"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveProjectSubTask(st.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                            title="حذف زیرفعالیت"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 pr-6">
+                            مسئولین: {(st.assignees && st.assignees.length > 0) ? st.assignees.map((a) => a.name).join('، ') : 'تعیین نشده'}
+                          </div>
+
+                          {progress === 'in_progress' && st.actualStartDate && (
+                            <div className="text-[10px] text-amber-600 dark:text-amber-400 pr-6">
+                              شروع: {formatToJalali(st.actualStartDate)}
+                            </div>
+                          )}
+                          {progress === 'completed' && (st.actualStartDate || st.actualCompletedDate) && (
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 pr-6">
+                              {st.actualStartDate && <>شروع: {formatToJalali(st.actualStartDate)}</>}
+                              {st.actualStartDate && st.actualCompletedDate && ' · '}
+                              {st.actualCompletedDate && <>پایان: {formatToJalali(st.actualCompletedDate)}</>}
+                            </div>
+                          )}
+
+                          {editingSubTaskId === st.id && (
+                            <div className="pr-6 pt-1 space-y-2 border-t border-slate-100 dark:border-slate-800">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">تاریخ انجام کار</label>
+                                  <JalaliDateTimePicker
+                                    valueISO={st.startDate || ''}
+                                    onChangeISO={(iso) => handleUpdateProjectSubTask(st.id, { startDate: iso })}
+                                    label=""
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">تاریخ اختتامیه</label>
+                                  <JalaliDateTimePicker
+                                    valueISO={st.endDate || ''}
+                                    onChangeISO={(iso) => handleUpdateProjectSubTask(st.id, { endDate: iso })}
+                                    label=""
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">مسئولین زیرفعالیت</label>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {allRegisteredUsers.map((u) => {
+                                    const checked = (st.assignees || []).some((a) => a.id === u.id);
+                                    return (
+                                      <label
+                                        key={u.id}
+                                        className={`px-2 py-1 rounded-lg border text-[10px] font-bold cursor-pointer flex items-center gap-1 ${
+                                          checked
+                                            ? 'bg-emerald-600 border-emerald-600 text-white'
+                                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                                        }`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => handleToggleProjectSubTaskAssignee(st.id, u.id)}
+                                          className="hidden"
+                                        />
+                                        {u.name || u.username}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      ))}
+                      );})}
                     </div>
                   )}
                 </div>

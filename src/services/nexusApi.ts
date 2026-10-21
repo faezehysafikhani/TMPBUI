@@ -25,6 +25,7 @@ import {
   TaskLog,
   ProjectSubTask,
   SubTaskImportance,
+  SubTaskProgress,
   RecurringConfig,
   RecurringFrequency,
   OccurrenceNth,
@@ -164,6 +165,10 @@ interface SubTaskDto {
   isGeneratedOccurrence?: boolean;
   startTime?: string | null;
   endTime?: string | null;
+  assignees?: UserSummaryDto[];
+  status?: 'NotStarted' | 'InProgress' | 'Completed';
+  actualStartedAtUtc?: string | null;
+  actualCompletedAtUtc?: string | null;
 }
 
 interface RepetitiveTaskDto {
@@ -189,6 +194,7 @@ interface TaskDto {
   title: string;
   description: string | null;
   isProject: boolean;
+  parentTaskId?: string | null;
   isRecurring: boolean;
   status: string;
   priority: string;
@@ -681,7 +687,20 @@ function toServerSubTaskId(uiId: string): string {
   return uiId;
 }
 
+const SUBTASK_PROGRESS_FROM_API: Record<string, SubTaskProgress> = {
+  NotStarted: 'not_started',
+  InProgress: 'in_progress',
+  Completed: 'completed',
+};
+
+const SUBTASK_PROGRESS_TO_API: Record<SubTaskProgress, 'NotStarted' | 'InProgress' | 'Completed'> = {
+  not_started: 'NotStarted',
+  in_progress: 'InProgress',
+  completed: 'Completed',
+};
+
 function mapSubTask(s: SubTaskDto): ProjectSubTask {
+  const status = SUBTASK_PROGRESS_FROM_API[s.status || 'NotStarted'] || 'not_started';
   return {
     id: toUiSubTaskId(s),
     title: s.title,
@@ -689,7 +708,11 @@ function mapSubTask(s: SubTaskDto): ProjectSubTask {
     endDate: fromDateOnly(s.endDate, s.endTime),
     importance: LEVEL_FROM_API[s.importance] || 'medium',
     completed: s.isCompleted,
+    status,
+    actualStartDate: s.actualStartedAtUtc || undefined,
+    actualCompletedDate: s.actualCompletedAtUtc || undefined,
     createdAt: s.createdAtUtc,
+    assignees: (s.assignees || []).map((a) => ({ id: a.id, name: a.displayName })),
   };
 }
 
@@ -816,6 +839,7 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     allowAssigneeStatusUpdate: dto.allowAssigneeStatusUpdate,
     tags: (dto.tags || []).map((t) => t.name),
     isProject: dto.isProject,
+    parentTaskId: dto.parentTaskId || undefined,
     isRecurring: dto.isRecurring,
     recurringConfig: dto.recurrence ? mapRecurrence(dto.recurrence) : undefined,
     projectCharter: hasCharter
@@ -878,6 +902,7 @@ function toSubTaskBody(s: ProjectSubTask, sortOrder: number) {
     endTime: toTimeOfDay(s.endDate),
     sortOrder,
     isGeneratedOccurrence: s.id.startsWith(OCCURRENCE_PREFIX),
+    assigneeUserIds: (s.assignees || []).map((a) => a.id),
   };
 }
 
@@ -1244,6 +1269,7 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
       priority: LEVEL_TO_API[taskData.priority] || 'Medium',
       description: taskData.description || null,
       isProject: !!taskData.isProject,
+      parentTaskId: taskData.parentTaskId || null,
       assignedUserId: requireGuid(responsibleIdsOf(taskData)[0], 'کاربر مسئول'),
       responsibleUserIds: responsibleIdsOf(taskData).map((id) => requireGuid(id, 'کاربر مسئول')),
       // Where tasks are given to posts: these posts (their holders are the people above).
@@ -1267,9 +1293,10 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
   try {
     const createdSubTasks = [...created.subTasks].sort((a, b) => a.sortOrder - b.sortOrder);
     for (let i = 0; i < subTasks.length && i < createdSubTasks.length; i++) {
-      if (subTasks[i].completed) {
+      const desiredStatus = subTasks[i].status || (subTasks[i].completed ? 'completed' : 'not_started');
+      if (desiredStatus !== 'not_started') {
         await request('PATCH', `/api/task-management/subtasks/${createdSubTasks[i].id}/status`, {
-          body: { isCompleted: true },
+          body: { status: SUBTASK_PROGRESS_TO_API[desiredStatus] },
         });
       }
     }
@@ -1318,8 +1345,9 @@ export async function updateTask(
       const s = desiredSubTasks[i];
       if (currentById.has(toServerSubTaskId(s.id))) continue;
       const added = await request<SubTaskDto>('POST', `${TASKS}/${taskId}/subtasks`, { body: toSubTaskBody(s, i) });
-      if (s.completed) {
-        await request('PATCH', `/api/task-management/subtasks/${added.id}/status`, { body: { isCompleted: true } });
+      const desiredStatus = s.status || (s.completed ? 'completed' : 'not_started');
+      if (desiredStatus !== 'not_started') {
+        await request('PATCH', `/api/task-management/subtasks/${added.id}/status`, { body: { status: SUBTASK_PROGRESS_TO_API[desiredStatus] } });
       }
     }
   }
@@ -1389,6 +1417,8 @@ export async function updateTask(
       const existing = currentById.get(serverId);
       if (!existing) continue;
       const body = toSubTaskBody(s, i);
+      const existingAssigneeIds = (existing.assignees || []).map((a) => a.id).sort();
+      const desiredAssigneeIds = [...body.assigneeUserIds].sort();
       const changed =
         existing.title !== body.title ||
         existing.importance !== body.importance ||
@@ -1396,12 +1426,15 @@ export async function updateTask(
         (existing.endDate || null) !== body.endDate ||
         (existing.startTime || null) !== body.startTime ||
         (existing.endTime || null) !== body.endTime ||
-        existing.sortOrder !== body.sortOrder;
+        existing.sortOrder !== body.sortOrder ||
+        existingAssigneeIds.length !== desiredAssigneeIds.length ||
+        existingAssigneeIds.some((id, idx) => id !== desiredAssigneeIds[idx]);
       if (changed) {
         await request('PUT', `/api/task-management/subtasks/${serverId}`, { body });
       }
-      if (existing.isCompleted !== !!s.completed) {
-        await request('PATCH', `/api/task-management/subtasks/${serverId}/status`, { body: { isCompleted: !!s.completed } });
+      const desiredStatus = SUBTASK_PROGRESS_TO_API[s.status || (s.completed ? 'completed' : 'not_started')];
+      if ((existing.status || 'NotStarted') !== desiredStatus) {
+        await request('PATCH', `/api/task-management/subtasks/${serverId}/status`, { body: { status: desiredStatus } });
       }
     }
     for (const existing of current.subTasks) {
