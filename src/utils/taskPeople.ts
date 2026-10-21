@@ -35,7 +35,7 @@ export function isResponsibleFor(
 
 /**
  * The dashboard's rule, and the only one the rest of the app (chat included) uses: a task is
- * shown to its owner, its responsible people and those on its access list - or to anyone with
+ * shown to its owner, its responsible people, its stand-ins (جانشین) and those on its access list - or to anyone with
  * Tasks.ManageAll (the server already returns every task of the organization to them; this must
  * not re-hide what the server already allowed). A task's team alone gives nobody the task.
  */
@@ -44,5 +44,7 @@ export function isTaskVisibleTo(task: Task, user: User | null | undefined): bool
   if (isTaskAdmin(user)) return true;
   if (!task.user || task.user === user.id) return true;
   if (isResponsibleFor(task, user)) return true;
+  // Standing in for a vacant post of the task (جانشین): sees it and comments, nothing more.
+  if (task.standIns?.some((s) => s.userId === user.id)) return true;
   return !!task.teamMemberIds && task.teamMemberIds.includes(user.id);
 }

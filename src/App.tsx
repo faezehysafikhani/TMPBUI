@@ -72,7 +72,7 @@ import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION, withoutEditDuplicates } from 
 import { describeTaskChanges, summarizeTaskChanges, userNameLookup } from './utils/taskChangeSummary';
 import { getReportScope, ReportScope } from './services/taskReportApi';
 import { isOrgStructureAvailable, orgStructureLookupKey, getSubstitutionInbox, SubstitutionInbox } from './services/orgStructureApi';
-import { refreshLookup, useLookup } from './utils/lookupCache';
+import { readLookup, refreshLookup, useLookup } from './utils/lookupCache';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
 import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
@@ -323,6 +323,10 @@ export default function App() {
     if (!liveUserId) return undefined;
     return subscribeToTasksPB(() => {
       loadTasks(false);
+      // A post falling vacant (or filled) changes the substitution inbox, and whether its menu shows
+      // (only where the inbox exists: it answered with tasks given to posts).
+      const key = `${liveUserId}:substitution`;
+      if (readLookup<SubstitutionInbox | null>(key)?.enabled) refreshLookup(key, getSubstitutionInbox).catch(() => {});
     });
   }, [loadTasks, liveUserId]);
 
