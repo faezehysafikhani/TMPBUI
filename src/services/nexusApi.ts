@@ -200,6 +200,8 @@ interface TaskDto {
   assignees: UserSummaryDto[];
   /** Everyone responsible (servers before multi-responsible tasks leave it out). */
   responsibleUsers?: UserSummaryDto[] | null;
+  /** Who stands in for a vacant post of the task (جانشین), with the post; older servers leave it out. */
+  standIns?: { id: string; displayName: string; note: string | null }[] | null;
   allowAssigneeStatusUpdate: boolean;
   charterDescription: string | null;
   charterProjectManager: string | null;
@@ -804,6 +806,7 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     assignedUserName: dto.assignedUser?.displayName,
     responsibleUserIds: responsibleOf(dto).map((u) => u.id),
     responsibleUserNames: responsibleOf(dto).map((u) => u.displayName),
+    standIns: dto.standIns?.length ? dto.standIns.map((s) => ({ userId: s.id, name: s.displayName, note: s.note ? s.note.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]) : null })) : undefined,
     assignedTeamId: dto.assignedUserGroup?.id,
     assignedTeamName: dto.assignedUserGroup?.name,
     teamMemberIds: (dto.assignees || []).map((a) => a.id),

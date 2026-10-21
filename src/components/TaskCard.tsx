@@ -334,6 +334,17 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             </span>
           )}
 
+          {showDetails && task.standIns && task.standIns.length > 0 && (
+            <span
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-50 dark:bg-violet-950/80 text-violet-800 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
+              title={task.standIns.map((s) => `${s.name}${s.note ? ` (${s.note})` : ''}`).join('، ')}
+              data-stand-in
+            >
+              <UserIcon className="w-2.5 h-2.5 text-violet-600 dark:text-violet-400" />
+              <span>جانشین: {task.standIns.map((s) => s.name).join('، ')}</span>
+            </span>
+          )}
+
           {task.isProject && (
             <button
               type="button"

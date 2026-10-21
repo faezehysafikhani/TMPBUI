@@ -483,6 +483,17 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               )}
             </div>
 
+            {task.standIns && task.standIns.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-xs" data-stand-in>
+                <span className="text-slate-500 dark:text-slate-400 font-medium">جانشین:</span>
+                {task.standIns.map((s) => (
+                  <span key={s.userId} className="font-bold text-violet-700 dark:text-violet-300">
+                    {s.name}{s.note ? <span className="font-medium text-slate-500 dark:text-slate-400"> ({s.note})</span> : null}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Assignee and Update Permission Info */}
             {task.assignedUserId && (
               <div className="flex items-center gap-2 text-xs">

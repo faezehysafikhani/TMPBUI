@@ -166,6 +166,8 @@ export interface Task {
   /** Everyone responsible for doing the task (one or more); the first is assignedUserId. */
   responsibleUserIds?: string[];
   responsibleUserNames?: string[];
+  /** Standing in for a vacant post of the task (جانشین): see it and comment, nothing more. */
+  standIns?: { userId: string; name: string; note: string | null }[];
   assignedTeamId?: string; // the task's team: its context, not who is responsible
   assignedTeamName?: string;
   /** Where tasks are given to posts: the responsible posts (their holders are responsibleUserIds). */
