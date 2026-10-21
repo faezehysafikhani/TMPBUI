@@ -63,9 +63,10 @@ const SummaryCard: React.FC<{
       onClick={onClick}
       disabled={!onClick}
       className={`relative w-full lg:w-[68%] text-right px-2.5 py-1.5 rounded-lg border transition-all ${t.box} ${onClick ? 'cursor-pointer hover:shadow-md' : 'cursor-default'} ${
-        active ? 'ring-2 ring-indigo-500' : ''
+        active ? 'ring-[3px] ring-indigo-500 shadow-lg shadow-indigo-500/25 -translate-y-0.5' : ''
       }`}
     >
+      {active && <span className="absolute -top-2 left-2 text-[10px] font-bold bg-indigo-600 text-white rounded-full px-2 py-px">فیلتر فعال</span>}
       <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400">{label}</div>
       <div className={`text-lg font-black leading-tight ${t.value}`}>{toPersianDigits(value)}</div>
       <Icon className={`absolute bottom-1 left-1.5 w-3.5 h-3.5 ${t.icon}`} aria-hidden="true" />
@@ -179,7 +180,7 @@ export const ReportsView: React.FC<{
     if (filters.tag) parts.push(`برچسب: ${filters.tag}`);
     if (filters.type) parts.push(`نوع: ${REPORT_TYPE_TITLES[filters.type]}`);
     if (filters.status) parts.push(`وضعیت: ${STATUSES[filters.status].title}`);
-    if (onlyOverdue) parts.push('فقط عقب‌افتاده‌ها');
+    if (onlyOverdue) parts.push('فقط موعد گذشته‌ها');
     if (filters.dueFrom) parts.push(`موعد از ${jalaliDate(filters.dueFrom)}`);
     if (filters.dueTo) parts.push(`موعد تا ${jalaliDate(filters.dueTo)}`);
     return parts.length ? parts.join(' • ') : 'بدون فیلتر';
@@ -311,7 +312,7 @@ export const ReportsView: React.FC<{
             >
               <option value="">همه وضعیت‌ها</option>
               {STATUS_KEYS.map((st) => <option key={st} value={st}>{STATUSES[st].title}</option>)}
-              <option value="overdue">عقب‌افتاده</option>
+              <option value="overdue">موعد گذشته</option>
             </select>
           </Field>
           <FieldGroup label="موعد انجام از">
@@ -332,7 +333,7 @@ export const ReportsView: React.FC<{
           <SummaryCard label="درحال اجرا" value={s.inProgress} theme="blue" icon={Play} active={filters.status === 'in_progress' && !onlyOverdue} onClick={() => { setOnlyOverdue(false); set({ status: 'in_progress' }); }} />
           <SummaryCard label="متوقف" value={s.paused} theme="amber" icon={Pause} active={filters.status === 'paused' && !onlyOverdue} onClick={() => { setOnlyOverdue(false); set({ status: 'paused' }); }} />
           <SummaryCard label="خاتمه یافته" value={s.completed} theme="emerald" icon={CheckCircle2} active={filters.status === 'completed' && !onlyOverdue} onClick={() => { setOnlyOverdue(false); set({ status: 'completed' }); }} />
-          <SummaryCard label="عقب‌افتاده" value={s.overdue} theme="rose" icon={AlertTriangle} active={onlyOverdue} onClick={() => { setOnlyOverdue((v) => !v); set({ status: undefined }); setPage(1); }} />
+          <SummaryCard label="موعد گذشته" value={s.overdue} theme="rose" icon={AlertTriangle} active={onlyOverdue} onClick={() => { setOnlyOverdue((v) => !v); set({ status: undefined }); setPage(1); }} />
         </div>
       )}
 

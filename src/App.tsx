@@ -9,6 +9,7 @@ import { BoardViewBar } from './components/BoardViewBar';
 import { BoardViewSettings, loadBoardView, saveBoardView } from './utils/boardView';
 import { KanbanBoard } from './components/KanbanBoard';
 import { SandwichBar, ActiveTab } from './components/SandwichBar';
+import ToastHost from './components/ToastHost';
 import { DesktopSidebar } from './components/DesktopSidebar';
 import type { ThemeMode } from './components/SettingsModal';
 
@@ -79,6 +80,17 @@ import { userErrorMessage } from './utils/errorMessages';
 import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
 import { appAlert, appConfirm } from './utils/appDialog';
 
+const PAGE_TITLES: Record<string, string> = {
+  kanban: 'بورد کانبان',
+  calendar: 'نمای تقویم',
+  overdue: 'موعد گذشته',
+  chat: 'گفتگوی تیمی',
+  notes: 'یادداشت‌های شخصی',
+  reports: 'گزارش فعالیت‌ها',
+  substitution: 'کارتابل جانشینی',
+  settings: 'تنظیمات و پروفایل',
+};
+
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -114,7 +126,18 @@ export default function App() {
 
   // Modals - Automatically open auth modal on startup if not logged in
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => !getCurrentUser());
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(() => !!getCurrentUser());
+  // The welcome summary shows once a day; the navbar button can still open it again.
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(() => {
+    if (!getCurrentUser()) return false;
+    const key = `tm_welcome_${new Date().toLocaleDateString('en-CA')}`;
+    try {
+      if (localStorage.getItem(key) === '1') return false;
+      localStorage.setItem(key, '1');
+    } catch {
+      // Storage blocked: show it as before.
+    }
+    return true;
+  });
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState<boolean>(false);
 
@@ -996,7 +1019,7 @@ export default function App() {
     const applyAppBadge = async () => {
       // 1. Document Title Badge
       if (typeof document !== 'undefined') {
-        const baseTitle = 'مدیریت وظایف (TM)';
+        const baseTitle = `${PAGE_TITLES[activeTab] || 'بورد کانبان'} · مدیریت وظایف`;
         if (totalBadgeCount > 0) {
           document.title = `(${toPersianDigits(totalBadgeCount)}) ${baseTitle}`;
         } else {
@@ -1033,7 +1056,7 @@ export default function App() {
     };
 
     applyAppBadge();
-  }, [totalBadgeCount]);
+  }, [totalBadgeCount, activeTab]);
 
   // Request notification permission on first user interaction if default (Required on iOS 16.4+ for PWA Home Screen Badges)
   useEffect(() => {
@@ -1290,6 +1313,13 @@ export default function App() {
               <div className="space-y-1 text-xs">
                 <h4 className="font-bold text-sm text-amber-800 dark:text-amber-300">خطا در انجام عملیات</h4>
                 <p className="leading-relaxed">{pbError}</p>
+                <button
+                  type="button"
+                  onClick={() => { setPbError(null); loadTasks(true); }}
+                  className="mt-1 px-3 py-1 rounded-lg border border-amber-400 bg-white dark:bg-amber-950 text-amber-800 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900 cursor-pointer"
+                >
+                  تلاش دوباره
+                </button>
               </div>
             </div>
           </div>
@@ -1457,6 +1487,7 @@ export default function App() {
         </div>
       </footer>
 
+      <ToastHost />
       <Suspense fallback={null}>
         {/* Form Modal for Add/Edit Task */}
         {isFormModalOpen && (

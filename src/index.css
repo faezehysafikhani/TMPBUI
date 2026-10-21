@@ -320,3 +320,15 @@ button:is([class*="bg-gradient-to"], [class*=" bg-indigo-600"], [class*=" bg-eme
     page-break-after: auto;
   }
 }
+
+/* Readability: nothing below 12px, and grey text on light pages dark enough to read. */
+.text-\[9px\], .text-\[10px\], .text-\[11px\] { font-size: 12px; line-height: 1.5; }
+:root:not(.dark) main .text-slate-400 { color: #64748b; }
+/* Keyboard focus is always visible. */
+:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+
+/* Phones: the floating menu of the bottom bar moves up while a chat box is open, so it does not
+   cover the attach button. */
+@media (max-width: 1023px) {
+  body:has(textarea[aria-label="متن پیام"]) [data-more-fab] { transform: translateY(-72px); }
+}

@@ -191,7 +191,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
               />
             )}
             <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
-              {item.title}
+              {item.title.replace(/\*\*/g, "")}
             </span>
           </div>
 
@@ -215,7 +215,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
                   className="w-3 h-3 text-amber-300 shrink-0"
                 />
                 <span>
-                  {delayDays >= 7 ? 'تاخیر شدید' : 'معوقه'} ({getDaysDiff(item.dueDate).text})
+                  {delayDays >= 7 ? 'تاخیر شدید' : 'موعد گذشته'} ({getDaysDiff(item.dueDate).text})
                 </span>
               </span>
             ) : (
@@ -485,7 +485,7 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
         </div>
 
         <div className="px-3.5 py-1.5 rounded-2xl bg-white/20 backdrop-blur-md text-xs font-bold border border-white/30 shrink-0 self-end sm:self-auto">
-          {toPersianDigits(overdueItems.length)} مورد معوقه
+          {toPersianDigits(overdueItems.length)} مورد موعد گذشته
         </div>
       </div>
 

@@ -110,6 +110,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const editCommentFileInputRef = useRef<HTMLInputElement>(null);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
 
+  // Escape closes the dialog (unless the emoji list is open: Escape closes that first).
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.querySelector('[data-emoji-picker]')) onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   // Load comments & activity logs from the server
   useEffect(() => {
     if (task && task.id) {
@@ -436,7 +446,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   onClose();
                   onDeleteTask(task.id);
                 }}
-                className="p-2 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
+                className="order-first me-3 p-2 text-rose-500 hover:text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
                 title="حذف فعالیت"
               >
                 <Trash2 className="w-4 h-4" />
@@ -445,6 +455,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
             <button
               onClick={onClose}
+              title="بستن"
+              aria-label="بستن"
               className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
