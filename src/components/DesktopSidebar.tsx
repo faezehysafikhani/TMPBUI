@@ -83,7 +83,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     <div className="hidden lg:block w-48 shrink-0" aria-hidden="true" />
     <aside
       className="hidden lg:flex flex-col w-48 shrink-0 gap-3 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm fixed z-20 overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300"
-      style={{ right: fixedRight, top: HEADER_HEIGHT_PX + EDGE_GAP_PX, maxHeight: `calc(100dvh - ${HEADER_HEIGHT_PX + EDGE_GAP_PX * 2}px)` }}
+      style={{ right: fixedRight, top: HEADER_HEIGHT_PX + EDGE_GAP_PX, bottom: EDGE_GAP_PX }}
     >
 
       {onOpenCreateModal && (
@@ -290,7 +290,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 
       {/* Progress Summary Widget */}
       {totalTasks > 0 && (
-        <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800/80 flex-1 min-h-0 flex flex-col items-center justify-center gap-2">
+        <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800/80 shrink-0 flex flex-col items-center justify-end gap-2">
           <div className="relative w-24 h-24 shrink-0">
             <svg viewBox="0 0 100 100" className="w-24 h-24 -rotate-90">
               <circle cx="50" cy="50" r={RADIUS} fill="none" strokeWidth="10" className="stroke-slate-100 dark:stroke-slate-800" />
