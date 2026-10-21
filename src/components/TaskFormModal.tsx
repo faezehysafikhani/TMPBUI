@@ -36,6 +36,7 @@ import {
   Briefcase,
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
+import PeoplePicker from './PeoplePicker';
 import { isResponsibleFor, responsibleIdsOf } from '../utils/taskPeople';
 import { getAssignmentLimit, getAssignablePosts, AssignablePosts } from '../services/nexusApi';
 import { appAlert } from '../utils/appDialog';
@@ -382,6 +383,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   // A recurring task is scheduled by its own recurrence settings and a project by its charter's
   // dates (its end date is its deadline); neither asks for the plain due date.
   const hideDueDate = isProject || isRecurring;
+  // A sub-activity made from a comment or message keeps that text as its title.
+  const titleLocked = isSub && !!parentTask && !taskToEdit;
 
   useEffect(() => {
     if (isAutoStatusTask) {
@@ -526,7 +529,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      setErrors({ title: 'عنوان فعالیت الزامی است' });
+      setErrors({ title: isProject ? 'عنوان پروژه الزامی است' : 'عنوان فعالیت الزامی است' });
       return;
     }
     // Every new task needs someone responsible for doing it (the server enforces this too).
@@ -735,58 +738,6 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </div>
           )}
 
-          {/* Title Input */}
-          <div className="flex items-center gap-3 pt-1"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-black shadow-md shadow-indigo-500/25">۱</span><div><p className="text-sm font-black text-slate-900 dark:text-white">شرح فعالیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">ابتدا عنوان روشن و توضیح کوتاه بنویسید.</p></div></div>
-          <div className="rounded-2xl border border-indigo-100/80 dark:border-indigo-900/50 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(79,70,229,0.55)]">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-              عنوان فعالیت <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative flex items-center">
-              <input
-                type="text"
-                value={title}
-                disabled={isStatusOnlyEdit}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  if (e.target.value.trim()) setErrors({});
-                }}
-                placeholder="مثال: طراحی صفحات داشبورد جدید"
-                className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 text-xs font-medium border rounded-xl focus:outline-hidden focus:ring-2 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
-                  isStatusOnlyEdit ? 'opacity-60 cursor-not-allowed' : 'focus:bg-white dark:focus:bg-slate-800'
-                } ${
-                  errors.title
-                    ? 'border-rose-400 focus:ring-rose-400'
-                    : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500 focus:border-indigo-500'
-                }`}
-              />
-            </div>
-            {errors.title && (
-              <p className="mt-1 text-xs text-rose-500 flex items-center gap-1 font-medium">
-                <AlertCircle className="w-3.5 h-3.5" />
-                {errors.title}
-              </p>
-            )}
-          </div>
-
-          {/* Description Input */}
-          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.45)]">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
-              شرح توضیحات
-            </label>
-            <textarea
-              rows={3}
-              value={description}
-              disabled={isStatusOnlyEdit}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="جزئیات و نکات مربوط به این فعالیت..."
-              className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none ${
-                isStatusOnlyEdit ? 'opacity-60 cursor-not-allowed' : 'focus:bg-white dark:focus:bg-slate-800'
-              }`}
-            />
-          </div>
-
-          {/* Jalali Date Time Picker & Status Grid */}
-          <div className="flex items-center gap-3 pt-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white text-xs font-black shadow-md shadow-violet-500/25">۲</span><div><p className="text-sm font-black text-slate-900 dark:text-white">زمان‌بندی و مسئولیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">موعد، وضعیت و افراد مسئول را مشخص کنید.</p></div></div>
           {/* Project or recurring first: either one decides the dates (and hides the plain due date). */}
           <div className={`p-3.5 bg-slate-50/80 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80 space-y-2 ${hideDueDate ? '' : 'hidden'}`}>
             {/* Project Options Inline Panel */}
@@ -886,17 +837,11 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
                         مسئولین زیرفعالیت: <span className="text-rose-500">*</span>
                       </label>
-                      <select
-                        multiple
-                        value={newSubTaskAssigneeIds}
-                        onChange={(e) => setNewSubTaskAssigneeIds(Array.from(e.target.selectedOptions, (o: HTMLOptionElement) => o.value))}
-                        className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-100 cursor-pointer"
-                        size={Math.min(4, Math.max(2, allRegisteredUsers.length))}
-                      >
-                        {allRegisteredUsers.map((u) => (
-                          <option key={u.id} value={u.id}>{u.name || u.username}</option>
-                        ))}
-                      </select>
+                      <PeoplePicker
+                        people={allRegisteredUsers}
+                        selectedIds={newSubTaskAssigneeIds}
+                        onToggle={(id) => setNewSubTaskAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
+                      />
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -1017,29 +962,11 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                               </div>
                               <div>
                                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">مسئولین زیرفعالیت</label>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {allRegisteredUsers.map((u) => {
-                                    const checked = (st.assignees || []).some((a) => a.id === u.id);
-                                    return (
-                                      <label
-                                        key={u.id}
-                                        className={`px-2 py-1 rounded-lg border text-[10px] font-bold cursor-pointer flex items-center gap-1 ${
-                                          checked
-                                            ? 'bg-emerald-600 border-emerald-600 text-white'
-                                            : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
-                                        }`}
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={checked}
-                                          onChange={() => handleToggleProjectSubTaskAssignee(st.id, u.id)}
-                                          className="hidden"
-                                        />
-                                        {u.name || u.username}
-                                      </label>
-                                    );
-                                  })}
-                                </div>
+                                <PeoplePicker
+                                  people={allRegisteredUsers}
+                                  selectedIds={(st.assignees || []).map((a) => a.id)}
+                                  onToggle={(id) => handleToggleProjectSubTaskAssignee(st.id, id)}
+                                />
                               </div>
                             </div>
                           )}
@@ -1358,6 +1285,62 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               </div>
             )}
           </div>
+
+          {/* Title Input */}
+          <div className="flex items-center gap-3 pt-1"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-black shadow-md shadow-indigo-500/25">۱</span><div><p className="text-sm font-black text-slate-900 dark:text-white">شرح فعالیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">ابتدا عنوان روشن و توضیح کوتاه بنویسید.</p></div></div>
+          <div className="rounded-2xl border border-indigo-100/80 dark:border-indigo-900/50 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(79,70,229,0.55)]">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+              {isProject ? 'عنوان پروژه' : 'عنوان فعالیت'} <span className="text-rose-500">*</span>
+            </label>
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                value={title}
+                disabled={isStatusOnlyEdit}
+                readOnly={titleLocked}
+                title={titleLocked ? 'عنوان زیرمجموعه از متن پیام/کامنت گرفته شده و قابل تغییر نیست' : undefined}
+                onChange={(e) => {
+                  if (titleLocked) return;
+                  setTitle(e.target.value);
+                  if (e.target.value.trim()) setErrors({});
+                }}
+                placeholder={isProject ? 'مثال: پروژه‌ی بازطراحی داشبورد' : 'مثال: طراحی صفحات داشبورد جدید'}
+                className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 text-xs font-medium border rounded-xl focus:outline-hidden focus:ring-2 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 ${
+                  isStatusOnlyEdit || titleLocked ? 'opacity-60 cursor-not-allowed' : 'focus:bg-white dark:focus:bg-slate-800'
+                } ${
+                  errors.title
+                    ? 'border-rose-400 focus:ring-rose-400'
+                    : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500 focus:border-indigo-500'
+                }`}
+              />
+            </div>
+            {errors.title && (
+              <p className="mt-1 text-xs text-rose-500 flex items-center gap-1 font-medium">
+                <AlertCircle className="w-3.5 h-3.5" />
+                {errors.title}
+              </p>
+            )}
+          </div>
+
+          {/* Description Input */}
+          <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/80 dark:bg-slate-800/35 p-4 shadow-[0_8px_24px_-20px_rgba(15,23,42,0.45)]">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-200 mb-1">
+              شرح توضیحات
+            </label>
+            <textarea
+              rows={3}
+              value={description}
+              disabled={isStatusOnlyEdit}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="جزئیات و نکات مربوط به این فعالیت..."
+              className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none ${
+                isStatusOnlyEdit ? 'opacity-60 cursor-not-allowed' : 'focus:bg-white dark:focus:bg-slate-800'
+              }`}
+            />
+          </div>
+
+          {/* Jalali Date Time Picker & Status Grid */}
+          <div className="flex items-center gap-3 pt-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white text-xs font-black shadow-md shadow-violet-500/25">۲</span><div><p className="text-sm font-black text-slate-900 dark:text-white">زمان‌بندی و مسئولیت</p><p className="text-[11px] text-slate-500 dark:text-slate-400">موعد، وضعیت و افراد مسئول را مشخص کنید.</p></div></div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-2xl border border-slate-200/80 dark:border-slate-700 bg-white/90 dark:bg-slate-800/35 p-4 shadow-sm">
             

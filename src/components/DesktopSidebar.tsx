@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Kanban, Calendar, AlertCircle, Settings, LogOut, MessageSquare, FileText, PanelRightClose, Plus, BarChart3, UserCog } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette, User as UserType } from '../types';
@@ -43,6 +43,19 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
+  // The navbar's real height (it grows when its items wrap on narrower screens), so the gap under
+  // it is the same on every monitor size.
+  const [headerHeight, setHeaderHeight] = useState(77);
+  useEffect(() => {
+    const header = document.querySelector('header.ui-bar');
+    if (!header) return;
+    const update = () => setHeaderHeight(Math.round(header.getBoundingClientRect().height));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
   if (!isOpen) {
     return null;
   }
@@ -61,8 +74,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   // The spacer div below keeps the width reserved in the flex row so the main content doesn't
   // shift into the space this now-fixed element used to occupy.
   const fixedRight = 'max(0.75rem, calc((100vw - 1920px) / 2 + 0.75rem))';
-  // Navbar at lg+: py-3.5 (2 x 14px) + 48px logo + 1px bottom border.
-  const HEADER_HEIGHT_PX = 77;
+  const HEADER_HEIGHT_PX = headerHeight;
   const EDGE_GAP_PX = 15;
 
   return (

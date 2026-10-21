@@ -43,6 +43,13 @@ const PATTERN_SCHEMES: { id: AppTheme; name: string; description: string; previe
   { id: 'dots', name: 'طرح نقطه‌ای', description: 'نقطه‌چین ظریف', previewClass: 'bg-pattern-dots' },
   { id: 'cross', name: 'چهارخانه', description: 'متقاطع ریز', previewClass: 'bg-pattern-cross' },
   { id: 'waves', name: 'طرح موجی', description: 'قوس‌های دایره‌ای', previewClass: 'bg-pattern-waves' },
+  { id: 'glass', name: 'شیشه‌ای', description: 'الماس‌های ظریف', previewClass: 'bg-pattern-glass' },
+  { id: 'bubbles', name: 'حبابی', description: 'حباب‌های رنگی', previewClass: 'bg-pattern-bubbles' },
+  { id: 'rain', name: 'بارانی', description: 'قطره‌های باران', previewClass: 'bg-pattern-rain' },
+  { id: 'dandelion', name: 'قاصدکی', description: 'قاصدک‌های سبک', previewClass: 'bg-pattern-dandelion' },
+  { id: 'snow', name: 'برفی', description: 'دانه‌های برف', previewClass: 'bg-pattern-snow' },
+  { id: 'autumn', name: 'برگی پاییزی', description: 'برگ‌های پاییزی', previewClass: 'bg-pattern-autumn' },
+  { id: 'spring', name: 'بهاری', description: 'شکوفه‌های بهاری', previewClass: 'bg-pattern-spring' },
 ];
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({

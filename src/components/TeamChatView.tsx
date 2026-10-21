@@ -138,6 +138,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>('');
   const [replyTo, setReplyTo] = useState<ReplyRef | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const handleStartEdit = (msg: DirectMessage) => {
     setEditingMessageId(msg.id);
@@ -916,7 +917,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                       <span className="block truncate">{reply.snippet}</span>
                                     </button>
                                   )}
-                                  {body && <p className="whitespace-pre-wrap break-words" dir="auto">{body}</p>}
+                                  {body && <p className="whitespace-pre-wrap break-words text-right" dir="rtl">{body}</p>}
                                 </>
                               );
                             })()
@@ -951,6 +952,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                     name: senderName,
                                     snippet: isVoiceName(msg.attachmentName) ? '🎤 پیام صوتی' : plain || msg.attachmentName || 'پیوست',
                                   });
+                                  composerRef.current?.focus();
                                 }}
                                 className={`p-1 rounded-md transition-colors cursor-pointer ${
                                   isMine
@@ -1084,6 +1086,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
               />
 
               <textarea
+                ref={composerRef}
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={(e) => {
@@ -1094,7 +1097,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                   }
                 }}
                 rows={1}
-                dir="auto"
+                dir="rtl"
                 aria-label="متن پیام"
                 placeholder={isGroup ? `پیام به تیم ${conversationTitle}...` : `پیام به ${conversationTitle}...`}
                 className="flex-1 min-w-0 resize-none max-h-32 bg-slate-100 dark:bg-slate-900 text-xs sm:text-sm text-slate-900 dark:text-slate-100 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
