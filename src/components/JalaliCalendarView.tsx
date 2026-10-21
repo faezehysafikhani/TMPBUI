@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
+import { appAlert } from '../utils/appDialog';
 
 interface JalaliCalendarViewProps {
   tasks: Task[];
@@ -118,7 +119,7 @@ const CalendarTaskCardItem: React.FC<{
             onStatusChange(parent.id, 'completed');
           }
         } else {
-          alert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
+          void appAlert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
         }
       }
     }

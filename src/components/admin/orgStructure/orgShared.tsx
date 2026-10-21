@@ -71,6 +71,9 @@ export const UserPicker: React.FC<{
   const debounced = useDebounced(query, 300);
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<AdminUser[]>([]);
+  // The search the results are for: results of an earlier search are never shown (or clickable)
+  // under a newer one, so a quick click can't pick the wrong person.
+  const [resultsFor, setResultsFor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
 
@@ -79,7 +82,7 @@ export const UserPicker: React.FC<{
     let alive = true;
     setBusy(true);
     listUsersPage({ page: 1, pageSize: 20, search: debounced })
-      .then((page) => alive && (setResults(page.items), setDenied(false)))
+      .then((page) => alive && (setResults(page.items), setResultsFor(debounced), setDenied(false)))
       .catch(() => alive && setDenied(true))
       .finally(() => alive && setBusy(false));
     return () => { alive = false; };
@@ -116,7 +119,7 @@ export const UserPicker: React.FC<{
       />
       {open && (
         <div className="absolute z-20 inset-x-0 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg">
-          {busy ? (
+          {busy || resultsFor !== query ? (
             <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-slate-500"><Loader2 className="w-3.5 h-3.5 animate-spin" /> در حال جستجو...</div>
           ) : denied ? (
             <div className="px-3 py-2.5 text-xs text-rose-600">برای انتخاب کاربر، دسترسی «مشاهده کاربران» لازم است.</div>

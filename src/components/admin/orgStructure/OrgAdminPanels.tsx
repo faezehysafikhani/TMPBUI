@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Pencil, Trash2, Network, Link2, Unlink, Loader2, Ban, CheckCircle2 } from 'lucide-react';
 import {
   AdminCard, AdminDialog, Field, IconAction, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass,
@@ -51,6 +51,9 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
   const [unitsOf, setUnitsOf] = useState<Company | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Company | null>(null);
   const { busy, run } = useAction(data.reload, setMessage);
+  // A message from before the dialog opened is not the dialog's.
+  const dialogOpen = !!draft;
+  useEffect(() => { if (dialogOpen) setMessage(null); }, [dialogOpen]);
 
   const save = async () => {
     if (!draft) return;
@@ -65,7 +68,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
 
   return (
     <div className="space-y-4">
-      {message && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
+      {message && !(draft && message.type === 'error') && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
       <AdminCard>
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div>
@@ -122,6 +125,8 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
             <PrimaryButton onClick={save} disabled={busy || !draft.name.trim() || !draft.code.trim()}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
           </>}
         >
+          {/* An error of this dialog shows in it, not behind it. */}
+          {message?.type === 'error' && <Notice type="error" onClose={() => setMessage(null)}>{message.text}</Notice>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="نام شرکت" required><input className={inputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
             <Field label="کد شرکت" required hint="کد یکتا، مثلاً TJ"><input className={`${inputClass} dir-ltr text-right`} value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} /></Field>
@@ -221,6 +226,9 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
   const [message, setMessage] = useState<Message>(null);
   const [draft, setDraft] = useState<UnitDraft | null>(null);
   const { busy, run } = useAction(data.reload, setMessage);
+  // A message from before the dialog opened is not the dialog's.
+  const dialogOpen = !!draft;
+  useEffect(() => { if (dialogOpen) setMessage(null); }, [dialogOpen]);
 
   const rows = useMemo(() => (data.data ? sortOrgUnits(data.data.units) : []), [data.data]);
   const companyOf = useMemo(() => {
@@ -243,7 +251,7 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
 
   return (
     <div className="space-y-4">
-      {message && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
+      {message && !(draft && message.type === 'error') && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
       <AdminCard>
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div>
@@ -312,6 +320,8 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
             <PrimaryButton onClick={save} disabled={busy || !draft.name.trim()}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
           </>}
         >
+          {/* An error of this dialog shows in it, not behind it. */}
+          {message?.type === 'error' && <Notice type="error" onClose={() => setMessage(null)}>{message.text}</Notice>}
           <Field label="نام واحد" required hint="مثلاً «معاونت فناوری اطلاعات»"><input className={inputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
           {draft.id && (
             <>
@@ -357,6 +367,9 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
   const [message, setMessage] = useState<Message>(null);
   const [draft, setDraft] = useState<PositionDraft | null>(null);
   const { busy, run } = useAction(data.reload, setMessage);
+  // A message from before the dialog opened is not the dialog's.
+  const dialogOpen = !!draft;
+  useEffect(() => { if (dialogOpen) setMessage(null); }, [dialogOpen]);
 
   const positions = data.data?.positions || [];
   const companies = data.data?.companies || [];
@@ -406,7 +419,7 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
 
   return (
     <div className="space-y-4">
-      {message && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
+      {message && !(draft && message.type === 'error') && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
       <AdminCard>
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div>
@@ -462,6 +475,8 @@ export const PositionsPanel: React.FC<{ canManage: boolean }> = ({ canManage }) 
             <PrimaryButton onClick={save} disabled={busy || !draft.title.trim() || draft.companyIds.length === 0}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
           </>}
         >
+          {/* An error of this dialog shows in it, not behind it. */}
+          {message?.type === 'error' && <Notice type="error" onClose={() => setMessage(null)}>{message.text}</Notice>}
           <Field label="عنوان سمت" required><input className={inputClass} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Field>
           <Field label="شرکت‌ها" required hint="این سمت فقط به کاربران و معاونت‌های این شرکت‌ها داده می‌شود.">
             {companies.length === 0 ? (

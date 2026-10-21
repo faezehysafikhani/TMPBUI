@@ -2,6 +2,9 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { installPersianValidationMessages } from './utils/persianValidation';
+
+installPersianValidationMessages();
 
 // Register Service Worker for PWA App Badging support
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {

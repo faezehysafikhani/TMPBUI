@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
+import { appAlert } from '../utils/appDialog';
 
 interface TaskCardProps {
   task: Task;
@@ -102,7 +103,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             onStatusChange(task.id, 'completed');
           }
         } else {
-          alert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
+          void appAlert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
         }
       }
     }
@@ -481,30 +482,30 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
                         e.stopPropagation();
                         handleToggleSubTaskClick(st.id);
                       }}
-                      className={`flex items-center justify-between p-2 rounded-xl border text-xs transition-all cursor-pointer ${
+                      className={`flex items-start gap-2 p-2 rounded-xl border text-xs transition-all cursor-pointer ${
                         isDone
                           ? 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 line-through'
                           : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:border-purple-300 dark:hover:border-purple-700'
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
-                        <input
-                          type="checkbox"
-                          checked={isDone}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            handleToggleSubTaskClick(st.id);
-                          }}
-                          className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-600 cursor-pointer shrink-0"
-                        />
-                        <span className="font-semibold text-xs truncate">{st.title}</span>
+                      <input
+                        type="checkbox"
+                        checked={isDone}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleToggleSubTaskClick(st.id);
+                        }}
+                        className="w-4 h-4 mt-0.5 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-600 cursor-pointer shrink-0"
+                      />
+                      {/* The title gets the row's width (the date goes under it), so it is never squeezed out on a narrow card. */}
+                      <div className="min-w-0 flex-1">
+                        <span className="block font-semibold text-xs leading-5 break-words line-clamp-2" title={st.title}>{st.title}</span>
+                        {st.startDate && (
+                          <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium dir-rtl">
+                            {formatToJalali(st.startDate)}
+                          </span>
+                        )}
                       </div>
-
-                      {st.startDate && (
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 font-medium dir-rtl mr-2">
-                          {formatToJalali(st.startDate)}
-                        </span>
-                      )}
                     </div>
                   );
                 })}

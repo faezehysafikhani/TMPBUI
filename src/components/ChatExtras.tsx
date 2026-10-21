@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Smile, Mic, Square } from 'lucide-react';
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { toPersianDigits } from '../utils/helpers';
+import { appAlert } from '../utils/appDialog';
 
 export const CHAT_EMOJIS = [
   '👍', '😂', '😭', '👏', '🤞', '🙏', '😊', '🥰', '😮', '🙌',
@@ -120,7 +121,7 @@ export const VoiceButton: React.FC<VoiceButtonProps> = ({ onRecorded, onError, c
         const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
         if (blob.size === 0) return;
         if (blob.size > MAX_ATTACHMENT_BYTES) {
-          alert(`حجم پیام صوتی بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
+          void appAlert(`حجم پیام صوتی بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           return;
         }
         const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm';

@@ -77,6 +77,7 @@ import { readLookup, refreshLookup, useLookup } from './utils/lookupCache';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
 import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
+import { appAlert, appConfirm } from './utils/appDialog';
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -513,7 +514,7 @@ export default function App() {
       console.error('Error saving task:', err);
       const errMsg = userErrorMessage(err, 'خطا در ذخیره‌سازی فعالیت');
       setPbError(errMsg);
-      alert(`خطا در ذخیره‌سازی:\n${errMsg}`);
+      void appAlert(`خطا در ذخیره‌سازی:\n${errMsg}`);
       loadTasks(false);
     } finally {
       setIsSyncing(false);
@@ -523,7 +524,7 @@ export default function App() {
   // Delete Task
   const handleDeleteTask = useCallback(async (taskId: string) => {
     const targetTask = tasks.find((t) => t.id === taskId);
-    if (!window.confirm('آیا از حذف این فعالیت اطمینان دارید؟')) return;
+    if (!(await appConfirm('آیا از حذف این فعالیت اطمینان دارید؟'))) return;
     
     // Log delete action before removing
     if (currentUser && taskId) {
@@ -547,7 +548,7 @@ export default function App() {
       console.error('Error deleting task:', err);
       const errMsg = userErrorMessage(err, 'خطا در حذف فعالیت.');
       setPbError(errMsg);
-      alert(errMsg);
+      void appAlert(errMsg);
       loadTasks(false);
     } finally {
       setIsSyncing(false);

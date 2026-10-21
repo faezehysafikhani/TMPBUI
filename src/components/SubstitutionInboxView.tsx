@@ -7,6 +7,7 @@ import { userErrorMessage } from '../utils/errorMessages';
 import {
   SubstitutionInbox, VacantPost, clearActingPost, getSubstitutionInbox, setActingPost,
 } from '../services/orgStructureApi';
+import { appConfirm } from '../utils/appDialog';
 
 const STATUS_TITLES: Record<string, string> = {
   Todo: 'شروع نشده', InProgress: 'در حال انجام', Paused: 'متوقف', Completed: 'تکمیل شده', Cancelled: 'لغو شده',
@@ -128,7 +129,7 @@ export const SubstitutionInboxView: React.FC<{ onChanged?: () => void }> = ({ on
               <SecondaryButton
                 type="button"
                 disabled={!!busy}
-                onClick={() => window.confirm('سرپرستی این پست پایان یابد؟') && act(post, () => clearActingPost(post.postId), 'سرپرستی پایان یافت.')}
+                onClick={async () => await appConfirm('سرپرستی این پست پایان یابد؟') && act(post, () => clearActingPost(post.postId), 'سرپرستی پایان یافت.')}
               >
                 <X className="w-4 h-4" /> پایان سرپرستی
               </SecondaryButton>

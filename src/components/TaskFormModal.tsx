@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { PersianTimeInput } from './PersianTimeInput';
 import { Task, TaskStatus, Priority, Attachment, STATUSES, PRIORITIES, AppColorPalette, User, WorkTeam, WorkTeamMember, RecurringFrequency, RecurringConfig, OccurrenceNth, ProjectCharter, ProjectSubTask, SubTaskImportance, SubTaskProgress, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 import { readFileAsDataUrl } from '../utils/storage';
@@ -37,6 +38,7 @@ import {
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleIdsOf } from '../utils/taskPeople';
 import { getAssignmentLimit, getAssignablePosts, AssignablePosts } from '../services/nexusApi';
+import { appAlert } from '../utils/appDialog';
 
 /** One person the responsible-people picker offers. */
 interface PersonOption {
@@ -398,16 +400,16 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!isAllowedUploadFile(file)) {
-          alert(UPLOAD_TYPE_ERROR_MESSAGE);
+          void appAlert(UPLOAD_TYPE_ERROR_MESSAGE);
           continue;
         }
         if (file.size > MAX_ATTACHMENT_BYTES) {
-          alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
+          void appAlert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           continue;
         }
         // The server refuses empty files, which would fail the whole save later on.
         if (file.size === 0) {
-          alert(`فایل «${file.name}» خالی است و قابل پیوست نیست.`);
+          void appAlert(`فایل «${file.name}» خالی است و قابل پیوست نیست.`);
           continue;
         }
         // Choosing the same file again would upload and store it twice.
@@ -415,7 +417,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
           (att) => att.name === file.name && att.size === file.size
         );
         if (isDuplicate) {
-          alert(`فایل «${file.name}» قبلاً به این فعالیت پیوست شده است.`);
+          void appAlert(`فایل «${file.name}» قبلاً به این فعالیت پیوست شده است.`);
           continue;
         }
         // Read file content as base64
@@ -432,7 +434,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setAttachments((prev) => [...prev, ...newAttachments]);
     } catch (err) {
       console.error('Failed to attach file:', err);
-      alert('خطا در بارگذاری فایل. لطفاً دوباره تلاش کنید.');
+      void appAlert('خطا در بارگذاری فایل. لطفاً دوباره تلاش کنید.');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -1307,11 +1309,11 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                       <span>ساعت شروع برگزاری:</span>
                     </label>
-                    <input
-                      type="time"
+                    <PersianTimeInput
                       value={recurringStartTime}
-                      onChange={(e) => setRecurringStartTime(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-slate-100"
+                      onChange={setRecurringStartTime}
+                      ariaLabel="ساعت شروع برگزاری"
+                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-purple-500 text-slate-800 dark:text-slate-100"
                     />
                   </div>
                   <div>
@@ -1319,11 +1321,11 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       <Clock className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                       <span>ساعت پایان برگزاری:</span>
                     </label>
-                    <input
-                      type="time"
+                    <PersianTimeInput
                       value={recurringEndTime}
-                      onChange={(e) => setRecurringEndTime(e.target.value)}
-                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-slate-100"
+                      onChange={setRecurringEndTime}
+                      ariaLabel="ساعت پایان برگزاری"
+                      className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded-xl focus-within:ring-2 focus-within:ring-purple-500 text-slate-800 dark:text-slate-100"
                     />
                   </div>
                 </div>

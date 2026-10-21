@@ -15,6 +15,7 @@ import { moduleTitle, toggleUserAccess, clearPrerequisiteDenials, clearPrerequis
 import { userErrorMessage } from '../../utils/errorMessages';
 import { LoadingRow } from './orgStructure/orgShared';
 import { OrgPlacementFields, useOrgPlacementData, EMPTY_PLACEMENT_DRAFT, OrgPlacementDraft } from './orgStructure/OrgPlacementFields';
+import { appConfirm } from '../../utils/appDialog';
 
 const PAGE_SIZE = 10;
 const NATIONAL_CODE = /^[0-9]{10}$/;
@@ -73,7 +74,7 @@ export const UsersPanel: React.FC<{
 
   const toggleStatus = async (user: AdminUser) => {
     const enable = !user.isActive;
-    if (!enable && !window.confirm(`حساب «${user.displayName}» غیرفعال شود؟ کاربر بلافاصله از سامانه خارج می‌شود.`)) return;
+    if (!enable && !(await appConfirm(`حساب «${user.displayName}» غیرفعال شود؟ کاربر بلافاصله از سامانه خارج می‌شود.`))) return;
     try {
       await setUserActive(user.id, enable);
       setMessage({ type: 'success', text: `حساب «${user.displayName}» ${enable ? 'فعال' : 'غیرفعال'} شد.` });

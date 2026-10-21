@@ -8,6 +8,7 @@ import { ChartSelection, companyHeadcount, companyPostsOf, headPostOf, positions
 import { PersonAvatar } from './PersonAvatar';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
+import { appAlert } from '../../../utils/appDialog';
 
 const PersonLine: React.FC<{ person: PersonRef | null; empty: string }> = ({ person, empty }) => (
   person ? (
@@ -551,7 +552,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
                 await downloadOrgChartPdf(content.current, `چارت سازمانی ${company.name}`, `org-chart-${day}.pdf`);
               } catch (err) {
                 console.error('Org chart PDF failed:', err);
-                window.alert('دریافت فایل PDF چارت انجام نشد.');
+                void appAlert('دریافت فایل PDF چارت انجام نشد.');
               } finally {
                 setExporting(false);
               }

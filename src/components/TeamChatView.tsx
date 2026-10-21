@@ -46,6 +46,7 @@ import { EmojiButton, VoiceButton, isVoiceName, containsEmoji } from './ChatExtr
 import { ReplyRef, splitReply, withReply } from '../utils/chatReply';
 import { useMyPermissions } from './admin/SystemAdministration';
 import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
+import { appAlert, appConfirm } from '../utils/appDialog';
 
 interface TeamChatViewProps {
   currentUser: User | null;
@@ -168,7 +169,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
   const handleDeleteMessage = async (messageId: string) => {
     const msg = messages.find((m) => m.id === messageId);
     if (!msg || msg.senderId !== currentUser?.id) return;
-    if (!window.confirm('آیا از حذف این پیام اطمینان دارید؟')) return;
+    if (!(await appConfirm('آیا از حذف این پیام اطمینان دارید؟'))) return;
     try {
       await deleteDirectMessagePB(messageId);
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
@@ -547,12 +548,12 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     if (!file) return;
 
     if (!isAllowedUploadFile(file)) {
-      alert(UPLOAD_TYPE_ERROR_MESSAGE);
+      void appAlert(UPLOAD_TYPE_ERROR_MESSAGE);
       return;
     }
 
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      alert(`حجم فایل پیوست بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
+      void appAlert(`حجم فایل پیوست بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
       return;
     }
 

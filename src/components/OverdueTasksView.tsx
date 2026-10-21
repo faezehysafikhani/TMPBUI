@@ -5,6 +5,7 @@ import { parseDateSafely } from '../utils/jalali';
 import { AlertCircle, AlertTriangle, CheckCircle2, Calendar, MessageSquare, Edit2, Trash2, ArrowDownUp } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor } from '../utils/taskPeople';
+import { appAlert } from '../utils/appDialog';
 
 interface OverdueTasksViewProps {
   tasks: Task[];
@@ -108,7 +109,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
             onCompleteItem(item);
           }, 250);
         } else {
-          alert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
+          void appAlert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
           setDragX(0);
         }
       } else {
@@ -473,11 +474,11 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <div className="inline-flex items-center gap-1.5 text-[11px] text-amber-100 bg-black/20 px-2.5 py-1 rounded-xl font-medium border border-white/10">
                 <ArrowDownUp className="w-3.5 h-3.5 shrink-0 text-amber-300" />
-                <span>مرتب‌شده بر اساس **بیشترین تاخیر** و **اولویت بالاتر**</span>
+                <span>مرتب‌شده بر اساس <b>بیشترین تاخیر</b> و <b>اولویت بالاتر</b></span>
               </div>
               <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-100 bg-emerald-900/40 px-2.5 py-1 rounded-xl font-medium border border-emerald-400/20">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
-                <span>با **درگ به سمت چپ**، فعالیت به «خاتمه یافته» تغییر می‌یابد</span>
+                <span>با <b>درگ به سمت چپ</b>، فعالیت به «خاتمه یافته» تغییر می‌یابد</span>
               </div>
             </div>
           </div>

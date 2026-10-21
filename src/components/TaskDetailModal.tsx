@@ -41,6 +41,7 @@ import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { userErrorMessage } from '../utils/errorMessages';
 import { EmojiButton, VoiceButton, isVoiceName, containsEmoji } from './ChatExtras';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
+import { appAlert, appConfirm } from '../utils/appDialog';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -216,11 +217,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!isAllowedUploadFile(file)) {
-          alert(UPLOAD_TYPE_ERROR_MESSAGE);
+          void appAlert(UPLOAD_TYPE_ERROR_MESSAGE);
           continue;
         }
         if (file.size > MAX_ATTACHMENT_BYTES) {
-          alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
+          void appAlert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           continue;
         }
         const dataUrl = await readFileAsDataUrl(file);
@@ -236,7 +237,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       setCommentAttachments((prev) => [...prev, ...newAtts]);
     } catch (err) {
       console.error('Failed to attach file to comment:', err);
-      alert('خطا در بارگذاری فایل. لطفاً مجدداً تلاش کنید.');
+      void appAlert('خطا در بارگذاری فایل. لطفاً مجدداً تلاش کنید.');
     } finally {
       setIsUploadingCommentFiles(false);
       if (commentFileInputRef.current) {
@@ -257,11 +258,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!isAllowedUploadFile(file)) {
-          alert(UPLOAD_TYPE_ERROR_MESSAGE);
+          void appAlert(UPLOAD_TYPE_ERROR_MESSAGE);
           continue;
         }
         if (file.size > MAX_ATTACHMENT_BYTES) {
-          alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
+          void appAlert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           continue;
         }
         const dataUrl = await readFileAsDataUrl(file);
@@ -277,7 +278,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       setEditingCommentAttachments((prev) => [...prev, ...newAtts]);
     } catch (err) {
       console.error('Failed to attach file to edit comment:', err);
-      alert('خطا در بارگذاری فایل. لطفاً مجدداً تلاش کنید.');
+      void appAlert('خطا در بارگذاری فایل. لطفاً مجدداً تلاش کنید.');
     } finally {
       setIsUploadingEditCommentFiles(false);
       if (editCommentFileInputRef.current) {
@@ -329,7 +330,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const previousAttachments = commentsList.find((c) => c.id === commentId)?.attachments || [];
     // Stored on the server when there is one; a failure is reported and the list reloaded.
     updateTaskCommentPB(commentId, editingCommentText.trim(), editingCommentAttachments, previousAttachments).catch((err) => {
-      alert(userErrorMessage(err, 'خطا در ذخیره ویرایش نظر'));
+      void appAlert(userErrorMessage(err, 'خطا در ذخیره ویرایش نظر'));
       fetchCommentsForTaskPB(task.id).then((fresh) => setCommentsList(fresh)).catch(() => {});
     });
     const updatedComments = commentsList.map((c) => {
@@ -351,7 +352,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    if (!window.confirm('آیا از حذف این نظر اطمینان دارید؟')) return;
+    if (!(await appConfirm('آیا از حذف این نظر اطمینان دارید؟'))) return;
     
     // Optimistic removal
     const updatedComments = commentsList.filter((c) => c.id !== commentId);
@@ -1121,7 +1122,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       },
                     ])
                   }
-                  onError={(msg) => alert(msg)}
+                  onError={(msg) => void appAlert(msg)}
                   className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors cursor-pointer shrink-0"
                   iconClassName="w-4 h-4"
                 />

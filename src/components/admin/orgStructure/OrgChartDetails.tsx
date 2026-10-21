@@ -16,6 +16,7 @@ import {
 import { UserPicker } from './orgShared';
 import { ChartSelection, companyHeadcount, companyPostsOf, findMember, findPosition, findUnit, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
+import { appConfirm, appPrompt } from '../../../utils/appDialog';
 
 type Dialog =
   | { kind: 'editCompany'; company: ChartCompany }
@@ -117,10 +118,15 @@ async function addToPosition(userId: string, company: ChartCompany, unit: ChartU
   const current = await getAssignment(userId);
   const held = current?.positions?.map((p) => p.unitPositionId) || [];
   if (held.includes(position.unitPositionId)) return;
+  // Someone with no post left where they are placed moves with this post: its deputy (or company)
+  // becomes their place and its position their main one, so their manager follows. Someone who
+  // still holds a post where they are stays there, with this post as an extra one.
+  const holdsPostWhereTheyAre = !!current && (current.positions || []).some((p) => p.unitId === current.unitId);
+  const moves = !current || !holdsPostWhereTheyAre;
   await setAssignment(userId, {
-    companyId: current?.companyId ?? company.companyId,
-    unitId: current ? current.unitId : unit?.unitId ?? null,
-    positionId: current ? current.positionId : position.positionId,
+    companyId: moves ? company.companyId : current!.companyId,
+    unitId: moves ? unit?.unitId ?? null : current!.unitId,
+    positionId: moves ? position.positionId : current!.positionId,
     managerUserId: current?.explicitManagerUserId ?? null,
     unitPositionIds: [...held, position.unitPositionId],
   });
@@ -275,7 +281,7 @@ export const OrgChartDetails: React.FC<{
                     <button
                       type="button"
                       disabled={busy || pos.holders.length > 0}
-                      onClick={() => window.confirm(`سمت «${pos.title}» از معاونت «${unit.name}» حذف شود؟`)
+                      onClick={async () => await appConfirm(`سمت «${pos.title}» از معاونت «${unit.name}» حذف شود؟`)
                         && run(() => removeUnitPosition(pos.unitPositionId), 'سمت از معاونت حذف شد.', 'حذف سمت انجام نشد.')}
                       className="p-1 rounded-lg text-slate-400 hover:text-rose-600 disabled:opacity-30 cursor-pointer"
                       title={pos.holders.length > 0 ? 'سمتی که کسی در آن هست حذف نمی‌شود' : 'حذف سمت از معاونت'}
@@ -298,7 +304,7 @@ export const OrgChartDetails: React.FC<{
                 tone="rose"
                 label="جدا کردن از شرکت"
                 disabled={busy || unitHeadcount(unit) > 0}
-                onClick={() => window.confirm(`معاونت «${unit.name}» از شرکت «${company.name}» جدا شود؟`)
+                onClick={async () => await appConfirm(`معاونت «${unit.name}» از شرکت «${company.name}» جدا شود؟`)
                   && run(async () => {
                     await unlinkUnit(unit.unitId);
                     onSelect({ kind: 'company', companyId: company.companyId });
@@ -335,8 +341,8 @@ export const OrgChartDetails: React.FC<{
       const parentPost = samePlace.find((p) => p.unitPositionId === position.parentPostId);
       const children = samePlace.filter((p) => p.parentPostId === position.unitPositionId);
       const holderLabel = (p: ChartPosition) => (p.holders.length ? p.holders.map((h) => h.displayName).join('، ') : 'خالی');
-      const changeCode = () => {
-        const code = window.prompt(`کد جدید پست «${position.title}» (در این شرکت یکتا):`, position.code || '');
+      const changeCode = async () => {
+        const code = await appPrompt(`کد جدید پست «${position.title}» (در این شرکت یکتا):`, position.code || '');
         if (code && code.trim() && code.trim() !== position.code) {
           run(() => updateUnitPositionCode(position.unitPositionId, code.trim()), 'کد پست تغییر کرد.', 'تغییر کد پست انجام نشد.');
         }
@@ -401,7 +407,7 @@ export const OrgChartDetails: React.FC<{
               empty="این سمت خالی است."
               removeLabel="برداشتن از این سمت"
               onRemove={can(P.manageAssignments)
-                ? (m) => window.confirm(`«${m.displayName}» از سمت «${position.title}» برداشته شود؟`)
+                ? async (m) => await appConfirm(`«${m.displayName}» از سمت «${position.title}» برداشته شود؟`)
                   && run(() => removeFromPosition(m.userId, position.unitPositionId), `«${m.displayName}» از سمت برداشته شد.`, 'برداشتن از سمت انجام نشد.')
                 : undefined}
             />
@@ -414,7 +420,7 @@ export const OrgChartDetails: React.FC<{
                 tone="rose"
                 label="حذف پست"
                 disabled={busy || position.holders.length > 0 || children.length > 0}
-                onClick={() => window.confirm(`پست «${postLabel(position)}» از «${placeName}» حذف شود؟`)
+                onClick={async () => await appConfirm(`پست «${postLabel(position)}» از «${placeName}» حذف شود؟`)
                   && run(async () => {
                     await removeUnitPosition(position.unitPositionId);
                     onSelect(unit ? { kind: 'unit', companyId: company.companyId, unitId: unit.unitId } : { kind: 'company', companyId: company.companyId });
@@ -717,8 +723,11 @@ const ChartDialog: React.FC<{
       const companyId = findUnit(chart, unitId)?.company.companyId || '';
       const perCompany = positions.some((p) => p.companyIds !== undefined);
       const ofCompany = perCompany ? positionsForCompany(positions, companyId) : positions;
-      const taken = new Set(positionsOf(dialog.unit).map((p) => p.positionId));
-      const free = ofCompany.filter((p) => p.isActive && !taken.has(p.id));
+      // A position may have several posts in a deputy (three «کارشناس»), so ones already here are
+      // offered again. The head's position (no superior) is the company's, never a deputy's.
+      const postsHere = new Map<string, number>();
+      positionsOf(dialog.unit).forEach((p) => postsHere.set(p.positionId, (postsHere.get(p.positionId) || 0) + 1));
+      const free = ofCompany.filter((p) => p.isActive && (!perCompany || !!p.parentPositionId));
       // A new position goes under the chosen superior: by default the deputy's first position, else the company's head's.
       const head = ofCompany.find((p) => !p.parentPositionId);
       const defaultParent = positionsOf(dialog.unit)[0]?.positionId || head?.id || '';
@@ -738,7 +747,11 @@ const ChartDialog: React.FC<{
           <Field label="سمت از فهرست سمت‌ها">
             <select className={inputClass} value={positionId} onChange={(e) => { setPositionId(e.target.value); if (e.target.value) setNewTitle(''); }}>
               <option value="">— انتخاب کنید —</option>
-              {free.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+              {free.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}{postsHere.get(p.id) ? ` (${toPersianDigits(postsHere.get(p.id)!)} پست در این معاونت)` : ''}
+                </option>
+              ))}
             </select>
           </Field>
           <Field label="یا عنوان سمت جدید">
@@ -781,7 +794,7 @@ const ChartDialog: React.FC<{
           personId={personId}
           personName={personName}
           onChange={(id, n) => { setPersonId(id); setPersonName(n); }}
-          hint={`پست‌های دیگرش حفظ می‌شود. اگر هنوز جایگاهی ندارد، در «${unit ? unit.name : company.name}» قرار می‌گیرد.`}
+          hint={`پست‌های دیگرش حفظ می‌شود. اگر در جایگاه فعلی‌اش پستی ندارد (یا هنوز جایگاهی ندارد)، جایگاهش به «${unit ? unit.name : company.name}» منتقل می‌شود.`}
         />
       );
       break;

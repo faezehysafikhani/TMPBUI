@@ -29,6 +29,7 @@ import {
   updatePersonalNotePB,
   deletePersonalNotePB,
 } from '../services/dataService';
+import { appAlert, appConfirm } from '../utils/appDialog';
 
 interface PersonalNotesViewProps {
   currentUser: User | null;
@@ -167,11 +168,11 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (!isAllowedUploadFile(file)) {
-        alert(UPLOAD_TYPE_ERROR_MESSAGE);
+        void appAlert(UPLOAD_TYPE_ERROR_MESSAGE);
         continue;
       }
       if (file.size > MAX_ATTACHMENT_BYTES) {
-        alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
+        void appAlert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
         continue;
       }
       try {
@@ -234,7 +235,7 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
   // Delete Note
   const handleDeleteNote = async (id: string) => {
     if (!currentUser) return;
-    if (!window.confirm('آیا از حذف این یادداشت شخصی مطمئن هستید؟')) return;
+    if (!(await appConfirm('آیا از حذف این یادداشت شخصی مطمئن هستید؟'))) return;
 
     await deletePersonalNotePB(id, currentUser.id);
     setNotes((prev) => prev.filter((n) => n.id !== id));
@@ -332,9 +333,11 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
       ) : filteredNotes.length === 0 ? (
         <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-12 text-center border border-slate-200 dark:border-slate-700 space-y-3">
           <Sparkles className="w-12 h-12 text-amber-400 mx-auto opacity-70" />
-          <h3 className="font-bold text-base text-slate-800 dark:text-slate-100">هیچ یادداشتی یافت نشد</h3>
+          <h3 className="font-bold text-base text-slate-800 dark:text-slate-100">{searchQuery.trim() ? 'یادداشتی با این جستجو پیدا نشد' : 'هیچ یادداشتی یافت نشد'}</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-            اولین یادداشت شخصی، ایده یا چک‌لیست خود را ثبت نمایید.
+            {searchQuery.trim()
+              ? 'عبارت دیگری را جستجو کنید یا جستجو را پاک کنید.'
+              : 'اولین یادداشت شخصی، ایده یا چک‌لیست خود را ثبت نمایید.'}
           </p>
           <button
             type="button"

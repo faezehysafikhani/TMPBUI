@@ -2409,6 +2409,11 @@ export async function addTaskActivityEntry(taskId: string, action: string, detai
 
 const taskChangeListeners = new Set<() => void>();
 let taskHub: HubConnection | null = null;
+/** Whose connection taskHub is: never reused for someone else signing in. */
+let taskHubUserId: string | null = null;
+let taskHubStopTimer: ReturnType<typeof setTimeout> | null = null;
+let taskHubRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let taskHubRetryDelay = 15_000;
 let changeTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function hubAccessToken(): Promise<string> {
@@ -2435,28 +2440,81 @@ function notifyTaskChange(): void {
  * in the tenant - whenever tasks change.
  */
 export function subscribeToTaskChanges(onChange: () => void): () => void {
-  if (!readSession()) return () => {};
+  const session = readSession();
+  if (!session) return () => {};
 
   taskChangeListeners.add(onChange);
-  if (!taskHub) {
-    const hub = new HubConnectionBuilder()
-      // The token travels as access_token; no cookies are needed. With credentials the browser's
-      // negotiate request is refused by the API's CORS policy and live updates never connect.
-      .withUrl(`${NEXUS_SIGNALR_BASE_URL}/hubs/task-management`, { accessTokenFactory: hubAccessToken, withCredentials: false })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
-      .build();
-    hub.on('TasksChanged', notifyTaskChange);
-    taskHub = hub;
-    hub.start().catch((err) => console.warn('Live task updates are unavailable:', err instanceof Error ? err.message : err));
+  // A stop asked for a moment ago (the screen re-subscribing) is called off - for the same user only.
+  if (taskHubStopTimer) {
+    clearTimeout(taskHubStopTimer);
+    taskHubStopTimer = null;
   }
+  if (taskHub && taskHubUserId !== session.user.id) stopTaskHub();
+  if (!taskHub) startTaskHub(session.user.id);
 
   return () => {
     taskChangeListeners.delete(onChange);
-    if (taskChangeListeners.size === 0 && taskHub) {
-      const hub = taskHub;
-      taskHub = null;
-      hub.stop().catch(() => undefined);
+    if (taskChangeListeners.size === 0 && taskHub && !taskHubStopTimer) {
+      // Stopping while the connection is still being negotiated logs an error and wastes it when
+      // the screen subscribes again right away (re-render, StrictMode), so the stop waits a moment.
+      taskHubStopTimer = setTimeout(() => {
+        taskHubStopTimer = null;
+        if (taskChangeListeners.size === 0) stopTaskHub();
+      }, 1_500);
     }
   };
+}
+
+function startTaskHub(userId: string): void {
+  const hub = new HubConnectionBuilder()
+    // The token travels as access_token; no cookies are needed. With credentials the browser's
+    // negotiate request is refused by the API's CORS policy and live updates never connect.
+    .withUrl(`${NEXUS_SIGNALR_BASE_URL}/hubs/task-management`, { accessTokenFactory: hubAccessToken, withCredentials: false })
+    .withAutomaticReconnect()
+    // The library's own console errors (a dropped or refused connection) are expected and handled
+    // here: one warning, then a retry while anyone is still listening.
+    .configureLogging(LogLevel.None)
+    .build();
+  hub.on('TasksChanged', notifyTaskChange);
+  hub.onreconnected(() => {
+    taskHubRetryDelay = 15_000;
+    notifyTaskChange(); // changes made while disconnected
+  });
+  hub.onclose(() => {
+    // Automatic reconnecting gave up (or the server closed it): try again later, while needed.
+    if (taskHub === hub && taskChangeListeners.size > 0) scheduleTaskHubRetry(hub);
+  });
+  taskHub = hub;
+  taskHubUserId = userId;
+  hub.start()
+    .then(() => { taskHubRetryDelay = 15_000; })
+    .catch((err) => {
+      console.warn('Live task updates are unavailable for now; retrying.', err instanceof Error ? err.message : err);
+      if (taskHub === hub) scheduleTaskHubRetry(hub);
+    });
+}
+
+function scheduleTaskHubRetry(hub: HubConnection): void {
+  if (taskHubRetryTimer) return;
+  taskHubRetryTimer = setTimeout(() => {
+    taskHubRetryTimer = null;
+    if (taskHub !== hub || taskChangeListeners.size === 0) return;
+    const session = readSession();
+    if (!session) return;
+    taskHub = null;
+    startTaskHub(session.user.id);
+    notifyTaskChange(); // catch up on what changed meanwhile
+  }, taskHubRetryDelay);
+  taskHubRetryDelay = Math.min(taskHubRetryDelay * 2, 120_000);
+}
+
+function stopTaskHub(): void {
+  const hub = taskHub;
+  taskHub = null;
+  taskHubUserId = null;
+  if (taskHubRetryTimer) {
+    clearTimeout(taskHubRetryTimer);
+    taskHubRetryTimer = null;
+  }
+  hub?.stop().catch(() => undefined);
 }
