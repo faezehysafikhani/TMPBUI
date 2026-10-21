@@ -42,7 +42,7 @@ import {
 } from '../services/dataService';
 import { userErrorMessage } from '../utils/errorMessages';
 import { canSeeWorkTeams } from '../utils/permissions';
-import { EmojiButton, VoiceButton, isVoiceName } from './ChatExtras';
+import { EmojiButton, VoiceButton, isVoiceName, containsEmoji } from './ChatExtras';
 import { ReplyRef, splitReply, withReply } from '../utils/chatReply';
 import { useMyPermissions } from './admin/SystemAdministration';
 import { isAllowedUploadFile, UPLOAD_TYPE_ERROR_MESSAGE, ALLOWED_UPLOAD_ACCEPT } from '../utils/uploadPolicy';
@@ -960,7 +960,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                               >
                                 <CornerUpLeft className="w-3.5 h-3.5 shrink-0" />
                               </button>
-                              {onConvertToTask && !isVoiceName(msg.attachmentName) && (
+                              {onConvertToTask && !isVoiceName(msg.attachmentName) && !containsEmoji(splitReply(msg.text).body) && (
                                 <button
                                   type="button"
                                   onClick={() => {

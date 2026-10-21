@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { userErrorMessage } from '../utils/errorMessages';
-import { EmojiButton, VoiceButton, isVoiceName } from './ChatExtras';
+import { EmojiButton, VoiceButton, isVoiceName, containsEmoji } from './ChatExtras';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
 
 interface TaskDetailModalProps {
@@ -940,7 +940,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       {/* Actions Footer for Comments */}
                       {!isEditingThis && (
                         <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-700/50 text-[11px]">
-                          {onConvertToTask && !cmt.attachments?.some((att) => isVoiceName(att.name)) && (
+                          {onConvertToTask && !cmt.attachments?.some((att) => isVoiceName(att.name)) && !containsEmoji(cmt.text) && (
                             <button
                               type="button"
                               onClick={() => {

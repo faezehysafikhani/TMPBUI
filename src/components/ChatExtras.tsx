@@ -15,6 +15,9 @@ export const CHAT_EMOJIS = [
 
 const VOICE_NAME = /^voice-.*\.(webm|ogg|m4a|mp4|wav|mp3)$/i;
 
+/** True when the text holds any emoji (pictographs, flags, keycaps); such messages cannot become a task. */
+export const containsEmoji = (text?: string) => !!text && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(text);
+
 /** A voice message is an audio recording made in the app; it cannot become a task. */
 export const isVoiceName = (name?: string) => !!name && VOICE_NAME.test(name);
 
