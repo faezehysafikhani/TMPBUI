@@ -841,7 +841,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                         مسئولین زیرفعالیت: <span className="text-rose-500">*</span>
                       </label>
                       <PeoplePicker
-                        people={allRegisteredUsers}
+                        people={allRegisteredUsers.filter((u) => !allowedIds || allowedIds.has(u.id) || newSubTaskAssigneeIds.includes(u.id))}
                         selectedIds={newSubTaskAssigneeIds}
                         onToggle={(id) => setNewSubTaskAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
                       />
@@ -966,7 +966,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                               <div>
                                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">مسئولین زیرفعالیت</label>
                                 <PeoplePicker
-                                  people={allRegisteredUsers}
+                                  people={allRegisteredUsers.filter((u) => !allowedIds || allowedIds.has(u.id) || (st.assignees || []).some((a) => a.id === u.id))}
                                   selectedIds={(st.assignees || []).map((a) => a.id)}
                                   onToggle={(id) => handleToggleProjectSubTaskAssignee(st.id, id)}
                                 />
