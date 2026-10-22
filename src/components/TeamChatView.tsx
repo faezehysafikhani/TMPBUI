@@ -138,6 +138,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>('');
   const [replyTo, setReplyTo] = useState<ReplyRef | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const handleStartEdit = (msg: DirectMessage) => {
     setEditingMessageId(msg.id);
@@ -849,7 +850,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                         )}
                         <div
                           data-msg-id={msg.id}
-                          className={`max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-2xs space-y-1.5 ${
+                          className={`group/msg max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-2xs space-y-1.5 ${
                             isMine
                               ? `${palette.accentBg} text-white rounded-br-md`
                               : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700/80 rounded-bl-md'
@@ -908,7 +909,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => document.querySelector(`[data-msg-id="${reply.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}
-                                      className={`block w-full text-right border-r-2 pr-2 py-0.5 rounded-sm text-[11px] cursor-pointer ${
+                                      className={`block w-full min-w-[140px] text-right border-r-2 pr-2 py-0.5 rounded-sm text-[11px] cursor-pointer ${
                                         isMine ? 'border-white/60 bg-white/10 text-white/90' : 'border-indigo-400 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300'
                                       }`}
                                     >
@@ -916,7 +917,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                       <span className="block truncate">{reply.snippet}</span>
                                     </button>
                                   )}
-                                  {body && <p className="whitespace-pre-wrap break-words" dir="auto">{body}</p>}
+                                  {body && <p className="whitespace-pre-wrap break-words text-right" dir="rtl">{body}</p>}
                                 </>
                               );
                             })()
@@ -941,7 +942,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
                           {/* Footer: actions and time */}
                           <div className={`flex items-center justify-between gap-2 text-[10px] ${isMine ? 'text-white/80' : 'text-slate-400'}`}>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 focus-within:opacity-100">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -951,6 +952,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                     name: senderName,
                                     snippet: isVoiceName(msg.attachmentName) ? '🎤 پیام صوتی' : plain || msg.attachmentName || 'پیوست',
                                   });
+                                  composerRef.current?.focus();
                                 }}
                                 className={`p-1 rounded-md transition-colors cursor-pointer ${
                                   isMine
@@ -1084,6 +1086,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
               />
 
               <textarea
+                ref={composerRef}
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyDown={(e) => {
@@ -1094,7 +1097,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                   }
                 }}
                 rows={1}
-                dir="auto"
+                dir="rtl"
                 aria-label="متن پیام"
                 placeholder={isGroup ? `پیام به تیم ${conversationTitle}...` : `پیام به ${conversationTitle}...`}
                 className="flex-1 min-w-0 resize-none max-h-32 bg-slate-100 dark:bg-slate-900 text-xs sm:text-sm text-slate-900 dark:text-slate-100 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"

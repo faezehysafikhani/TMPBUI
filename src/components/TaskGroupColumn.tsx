@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Minus } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Task, TaskStatus, Attachment, User } from '../types';
 import { TaskCardList } from './TaskCardList';
 import { toPersianDigits } from '../utils/helpers';
@@ -35,8 +35,8 @@ const TaskGroupColumnBase: React.FC<TaskGroupColumnProps> = ({
   onOpenProjectDetails,
   onToggleSubTask,
 }) => {
-  // Collapsed by default, like the Kanban columns.
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
+  // A group holding cards starts open; an empty one starts closed.
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(group.tasks.length === 0);
   const tone = GROUP_TONES[group.tone];
 
   return (
@@ -61,7 +61,7 @@ const TaskGroupColumnBase: React.FC<TaskGroupColumnProps> = ({
             }`}
             title={isCollapsed ? 'باز کردن گروه‌بندی' : 'بستن گروه‌بندی'}
           >
-            {isCollapsed ? <Plus className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+            <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
           </button>
           <div className="min-w-0">
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={group.title}>{group.title}</h2>

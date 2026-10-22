@@ -315,7 +315,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
           {overdue && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 animate-pulse">
               <AlertCircle className="w-2.5 h-2.5" />
-              عقب افتاده
+              موعد گذشته
             </span>
           )}
 

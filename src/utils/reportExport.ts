@@ -2,6 +2,7 @@
 // spreadsheet library, nothing fetched), and a PDF made from the printable pages
 // (ReportPrintPages) with html2canvas + jsPDF, so Persian text keeps the app's own font and shaping.
 import { zipSync, strToU8 } from 'fflate';
+import { showToast } from './toast';
 import { getCurrentJalali } from './jalali';
 
 /** One sheet: header row (bold), then rows; the sheet reads right to left. */
@@ -42,6 +43,7 @@ export function saveBlob(blob: Blob, fileName: string): void {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  showToast(`فایل «${fileName}» آماده شد و دانلود شروع شد`, 'ok');
 }
 
 /**

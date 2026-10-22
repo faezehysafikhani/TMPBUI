@@ -9,6 +9,7 @@ import { BoardViewBar } from './components/BoardViewBar';
 import { BoardViewSettings, loadBoardView, saveBoardView } from './utils/boardView';
 import { KanbanBoard } from './components/KanbanBoard';
 import { SandwichBar, ActiveTab } from './components/SandwichBar';
+import ToastHost from './components/ToastHost';
 import { DesktopSidebar } from './components/DesktopSidebar';
 import type { ThemeMode } from './components/SettingsModal';
 
@@ -79,6 +80,17 @@ import { userErrorMessage } from './utils/errorMessages';
 import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
 import { appAlert, appConfirm } from './utils/appDialog';
 
+const PAGE_TITLES: Record<string, string> = {
+  kanban: 'بورد کانبان',
+  calendar: 'نمای تقویم',
+  overdue: 'موعد گذشته',
+  chat: 'گفتگوی تیمی',
+  notes: 'یادداشت‌های شخصی',
+  reports: 'گزارش فعالیت‌ها',
+  substitution: 'کارتابل جانشینی',
+  settings: 'تنظیمات و پروفایل',
+};
+
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -114,7 +126,18 @@ export default function App() {
 
   // Modals - Automatically open auth modal on startup if not logged in
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => !getCurrentUser());
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(() => !!getCurrentUser());
+  // The welcome summary shows once a day; the navbar button can still open it again.
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(() => {
+    if (!getCurrentUser()) return false;
+    const key = `tm_welcome_${new Date().toLocaleDateString('en-CA')}`;
+    try {
+      if (localStorage.getItem(key) === '1') return false;
+      localStorage.setItem(key, '1');
+    } catch {
+      // Storage blocked: show it as before.
+    }
+    return true;
+  });
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState<boolean>(false);
 
@@ -996,7 +1019,7 @@ export default function App() {
     const applyAppBadge = async () => {
       // 1. Document Title Badge
       if (typeof document !== 'undefined') {
-        const baseTitle = 'مدیریت وظایف (TM)';
+        const baseTitle = `${PAGE_TITLES[activeTab] || 'بورد کانبان'} · مدیریت وظایف`;
         if (totalBadgeCount > 0) {
           document.title = `(${toPersianDigits(totalBadgeCount)}) ${baseTitle}`;
         } else {
@@ -1033,7 +1056,7 @@ export default function App() {
     };
 
     applyAppBadge();
-  }, [totalBadgeCount]);
+  }, [totalBadgeCount, activeTab]);
 
   // Request notification permission on first user interaction if default (Required on iOS 16.4+ for PWA Home Screen Badges)
   useEffect(() => {
@@ -1197,7 +1220,7 @@ export default function App() {
 
   return (
     <TaskTitleContext.Provider value={taskTitleById}>
-    <div className={`min-h-screen bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans pb-24 lg:pb-0 transition-colors duration-200`}>
+    <div className={`min-h-dvh bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}>
       
       {/* Startup Summary Welcome Modal (Priority 1 Overlay) */}
       {isWelcomeModalOpen && (
@@ -1256,7 +1279,7 @@ export default function App() {
       )}
 
       {/* Main Container with Right Desktop Sidebar */}
-      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 sm:pt-6 lg:pt-4 pb-24 lg:pb-4">
+      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 pb-4">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           
           {/* Desktop Sidebar (Renders on Right Side in RTL) */}
@@ -1290,6 +1313,13 @@ export default function App() {
               <div className="space-y-1 text-xs">
                 <h4 className="font-bold text-sm text-amber-800 dark:text-amber-300">خطا در انجام عملیات</h4>
                 <p className="leading-relaxed">{pbError}</p>
+                <button
+                  type="button"
+                  onClick={() => { setPbError(null); loadTasks(true); }}
+                  className="mt-1 px-3 py-1 rounded-lg border border-amber-400 bg-white dark:bg-amber-950 text-amber-800 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900 cursor-pointer"
+                >
+                  تلاش دوباره
+                </button>
               </div>
             </div>
           </div>
@@ -1449,7 +1479,7 @@ export default function App() {
           pages the flex-1 main container above pushes it to the bottom of the screen. While the
           fixed desktop sidebar is open, it sits in the main column (sidebar 12rem + gap 1.5rem +
           page padding 0.75rem) so the sidebar never covers it. */}
-      <footer className={`w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-6 pb-4 lg:pt-3 lg:pb-3 ${isDesktopSidebarOpen ? 'lg:pr-[14.25rem]' : ''}`}>
+      <footer className={`w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-6 pb-24 lg:pt-3 lg:pb-3 ${isDesktopSidebarOpen ? 'lg:pr-[14.25rem]' : ''}`}>
         <div className="ui-bar bg-slate-900 text-white rounded-2xl p-4 lg:py-3 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
           <span className="font-bold tracking-tight text-white/95">
             تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
@@ -1457,6 +1487,7 @@ export default function App() {
         </div>
       </footer>
 
+      <ToastHost />
       <Suspense fallback={null}>
         {/* Form Modal for Add/Edit Task */}
         {isFormModalOpen && (

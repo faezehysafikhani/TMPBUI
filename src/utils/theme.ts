@@ -50,6 +50,48 @@ export const PATTERN_THEMES: Record<AppTheme, PatternConfig> = {
     patternClass: 'bg-pattern-waves',
     cardPatternClass: 'bg-pattern-waves bg-white/90 dark:bg-slate-800/90',
   },
+  glass: {
+    id: 'glass',
+    name: 'شیشه‌ای',
+    patternClass: 'bg-pattern-glass',
+    cardPatternClass: 'bg-white/90 dark:bg-slate-800/90',
+  },
+  bubbles: {
+    id: 'bubbles',
+    name: 'حبابی',
+    patternClass: 'bg-pattern-bubbles',
+    cardPatternClass: 'bg-white/90 dark:bg-slate-800/90',
+  },
+  rain: {
+    id: 'rain',
+    name: 'بارانی',
+    patternClass: 'bg-pattern-rain',
+    cardPatternClass: 'bg-white/90 dark:bg-slate-800/90',
+  },
+  dandelion: {
+    id: 'dandelion',
+    name: 'قاصدکی',
+    patternClass: 'bg-pattern-dandelion',
+    cardPatternClass: 'bg-white/90 dark:bg-slate-800/90',
+  },
+  snow: {
+    id: 'snow',
+    name: 'برفی',
+    patternClass: 'bg-pattern-snow',
+    cardPatternClass: 'bg-white/90 dark:bg-slate-800/90',
+  },
+  autumn: {
+    id: 'autumn',
+    name: 'برگی پاییزی',
+    patternClass: 'bg-pattern-autumn',
+    cardPatternClass: 'bg-white/90 dark:bg-slate-800/90',
+  },
+  spring: {
+    id: 'spring',
+    name: 'بهاری',
+    patternClass: 'bg-pattern-spring',
+    cardPatternClass: 'bg-white/90 dark:bg-slate-800/90',
+  },
 };
 
 export interface ColorPaletteConfig {

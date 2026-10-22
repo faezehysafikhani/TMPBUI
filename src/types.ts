@@ -22,7 +22,7 @@ export type TaskStatus = 'todo' | 'in_progress' | 'paused' | 'completed';
 
 export type Priority = 'low' | 'medium' | 'high';
 
-export type AppTheme = 'default' | 'checkerboard' | 'diagonal' | 'grid' | 'dots' | 'cross' | 'waves';
+export type AppTheme = 'default' | 'checkerboard' | 'diagonal' | 'grid' | 'dots' | 'cross' | 'waves' | 'glass' | 'bubbles' | 'rain' | 'dandelion' | 'snow' | 'autumn' | 'spring';
 
 export type AppColorPalette = 'indigo' | 'emerald' | 'rose' | 'amber' | 'cyan' | 'slate';
 

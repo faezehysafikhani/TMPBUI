@@ -65,7 +65,7 @@ export const EmojiButton: React.FC<EmojiButtonProps> = ({ onPick, className = ''
         <Smile className={iconClassName} />
       </button>
       {open && (
-        <div className="absolute bottom-full mb-2 right-0 z-40 w-72 max-h-60 overflow-y-auto p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
+        <div data-emoji-picker className="absolute bottom-full mb-2 right-0 z-40 w-72 max-h-60 overflow-y-auto p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
           <p className="text-xs font-bold text-slate-700 dark:text-slate-200 mb-2">انتخاب ایموجی</p>
           <div className="grid grid-cols-8 gap-1 justify-items-center">
             {CHAT_EMOJIS.map((emoji) => (

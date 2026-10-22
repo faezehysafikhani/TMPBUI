@@ -50,7 +50,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           <div className="relative flex flex-col items-center">
             
             {/* Speed Dial Menu Stack - Anchored directly above the Card View icon */}
-            <div className="absolute bottom-full mb-6 flex flex-col items-center gap-2.5 z-50">
+            <div data-more-fab className="absolute bottom-full mb-6 flex flex-col items-center gap-2.5 z-50">
               
               {/* Floating action icons (stacked vertically above the trigger) */}
               {isToolsMenuOpen && (
@@ -77,6 +77,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                         {toPersianDigits(unreadChatCount)}
                       </span>
                     )}
+                  
+                    <span className="absolute right-full mr-2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg pointer-events-none">گفتگوی تیمی</span>
                   </button>
 
                   {/* 2. Personal Notes Icon Button */}
@@ -87,7 +89,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                       setIsToolsMenuOpen(false);
                       setActiveTab('notes');
                     }}
-                    className={`w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-150 ${
+                    className={`relative w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-150 ${
                       activeTab === 'notes'
                         ? 'bg-emerald-600 text-white ring-2 ring-emerald-400'
                         : 'bg-slate-800 hover:bg-slate-700 text-emerald-400'
@@ -96,6 +98,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                     aria-label="یادداشت‌های شخصی"
                   >
                     <FileText className="w-5.5 h-5.5" />
+                  
+                    <span className="absolute right-full mr-2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg pointer-events-none">یادداشت‌های شخصی</span>
                   </button>
                   )}
 
@@ -107,7 +111,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                       setIsToolsMenuOpen(false);
                       setActiveTab('reports');
                     }}
-                    className={`w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-100 ${
+                    className={`relative w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-100 ${
                       activeTab === 'reports'
                         ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
                         : 'bg-slate-800 hover:bg-slate-700 text-sky-400'
@@ -116,6 +120,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                     aria-label="گزارش فعالیت‌ها"
                   >
                     <BarChart3 className="w-5.5 h-5.5" />
+                  
+                    <span className="absolute right-full mr-2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg pointer-events-none">گزارش فعالیت‌ها</span>
                   </button>
                   )}
 
@@ -127,7 +133,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                       setIsToolsMenuOpen(false);
                       setActiveTab('substitution');
                     }}
-                    className={`w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-100 ${
+                    className={`relative w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-100 ${
                       activeTab === 'substitution'
                         ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
                         : 'bg-slate-800 hover:bg-slate-700 text-amber-400'
@@ -136,6 +142,8 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                     aria-label="کارتابل جانشینی"
                   >
                     <UserCog className="w-5.5 h-5.5" />
+                  
+                    <span className="absolute right-full mr-2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg pointer-events-none">کارتابل جانشینی</span>
                   </button>
                   )}
 
@@ -173,7 +181,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('kanban')}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all cursor-pointer ${
+              className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-2xl sm:rounded-full transition-all cursor-pointer ${
                 activeTab === 'kanban'
                   ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
                   : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
@@ -181,7 +189,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
               title="بورد کانبان (نمای کارت)"
             >
               <Kanban className="w-7 h-7 shrink-0" />
-              <span className="text-xs hidden sm:inline">کانبان</span>
+              <span className="text-[11px] sm:text-xs leading-none whitespace-nowrap">کانبان</span>
             </button>
             )}
           </div>
@@ -191,7 +199,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('calendar')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all cursor-pointer ${
+            className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-2xl sm:rounded-full transition-all cursor-pointer ${
               activeTab === 'calendar'
                 ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
                 : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
@@ -199,7 +207,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
             title="نمای تقویم"
           >
             <Calendar className="w-7 h-7 shrink-0" />
-            <span className="text-xs hidden sm:inline">تقویم</span>
+            <span className="text-[11px] sm:text-xs leading-none whitespace-nowrap">تقویم</span>
           </button>
           )}
 
@@ -221,7 +229,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('overdue')}
-            className={`relative flex items-center gap-1.5 px-3 py-2 rounded-full transition-all cursor-pointer ${
+            className={`relative flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-2xl sm:rounded-full transition-all cursor-pointer ${
               activeTab === 'overdue'
                 ? 'bg-rose-600 text-white font-bold shadow-md shadow-rose-950 ring-2 ring-white/20'
                 : 'text-slate-400 hover:text-rose-400 hover:bg-rose-950/40'
@@ -229,7 +237,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
             title="فعالیت‌های از موعد گذشته"
           >
             <AlertCircle className="w-7 h-7 shrink-0" />
-            <span className="text-xs hidden sm:inline">موعد گذشته</span>
+            <span className="text-[11px] sm:text-xs leading-none whitespace-nowrap">موعد گذشته</span>
             {overdueCount > 0 && (
               <span
                 className={`absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold border ${
@@ -248,7 +256,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
           <button
             type="button"
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-full transition-all cursor-pointer ${
+            className={`flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-2xl sm:rounded-full transition-all cursor-pointer ${
               activeTab === 'settings'
                 ? `${palette.accentBg} text-white font-bold shadow-md shadow-slate-950 ring-2 ring-white/20`
                 : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/80'
@@ -256,7 +264,7 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
             title="تنظیمات و پروفایل"
           >
             <Settings className="w-7 h-7 shrink-0" />
-            <span className="text-xs hidden sm:inline">تنظیمات</span>
+            <span className="text-[11px] sm:text-xs leading-none whitespace-nowrap">تنظیمات</span>
           </button>
 
         </div>
