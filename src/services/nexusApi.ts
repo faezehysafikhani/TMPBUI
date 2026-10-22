@@ -2106,7 +2106,11 @@ export async function getTaskReminderSettings(): Promise<TaskReminderSettings | 
 }
 
 /** Whom the signed-in user may not make responsible for a task. */
-export interface AssignmentLimit { limited: boolean; blockedUserIds: string[] }
+/**
+ * limited: by level (own level and below). allowedUserIds: where everyone is kept to their own
+ * company, the only people one may choose (null/absent: not kept).
+ */
+export interface AssignmentLimit { limited: boolean; blockedUserIds: string[]; allowedUserIds?: string[] | null }
 
 /** Null on a server that does not limit it (an older version). The server checks again on saving. */
 /** Where tasks are given to posts: the posts to choose from. enabled false (or null): give them to people. */

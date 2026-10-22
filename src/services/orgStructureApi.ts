@@ -286,7 +286,19 @@ export const removeAssignment = (userId: string) => apiRequest<void>('DELETE', `
 export const getSubordinatesOf = (userId: string, all: boolean) =>
   apiRequest<Subordinate[]>('GET', `${BASE}/users/${userId}/subordinates`, { query: { all } });
 
-export const listOrgUnits = () => apiRequest<OrgUnit[]>('GET', '/api/organization/units');
+/**
+ * Units, without those of other companies where the user is kept to their own company (the
+ * server says which; an older server, or none kept: every unit).
+ */
+export const listOrgUnits = async (): Promise<OrgUnit[]> => {
+  const [units, hidden] = await Promise.all([
+    apiRequest<OrgUnit[]>('GET', '/api/organization/units'),
+    apiRequest<string[]>('GET', `${BASE}/other-companies-units`).catch(() => [] as string[]),
+  ]);
+  if (!hidden?.length) return units;
+  const other = new Set(hidden);
+  return units.filter((unit) => !other.has(unit.id));
+};
 export const createOrgUnit = (input: { name: string }) =>
   apiRequest<OrgUnit>('POST', '/api/organization/units', { body: { ...input, tenantId: getSessionTenantId() } });
 export const updateOrgUnit = (id: string, input: OrgUnitInput) => apiRequest<OrgUnit>('PUT', `/api/organization/units/${id}`, { body: input });
