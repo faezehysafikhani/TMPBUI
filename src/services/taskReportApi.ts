@@ -75,6 +75,7 @@ export async function getReportScope(): Promise<ReportScope | null> {
 
 export function getTaskReport(filters: TaskReportFilters): Promise<TaskReport> {
   return apiRequest<TaskReport>('GET', '/api/task-reports/tasks', {
+    cache: 'no-store',
     query: {
       personId: filters.personId,
       personRole: filters.personId || filters.positionId ? filters.personRole : undefined,

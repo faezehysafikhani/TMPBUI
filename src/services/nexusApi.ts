@@ -396,6 +396,8 @@ interface RequestOptions {
   responseType?: 'json' | 'blob';
   /** Message used for 401 instead of the generic session-expired text (login form). */
   unauthorizedMessage?: string;
+  /** Fetch cache mode; reports use 'no-store' so a repeat request never returns an old copy. */
+  cache?: RequestCache;
 }
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
@@ -450,6 +452,7 @@ async function request<T>(method: string, path: string, options: RequestOptions 
       headers,
       // FormData sets its own multipart boundary header.
       body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
+      cache: options.cache,
       signal: controller.signal,
     });
   } catch (err: any) {
