@@ -76,6 +76,7 @@ const KNOWN_MESSAGES: Record<string, string> = {
   'All members must belong to the same tenant as the group.': 'همه اعضا باید از سازمان همین گروه باشند.',
   'All members must belong to the same tenant as the team.': 'همه اعضا باید از سازمان همین تیم باشند.',
   'Only members of your own deputy can be added to your team.': 'فقط افراد معاونت خودتان را می‌توانید به تیم اضافه کنید؛ برای افزودن افراد سایر معاونت‌ها دسترسی لازم را ندارید.',
+  'Only people of your own company can be added to your team.': 'فقط افراد شرکت خودتان را می‌توانید به تیم اضافه کنید.',
   'A personal work team cannot carry permissions.': 'به تیم کاری شخصی نمی‌توان مجوز داد.',
   'Group name is required.': 'نام گروه را وارد کنید.',
   // Organizational teams and titles before names (organization-structure module)
@@ -223,6 +224,9 @@ const KNOWN_MESSAGES: Record<string, string> = {
   'This position is not for the company.': 'این سمت برای این شرکت تعریف نشده است.',
   'Positions of this unit are not for that company. Add the company to those positions first.': 'سمت‌های این معاونت برای آن شرکت تعریف نشده‌اند؛ ابتدا آن شرکت را به این سمت‌ها اضافه کنید.',
   'You can give tasks only to people at your own level or below in the organization.': 'فعالیت را فقط می‌توانید به افراد هم‌سطح خود یا زیرمجموعه‌تان ارجاع دهید.',
+  'You can give tasks only to people of your own company.': 'فعالیت را فقط می‌توانید به افراد شرکت خودتان ارجاع دهید.',
+  'Only people of your own company can be given access to the task.': 'دسترسی به فعالیت را فقط می‌توانید به افراد شرکت خودتان بدهید.',
+  'You can only see and change your own company.': 'فقط ساختار شرکت خودتان را می‌توانید ببینید و تغییر دهید.',
   'Send every position of the unit once, in the new order.': 'ترتیب سمت‌ها تغییر کرده است؛ صفحه را تازه کنید و دوباره امتحان کنید.',
   'Unit position was not found.': 'این سمت در معاونت پیدا نشد؛ صفحه را تازه کنید.',
   'People hold this position. Change their positions first.': 'کسانی در این سمت هستند؛ ابتدا آن‌ها را از این سمت بردارید.',

@@ -102,6 +102,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   // Where the organization limits it: the people this user may not make responsible (above them).
   const [assignmentLimited, setAssignmentLimited] = useState(false);
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+  // Kept to one's own company: only its people may be chosen (null: anyone not blocked).
+  const [allowedIds, setAllowedIds] = useState<Set<string> | null>(null);
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
   const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState<boolean>(false);
   const assigneeDropdownRef = useRef<HTMLDivElement>(null);
@@ -227,6 +229,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         if (!alive) return;
         setAssignmentLimited(!!limit?.limited);
         setBlockedIds(new Set(limit?.blockedUserIds || []));
+        setAllowedIds(limit?.allowedUserIds ? new Set(limit.allowedUserIds) : null);
       })
       .catch(() => {});
     getAssignablePosts()
@@ -838,7 +841,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                         مسئولین زیرفعالیت: <span className="text-rose-500">*</span>
                       </label>
                       <PeoplePicker
-                        people={allRegisteredUsers}
+                        people={allRegisteredUsers.filter((u) => !allowedIds || allowedIds.has(u.id) || newSubTaskAssigneeIds.includes(u.id))}
                         selectedIds={newSubTaskAssigneeIds}
                         onToggle={(id) => setNewSubTaskAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
                       />
@@ -963,7 +966,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                               <div>
                                 <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">مسئولین زیرفعالیت</label>
                                 <PeoplePicker
-                                  people={allRegisteredUsers}
+                                  people={allRegisteredUsers.filter((u) => !allowedIds || allowedIds.has(u.id) || (st.assignees || []).some((a) => a.id === u.id))}
                                   selectedIds={(st.assignees || []).map((a) => a.id)}
                                   onToggle={(id) => handleToggleProjectSubTaskAssignee(st.id, id)}
                                 />
@@ -1571,7 +1574,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 });
 
                 // Someone the user may not give tasks to is not offered - unless already responsible.
-                const candidates = Array.from(byId.values()).filter((p) => !blockedIds.has(p.id) || responsibleIds.includes(p.id)).sort((a, b) => {
+                const candidates = Array.from(byId.values()).filter((p) => (!blockedIds.has(p.id) && (!allowedIds || allowedIds.has(p.id))) || responsibleIds.includes(p.id)).sort((a, b) => {
                   const rank = (p: PersonOption) => (p.id === currentUser?.id ? 0 : teamIds.has(p.id) ? 1 : 2);
                   return rank(a) - rank(b) || a.name.localeCompare(b.name, 'fa');
                 });
@@ -1707,6 +1710,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                     {assignmentLimited && !isStatusOnlyEdit && (
                       <p className="text-[10px] text-slate-500 dark:text-slate-400">فقط افراد هم‌سطح شما و زیرمجموعه‌تان در چارت سازمانی نمایش داده می‌شوند.</p>
                     )}
+                    {!assignmentLimited && allowedIds && !isStatusOnlyEdit && (
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400">فقط افراد شرکت خودتان نمایش داده می‌شوند.</p>
+                    )}
 
                     {errors.assignee && (
                       <p className="text-xs text-red-500 font-medium">{errors.assignee}</p>
@@ -1763,6 +1769,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               const accessQuery = accessSearchQuery.trim().toLowerCase();
               const outsideCandidates = allRegisteredUsers
                 .filter((u) => !u.disabled && u.id !== ownerId && !teamIds.has(u.id) && !selectedMemberIds.includes(u.id) && !responsibleIds.includes(u.id))
+                // Kept to one's own company: nobody of another company is offered.
+                .filter((u) => !allowedIds || allowedIds.has(u.id))
                 .filter((u) =>
                   !accessQuery ||
                   (u.name || '').toLowerCase().includes(accessQuery) ||
