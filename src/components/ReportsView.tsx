@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BarChart3, FileSpreadsheet, FileDown, Printer, Eye, FilterX, Loader2, Repeat, FolderKanban, AlertCircle, Tag, ListChecks, Clock, Play, Pause, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Task, TaskStatus, STATUSES, PRIORITIES } from '../types';
 import { AdminCard, AdminDialog, Field, Notice, Pagination, SecondaryButton, StatusBadge, inputClass } from './admin/AdminUi';
@@ -120,10 +120,12 @@ const ReportTaskDialog: React.FC<{ row: TaskReportRow; onClose: () => void }> = 
 export const ReportsView: React.FC<{
   scope: ReportScope;
   visibleTasks: Task[];
+  /** Raised by the app after a task changes: reloads the report without a loading flash. */
+  refreshKey?: number;
   onOpenTask: (task: Task) => void;
   /** Name of the signed-in user, printed next to the date on the PDF / printout. */
   generatedBy?: string;
-}> = ({ scope, visibleTasks, onOpenTask, generatedBy }) => {
+}> = ({ scope, visibleTasks, refreshKey = 0, onOpenTask, generatedBy }) => {
   const [filters, setFilters] = useState<TaskReportFilters>({ personRole: 'responsible' });
   const [report, setReport] = useState<TaskReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -135,16 +137,21 @@ export const ReportsView: React.FC<{
   // The cards count every status, so they come from the same filters without the status one.
   const [overview, setOverview] = useState<TaskReport['summary'] | null>(null);
 
+  const lastFilters = useRef(filters);
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    // A new filter shows the loading state and starts at page 1; a refresh after a task changed
+    // keeps the screen and the page as they are.
+    const filtersChanged = lastFilters.current !== filters;
+    lastFilters.current = filters;
+    if (filtersChanged) setLoading(true);
     setError(null);
     getTaskReport(filters)
-      .then((result) => { if (alive) { setReport(result); setPage(1); } })
+      .then((result) => { if (alive) { setReport(result); if (filtersChanged) setPage(1); } })
       .catch((err) => alive && setError(userErrorMessage(err, 'دریافت گزارش ممکن نشد.')))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [filters]);
+  }, [filters, refreshKey]);
 
   useEffect(() => {
     if (!filters.status) { setOverview(null); return; }
@@ -153,7 +160,7 @@ export const ReportsView: React.FC<{
       .then((result) => { if (alive) setOverview(result.summary); })
       .catch(() => alive && setOverview(null));
     return () => { alive = false; };
-  }, [filters.personId, filters.personRole, filters.positionId, filters.tag, filters.type, filters.dueFrom, filters.dueTo, filters.status]);
+  }, [filters.personId, filters.personRole, filters.positionId, filters.tag, filters.type, filters.dueFrom, filters.dueTo, filters.status, refreshKey]);
 
   const set = (patch: Partial<TaskReportFilters>) => setFilters((f) => ({ ...f, ...patch }));
   const hasFilters = !!(filters.personId || filters.positionId || filters.tag || filters.type || filters.status || filters.dueFrom || filters.dueTo || onlyOverdue);
@@ -162,6 +169,11 @@ export const ReportsView: React.FC<{
   const byId = useMemo(() => new Map(visibleTasks.map((t) => [t.id, t])), [visibleTasks]);
   const rows = useMemo(() => (report?.rows || []).filter((r) => !onlyOverdue || r.isOverdue), [report, onlyOverdue]);
   const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // If rows disappeared and the page no longer exists, go back to the last valid one.
+  useEffect(() => {
+    const lastPage = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    if (page > lastPage) setPage(lastPage);
+  }, [rows.length, page]);
   const subordinates = scope.people.filter((p) => p.relation === 'direct' || p.relation === 'indirect').length;
   const scopeText = scope.seesAll
     ? 'همه فعالیت‌های سازمان'

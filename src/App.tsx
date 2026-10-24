@@ -95,6 +95,8 @@ export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [pbError, setPbError] = useState<string | null>(null);
+  // Raised after a task is saved, deleted or changes status, so the open report reloads.
+  const [reportRefreshKey, setReportRefreshKey] = useState(0);
 
   // Desktop Sidebar visibility state (default: open, saved in localStorage)
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(() => {
@@ -474,6 +476,7 @@ export default function App() {
           setSelectedTaskForDetail((prev) => (prev ? { ...prev, ...taskData } : null));
         }
         const saved = await updateTaskInPB(taskId, taskData);
+        setReportRefreshKey((k) => k + 1);
         // Show what the server saved (who is responsible, the access list...), not the form's copy.
         setTasks((prev) =>
           prev.map((t) => (t.id === taskId ? { ...saved, comments: saved.comments ?? t.comments, logs: saved.logs ?? t.logs } : t))
@@ -506,6 +509,7 @@ export default function App() {
           taskData.actualCompletionDate = new Date().toISOString();
         }
         const created = await createTaskInPB(taskData);
+        setReportRefreshKey((k) => k + 1);
         setTasks((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
 
         // Log creation action for notifications (notifies assignee and team members)
@@ -566,6 +570,7 @@ export default function App() {
     setIsSyncing(true);
     try {
       await deleteTaskFromPB(taskId);
+      setReportRefreshKey((k) => k + 1);
       setPbError(null);
     } catch (err: any) {
       console.error('Error deleting task:', err);
@@ -573,6 +578,7 @@ export default function App() {
       setPbError(errMsg);
       void appAlert(errMsg);
       loadTasks(false);
+      setReportRefreshKey((k) => k + 1);
     } finally {
       setIsSyncing(false);
     }
@@ -625,6 +631,7 @@ export default function App() {
 
     try {
       await updateTaskInPB(taskId, { projectSubTasks: updatedSubTasks, status: autoStatus, actualCompletionDate });
+      setReportRefreshKey((k) => k + 1);
       setPbError(null);
     } catch (err: any) {
       console.error('Error toggling subtask:', err);
@@ -660,6 +667,7 @@ export default function App() {
       // The server's own status-change endpoint already records a clear "Status changed" log
       // entry with the before/after status; logging it again here only duplicated it.
       await updateTaskInPB(taskId, { status: newStatus, actualCompletionDate });
+      setReportRefreshKey((k) => k + 1);
       setPbError(null);
     } catch (err: any) {
       console.error('Error updating task status:', err);
@@ -709,6 +717,7 @@ export default function App() {
 
     try {
       await updateTaskInPB(taskId, finalUpdates);
+      setReportRefreshKey((k) => k + 1);
     } catch (err) {
       console.error('Error syncing project details to server:', err);
     }
@@ -1408,7 +1417,7 @@ export default function App() {
             {/* Task reports (only where the backend offers them) */}
             {activeTab === 'reports' && reportScope && canOpenTab(currentUser, 'reports') && (
               <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
-                <ReportsView scope={reportScope} visibleTasks={visibleTasks} onOpenTask={handleOpenTaskDetail} generatedBy={currentUser?.name || currentUser?.username} />
+                <ReportsView scope={reportScope} refreshKey={reportRefreshKey} visibleTasks={visibleTasks} onOpenTask={handleOpenTaskDetail} generatedBy={currentUser?.name || currentUser?.username} />
               </Suspense>
             )}
 
