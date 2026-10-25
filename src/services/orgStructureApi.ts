@@ -212,38 +212,6 @@ export const getMySubordinates = (all: boolean) => apiRequest<Subordinate[]>('GE
 
 export const getChart = (companyId?: string) => apiRequest<ChartCompany[]>('GET', `${BASE}/chart`, { query: { companyId } });
 
-/** Draws and saves charts by hand («طراحی چارت دلخواه»); readers of the structure see the saved ones. */
-export const DESIGN_CHARTS_PERMISSION = 'org_structure.design_charts';
-
-/** A chart drawn by hand: the companies, deputies (units) and posts chosen for it. */
-export interface CustomChart {
-  id: string;
-  name: string;
-  description: string | null;
-  companyIds: string[];
-  unitIds: string[];
-  postIds: string[];
-  /** Whether each post shows who holds it. */
-  showHolders: boolean;
-  createdAtUtc: string;
-  modifiedAtUtc: string | null;
-}
-
-export interface CustomChartInput {
-  name: string;
-  description: string | null;
-  companyIds: string[];
-  unitIds: string[];
-  postIds: string[];
-  showHolders: boolean;
-}
-
-export const listCustomCharts = () => apiRequest<CustomChart[]>('GET', `${BASE}/custom-charts`);
-export const createCustomChart = (input: CustomChartInput) => apiRequest<CustomChart>('POST', `${BASE}/custom-charts`, { body: input });
-export const updateCustomChart = (id: string, input: CustomChartInput) =>
-  apiRequest<CustomChart>('PUT', `${BASE}/custom-charts/${id}`, { body: input });
-export const deleteCustomChart = (id: string) => apiRequest<void>('DELETE', `${BASE}/custom-charts/${id}`);
-
 export const listCompanies = () => apiRequest<Company[]>('GET', `${BASE}/companies`);
 export const createCompany = (input: CompanyInput) => apiRequest<Company>('POST', `${BASE}/companies`, { body: input });
 export const updateCompany = (id: string, input: CompanyInput & { isActive: boolean }) =>
