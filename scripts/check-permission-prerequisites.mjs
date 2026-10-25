@@ -20,6 +20,7 @@ const expected = {
   'org_structure.manage_substitution': ['org_structure.view'],
   'org_structure.assign_tasks_any_level': ['org_structure.view'],
   'org_structure.team_members_any_unit': ['org_structure.view'],
+  'org_structure.design_charts': ['org_structure.view'],
   'settings.update': ['settings.view'], 'sms_settings.update': ['sms_settings.view'], 'sms_settings.test': ['sms_settings.view'],
   'ldap_settings.update': ['ldap_settings.view'], 'ldap_settings.test': ['ldap_settings.view'],
   'tenants.create': ['tenants.view'], 'tenants.manage_all': ['tenants.view'],
