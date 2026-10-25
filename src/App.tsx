@@ -79,6 +79,7 @@ import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissio
 import { userErrorMessage } from './utils/errorMessages';
 import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
 import { appAlert, appConfirm } from './utils/appDialog';
+import { showToast } from './utils/toast';
 
 const PAGE_TITLES: Record<string, string> = {
   kanban: 'بورد کانبان',
@@ -747,7 +748,8 @@ export default function App() {
     if (!can(currentUser, PERMISSIONS.tasksCreate)) return;
     setTaskToEdit(null);
     setInitialStatusForNewTask(status);
-    setInitialDueDateForNewTask(isoDate || new Date().toISOString());
+    // No date chosen (e.g. not from the calendar): the form's own default (end of today).
+    setInitialDueDateForNewTask(isoDate);
     setInitialTitleForNewTask(initialTitle);
     setLockInitialDescription(false);
     setInitialDescriptionForNewTask(initialDescription);
@@ -1626,6 +1628,9 @@ export default function App() {
               const target = tasks.find((t) => t.id === taskId);
               if (target) {
                 handleOpenTaskDetail(target);
+              } else {
+                // Taken off the task (or it was deleted) since the notification came.
+                showToast('این فعالیت دیگر در دسترس شما نیست.', 'info');
               }
             }}
             appColorPalette={appColorPalette}
