@@ -34,6 +34,7 @@ import {
   PlayCircle,
   CheckCircle2,
   Briefcase,
+  Lock,
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import PeoplePicker from './PeoplePicker';
@@ -1337,21 +1338,24 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               {isProject ? 'شرح توضیحات پروژه' : 'شرح توضیحات'}
             </label>
             {lockedDescription ? (
-              <div className="space-y-2">
+              // One box: the text taken from the message or comment on top (cannot be changed),
+              // and what the user adds right under it.
+              <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus-within:ring-2 focus-within:ring-indigo-500">
                 <div
-                  className="whitespace-pre-wrap break-words rounded-xl border border-dashed border-slate-300 dark:border-slate-600 bg-slate-100/80 dark:bg-slate-800/70 px-3.5 py-2.5 text-xs font-medium leading-6 text-slate-600 dark:text-slate-300"
-                  title="متن اصلی پیام یا کامنت قابل ویرایش نیست؛ می‌توانید بعد از آن توضیح اضافه کنید."
+                  className="flex items-start gap-2 whitespace-pre-wrap break-words border-b border-dashed border-slate-300 dark:border-slate-600 bg-slate-100/90 dark:bg-slate-700/50 px-3.5 py-2.5 text-xs font-medium leading-6 text-slate-600 dark:text-slate-300 select-text"
+                  title="متن اصلی پیام یا کامنت قابل ویرایش نیست؛ می‌توانید زیر آن توضیح اضافه کنید."
                 >
-                  {lockedDescription}
+                  <Lock className="mt-1 h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden="true" />
+                  <span>{lockedDescription}</span>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">متن بالا از پیام یا کامنت گرفته شده و تغییر نمی‌کند؛ هر توضیح دیگری را در کادر زیر بنویسید.</p>
                 <textarea
                   rows={3}
                   value={descriptionExtra}
                   disabled={isStatusOnlyEdit}
                   onChange={(e) => setDescriptionExtra(e.target.value)}
-                  placeholder="افزودن توضیح بعد از متن بالا..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none"
+                  placeholder="توضیح خود را بعد از متن بالا بنویسید..."
+                  aria-label="افزودن توضیح بعد از متن پیام یا کامنت"
+                  className="block w-full resize-none bg-transparent px-3.5 py-2.5 text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-hidden"
                 />
               </div>
             ) : (
