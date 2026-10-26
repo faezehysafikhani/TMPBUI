@@ -25,6 +25,7 @@ import {
   TaskLog,
   ProjectSubTask,
   SubTaskImportance,
+  SubTaskProgress,
   RecurringConfig,
   RecurringFrequency,
   OccurrenceNth,
@@ -164,6 +165,10 @@ interface SubTaskDto {
   isGeneratedOccurrence?: boolean;
   startTime?: string | null;
   endTime?: string | null;
+  assignees?: UserSummaryDto[];
+  status?: 'NotStarted' | 'InProgress' | 'Completed';
+  actualStartedAtUtc?: string | null;
+  actualCompletedAtUtc?: string | null;
 }
 
 interface RepetitiveTaskDto {
@@ -189,6 +194,7 @@ interface TaskDto {
   title: string;
   description: string | null;
   isProject: boolean;
+  parentTaskId?: string | null;
   isRecurring: boolean;
   status: string;
   priority: string;
@@ -200,6 +206,8 @@ interface TaskDto {
   assignees: UserSummaryDto[];
   /** Everyone responsible (servers before multi-responsible tasks leave it out). */
   responsibleUsers?: UserSummaryDto[] | null;
+  /** Who stands in for a vacant post of the task (جانشین), with the post; older servers leave it out. */
+  standIns?: { id: string; displayName: string; note: string | null }[] | null;
   allowAssigneeStatusUpdate: boolean;
   charterDescription: string | null;
   charterProjectManager: string | null;
@@ -216,6 +224,7 @@ interface TaskDto {
   /** Times of day on the charter dates, like dueTime. */
   charterStartTime?: string | null;
   charterEndTime?: string | null;
+  posts?: Array<{ postId: string; role: string; title: string; code: string; place: string; holderUserId: string | null; holderName: string | null }> | null;
 }
 
 interface TaskListItemDto { id: string; }
@@ -229,6 +238,7 @@ interface TaskCommentDto {
   createdAtUtc: string;
   modifiedAtUtc: string | null;
   files?: TaskFileDto[] | null;
+  actingNote?: string | null;
 }
 
 interface TaskActivityDto {
@@ -386,6 +396,8 @@ interface RequestOptions {
   responseType?: 'json' | 'blob';
   /** Message used for 401 instead of the generic session-expired text (login form). */
   unauthorizedMessage?: string;
+  /** Fetch cache mode; reports use 'no-store' so a repeat request never returns an old copy. */
+  cache?: RequestCache;
 }
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
@@ -440,6 +452,7 @@ async function request<T>(method: string, path: string, options: RequestOptions 
       headers,
       // FormData sets its own multipart boundary header.
       body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
+      cache: options.cache,
       signal: controller.signal,
     });
   } catch (err: any) {
@@ -677,7 +690,20 @@ function toServerSubTaskId(uiId: string): string {
   return uiId;
 }
 
+const SUBTASK_PROGRESS_FROM_API: Record<string, SubTaskProgress> = {
+  NotStarted: 'not_started',
+  InProgress: 'in_progress',
+  Completed: 'completed',
+};
+
+const SUBTASK_PROGRESS_TO_API: Record<SubTaskProgress, 'NotStarted' | 'InProgress' | 'Completed'> = {
+  not_started: 'NotStarted',
+  in_progress: 'InProgress',
+  completed: 'Completed',
+};
+
 function mapSubTask(s: SubTaskDto): ProjectSubTask {
+  const status = SUBTASK_PROGRESS_FROM_API[s.status || 'NotStarted'] || 'not_started';
   return {
     id: toUiSubTaskId(s),
     title: s.title,
@@ -685,7 +711,11 @@ function mapSubTask(s: SubTaskDto): ProjectSubTask {
     endDate: fromDateOnly(s.endDate, s.endTime),
     importance: LEVEL_FROM_API[s.importance] || 'medium',
     completed: s.isCompleted,
+    status,
+    actualStartDate: s.actualStartedAtUtc || undefined,
+    actualCompletedDate: s.actualCompletedAtUtc || undefined,
     createdAt: s.createdAtUtc,
+    assignees: (s.assignees || []).map((a) => ({ id: a.id, name: a.displayName })),
   };
 }
 
@@ -765,6 +795,7 @@ function mapComment(c: TaskCommentDto, attachments?: Attachment[]): TaskComment 
     taskId: c.taskId,
     userId: c.userId,
     userName: c.userDisplayName || 'کاربر',
+    actingNote: c.actingNote || undefined,
     text: c.text,
     attachments: attachments && attachments.length > 0 ? attachments : undefined,
     createdAt: c.createdAtUtc,
@@ -801,13 +832,17 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     assignedUserName: dto.assignedUser?.displayName,
     responsibleUserIds: responsibleOf(dto).map((u) => u.id),
     responsibleUserNames: responsibleOf(dto).map((u) => u.displayName),
+    standIns: dto.standIns?.length ? dto.standIns.map((s) => ({ userId: s.id, name: s.displayName, note: s.note ? s.note.replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]) : null })) : undefined,
     assignedTeamId: dto.assignedUserGroup?.id,
     assignedTeamName: dto.assignedUserGroup?.name,
     teamMemberIds: (dto.assignees || []).map((a) => a.id),
     teamMemberNames: (dto.assignees || []).map((a) => a.displayName),
+    posts: dto.posts ? dto.posts.map((p) => ({ ...p, role: p.role as 'owner' | 'responsible' | 'access' })) : undefined,
+    responsiblePostIds: dto.posts ? dto.posts.filter((p) => p.role === 'responsible').map((p) => p.postId) : undefined,
     allowAssigneeStatusUpdate: dto.allowAssigneeStatusUpdate,
     tags: (dto.tags || []).map((t) => t.name),
     isProject: dto.isProject,
+    parentTaskId: dto.parentTaskId || undefined,
     isRecurring: dto.isRecurring,
     recurringConfig: dto.recurrence ? mapRecurrence(dto.recurrence) : undefined,
     projectCharter: hasCharter
@@ -870,6 +905,7 @@ function toSubTaskBody(s: ProjectSubTask, sortOrder: number) {
     endTime: toTimeOfDay(s.endDate),
     sortOrder,
     isGeneratedOccurrence: s.id.startsWith(OCCURRENCE_PREFIX),
+    assigneeUserIds: (s.assignees || []).map((a) => a.id),
   };
 }
 
@@ -1236,8 +1272,11 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
       priority: LEVEL_TO_API[taskData.priority] || 'Medium',
       description: taskData.description || null,
       isProject: !!taskData.isProject,
+      parentTaskId: taskData.parentTaskId || null,
       assignedUserId: requireGuid(responsibleIdsOf(taskData)[0], 'کاربر مسئول'),
       responsibleUserIds: responsibleIdsOf(taskData).map((id) => requireGuid(id, 'کاربر مسئول')),
+      // Where tasks are given to posts: these posts (their holders are the people above).
+      responsiblePostIds: taskData.responsiblePostIds ?? null,
       assignedUserGroupId: requireGuid(taskData.assignedTeamId, 'تیم'),
       assigneeUserIds: (taskData.teamMemberIds || []).map((id) => requireGuid(id, 'عضو تیم')),
       allowAssigneeStatusUpdate: taskData.allowAssigneeStatusUpdate ?? true,
@@ -1257,9 +1296,10 @@ export async function createTask(taskData: Omit<Task, 'id' | 'createdAt' | 'upda
   try {
     const createdSubTasks = [...created.subTasks].sort((a, b) => a.sortOrder - b.sortOrder);
     for (let i = 0; i < subTasks.length && i < createdSubTasks.length; i++) {
-      if (subTasks[i].completed) {
+      const desiredStatus = subTasks[i].status || (subTasks[i].completed ? 'completed' : 'not_started');
+      if (desiredStatus !== 'not_started') {
         await request('PATCH', `/api/task-management/subtasks/${createdSubTasks[i].id}/status`, {
-          body: { isCompleted: true },
+          body: { status: SUBTASK_PROGRESS_TO_API[desiredStatus] },
         });
       }
     }
@@ -1308,8 +1348,9 @@ export async function updateTask(
       const s = desiredSubTasks[i];
       if (currentById.has(toServerSubTaskId(s.id))) continue;
       const added = await request<SubTaskDto>('POST', `${TASKS}/${taskId}/subtasks`, { body: toSubTaskBody(s, i) });
-      if (s.completed) {
-        await request('PATCH', `/api/task-management/subtasks/${added.id}/status`, { body: { isCompleted: true } });
+      const desiredStatus = s.status || (s.completed ? 'completed' : 'not_started');
+      if (desiredStatus !== 'not_started') {
+        await request('PATCH', `/api/task-management/subtasks/${added.id}/status`, { body: { status: SUBTASK_PROGRESS_TO_API[desiredStatus] } });
       }
     }
   }
@@ -1349,6 +1390,7 @@ export async function updateTask(
           taskData.responsibleUserIds !== undefined
             ? responsibleIdsOf(taskData).map((id) => requireGuid(id, 'کاربر مسئول'))
             : null,
+        responsiblePostIds: taskData.responsiblePostIds ?? null,
         assignedUserGroupId:
           taskData.assignedTeamId !== undefined
             ? requireGuid(taskData.assignedTeamId, 'تیم')
@@ -1378,6 +1420,8 @@ export async function updateTask(
       const existing = currentById.get(serverId);
       if (!existing) continue;
       const body = toSubTaskBody(s, i);
+      const existingAssigneeIds = (existing.assignees || []).map((a) => a.id).sort();
+      const desiredAssigneeIds = [...body.assigneeUserIds].sort();
       const changed =
         existing.title !== body.title ||
         existing.importance !== body.importance ||
@@ -1385,12 +1429,15 @@ export async function updateTask(
         (existing.endDate || null) !== body.endDate ||
         (existing.startTime || null) !== body.startTime ||
         (existing.endTime || null) !== body.endTime ||
-        existing.sortOrder !== body.sortOrder;
+        existing.sortOrder !== body.sortOrder ||
+        existingAssigneeIds.length !== desiredAssigneeIds.length ||
+        existingAssigneeIds.some((id, idx) => id !== desiredAssigneeIds[idx]);
       if (changed) {
         await request('PUT', `/api/task-management/subtasks/${serverId}`, { body });
       }
-      if (existing.isCompleted !== !!s.completed) {
-        await request('PATCH', `/api/task-management/subtasks/${serverId}/status`, { body: { isCompleted: !!s.completed } });
+      const desiredStatus = SUBTASK_PROGRESS_TO_API[s.status || (s.completed ? 'completed' : 'not_started')];
+      if ((existing.status || 'NotStarted') !== desiredStatus) {
+        await request('PATCH', `/api/task-management/subtasks/${serverId}/status`, { body: { status: desiredStatus } });
       }
     }
     for (const existing of current.subTasks) {
@@ -1794,6 +1841,33 @@ export async function listRoles(): Promise<AdminRole[]> {
   return request<AdminRole[]>('GET', '/api/identity/roles', { query: { tenantId: getSessionTenantId() } });
 }
 
+/** A new custom role (roles.create); its permissions are set with setRolePermissions. */
+export async function createRole(name: string, description: string | null): Promise<AdminRole> {
+  return request<AdminRole>('POST', '/api/identity/roles', { body: { tenantId: getSessionTenantId(), name, description } });
+}
+
+/** Renames a custom role or changes its description (roles.update). */
+export async function updateRole(roleId: string, name: string, description: string | null): Promise<AdminRole> {
+  return request<AdminRole>('PUT', `/api/identity/roles/${requireGuid(roleId, 'نقش')}`, { body: { name, description } });
+}
+
+/** Replaces a custom role's permissions (roles.assign_permissions); the server adds their prerequisites. */
+export async function setRolePermissions(roleId: string, permissionIds: string[]): Promise<void> {
+  await request('PUT', `/api/identity/roles/${requireGuid(roleId, 'نقش')}/permissions`, { body: { permissionIds } });
+}
+
+export interface PermissionInfo {
+  id: string;
+  name: string;
+  module: string;
+  description: string;
+}
+
+/** Every permission this product manages, grouped by module (permissions.view). */
+export async function listPermissionGroups(): Promise<{ module: string; permissions: PermissionInfo[] }[]> {
+  return request<{ module: string; permissions: PermissionInfo[] }[]>('GET', '/api/identity/permissions');
+}
+
 export interface UserAccessEntry {
   permissionId: string;
   name: string;
@@ -2055,6 +2129,36 @@ export interface TaskReminderSettings {
 export async function getTaskReminderSettings(): Promise<TaskReminderSettings | null> {
   try {
     return await request<TaskReminderSettings>('GET', '/api/task-management/reminder-settings');
+  } catch (err) {
+    if (err instanceof NexusApiError && (err.httpStatus === 404 || err.httpStatus === 405)) return null;
+    throw err;
+  }
+}
+
+/** Whom the signed-in user may not make responsible for a task. */
+/**
+ * limited: by level (own level and below). allowedUserIds: where everyone is kept to their own
+ * company, the only people one may choose (null/absent: not kept).
+ */
+export interface AssignmentLimit { limited: boolean; blockedUserIds: string[]; allowedUserIds?: string[] | null }
+
+/** Null on a server that does not limit it (an older version). The server checks again on saving. */
+/** Where tasks are given to posts: the posts to choose from. enabled false (or null): give them to people. */
+export interface AssignablePost { postId: string; title: string; code: string; place: string; holderUserId: string | null; holderName: string | null; blocked: boolean }
+export interface AssignablePosts { enabled: boolean; posts: AssignablePost[] }
+
+export async function getAssignablePosts(): Promise<AssignablePosts | null> {
+  try {
+    return await request<AssignablePosts>('GET', '/api/task-management/assignable-posts');
+  } catch (err) {
+    if (err instanceof NexusApiError && (err.httpStatus === 404 || err.httpStatus === 405)) return null;
+    throw err;
+  }
+}
+
+export async function getAssignmentLimit(): Promise<AssignmentLimit | null> {
+  try {
+    return await request<AssignmentLimit>('GET', '/api/task-management/assignment-limit');
   } catch (err) {
     if (err instanceof NexusApiError && (err.httpStatus === 404 || err.httpStatus === 405)) return null;
     throw err;
@@ -2339,6 +2443,11 @@ export async function addTaskActivityEntry(taskId: string, action: string, detai
 
 const taskChangeListeners = new Set<() => void>();
 let taskHub: HubConnection | null = null;
+/** Whose connection taskHub is: never reused for someone else signing in. */
+let taskHubUserId: string | null = null;
+let taskHubStopTimer: ReturnType<typeof setTimeout> | null = null;
+let taskHubRetryTimer: ReturnType<typeof setTimeout> | null = null;
+let taskHubRetryDelay = 15_000;
 let changeTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function hubAccessToken(): Promise<string> {
@@ -2365,28 +2474,81 @@ function notifyTaskChange(): void {
  * in the tenant - whenever tasks change.
  */
 export function subscribeToTaskChanges(onChange: () => void): () => void {
-  if (!readSession()) return () => {};
+  const session = readSession();
+  if (!session) return () => {};
 
   taskChangeListeners.add(onChange);
-  if (!taskHub) {
-    const hub = new HubConnectionBuilder()
-      // The token travels as access_token; no cookies are needed. With credentials the browser's
-      // negotiate request is refused by the API's CORS policy and live updates never connect.
-      .withUrl(`${NEXUS_SIGNALR_BASE_URL}/hubs/task-management`, { accessTokenFactory: hubAccessToken, withCredentials: false })
-      .withAutomaticReconnect()
-      .configureLogging(LogLevel.Warning)
-      .build();
-    hub.on('TasksChanged', notifyTaskChange);
-    taskHub = hub;
-    hub.start().catch((err) => console.warn('Live task updates are unavailable:', err instanceof Error ? err.message : err));
+  // A stop asked for a moment ago (the screen re-subscribing) is called off - for the same user only.
+  if (taskHubStopTimer) {
+    clearTimeout(taskHubStopTimer);
+    taskHubStopTimer = null;
   }
+  if (taskHub && taskHubUserId !== session.user.id) stopTaskHub();
+  if (!taskHub) startTaskHub(session.user.id);
 
   return () => {
     taskChangeListeners.delete(onChange);
-    if (taskChangeListeners.size === 0 && taskHub) {
-      const hub = taskHub;
-      taskHub = null;
-      hub.stop().catch(() => undefined);
+    if (taskChangeListeners.size === 0 && taskHub && !taskHubStopTimer) {
+      // Stopping while the connection is still being negotiated logs an error and wastes it when
+      // the screen subscribes again right away (re-render, StrictMode), so the stop waits a moment.
+      taskHubStopTimer = setTimeout(() => {
+        taskHubStopTimer = null;
+        if (taskChangeListeners.size === 0) stopTaskHub();
+      }, 1_500);
     }
   };
+}
+
+function startTaskHub(userId: string): void {
+  const hub = new HubConnectionBuilder()
+    // The token travels as access_token; no cookies are needed. With credentials the browser's
+    // negotiate request is refused by the API's CORS policy and live updates never connect.
+    .withUrl(`${NEXUS_SIGNALR_BASE_URL}/hubs/task-management`, { accessTokenFactory: hubAccessToken, withCredentials: false })
+    .withAutomaticReconnect()
+    // The library's own console errors (a dropped or refused connection) are expected and handled
+    // here: one warning, then a retry while anyone is still listening.
+    .configureLogging(LogLevel.None)
+    .build();
+  hub.on('TasksChanged', notifyTaskChange);
+  hub.onreconnected(() => {
+    taskHubRetryDelay = 15_000;
+    notifyTaskChange(); // changes made while disconnected
+  });
+  hub.onclose(() => {
+    // Automatic reconnecting gave up (or the server closed it): try again later, while needed.
+    if (taskHub === hub && taskChangeListeners.size > 0) scheduleTaskHubRetry(hub);
+  });
+  taskHub = hub;
+  taskHubUserId = userId;
+  hub.start()
+    .then(() => { taskHubRetryDelay = 15_000; })
+    .catch((err) => {
+      console.warn('Live task updates are unavailable for now; retrying.', err instanceof Error ? err.message : err);
+      if (taskHub === hub) scheduleTaskHubRetry(hub);
+    });
+}
+
+function scheduleTaskHubRetry(hub: HubConnection): void {
+  if (taskHubRetryTimer) return;
+  taskHubRetryTimer = setTimeout(() => {
+    taskHubRetryTimer = null;
+    if (taskHub !== hub || taskChangeListeners.size === 0) return;
+    const session = readSession();
+    if (!session) return;
+    taskHub = null;
+    startTaskHub(session.user.id);
+    notifyTaskChange(); // catch up on what changed meanwhile
+  }, taskHubRetryDelay);
+  taskHubRetryDelay = Math.min(taskHubRetryDelay * 2, 120_000);
+}
+
+function stopTaskHub(): void {
+  const hub = taskHub;
+  taskHub = null;
+  taskHubUserId = null;
+  if (taskHubRetryTimer) {
+    clearTimeout(taskHubRetryTimer);
+    taskHubRetryTimer = null;
+  }
+  hub?.stop().catch(() => undefined);
 }

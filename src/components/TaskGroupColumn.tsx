@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Minus } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Task, TaskStatus, Attachment, User } from '../types';
-import { TaskCard } from './TaskCard';
+import { TaskCardList } from './TaskCardList';
 import { toPersianDigits } from '../utils/helpers';
 import { GROUP_TONES, TaskGroup } from '../utils/boardView';
 
@@ -35,7 +35,7 @@ const TaskGroupColumnBase: React.FC<TaskGroupColumnProps> = ({
   onOpenProjectDetails,
   onToggleSubTask,
 }) => {
-  // Collapsed by default, like the Kanban columns.
+  // Groups start closed, like the Kanban columns.
   const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
   const tone = GROUP_TONES[group.tone];
 
@@ -61,7 +61,7 @@ const TaskGroupColumnBase: React.FC<TaskGroupColumnProps> = ({
             }`}
             title={isCollapsed ? 'باز کردن گروه‌بندی' : 'بستن گروه‌بندی'}
           >
-            {isCollapsed ? <Plus className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+            <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
           </button>
           <div className="min-w-0">
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={group.title}>{group.title}</h2>
@@ -83,21 +83,18 @@ const TaskGroupColumnBase: React.FC<TaskGroupColumnProps> = ({
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">هیچ فعالیتی در این بخش وجود ندارد</p>
               </div>
             ) : (
-              group.tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  currentUser={currentUser}
-                  showDetails={showDetails}
-                  onEdit={onEditTask}
-                  onDelete={onDeleteTask}
-                  onStatusChange={onStatusChange}
-                  onPreviewAttachment={onPreviewAttachment}
-                  onViewDetails={onViewDetails}
-                  onOpenProjectDetails={onOpenProjectDetails}
-                  onToggleSubTask={onToggleSubTask}
-                />
-              ))
+              <TaskCardList
+                tasks={group.tasks}
+                currentUser={currentUser}
+                showDetails={showDetails}
+                onEdit={onEditTask}
+                onDelete={onDeleteTask}
+                onStatusChange={onStatusChange}
+                onPreviewAttachment={onPreviewAttachment}
+                onViewDetails={onViewDetails}
+                onOpenProjectDetails={onOpenProjectDetails}
+                onToggleSubTask={onToggleSubTask}
+              />
             )}
           </div>
         </div>

@@ -14,10 +14,10 @@ let cachedPolicy: Promise<UploadPolicy> | null = null;
 /** The admin-configured upload limit, cached until refreshUploadPolicy() (falls back to 200 KB). */
 export function getUploadPolicy(): Promise<UploadPolicy> {
   if (!cachedPolicy) {
-    cachedPolicy = fetchUploadPolicy().catch(() => ({
-      maxFileSizeKb: DEFAULT_MAX_FILE_SIZE_KB,
-      allowedExtensions: ALLOWED_UPLOAD_EXTENSIONS,
-    }));
+    cachedPolicy = fetchUploadPolicy().catch(() => {
+      cachedPolicy = null; // a failed read must not stick: the next call asks the server again
+      return { maxFileSizeKb: DEFAULT_MAX_FILE_SIZE_KB, allowedExtensions: ALLOWED_UPLOAD_EXTENSIONS };
+    });
   }
   return cachedPolicy;
 }

@@ -5,6 +5,7 @@ import { parseDateSafely } from '../utils/jalali';
 import { AlertCircle, AlertTriangle, CheckCircle2, Calendar, MessageSquare, Edit2, Trash2, ArrowDownUp } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor } from '../utils/taskPeople';
+import { appAlert } from '../utils/appDialog';
 
 interface OverdueTasksViewProps {
   tasks: Task[];
@@ -108,7 +109,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
             onCompleteItem(item);
           }, 250);
         } else {
-          alert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
+          void appAlert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
           setDragX(0);
         }
       } else {
@@ -190,7 +191,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
               />
             )}
             <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
-              {item.title}
+              {item.title.replace(/\*\*/g, "")}
             </span>
           </div>
 
@@ -214,7 +215,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
                   className="w-3 h-3 text-amber-300 shrink-0"
                 />
                 <span>
-                  {delayDays >= 7 ? 'تاخیر شدید' : 'معوقه'} ({getDaysDiff(item.dueDate).text})
+                  {delayDays >= 7 ? 'تاخیر شدید' : 'موعد گذشته'} ({getDaysDiff(item.dueDate).text})
                 </span>
               </span>
             ) : (
@@ -243,7 +244,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
               title="خاتمه یافته (تکمیل سریع)"
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="hidden sm:inline">خاتمه یافته</span>
+              <span className="hidden sm:inline">تبدیل به خاتمه یافته</span>
             </button>
           )}
 
@@ -473,18 +474,18 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <div className="inline-flex items-center gap-1.5 text-[11px] text-amber-100 bg-black/20 px-2.5 py-1 rounded-xl font-medium border border-white/10">
                 <ArrowDownUp className="w-3.5 h-3.5 shrink-0 text-amber-300" />
-                <span>مرتب‌شده بر اساس **بیشترین تاخیر** و **اولویت بالاتر**</span>
+                <span>مرتب‌شده بر اساس <b>بیشترین تاخیر</b> و <b>اولویت بالاتر</b></span>
               </div>
               <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-100 bg-emerald-900/40 px-2.5 py-1 rounded-xl font-medium border border-emerald-400/20">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
-                <span>با **درگ به سمت چپ**، فعالیت به «خاتمه یافته» تغییر می‌یابد</span>
+                <span>با <b>درگ به سمت چپ</b>، فعالیت به «خاتمه یافته» تغییر می‌یابد</span>
               </div>
             </div>
           </div>
         </div>
 
         <div className="px-3.5 py-1.5 rounded-2xl bg-white/20 backdrop-blur-md text-xs font-bold border border-white/30 shrink-0 self-end sm:self-auto">
-          {toPersianDigits(overdueItems.length)} مورد معوقه
+          {toPersianDigits(overdueItems.length)} مورد موعد گذشته
         </div>
       </div>
 

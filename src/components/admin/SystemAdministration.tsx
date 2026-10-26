@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2, BadgeCheck } from 'lucide-react';
+import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2, BadgeCheck, ShieldCheck } from 'lucide-react';
 import { getKnownPermissions, getMyPermissions, changeMyPassword, fetchUploadPolicy, updateMaxUploadSizeKb } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
+import { RolesPanel } from './RolesPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
 import { LdapPanel } from './LdapPanel';
 import { SsoPreparationPanel } from './SsoPreparationPanel';
@@ -16,7 +17,7 @@ import { TitlesPanel } from './orgStructure/TitlesPanel';
 import { canSeeWorkTeams } from '../../utils/permissions';
 
 type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users' | 'org';
-type UsersTab = 'list' | 'titles' | 'history' | 'ldap' | 'sso';
+type UsersTab = 'list' | 'roles' | 'titles' | 'history' | 'ldap' | 'sso';
 
 /**
  * Permission names the signed-in user holds: those saved at sign-in at once (so menus do not
@@ -51,10 +52,11 @@ function useOrgStructureAvailable(userId: string | undefined): { available: bool
   return { available: value, known };
 }
 
-/** «مدیریت کاربران» with its sub-tabs: users, sign-in history and LDAP. */
+/** «مدیریت کاربران» with its sub-tabs: users, roles, titles, sign-in history, LDAP and SSO. */
 const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) => boolean; orgStructureAvailable: boolean }> = ({ currentUserId, can, orgStructureAvailable }) => {
   const tabs: TabItem<UsersTab>[] = [
     ...(can('users.view') ? [{ id: 'list' as const, label: 'مدیریت کاربران', icon: Users }] : []),
+    ...(can('roles.view') ? [{ id: 'roles' as const, label: 'نقش‌ها', icon: ShieldCheck }] : []),
     // Titles before names come with the organization-structure module; whoever may add users manages them.
     ...(orgStructureAvailable && can(TITLE_PERMISSIONS.manage) ? [{ id: 'titles' as const, label: 'عنوان‌ها', icon: BadgeCheck }] : []),
     ...(can('audit_logs.view') ? [{ id: 'history' as const, label: 'تاریخچه ورود', icon: History }] : []),
@@ -81,6 +83,9 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
           canManageOrgAssignments={can(ORG_STRUCTURE_PERMISSIONS.manageAssignments)}
           canSeeOrgUnits={can(ORG_UNIT_PERMISSIONS.view)}
         />
+      )}
+      {current === 'roles' && (
+        <RolesPanel rights={{ create: can('roles.create'), update: can('roles.update'), assignPermissions: can('roles.assign_permissions') }} />
       )}
       {current === 'titles' && <TitlesPanel />}
       {current === 'history' && <LoginHistoryPanel />}
@@ -238,7 +243,7 @@ export const SystemAdministration: React.FC<{
     { id: 'appearance', label: 'ظاهر سامانه', icon: Palette },
     { id: 'help', label: 'راهنما', icon: FileText },
     ...(can('sms_settings.view') ? [{ id: 'sms' as const, label: 'پنل پیامکی', icon: MessageSquare }] : []),
-    ...(can('users.view') || can('audit_logs.view') || can('ldap_settings.view') || can('sso_settings.view')
+    ...(can('users.view') || can('roles.view') || can('audit_logs.view') || can('ldap_settings.view') || can('sso_settings.view')
       ? [{ id: 'users' as const, label: 'مدیریت کاربران', icon: Users }] : []),
     ...(orgStructureAvailable ? [{ id: 'org' as const, label: 'ساختار سازمانی', icon: Building2 }] : []),
   ];

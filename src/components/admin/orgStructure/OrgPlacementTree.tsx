@@ -103,17 +103,26 @@ export const OrgPlacementTree: React.FC<{
   const visibleCompanies = companies
     .filter((c) => c.isActive || c.id === value.companyId)
     .sort((a, b) => a.name.localeCompare(b.name, 'fa'));
-  const tree = useMemo(() => positionTree(positions, value.positionId), [positions, value.positionId]);
+  // Each company offers only its own positions (a backend without per-company positions: all).
+  const perCompany = positions.some((p) => p.companyIds !== undefined);
+  const trees = useMemo(() => new Map(companies.map((c) => [
+    c.id,
+    positionTree(perCompany ? positions.filter((p) => (p.companyIds || []).includes(c.id) || p.id === value.positionId) : positions, value.positionId),
+  ])), [companies, positions, perCompany, value.positionId]);
 
   const companyName = companies.find((c) => c.id === value.companyId)?.name;
   const unitName = links.find((l) => l.unitId === value.unitId)?.unitName;
   const positionTitle = positions.find((p) => p.id === value.positionId)?.title;
   const path = [companyName, value.companyId ? unitName || (value.positionId ? 'مستقیم زیر شرکت' : null) : null, positionTitle].filter(Boolean);
 
-  const positionRows = (companyId: string, unitId: string) => (
+  const positionRows = (companyId: string, unitId: string) => {
+    const tree = trees.get(companyId) || [];
+    // With old positions that still lack a superior, which one is the head's is not certain.
+    const roots = tree.filter(({ position }) => !position.parentPositionId).length;
+    return (
     <div className="ms-9 border-s-2 border-dashed border-slate-200 dark:border-slate-700 ps-2 py-1 space-y-0.5">
       {tree.length === 0 ? (
-        <p className="text-xs text-slate-400 px-2 py-1">هنوز سمتی تعریف نشده است.</p>
+        <p className="text-xs text-slate-400 px-2 py-1">هنوز سمتی برای این شرکت تعریف نشده است.</p>
       ) : tree.map(({ position, depth }) => {
         const selected = value.companyId === companyId && value.unitId === unitId && value.positionId === position.id;
         return (
@@ -126,13 +135,14 @@ export const OrgPlacementTree: React.FC<{
               tone="bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"
               label={position.title}
               muted={!position.isActive}
-              note={position.isActive ? undefined : 'غیرفعال'}
+              note={!position.isActive ? 'غیرفعال' : perCompany && !unitId && !position.parentPositionId ? (roots === 1 ? 'رئیس کل شرکت' : 'بدون مافوق') : undefined}
             />
           </div>
         );
       })}
     </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-2">

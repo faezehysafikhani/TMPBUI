@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Task, TaskStatus, STATUSES, Attachment, User } from '../types';
-import { TaskCard } from './TaskCard';
+import { TaskCardList } from './TaskCardList';
 import { toPersianDigits } from '../utils/helpers';
-import { Plus, Minus, Move } from 'lucide-react';
+import { Plus, ChevronDown, Move } from 'lucide-react';
 import { can, PERMISSIONS } from '../utils/permissions';
 
 interface KanbanColumnProps {
@@ -34,7 +34,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
   onToggleSubTask,
   showDetails = true,
 }) => {
-  // Default state is COLLAPSED by user request
+  // Columns start closed; the user opens the ones to look at.
   const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
 
@@ -92,7 +92,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
             }`}
             title={isCollapsed ? 'باز کردن گروه‌بندی' : 'بستن گروه‌بندی'}
           >
-            {isCollapsed ? <Plus className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
+            <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
           </button>
 
           <div>
@@ -153,21 +153,18 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
                 )}
               </div>
             ) : (
-              tasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  currentUser={currentUser}
-                  showDetails={showDetails}
-                  onEdit={onEditTask}
-                  onDelete={onDeleteTask}
-                  onStatusChange={onStatusChange}
-                  onPreviewAttachment={onPreviewAttachment}
-                  onViewDetails={onViewDetails}
-                  onOpenProjectDetails={onOpenProjectDetails}
-                  onToggleSubTask={onToggleSubTask}
-                />
-              ))
+              <TaskCardList
+                tasks={tasks}
+                currentUser={currentUser}
+                showDetails={showDetails}
+                onEdit={onEditTask}
+                onDelete={onDeleteTask}
+                onStatusChange={onStatusChange}
+                onPreviewAttachment={onPreviewAttachment}
+                onViewDetails={onViewDetails}
+                onOpenProjectDetails={onOpenProjectDetails}
+                onToggleSubTask={onToggleSubTask}
+              />
             )}
           </div>
         </div>

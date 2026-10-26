@@ -104,26 +104,74 @@ export function toggleUserAccess(
   return { direct: nextDirect, denied: nextDenied };
 }
 
+// Dependent permission -> the permissions it needs. The server holds the same table
+// (PermissionPrerequisites.cs) and also saves these with an assignment; keep the two in step
+// (scripts/check-permission-prerequisites.mjs compares this table with the agreed snapshot).
 const PERMISSION_PREREQUISITES: Readonly<Record<string, readonly string[]>> = {
-  'users.assign_roles': ['users.view'],
-  'users.change_status': ['users.view'],
+  // Identity
   'users.create': ['users.view'],
   'users.update': ['users.view'],
-  'org_structure.manage_companies': ['org_structure.view', 'users.view', 'users.update'],
-  'org_structure.manage_positions': ['org_structure.view', 'users.view', 'users.update'],
-  'org_structure.manage_assignments': ['org_structure.view', 'users.view', 'users.update'],
+  'users.delete': ['users.view'],
+  'users.change_status': ['users.view'],
+  'users.assign_roles': ['users.view', 'roles.view'],
+  'users.assign_permissions': ['users.view', 'permissions.view'],
+  'roles.create': ['roles.view'],
+  'roles.update': ['roles.view'],
+  'roles.assign_permissions': ['roles.view', 'permissions.view'],
+  'groups.create': ['groups.view'],
+  'groups.update': ['groups.view'],
+  'groups.delete': ['groups.view'],
+  'groups.manage_members': ['groups.view', 'users.view'],
+  'groups.assign_permissions': ['groups.view', 'permissions.view'],
+  // A team is built from the user list, so the server asks for users.view here too.
+  'groups.manage_own': ['groups.view_own', 'users.view'],
+  // Organization
   'organization_units.create': ['organization_units.view'],
   'organization_units.update': ['organization_units.view'],
   'organization_units.delete': ['organization_units.view'],
-  'Tasks.Comment': ['Tasks.View'],
+  'org_structure.manage_companies': ['org_structure.view', 'users.view', 'users.update'],
+  'org_structure.manage_positions': ['org_structure.view', 'users.view', 'users.update'],
+  'org_structure.manage_assignments': ['org_structure.view', 'users.view', 'users.update'],
+  'org_structure.manage_substitution': ['org_structure.view'],
+  'org_structure.assign_tasks_any_level': ['org_structure.view'],
+  'org_structure.team_members_any_unit': ['org_structure.view'],
+  // Platform
+  'settings.update': ['settings.view'],
+  'sms_settings.update': ['sms_settings.view'],
+  'sms_settings.test': ['sms_settings.view'],
+  'ldap_settings.update': ['ldap_settings.view'],
+  'ldap_settings.test': ['ldap_settings.view'],
+  'tenants.create': ['tenants.view'],
+  'tenants.manage_all': ['tenants.view'],
+  // Tasks
   'Tasks.Create': ['Tasks.View'],
   'Tasks.Edit': ['Tasks.View'],
   'Tasks.Delete': ['Tasks.View'],
+  'Tasks.Assign': ['Tasks.View'],
+  'Tasks.Comment': ['Tasks.View'],
+  'Tasks.UploadFiles': ['Tasks.View'],
+  'Tasks.ManageAll': ['Tasks.View'],
+  'Tasks.ManageRecurring': ['Tasks.View'],
+  'Tasks.ManageTags': ['Tasks.View'],
+  // Actions
   'Actions.Create': ['Actions.View'],
   'Actions.Edit': ['Actions.View'],
   'Actions.Delete': ['Actions.View'],
   'Actions.Submit': ['Actions.View'],
 };
+
+/** Every permission this one needs, directly or through another one it needs. */
+export function prerequisitesOf(permissionName: string): string[] {
+  const found = new Set<string>();
+  const pending = [...(PERMISSION_PREREQUISITES[permissionName] || [])];
+  while (pending.length > 0) {
+    const next = pending.pop()!;
+    if (found.has(next)) continue;
+    found.add(next);
+    pending.push(...(PERMISSION_PREREQUISITES[next] || []));
+  }
+  return [...found];
+}
 
 export function hasKnownPermissionDependents(permissionName: string): boolean {
   return Object.values(PERMISSION_PREREQUISITES).some((prerequisites) => prerequisites.includes(permissionName));
@@ -297,9 +345,8 @@ const UNLISTED_PERMISSIONS = new Set([
   // Organisational user groups (granting permissions to a whole group): managed only through the
   // API here. Personal work teams (groups.view_own, groups.manage_own) are different and stay.
   'groups.view', 'groups.create', 'groups.update', 'groups.assign_permissions', 'groups.manage_members', 'groups.delete',
-  // No screen for them: deleting users (they are deactivated instead), managing roles, tenants
-  // (one organization).
-  'users.delete', 'roles.create', 'roles.update', 'roles.assign_permissions',
+  // No screen for them: deleting users (they are deactivated instead), tenants (one organization).
+  'users.delete',
   'tenants.view', 'tenants.create', 'tenants.manage_all',
   // Assigning happens through creating and editing a task (Tasks.Create / Tasks.Edit); the
   // endpoints that need this one are not used by this app.

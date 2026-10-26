@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification, setMaxAttachmentBytes } from './types';
+import { TaskTitleContext } from './components/TaskCardList';
+import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification, setMaxAttachmentBytes, SubTaskProgress } from './types';
 import { getUploadPolicy, refreshUploadPolicy } from './utils/uploadPolicy';
 import { isOverdue, toPersianDigits, formatToJalali, getTaskLastModifiedTime, computeAutoTaskStatus } from './utils/helpers';
 import { Navbar } from './components/Navbar';
@@ -8,6 +9,7 @@ import { BoardViewBar } from './components/BoardViewBar';
 import { BoardViewSettings, loadBoardView, saveBoardView } from './utils/boardView';
 import { KanbanBoard } from './components/KanbanBoard';
 import { SandwichBar, ActiveTab } from './components/SandwichBar';
+import ToastHost from './components/ToastHost';
 import { DesktopSidebar } from './components/DesktopSidebar';
 import type { ThemeMode } from './components/SettingsModal';
 
@@ -20,6 +22,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 const JalaliCalendarView = lazy(() => import('./components/JalaliCalendarView').then(m => ({ default: m.JalaliCalendarView })));
 const OverdueTasksView = lazy(() => import('./components/OverdueTasksView').then(m => ({ default: m.OverdueTasksView })));
 const ReportsView = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
+const SubstitutionInboxView = lazy(() => import('./components/SubstitutionInboxView').then(m => ({ default: m.SubstitutionInboxView })));
 const TeamChatView = lazy(() => import('./components/TeamChatView').then(m => ({ default: m.TeamChatView })));
 const PersonalNotesView = lazy(() => import('./components/PersonalNotesView').then(m => ({ default: m.PersonalNotesView })));
 const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
@@ -70,16 +73,31 @@ import { Database, PanelRightOpen } from 'lucide-react';
 import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION, withoutEditDuplicates } from './services/nexusApi';
 import { describeTaskChanges, summarizeTaskChanges, userNameLookup } from './utils/taskChangeSummary';
 import { getReportScope, ReportScope } from './services/taskReportApi';
-import { isOrgStructureAvailable, orgStructureLookupKey } from './services/orgStructureApi';
-import { refreshLookup, useLookup } from './utils/lookupCache';
+import { isOrgStructureAvailable, orgStructureLookupKey, getSubstitutionInbox, SubstitutionInbox } from './services/orgStructureApi';
+import { readLookup, refreshLookup, useLookup } from './utils/lookupCache';
 import { can, canOpenTab, firstAllowedTab, PERMISSIONS } from './utils/permissions';
 import { userErrorMessage } from './utils/errorMessages';
 import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/taskPeople';
+import { appAlert, appConfirm } from './utils/appDialog';
+import { showToast } from './utils/toast';
+
+const PAGE_TITLES: Record<string, string> = {
+  kanban: 'بورد کانبان',
+  calendar: 'نمای تقویم',
+  overdue: 'موعد گذشته',
+  chat: 'گفتگوی تیمی',
+  notes: 'یادداشت‌های شخصی',
+  reports: 'گزارش فعالیت‌ها',
+  substitution: 'کارتابل جانشینی',
+  settings: 'تنظیمات و پروفایل',
+};
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [pbError, setPbError] = useState<string | null>(null);
+  // Raised after a task is saved, deleted or changes status, so the open report reloads.
+  const [reportRefreshKey, setReportRefreshKey] = useState(0);
 
   // Desktop Sidebar visibility state (default: open, saved in localStorage)
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState<boolean>(() => {
@@ -111,7 +129,18 @@ export default function App() {
 
   // Modals - Automatically open auth modal on startup if not logged in
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(() => !getCurrentUser());
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(() => !!getCurrentUser());
+  // The welcome summary shows once a day; the navbar button can still open it again.
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState<boolean>(() => {
+    if (!getCurrentUser()) return false;
+    const key = `tm_welcome_${new Date().toLocaleDateString('en-CA')}`;
+    try {
+      if (localStorage.getItem(key) === '1') return false;
+      localStorage.setItem(key, '1');
+    } catch {
+      // Storage blocked: show it as before.
+    }
+    return true;
+  });
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState<boolean>(false);
 
@@ -208,6 +237,8 @@ export default function App() {
   const [initialStatusForNewTask, setInitialStatusForNewTask] = useState<TaskStatus>('todo');
   const [initialDueDateForNewTask, setInitialDueDateForNewTask] = useState<string | undefined>(undefined);
   const [initialTitleForNewTask, setInitialTitleForNewTask] = useState<string>('');
+  const [lockInitialDescription, setLockInitialDescription] = useState<boolean>(false);
+  const [parentForNewTask, setParentForNewTask] = useState<{ id: string; title: string } | null>(null);
   const [initialDescriptionForNewTask, setInitialDescriptionForNewTask] = useState<string>('');
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
 
@@ -313,15 +344,21 @@ export default function App() {
     }
 
     syncUserAndTasks();
-
-    const unsubscribe = subscribeToTasksPB(() => {
-      loadTasks(false);
-    });
-
-    return () => {
-      unsubscribe();
-    };
   }, [loadTasks]);
+
+  // Live task updates need a session: connect whenever someone is signed in (also right after
+  // signing in, not only on a page load with a saved session) and disconnect on sign-out.
+  const liveUserId = currentUser?.id;
+  useEffect(() => {
+    if (!liveUserId) return undefined;
+    return subscribeToTasksPB(() => {
+      loadTasks(false);
+      // A post falling vacant (or filled) changes the substitution inbox, and whether its menu shows
+      // (only where the inbox exists: it answered with tasks given to posts).
+      const key = `${liveUserId}:substitution`;
+      if (readLookup<SubstitutionInbox | null>(key)?.enabled) refreshLookup(key, getSubstitutionInbox).catch(() => {});
+    });
+  }, [loadTasks, liveUserId]);
 
   // The server ended the session (account disabled, tokens revoked): back to sign-in.
   useEffect(() => {
@@ -366,9 +403,16 @@ export default function App() {
   useEffect(() => {
     if (currentUserId) refreshLookup(orgStructureLookupKey(currentUserId), isOrgStructureAvailable).catch(() => {});
   }, [currentUserId]);
+  // «کارتابل جانشینی» exists only where tasks are given to posts, for those who may put a stand-in
+  // in charge of a vacant post (or have one below them with open tasks).
+  const substitution = useLookup<SubstitutionInbox | null>(
+    currentUserId ? `${currentUserId}:substitution` : null, getSubstitutionInbox, null).value;
+  const showSubstitution = !!substitution?.enabled && (substitution.canManageAll || substitution.posts.length > 0);
   const canOpenSection = useCallback(
-    (tab: ActiveTab) => canOpenTab(currentUser, tab) && (tab !== 'reports' || reportScope !== null),
-    [currentUser, reportScope],
+    (tab: ActiveTab) => canOpenTab(currentUser, tab)
+      && (tab !== 'reports' || reportScope !== null)
+      && (tab !== 'substitution' || showSubstitution),
+    [currentUser, reportScope, showSubstitution],
   );
 
   const canCreateTask = can(currentUser, PERMISSIONS.tasksCreate);
@@ -434,6 +478,7 @@ export default function App() {
           setSelectedTaskForDetail((prev) => (prev ? { ...prev, ...taskData } : null));
         }
         const saved = await updateTaskInPB(taskId, taskData);
+        setReportRefreshKey((k) => k + 1);
         // Show what the server saved (who is responsible, the access list...), not the form's copy.
         setTasks((prev) =>
           prev.map((t) => (t.id === taskId ? { ...saved, comments: saved.comments ?? t.comments, logs: saved.logs ?? t.logs } : t))
@@ -466,6 +511,7 @@ export default function App() {
           taskData.actualCompletionDate = new Date().toISOString();
         }
         const created = await createTaskInPB(taskData);
+        setReportRefreshKey((k) => k + 1);
         setTasks((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
 
         // Log creation action for notifications (notifies assignee and team members)
@@ -497,7 +543,7 @@ export default function App() {
       console.error('Error saving task:', err);
       const errMsg = userErrorMessage(err, 'خطا در ذخیره‌سازی فعالیت');
       setPbError(errMsg);
-      alert(`خطا در ذخیره‌سازی:\n${errMsg}`);
+      void appAlert(`خطا در ذخیره‌سازی:\n${errMsg}`);
       loadTasks(false);
     } finally {
       setIsSyncing(false);
@@ -507,7 +553,7 @@ export default function App() {
   // Delete Task
   const handleDeleteTask = useCallback(async (taskId: string) => {
     const targetTask = tasks.find((t) => t.id === taskId);
-    if (!window.confirm('آیا از حذف این فعالیت اطمینان دارید؟')) return;
+    if (!(await appConfirm('آیا از حذف این فعالیت اطمینان دارید؟'))) return;
     
     // Log delete action before removing
     if (currentUser && taskId) {
@@ -526,26 +572,39 @@ export default function App() {
     setIsSyncing(true);
     try {
       await deleteTaskFromPB(taskId);
+      setReportRefreshKey((k) => k + 1);
       setPbError(null);
     } catch (err: any) {
       console.error('Error deleting task:', err);
       const errMsg = userErrorMessage(err, 'خطا در حذف فعالیت.');
       setPbError(errMsg);
-      alert(errMsg);
+      void appAlert(errMsg);
       loadTasks(false);
+      setReportRefreshKey((k) => k + 1);
     } finally {
       setIsSyncing(false);
     }
   }, [tasks, currentUser, loadTasks]);
 
-  // Toggle Subtask Completion
+  // Advance a subtask through its own lifecycle: not started -> in progress -> completed -> not started.
   const handleToggleSubTask = useCallback(async (taskId: string, subTaskId: string) => {
     const targetTask = tasks.find((t) => t.id === taskId);
     if (!targetTask || !targetTask.projectSubTasks) return;
 
-    const updatedSubTasks = targetTask.projectSubTasks.map((st) =>
-      st.id === subTaskId ? { ...st, completed: !st.completed } : st
-    );
+    const nowIso = new Date().toISOString();
+    const updatedSubTasks = targetTask.projectSubTasks.map((st) => {
+      if (st.id !== subTaskId) return st;
+      const current = st.status || (st.completed ? 'completed' : 'not_started');
+      const next: SubTaskProgress =
+        current === 'not_started' ? 'in_progress' : current === 'in_progress' ? 'completed' : 'not_started';
+      return {
+        ...st,
+        status: next,
+        completed: next === 'completed',
+        actualStartDate: next === 'not_started' ? st.actualStartDate : st.actualStartDate || nowIso,
+        actualCompletedDate: next === 'completed' ? st.actualCompletedDate || nowIso : st.actualCompletedDate,
+      };
+    });
 
     const autoStatus = computeAutoTaskStatus(updatedSubTasks);
 
@@ -574,6 +633,7 @@ export default function App() {
 
     try {
       await updateTaskInPB(taskId, { projectSubTasks: updatedSubTasks, status: autoStatus, actualCompletionDate });
+      setReportRefreshKey((k) => k + 1);
       setPbError(null);
     } catch (err: any) {
       console.error('Error toggling subtask:', err);
@@ -609,6 +669,7 @@ export default function App() {
       // The server's own status-change endpoint already records a clear "Status changed" log
       // entry with the before/after status; logging it again here only duplicated it.
       await updateTaskInPB(taskId, { status: newStatus, actualCompletionDate });
+      setReportRefreshKey((k) => k + 1);
       setPbError(null);
     } catch (err: any) {
       console.error('Error updating task status:', err);
@@ -658,6 +719,7 @@ export default function App() {
 
     try {
       await updateTaskInPB(taskId, finalUpdates);
+      setReportRefreshKey((k) => k + 1);
     } catch (err) {
       console.error('Error syncing project details to server:', err);
     }
@@ -680,20 +742,27 @@ export default function App() {
     status: TaskStatus = 'todo',
     isoDate?: string,
     initialTitle: string = '',
-    initialDescription: string = ''
+    initialDescription: string = '',
+    parent?: { id: string; title: string }
   ) => {
     if (!can(currentUser, PERMISSIONS.tasksCreate)) return;
     setTaskToEdit(null);
     setInitialStatusForNewTask(status);
-    setInitialDueDateForNewTask(isoDate || new Date().toISOString());
+    // No date chosen (e.g. not from the calendar): the form's own default (end of today).
+    setInitialDueDateForNewTask(isoDate);
     setInitialTitleForNewTask(initialTitle);
+    setLockInitialDescription(false);
     setInitialDescriptionForNewTask(initialDescription);
+    setParentForNewTask(parent || null);
     setIsFormModalOpen(true);
   }, [currentUser]);
 
   // Handler to convert chat messages, activity comments, or personal notes into a new task
-  const handleConvertToTask = useCallback((title: string, description?: string) => {
-    handleOpenCreateModal('todo', undefined, title, description || '');
+  // A message or comment turned into a task keeps its text as the description (nothing can be
+  // changed in it, more can be added); a note's text is an ordinary description.
+  const handleConvertToTask = useCallback((title: string, description?: string, parent?: { id: string; title: string }, lockDescription = true) => {
+    handleOpenCreateModal('todo', undefined, title, description || '', parent);
+    setLockInitialDescription(lockDescription && !!(description || '').trim());
   }, [handleOpenCreateModal]);
 
   // Open Form Modal for Editing Task
@@ -702,6 +771,7 @@ export default function App() {
     setInitialDueDateForNewTask(undefined);
     setInitialTitleForNewTask('');
     setInitialDescriptionForNewTask('');
+    setParentForNewTask(null);
     setIsFormModalOpen(true);
   }, []);
 
@@ -711,6 +781,8 @@ export default function App() {
     if (!currentUser) return tasks;
     return tasks.filter((task) => isTaskVisibleTo(task, currentUser));
   }, [tasks, currentUser]);
+
+  const taskTitleById = useMemo(() => new Map(visibleTasks.map((t) => [t.id, t.title])), [visibleTasks]);
 
   // Current User Team Members for Assignee Filter
   const currentUserTeamMembers = useMemo(() => {
@@ -963,7 +1035,7 @@ export default function App() {
     const applyAppBadge = async () => {
       // 1. Document Title Badge
       if (typeof document !== 'undefined') {
-        const baseTitle = 'مدیریت وظایف (TM)';
+        const baseTitle = `${PAGE_TITLES[activeTab] || 'بورد کانبان'} · مدیریت وظایف`;
         if (totalBadgeCount > 0) {
           document.title = `(${toPersianDigits(totalBadgeCount)}) ${baseTitle}`;
         } else {
@@ -1000,7 +1072,7 @@ export default function App() {
     };
 
     applyAppBadge();
-  }, [totalBadgeCount]);
+  }, [totalBadgeCount, activeTab]);
 
   // Request notification permission on first user interaction if default (Required on iOS 16.4+ for PWA Home Screen Badges)
   useEffect(() => {
@@ -1163,7 +1235,8 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans pb-24 lg:pb-0 transition-colors duration-200`}>
+    <TaskTitleContext.Provider value={taskTitleById}>
+    <div className={`min-h-dvh bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}>
       
       {/* Startup Summary Welcome Modal (Priority 1 Overlay) */}
       {isWelcomeModalOpen && (
@@ -1222,7 +1295,7 @@ export default function App() {
       )}
 
       {/* Main Container with Right Desktop Sidebar */}
-      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 sm:pt-6 lg:pt-4 pb-24 lg:pb-4">
+      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 pb-4">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           
           {/* Desktop Sidebar (Renders on Right Side in RTL) */}
@@ -1256,6 +1329,13 @@ export default function App() {
               <div className="space-y-1 text-xs">
                 <h4 className="font-bold text-sm text-amber-800 dark:text-amber-300">خطا در انجام عملیات</h4>
                 <p className="leading-relaxed">{pbError}</p>
+                <button
+                  type="button"
+                  onClick={() => { setPbError(null); loadTasks(true); }}
+                  className="mt-1 px-3 py-1 rounded-lg border border-amber-400 bg-white dark:bg-amber-950 text-amber-800 dark:text-amber-200 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900 cursor-pointer"
+                >
+                  تلاش دوباره
+                </button>
               </div>
             </div>
           </div>
@@ -1344,7 +1424,14 @@ export default function App() {
             {/* Task reports (only where the backend offers them) */}
             {activeTab === 'reports' && reportScope && canOpenTab(currentUser, 'reports') && (
               <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
-                <ReportsView scope={reportScope} visibleTasks={visibleTasks} onOpenTask={handleOpenTaskDetail} />
+                <ReportsView scope={reportScope} refreshKey={reportRefreshKey} visibleTasks={visibleTasks} onOpenTask={handleOpenTaskDetail} generatedBy={currentUser?.name || currentUser?.username} />
+              </Suspense>
+            )}
+
+            {/* The substitution inbox (only where tasks are given to posts) */}
+            {activeTab === 'substitution' && showSubstitution && (
+              <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
+                <SubstitutionInboxView onChanged={() => currentUserId && refreshLookup(`${currentUserId}:substitution`, getSubstitutionInbox).catch(() => {})} />
               </Suspense>
             )}
 
@@ -1371,7 +1458,7 @@ export default function App() {
                 <PersonalNotesView
                   currentUser={currentUser}
                   appColorPalette={appColorPalette}
-                  onConvertToTask={handleConvertToTask}
+                  onConvertToTask={(title, description) => handleConvertToTask(title, description, undefined, false)}
                 />
               </Suspense>
             )}
@@ -1408,7 +1495,7 @@ export default function App() {
           pages the flex-1 main container above pushes it to the bottom of the screen. While the
           fixed desktop sidebar is open, it sits in the main column (sidebar 12rem + gap 1.5rem +
           page padding 0.75rem) so the sidebar never covers it. */}
-      <footer className={`w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-6 pb-4 lg:pt-3 lg:pb-3 ${isDesktopSidebarOpen ? 'lg:pr-[14.25rem]' : ''}`}>
+      <footer className={`w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-6 pb-24 lg:pt-3 lg:pb-3 ${isDesktopSidebarOpen ? 'lg:pr-[14.25rem]' : ''}`}>
         <div className="ui-bar bg-slate-900 text-white rounded-2xl p-4 lg:py-3 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
           <span className="font-bold tracking-tight text-white/95">
             تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
@@ -1416,6 +1503,7 @@ export default function App() {
         </div>
       </footer>
 
+      <ToastHost />
       <Suspense fallback={null}>
         {/* Form Modal for Add/Edit Task */}
         {isFormModalOpen && (
@@ -1428,6 +1516,8 @@ export default function App() {
             initialDueDate={initialDueDateForNewTask}
             initialTitle={initialTitleForNewTask}
             initialDescription={initialDescriptionForNewTask}
+            lockInitialDescription={lockInitialDescription}
+            parentTask={parentForNewTask}
             appColorPalette={appColorPalette}
             currentUser={currentUser}
             existingTasks={visibleTasks}
@@ -1538,6 +1628,9 @@ export default function App() {
               const target = tasks.find((t) => t.id === taskId);
               if (target) {
                 handleOpenTaskDetail(target);
+              } else {
+                // Taken off the task (or it was deleted) since the notification came.
+                showToast('این فعالیت دیگر در دسترس شما نیست.', 'info');
               }
             }}
             appColorPalette={appColorPalette}
@@ -1567,6 +1660,7 @@ export default function App() {
 
 
     </div>
+    </TaskTitleContext.Provider>
   );
 }
 

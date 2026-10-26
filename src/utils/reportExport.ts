@@ -2,6 +2,7 @@
 // spreadsheet library, nothing fetched), and a PDF made from the printable pages
 // (ReportPrintPages) with html2canvas + jsPDF, so Persian text keeps the app's own font and shaping.
 import { zipSync, strToU8 } from 'fflate';
+import { showToast } from './toast';
 import { getCurrentJalali } from './jalali';
 
 /** One sheet: header row (bold), then rows; the sheet reads right to left. */
@@ -42,16 +43,20 @@ export function saveBlob(blob: Blob, fileName: string): void {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  showToast(`فایل «${fileName}» آماده شد و دانلود شروع شد`, 'ok');
 }
 
 /**
- * One PDF page (A4 landscape) per element, captured as an image so Persian text is shaped and
+ * One PDF page (A4 portrait) per element, captured as an image so Persian text is shaped and
  * drawn by the browser in the app's font. `onProgress(done, total)` reports each page.
  */
 export async function pagesToPdf(pages: HTMLElement[], onProgress?: (done: number, total: number) => void): Promise<Blob> {
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
   if (document.fonts?.ready) await document.fonts.ready;
-  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
+  // Images (the logo) must be loaded before a page is captured.
+  await Promise.all(pages.flatMap((page) => Array.from(page.querySelectorAll('img'))).map((img) =>
+    img.complete ? Promise.resolve() : new Promise<void>((resolve) => { img.onload = img.onerror = () => resolve(); })));
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
   // html2canvas reads the background of <html> and <body> in its copy of the document, and cannot
   // parse the oklch() colours Tailwind gives them (bg-slate-50, dark mode) - it throws. The copy
   // is made plain white here; the pages themselves use hex colours only.
@@ -67,8 +72,8 @@ export async function pagesToPdf(pages: HTMLElement[], onProgress?: (done: numbe
   };
   for (let i = 0; i < pages.length; i++) {
     const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: '#ffffff', logging: false, useCORS: true, onclone });
-    if (i > 0) pdf.addPage('a4', 'landscape');
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.88), 'JPEG', 0, 0, 297, 210, undefined, 'FAST');
+    if (i > 0) pdf.addPage('a4', 'portrait');
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.88), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
     onProgress?.(i + 1, pages.length);
     // Let the page repaint (progress) between pages.
     await new Promise((resolve) => setTimeout(resolve, 0));

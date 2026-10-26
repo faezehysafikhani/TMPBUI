@@ -22,7 +22,7 @@ export type TaskStatus = 'todo' | 'in_progress' | 'paused' | 'completed';
 
 export type Priority = 'low' | 'medium' | 'high';
 
-export type AppTheme = 'default' | 'checkerboard' | 'diagonal' | 'grid' | 'dots' | 'cross' | 'waves';
+export type AppTheme = 'default' | 'checkerboard' | 'diagonal' | 'grid' | 'dots' | 'cross' | 'waves' | 'glass' | 'bubbles' | 'rain' | 'dandelion' | 'snow' | 'autumn' | 'spring';
 
 export type AppColorPalette = 'indigo' | 'emerald' | 'rose' | 'amber' | 'cyan' | 'slate';
 
@@ -89,6 +89,8 @@ export interface TaskComment {
   userId: string;
   userName: string;
   userAvatar?: string;
+  /** Written as a stand-in for a vacant post («جانشین کارشناس · کد ۷»). */
+  actingNote?: string;
   text: string;
   attachments?: Attachment[];
   createdAt: string;
@@ -110,14 +112,28 @@ export interface TaskLog {
 
 export type SubTaskImportance = 'low' | 'medium' | 'high';
 
+export interface SubTaskAssignee {
+  id: string;
+  name: string;
+}
+
+/** A subtask's own lifecycle, independent of its parent task's. */
+export type SubTaskProgress = 'not_started' | 'in_progress' | 'completed';
+
 export interface ProjectSubTask {
   id: string;
   title: string;
   startDate?: string;
   endDate?: string;
   importance: SubTaskImportance; // 'low' (1), 'medium' (2), 'high' (3)
-  completed: boolean;
+  completed: boolean; // derived: status === 'completed'
+  status?: SubTaskProgress;
+  /** When the subtask actually entered 'in_progress'. Set once, never cleared. */
+  actualStartDate?: string;
+  /** When the subtask actually entered 'completed'. Set once, never cleared. */
+  actualCompletedDate?: string;
   createdAt: string;
+  assignees?: SubTaskAssignee[];
 }
 
 export interface ProjectCharter {
@@ -164,13 +180,21 @@ export interface Task {
   /** Everyone responsible for doing the task (one or more); the first is assignedUserId. */
   responsibleUserIds?: string[];
   responsibleUserNames?: string[];
+  /** Standing in for a vacant post of the task (جانشین): see it and comment, nothing more. */
+  standIns?: { userId: string; name: string; note: string | null }[];
   assignedTeamId?: string; // the task's team: its context, not who is responsible
   assignedTeamName?: string;
+  /** Where tasks are given to posts: the responsible posts (their holders are responsibleUserIds). */
+  responsiblePostIds?: string[];
+  /** Where tasks are given to posts: every post of the task (creator's, responsible, access). */
+  posts?: TaskPostInfo[];
   teamMemberIds?: string[]; // the access list: who else may see and work on the task
   teamMemberNames?: string[]; // their names, in the same order
   allowAssigneeStatusUpdate?: boolean; // آیا مسئول امکان بروزرسانی وضعیت را دارد یا خیر
   tags?: string[];
   isProject?: boolean;
+  /** The activity this one was created under (a sub-activity), when it has a parent. */
+  parentTaskId?: string;
   isRecurring?: boolean;
   recurringConfig?: RecurringConfig;
   projectCharter?: ProjectCharter;
@@ -179,6 +203,17 @@ export interface Task {
   logs?: TaskLog[];
   createdAt: string;
   updatedAt: string;
+}
+
+/** A post a task is given to: role owner / responsible / access; holderUserId null when vacant. */
+export interface TaskPostInfo {
+  postId: string;
+  role: 'owner' | 'responsible' | 'access';
+  title: string;
+  code: string;
+  place: string;
+  holderUserId: string | null;
+  holderName: string | null;
 }
 
 export interface StatusConfig {

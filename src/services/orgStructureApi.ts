@@ -16,13 +16,22 @@ export interface Company {
   linkedUnitIds: string[];
 }
 
-export interface CompanyInput { name: string; code: string; description?: string | null; managerUserId?: string | null }
+/** The head is not chosen here: it is whoever holds the company's position with no superior. */
+export interface CompanyInput { name: string; code: string; description?: string | null }
 
 export interface CompanyUnitLink { unitId: string; unitName: string; companyId: string; companyName: string }
 
-export interface Position { id: string; title: string; parentPositionId: string | null; isActive: boolean }
+/**
+ * companyIds: the companies the position is for (given only there). In each company the one
+ * position with no superior is the head's (رئیس کل).
+ */
+export interface Position { id: string; title: string; parentPositionId: string | null; isActive: boolean; companyIds?: string[] }
 
-export type ManagerSource = 'Explicit' | 'UnitManager' | 'CompanyManager';
+/** Positions for a company: those it is for. */
+export const positionsForCompany = (positions: Position[], companyId: string) =>
+  positions.filter((p) => (p.companyIds || []).includes(companyId));
+
+export type ManagerSource = 'Explicit' | 'UnitManager' | 'CompanyManager' | 'PostSuperior';
 
 export interface Manager { userId: string; displayName: string; isActive: boolean; source: ManagerSource }
 
@@ -38,9 +47,43 @@ export interface UserAssignment {
   positionTitle: string | null;
   explicitManagerUserId: string | null;
   manager: Manager | null;
+  /** Every deputy position the person holds, the main one first (absent on an older backend). */
+  positions?: HeldPosition[];
 }
 
-export interface AssignmentInput { companyId: string; unitId: string | null; positionId: string | null; managerUserId: string | null }
+/** One of a deputy's positions that someone holds. */
+/** A post someone holds. unitId null: directly in the company (unitName is then the company's). */
+export interface HeldPosition { unitPositionId: string; unitId: string | null; unitName: string; positionId: string; title: string; code?: string | null }
+
+/**
+ * unitPositionIds, when sent, is every deputy position the person holds (replacing the list);
+ * without it, positionId is their main position in unitId and their other positions stay.
+ */
+export interface AssignmentInput {
+  companyId: string;
+  unitId: string | null;
+  positionId: string | null;
+  managerUserId: string | null;
+  unitPositionIds?: string[];
+}
+
+/** A position a deputy has, in the deputy's order, with whoever holds it (none: vacant). */
+/** A post: one person at most (holders). unitId null: directly in the company. */
+export interface UnitPosition {
+  id: string;
+  unitId: string | null;
+  unitName: string | null;
+  positionId: string;
+  title: string;
+  sortOrder: number;
+  isPositionActive: boolean;
+  holders: PersonRef[];
+  code?: string;
+  companyId?: string;
+  companyName?: string | null;
+  /** The post above this one in its place (its holder manages this post's holder). */
+  parentPostId?: string | null;
+}
 
 export interface Subordinate {
   userId: string;
@@ -71,8 +114,39 @@ export interface ChartMember {
  */
 export interface ChartTeam { teamId: string; name: string; description: string | null; owner: PersonRef; members: ChartMember[] }
 
-/** members: the unit's people in no work team. teams: the work teams its people built (absent on an older backend). */
-export interface ChartUnit { unitId: string; name: string; manager: PersonRef | null; members: ChartMember[]; teams?: ChartTeam[]; isActive?: boolean; peopleCount?: number }
+/** A deputy's position in the chart; no holders: vacant. */
+/** A post in the chart: at most one holder; code unique in its company; isHead: the company head's post. */
+export interface ChartPosition {
+  unitPositionId: string;
+  positionId: string;
+  title: string;
+  sortOrder: number;
+  isActive: boolean;
+  holders: ChartMember[];
+  code?: string;
+  isHead?: boolean;
+  /** The post above this one in its place (its holder manages this post's holder). */
+  parentPostId?: string | null;
+}
+
+/** «کارشناس · کد ۷»: a post's title with its code. */
+export const postLabel = (post: { title: string; code?: string | null }) =>
+  post.code ? `${post.title} · کد ${post.code.replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)])}` : post.title;
+
+/**
+ * positions: the deputy's positions in its order, vacant ones too (absent on an older backend).
+ * members: the deputy's people who hold none of its positions. teams: no longer shown.
+ */
+export interface ChartUnit {
+  unitId: string;
+  name: string;
+  manager: PersonRef | null;
+  members: ChartMember[];
+  teams?: ChartTeam[];
+  isActive?: boolean;
+  peopleCount?: number;
+  positions?: ChartPosition[];
+}
 
 export interface ChartCompany {
   companyId: string;
@@ -84,6 +158,8 @@ export interface ChartCompany {
   units: ChartUnit[];
   /** How many people the company has (its people in a deputy and those directly under it). */
   peopleCount?: number;
+  /** Posts directly in the company (the head's first); absent on an older backend. */
+  positions?: ChartPosition[];
 }
 
 /** An organization unit (a deputy, a department...) from Nexus.Organization. */
@@ -96,7 +172,8 @@ const BASE = '/api/org-structure';
 export const MANAGER_SOURCE_TITLES: Record<ManagerSource, string> = {
   Explicit: 'تعیین‌شده مستقیم',
   UnitManager: 'مدیر واحد',
-  CompanyManager: 'مدیر ارشد شرکت',
+  CompanyManager: 'رئیس کل شرکت',
+  PostSuperior: 'پست مافوق',
 };
 
 export const ORG_STRUCTURE_PERMISSIONS = {
@@ -147,11 +224,47 @@ export const linkUnitToCompany = (unitId: string, companyId: string) =>
 export const unlinkUnit = (unitId: string) => apiRequest<void>('DELETE', `${BASE}/company-units/${unitId}`);
 
 export const listPositions = () => apiRequest<Position[]>('GET', `${BASE}/positions`);
-export const createPosition = (title: string, parentPositionId: string | null) =>
-  apiRequest<Position>('POST', `${BASE}/positions`, { body: { title, parentPositionId } });
-export const updatePosition = (id: string, title: string, parentPositionId: string | null, isActive: boolean) =>
-  apiRequest<Position>('PUT', `${BASE}/positions/${id}`, { body: { title, parentPositionId, isActive } });
+export const createPosition = (title: string, parentPositionId: string | null, companyIds: string[]) =>
+  apiRequest<Position>('POST', `${BASE}/positions`, { body: { title, parentPositionId, companyIds } });
+export const updatePosition = (id: string, title: string, parentPositionId: string | null, isActive: boolean, companyIds: string[]) =>
+  apiRequest<Position>('PUT', `${BASE}/positions/${id}`, { body: { title, parentPositionId, isActive, companyIds } });
 export const deletePosition = (id: string) => apiRequest<void>('DELETE', `${BASE}/positions/${id}`);
+
+/** A deputy's positions (or every deputy's), each with its holders. */
+export const listUnitPositions = (unitId?: string) => apiRequest<UnitPosition[]>('GET', `${BASE}/unit-positions`, { query: { unitId } });
+export const addUnitPosition = (unitId: string, positionId: string, code?: string, parentPostId?: string | null) =>
+  apiRequest<UnitPosition>('POST', `${BASE}/units/${unitId}/positions`, { body: { positionId, code: code || null, parentPostId: parentPostId || null } });
+/** A post directly in the company (the head's, a board member's...). */
+export const addCompanyPosition = (companyId: string, positionId: string, code?: string, parentPostId?: string | null) =>
+  apiRequest<UnitPosition>('POST', `${BASE}/companies/${companyId}/positions`, { body: { positionId, code: code || null, parentPostId: parentPostId || null } });
+export const updateUnitPositionCode = (unitPositionId: string, code: string) =>
+  apiRequest<UnitPosition>('PUT', `${BASE}/unit-positions/${unitPositionId}`, { body: { code } });
+/** Puts a post under another post of its place (null: under none). */
+export const setPostParent = (unitPositionId: string, parentPostId: string | null) =>
+  apiRequest<UnitPosition>('PUT', `${BASE}/unit-positions/${unitPositionId}/parent`, { body: { parentPostId } });
+/** Every position of the deputy, in the new order. */
+export const orderUnitPositions = (unitId: string, unitPositionIds: string[]) =>
+  apiRequest<UnitPosition[]>('PUT', `${BASE}/units/${unitId}/positions/order`, { body: { unitPositionIds } });
+export const removeUnitPosition = (unitPositionId: string) => apiRequest<void>('DELETE', `${BASE}/unit-positions/${unitPositionId}`);
+
+/** The substitution inbox (کارتابل جانشینی): vacant posts' open tasks and who stands in for them. */
+export interface ActingPost { postId: string; title: string; code: string; place: string; holderUserId: string | null; holderName: string | null }
+export interface SubstitutionTask { taskId: string; title: string; dueDate: string; status: string }
+export interface VacantPost { postId: string; title: string; code: string; place: string; acting: ActingPost | null; tasks: SubstitutionTask[]; candidates: ActingPost[] }
+export interface SubstitutionInbox { enabled: boolean; canManageAll: boolean; posts: VacantPost[] }
+
+/** Null where the backend has no inbox (404). */
+export async function getSubstitutionInbox(): Promise<SubstitutionInbox | null> {
+  try {
+    return await apiRequest<SubstitutionInbox>('GET', `${BASE}/substitution`);
+  } catch (err) {
+    if (err instanceof NexusApiError && (err.httpStatus === 404 || err.httpStatus === 405)) return null;
+    throw err;
+  }
+}
+export const setActingPost = (vacantPostId: string, actingPostId: string) =>
+  apiRequest<void>('PUT', `${BASE}/substitution/${vacantPostId}`, { body: { actingPostId } });
+export const clearActingPost = (vacantPostId: string) => apiRequest<void>('DELETE', `${BASE}/substitution/${vacantPostId}`);
 
 export const listAssignments = (filter: { companyId?: string; unitId?: string } = {}) =>
   apiRequest<UserAssignment[]>('GET', `${BASE}/assignments`, { query: filter });
@@ -173,7 +286,19 @@ export const removeAssignment = (userId: string) => apiRequest<void>('DELETE', `
 export const getSubordinatesOf = (userId: string, all: boolean) =>
   apiRequest<Subordinate[]>('GET', `${BASE}/users/${userId}/subordinates`, { query: { all } });
 
-export const listOrgUnits = () => apiRequest<OrgUnit[]>('GET', '/api/organization/units');
+/**
+ * Units, without those of other companies where the user is kept to their own company (the
+ * server says which; an older server, or none kept: every unit).
+ */
+export const listOrgUnits = async (): Promise<OrgUnit[]> => {
+  const [units, hidden] = await Promise.all([
+    apiRequest<OrgUnit[]>('GET', '/api/organization/units'),
+    apiRequest<string[]>('GET', `${BASE}/other-companies-units`).catch(() => [] as string[]),
+  ]);
+  if (!hidden?.length) return units;
+  const other = new Set(hidden);
+  return units.filter((unit) => !other.has(unit.id));
+};
 export const createOrgUnit = (input: { name: string }) =>
   apiRequest<OrgUnit>('POST', '/api/organization/units', { body: { ...input, tenantId: getSessionTenantId() } });
 export const updateOrgUnit = (id: string, input: OrgUnitInput) => apiRequest<OrgUnit>('PUT', `/api/organization/units/${id}`, { body: input });

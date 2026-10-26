@@ -1,5 +1,5 @@
-import React from 'react';
-import { Kanban, Calendar, AlertCircle, Settings, LogOut, MessageSquare, FileText, PanelRightClose, Plus, BarChart3 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Kanban, Calendar, AlertCircle, Settings, LogOut, MessageSquare, FileText, PanelRightClose, Plus, BarChart3, UserCog } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette, User as UserType } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
@@ -43,6 +43,19 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 }) => {
   const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
 
+  // The navbar's real height (it grows when its items wrap on narrower screens), so the gap under
+  // it is the same on every monitor size.
+  const [headerHeight, setHeaderHeight] = useState(77);
+  useEffect(() => {
+    const header = document.querySelector('header.ui-bar');
+    if (!header) return;
+    const update = () => setHeaderHeight(Math.round(header.getBoundingClientRect().height));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
   if (!isOpen) {
     return null;
   }
@@ -61,8 +74,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   // The spacer div below keeps the width reserved in the flex row so the main content doesn't
   // shift into the space this now-fixed element used to occupy.
   const fixedRight = 'max(0.75rem, calc((100vw - 1920px) / 2 + 0.75rem))';
-  // Navbar at lg+: py-3.5 (2 x 14px) + 48px logo + 1px bottom border.
-  const HEADER_HEIGHT_PX = 77;
+  const HEADER_HEIGHT_PX = headerHeight;
   const EDGE_GAP_PX = 15;
 
   return (
@@ -222,6 +234,24 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
           </div>
         </button>
         )}
+
+        {/* 7. Substitution inbox (only where tasks are given to posts and there is something for the user) */}
+        {canOpenTab('substitution') && (
+        <button
+          type="button"
+          onClick={() => setActiveTab('substitution')}
+          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === 'substitution'
+              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
+              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <UserCog className="w-4 h-4 shrink-0" />
+            <span className="truncate">کارتابل جانشینی</span>
+          </div>
+        </button>
+        )}
       </div>
 
 
@@ -260,7 +290,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 
       {/* Progress Summary Widget */}
       {totalTasks > 0 && (
-        <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800/80 flex-1 min-h-0 flex flex-col items-center justify-center gap-2">
+        <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800/80 shrink-0 flex flex-col items-center justify-end gap-2">
           <div className="relative w-24 h-24 shrink-0">
             <svg viewBox="0 0 100 100" className="w-24 h-24 -rotate-90">
               <circle cx="50" cy="50" r={RADIUS} fill="none" strokeWidth="10" className="stroke-slate-100 dark:stroke-slate-800" />

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { PersianTimeInput } from '../PersianTimeInput';
 import { Loader2, Save, Send, MessageSquareText, RotateCcw, Plus, Pencil, Trash2, X, AlarmClock } from 'lucide-react';
 import {
   SmsPanelSettings, SmsProviderConfiguration, SmsProviderOption, SmsTemplate, SmsQuietHours, TaskReminderSettings,
@@ -8,6 +9,7 @@ import {
 import { AdminCard, Field, inputClass, Toggle, Notice, PrimaryButton, SecondaryButton, toLatinDigits } from './AdminUi';
 import { userErrorMessage } from '../../utils/errorMessages';
 import { productSmsTemplates, validateSmsTemplate, SMS_TEMPLATE_MAX_LENGTH } from '../../utils/smsTemplates';
+import { appConfirm } from '../../utils/appDialog';
 
 /** The SMS panel (پنل پیامکی): provider settings, the system's SMS texts and a test message. */
 export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ canUpdate, canTest }) => {
@@ -92,7 +94,7 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
     }
   };
   const deleteProvider = async (item: SmsProviderConfiguration) => {
-    if (!window.confirm(`سرویس‌دهنده «${item.name}» حذف شود؟`)) return;
+    if (!(await appConfirm(`سرویس‌دهنده «${item.name}» حذف شود؟`))) return;
     setBusy('provider');
     setMessage(null);
     try {
@@ -344,10 +346,10 @@ export const SmsPanel: React.FC<{ canUpdate: boolean; canTest: boolean }> = ({ c
               />
               <div className="grid grid-cols-2 gap-4 max-w-md">
                 <Field label="از ساعت">
-                  <input type="time" className={`${inputClass} dir-ltr text-right`} value={quietHours.start} disabled={disabled || !quietHours.enabled} onChange={(e) => setQuietHours({ ...quietHours, start: e.target.value })} />
+                  <PersianTimeInput className={inputClass} value={quietHours.start} disabled={disabled || !quietHours.enabled} onChange={(v) => setQuietHours({ ...quietHours, start: v })} ariaLabel="شروع ساعات سکوت" />
                 </Field>
                 <Field label="تا ساعت">
-                  <input type="time" className={`${inputClass} dir-ltr text-right`} value={quietHours.end} disabled={disabled || !quietHours.enabled} onChange={(e) => setQuietHours({ ...quietHours, end: e.target.value })} />
+                  <PersianTimeInput className={inputClass} value={quietHours.end} disabled={disabled || !quietHours.enabled} onChange={(v) => setQuietHours({ ...quietHours, end: v })} ariaLabel="پایان ساعات سکوت" />
                 </Field>
               </div>
             </div>

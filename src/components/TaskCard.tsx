@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
+import { appAlert } from '../utils/appDialog';
 
 interface TaskCardProps {
   task: Task;
@@ -102,7 +103,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             onStatusChange(task.id, 'completed');
           }
         } else {
-          alert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
+          void appAlert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
         }
       }
     }
@@ -314,7 +315,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
           {overdue && (
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 animate-pulse">
               <AlertCircle className="w-2.5 h-2.5" />
-              عقب افتاده
+              موعد گذشته
             </span>
           )}
 
@@ -331,6 +332,17 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
               <UserIcon className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
               <span>مسئول: {responsibleNamesOf(task)}</span>
+            </span>
+          )}
+
+          {showDetails && task.standIns && task.standIns.length > 0 && (
+            <span
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-50 dark:bg-violet-950/80 text-violet-800 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
+              title={task.standIns.map((s) => `${s.name}${s.note ? ` (${s.note})` : ''}`).join('، ')}
+              data-stand-in
+            >
+              <UserIcon className="w-2.5 h-2.5 text-violet-600 dark:text-violet-400" />
+              <span>جانشین: {task.standIns.map((s) => s.name).join('، ')}</span>
             </span>
           )}
 
@@ -470,30 +482,30 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
                         e.stopPropagation();
                         handleToggleSubTaskClick(st.id);
                       }}
-                      className={`flex items-center justify-between p-2 rounded-xl border text-xs transition-all cursor-pointer ${
+                      className={`flex items-start gap-2 p-2 rounded-xl border text-xs transition-all cursor-pointer ${
                         isDone
                           ? 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 line-through'
                           : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:border-purple-300 dark:hover:border-purple-700'
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0 flex-1 pr-1">
-                        <input
-                          type="checkbox"
-                          checked={isDone}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            handleToggleSubTaskClick(st.id);
-                          }}
-                          className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-600 cursor-pointer shrink-0"
-                        />
-                        <span className="font-semibold text-xs truncate">{st.title}</span>
+                      <input
+                        type="checkbox"
+                        checked={isDone}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleToggleSubTaskClick(st.id);
+                        }}
+                        className="w-4 h-4 mt-0.5 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-600 cursor-pointer shrink-0"
+                      />
+                      {/* The title gets the row's width (the date goes under it), so it is never squeezed out on a narrow card. */}
+                      <div className="min-w-0 flex-1">
+                        <span className="block font-semibold text-xs leading-5 break-words line-clamp-2" title={st.title}>{st.title}</span>
+                        {st.startDate && (
+                          <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium dir-rtl">
+                            {formatToJalali(st.startDate)}
+                          </span>
+                        )}
                       </div>
-
-                      {st.startDate && (
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 font-medium dir-rtl mr-2">
-                          {formatToJalali(st.startDate)}
-                        </span>
-                      )}
                     </div>
                   );
                 })}

@@ -211,7 +211,7 @@ export const UserWelcomeModal: React.FC<UserWelcomeModalProps> = ({
             >
               <div className="flex items-center justify-between text-slate-300">
                 <span className={`text-[11px] font-bold ${overdueCount > 0 ? 'text-rose-300' : ''}`}>
-                  کارهای معوقه
+                  موعد گذشته
                 </span>
                 <AlertTriangle className={`w-4 h-4 ${overdueCount > 0 ? 'text-rose-400 animate-bounce' : 'text-slate-300'}`} />
               </div>

@@ -5,6 +5,7 @@ import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
 import { Honorific, createTitle, deleteTitle, listTitles, updateTitle } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
+import { appConfirm } from '../../../utils/appDialog';
 
 type Message = { type: 'success' | 'error'; text: string } | null;
 
@@ -96,7 +97,7 @@ export const TitlesPanel: React.FC = () => {
                       label="حذف"
                       disabled={busy || t.userCount > 0}
                       disabledReason="کاربرانی این عنوان را دارند؛ به‌جای حذف، آن را غیرفعال کنید."
-                      onClick={() => window.confirm(`عنوان «${t.title}» حذف شود؟`) && run(() => deleteTitle(t.id), 'عنوان حذف شد.', 'حذف عنوان انجام نشد.')}
+                      onClick={async () => await appConfirm(`عنوان «${t.title}» حذف شود؟`) && run(() => deleteTitle(t.id), 'عنوان حذف شد.', 'حذف عنوان انجام نشد.')}
                     />
                   </div>
                 </div>

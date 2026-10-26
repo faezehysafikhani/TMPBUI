@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
+import { appAlert } from '../utils/appDialog';
 
 interface JalaliCalendarViewProps {
   tasks: Task[];
@@ -118,7 +119,7 @@ const CalendarTaskCardItem: React.FC<{
             onStatusChange(parent.id, 'completed');
           }
         } else {
-          alert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
+          void appAlert('شما دسترسی لازم برای تغییر وضعیت این فعالیت را ندارید.');
         }
       }
     }
@@ -594,7 +595,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
                   }
                 }}
                 title={holidayInfo.isHoliday ? holidayInfo.title : undefined}
-                className={`relative h-14 sm:h-20 lg:h-(--cal-cell-h) p-1 sm:p-2 lg:p-1.5 rounded-2xl border transition-all duration-200 flex flex-col justify-between items-center cursor-pointer ${
+                className={`group/day relative h-14 sm:h-20 lg:h-(--cal-cell-h) p-1 sm:p-2 lg:p-1.5 rounded-2xl border transition-all duration-200 flex flex-col justify-between items-center cursor-pointer ${
                   isSelected
                     ? isRedDay
                       ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-200 dark:shadow-none scale-102 z-10'
@@ -640,7 +641,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
                         }}
                         title="افزودن فعالیت در این روز"
                         aria-label={`افزودن فعالیت در روز ${toPersianDigits(dayNum)}`}
-                        className={`w-4 h-4 sm:w-5 sm:h-5 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
+                        className={`w-4 h-4 sm:w-5 sm:h-5 rounded-md flex items-center justify-center transition-all cursor-pointer [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/day:opacity-100 focus-visible:opacity-100 ${
                           isSelected
                             ? 'bg-white/20 hover:bg-white/35 text-white'
                             : isRedDay

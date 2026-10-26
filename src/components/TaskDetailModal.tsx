@@ -24,6 +24,7 @@ import {
   Send,
   AlertCircle,
   ChevronDown,
+  ChevronLeft,
   Check,
   CheckCircle2,
   History,
@@ -33,10 +34,16 @@ import {
   CheckSquare,
   ExternalLink,
   Loader2,
+  Circle,
+  PlayCircle,
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { userErrorMessage } from '../utils/errorMessages';
+import { EmojiButton, VoiceButton, isVoiceName, containsEmoji } from './ChatExtras';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
+import { appAlert, appConfirm } from '../utils/appDialog';
+import { showToast } from '../utils/toast';
+import { NexusApiError } from '../services/nexusApi';
 
 interface TaskDetailModalProps {
   isOpen: boolean;
@@ -50,8 +57,22 @@ interface TaskDetailModalProps {
   onPreviewAttachment: (attachment: Attachment) => void;
   onOpenProjectDetails?: (task: Task) => void;
   onToggleSubTask?: (taskId: string, subTaskId: string) => void;
-  onConvertToTask?: (title: string, description?: string) => void;
+  onConvertToTask?: (title: string, description?: string, parent?: { id: string; title: string }) => void;
 }
+
+const LOGS_PAGE_SIZE = 10;
+
+// Test only: set VITE_FAKE_LOGS=30 in .env.development to pad the history with fake entries.
+const fakeLogs = (taskId: string): TaskLog[] =>
+  Array.from({ length: Number((import.meta as any).env?.VITE_FAKE_LOGS) || 0 }, (_, i) => ({
+    id: `fake-${i}`,
+    taskId,
+    userId: 'fake',
+    userName: i % 2 ? 'علی رضایی' : 'مریم احمدی',
+    action: i % 3 ? 'ویرایش فعالیت' : 'تغییر وضعیت',
+    details: 'تغییر موعد انجام: ۱۴۰۵/۰۷/۱۰ ← ۱۴۰۵/۰۷/۲۰ | تغییر اولویت: متوسط ← زیاد',
+    createdAt: new Date(Date.now() - i * 3600_000).toISOString(),
+  }));
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   isOpen,
@@ -73,6 +94,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     [...(task.comments || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   );
   const [logsList, setLogsList] = useState<TaskLog[]>(task.logs || []);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const [visibleLogCount, setVisibleLogCount] = useState(LOGS_PAGE_SIZE);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
   const [newCommentText, setNewCommentText] = useState('');
@@ -88,7 +112,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const editCommentFileInputRef = useRef<HTMLInputElement>(null);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
 
+  // Escape closes the dialog (unless the emoji list is open: Escape closes that first).
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.querySelector('[data-emoji-picker]')) onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
+
   // Load comments & activity logs from the server
+  const toldGoneRef = useRef(false);
   useEffect(() => {
     if (task && task.id) {
       setIsLoadingComments(true);
@@ -100,7 +135,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           setCommentsList(sorted);
           onUpdateComments(task.id, sorted);
         })
-        .catch(() => {
+        .catch((err) => {
+          // The server no longer shows this task to the user (taken off it, or deleted) - e.g.
+          // opened from an old notification: say so instead of showing what the screen had.
+          if (err instanceof NexusApiError && err.httpStatus === 404) {
+            // Once, even if the comments were asked for twice.
+            if (!toldGoneRef.current) {
+              toldGoneRef.current = true;
+              showToast('این فعالیت دیگر در دسترس شما نیست.', 'info');
+            }
+            onClose();
+            return;
+          }
           const sorted = [...(task.comments || [])].sort(
             (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
@@ -117,7 +163,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           const filtered = fetchedLogs.filter(
             (l) => !l.action.includes('نظر') && !l.action.includes('گفتگو') && !l.action.includes('پیام')
           );
-          setLogsList(filtered);
+          setLogsList([...filtered, ...fakeLogs(task.id)]);
         })
         .catch(() => {
           const filtered = (task.logs || []).filter(
@@ -195,11 +241,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!isAllowedUploadFile(file)) {
-          alert(UPLOAD_TYPE_ERROR_MESSAGE);
+          void appAlert(UPLOAD_TYPE_ERROR_MESSAGE);
           continue;
         }
         if (file.size > MAX_ATTACHMENT_BYTES) {
-          alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
+          void appAlert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           continue;
         }
         const dataUrl = await readFileAsDataUrl(file);
@@ -215,7 +261,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       setCommentAttachments((prev) => [...prev, ...newAtts]);
     } catch (err) {
       console.error('Failed to attach file to comment:', err);
-      alert('خطا در بارگذاری فایل. لطفاً مجدداً تلاش کنید.');
+      void appAlert('خطا در بارگذاری فایل. لطفاً مجدداً تلاش کنید.');
     } finally {
       setIsUploadingCommentFiles(false);
       if (commentFileInputRef.current) {
@@ -236,11 +282,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!isAllowedUploadFile(file)) {
-          alert(UPLOAD_TYPE_ERROR_MESSAGE);
+          void appAlert(UPLOAD_TYPE_ERROR_MESSAGE);
           continue;
         }
         if (file.size > MAX_ATTACHMENT_BYTES) {
-          alert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
+          void appAlert(`حجم فایل «${file.name}» بیشتر از ${MAX_ATTACHMENT_LABEL} است.`);
           continue;
         }
         const dataUrl = await readFileAsDataUrl(file);
@@ -256,7 +302,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       setEditingCommentAttachments((prev) => [...prev, ...newAtts]);
     } catch (err) {
       console.error('Failed to attach file to edit comment:', err);
-      alert('خطا در بارگذاری فایل. لطفاً مجدداً تلاش کنید.');
+      void appAlert('خطا در بارگذاری فایل. لطفاً مجدداً تلاش کنید.');
     } finally {
       setIsUploadingEditCommentFiles(false);
       if (editCommentFileInputRef.current) {
@@ -308,7 +354,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const previousAttachments = commentsList.find((c) => c.id === commentId)?.attachments || [];
     // Stored on the server when there is one; a failure is reported and the list reloaded.
     updateTaskCommentPB(commentId, editingCommentText.trim(), editingCommentAttachments, previousAttachments).catch((err) => {
-      alert(userErrorMessage(err, 'خطا در ذخیره ویرایش نظر'));
+      void appAlert(userErrorMessage(err, 'خطا در ذخیره ویرایش نظر'));
       fetchCommentsForTaskPB(task.id).then((fresh) => setCommentsList(fresh)).catch(() => {});
     });
     const updatedComments = commentsList.map((c) => {
@@ -330,7 +376,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   };
 
   const handleDeleteComment = async (commentId: string) => {
-    if (!window.confirm('آیا از حذف این نظر اطمینان دارید؟')) return;
+    if (!(await appConfirm('آیا از حذف این نظر اطمینان دارید؟'))) return;
     
     // Optimistic removal
     const updatedComments = commentsList.filter((c) => c.id !== commentId);
@@ -414,7 +460,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   onClose();
                   onDeleteTask(task.id);
                 }}
-                className="p-2 text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
+                className="order-first me-3 p-2 text-rose-500 hover:text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
                 title="حذف فعالیت"
               >
                 <Trash2 className="w-4 h-4" />
@@ -423,6 +469,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
             <button
               onClick={onClose}
+              title="بستن"
+              aria-label="بستن"
               className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -482,6 +530,17 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
               )}
             </div>
+
+            {task.standIns && task.standIns.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 text-xs" data-stand-in>
+                <span className="text-slate-500 dark:text-slate-400 font-medium">جانشین:</span>
+                {task.standIns.map((s) => (
+                  <span key={s.userId} className="font-bold text-violet-700 dark:text-violet-300">
+                    {s.name}{s.note ? <span className="font-medium text-slate-500 dark:text-slate-400"> ({s.note})</span> : null}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Assignee and Update Permission Info */}
             {task.assignedUserId && (
@@ -626,7 +685,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
                 {task.projectSubTasks.map((st) => {
-                  const isDone = !!st.completed;
+                  const progress = st.status || (st.completed ? 'completed' : 'not_started');
+                  const isDone = progress === 'completed';
+                  const isInProgress = progress === 'in_progress';
                   return (
                     <div
                       key={st.id}
@@ -634,22 +695,54 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-all cursor-pointer ${
                         isDone
                           ? 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 line-through'
-                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:border-purple-300'
+                          : isInProgress
+                            ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 text-slate-800 dark:text-slate-100 hover:border-amber-300'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:border-purple-300'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-1">
-                        <input
-                          type="checkbox"
-                          checked={isDone}
-                          onChange={() => handleToggleSubTaskInModal(st.id)}
-                          className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-600 cursor-pointer shrink-0"
-                        />
-                        <span className="font-bold text-xs truncate">{st.title}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleToggleSubTaskInModal(st.id); }}
+                          title={isDone ? 'انجام شده - کلیک برای بازگشت به شروع نشده' : isInProgress ? 'درحال انجام - کلیک برای علامت زدن به انجام شده' : 'شروع نشده - کلیک برای شروع'}
+                          className="shrink-0"
+                        >
+                          {isDone ? (
+                            <CheckCircle2 className="w-4 h-4 text-purple-600" />
+                          ) : isInProgress ? (
+                            <PlayCircle className="w-4 h-4 text-amber-500" />
+                          ) : (
+                            <Circle className="w-4 h-4 text-slate-300 dark:text-slate-600" />
+                          )}
+                        </button>
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-xs truncate block">{st.title}</span>
+                          {st.assignees && st.assignees.length > 0 && (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block">
+                              مسئول: {st.assignees.map((a) => a.name).join('، ')}
+                            </span>
+                          )}
+                          {isInProgress && st.actualStartDate && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400 truncate block">
+                              شروع: {formatToJalali(st.actualStartDate)}
+                            </span>
+                          )}
+                          {isDone && (st.actualStartDate || st.actualCompletedDate) && (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate block">
+                              {st.actualStartDate && <>شروع: {formatToJalali(st.actualStartDate)}</>}
+                              {st.actualStartDate && st.actualCompletedDate && ' · '}
+                              {st.actualCompletedDate && <>پایان: {formatToJalali(st.actualCompletedDate)}</>}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      {st.startDate && (
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 font-medium dir-rtl mr-2">
-                          {formatToJalali(st.startDate)}
+                      {(st.startDate || st.endDate) && (
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 font-medium dir-rtl mr-2 text-left">
+                          {st.startDate && <span>{formatToJalali(st.startDate)}</span>}
+                          {st.endDate && st.endDate !== st.startDate && (
+                            <span> - {formatToJalali(st.endDate)}</span>
+                          )}
                         </span>
                       )}
                     </div>
@@ -726,6 +819,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                           >
                             {isMyComment ? 'شما' : cmt.userName}
                           </span>
+                          {cmt.actingNote && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-[10px] font-bold" title="به‌عنوان جانشین پست خالی">
+                              {cmt.actingNote.replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)])}
+                            </span>
+                          )}
                         </div>
 
                         {/* Date & Time display in violet/indigo font */}
@@ -840,6 +938,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                           {cmt.attachments && cmt.attachments.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                               {cmt.attachments.map((att) => {
+                                if (isVoiceName(att.name)) {
+                                  return <audio key={att.id} controls src={att.dataUrl} className="w-full h-9 sm:col-span-2" />;
+                                }
                                 const isImg = att.type.startsWith('image/') || att.dataUrl.startsWith('data:image/');
                                 return (
                                   <div
@@ -877,7 +978,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       {/* Actions Footer for Comments */}
                       {!isEditingThis && (
                         <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100 dark:border-slate-700/50 text-[11px]">
-                          {onConvertToTask && (
+                          {onConvertToTask && !cmt.attachments?.some((att) => isVoiceName(att.name)) && !containsEmoji(cmt.text) && (
                             <button
                               type="button"
                               onClick={() => {
@@ -888,7 +989,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                   : 'وظیفه جدید از گفتگو';
                                 const desc = `برگرفته از گفتگو و نظر روی فعالیت «${task.title}» (نویسنده: ${cmt.userName || 'کاربر'}):\n${cmt.text}`;
                                 onClose();
-                                onConvertToTask(title, desc);
+                                onConvertToTask(title, desc, { id: task.id, title: task.title });
                               }}
                               className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold cursor-pointer"
                               title="تبدیل این نظر به یک وظیفه جدید"
@@ -1032,6 +1133,25 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
               {/* Toolbar Controls: Side-by-side icon-only Send & Attachment buttons without extra labels or text */}
               <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-slate-200/70 dark:border-slate-700/60 mt-1">
+                <EmojiButton onPick={(emoji) => setNewCommentText((t) => t + emoji)} className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors cursor-pointer shrink-0" iconClassName="w-4 h-4" />
+                <VoiceButton
+                  onRecorded={(v) =>
+                    setCommentAttachments((prev) => [
+                      ...prev,
+                      {
+                        id: `att-cmt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                        name: v.name,
+                        size: v.size,
+                        type: v.type,
+                        dataUrl: v.url,
+                        createdAt: new Date().toISOString(),
+                      },
+                    ])
+                  }
+                  onError={(msg) => void appAlert(msg)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors cursor-pointer shrink-0"
+                  iconClassName="w-4 h-4"
+                />
                 <button
                   type="button"
                   onClick={() => commentFileInputRef.current?.click()}
@@ -1063,10 +1183,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           {/* Activity Log / Change History Timeline */}
           <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setLogsOpen((v) => !v)}
+                aria-expanded={logsOpen}
+                className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 cursor-pointer"
+              >
+                <ChevronLeft
+                  className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${logsOpen ? '-rotate-90' : ''}`}
+                />
                 <History className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 <span>تاریخچه و لاگ تغییرات فعالیت ({toPersianDigits(logsList.length)})</span>
-              </h4>
+              </button>
               {isLoadingLogs && (
                 <span className="text-[10px] text-indigo-600 dark:text-indigo-400 animate-pulse font-medium">
                   در حال بارگذاری تغییرات...
@@ -1074,28 +1202,51 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               )}
             </div>
 
-            {logsList.length === 0 ? (
+            {!logsOpen ? null : logsList.length === 0 ? (
               <div className="p-4 text-center text-xs text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
                 هنوز هیچ لاگ رویداد یا تغییری ثبت نشده است.
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                {logsList.map((log) => (
-                  <div
-                    key={log.id}
-                    className="p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl text-xs flex items-start justify-between gap-2"
-                  >
-                    <div className="space-y-0.5 overflow-hidden">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-slate-800 dark:text-slate-100 bg-slate-200/60 dark:bg-slate-700/60 px-2 py-0.5 rounded-md text-[11px]">
-                          {log.userName || 'کاربر سیستم'}
-                        </span>
-                        <span className="font-bold text-indigo-700 dark:text-indigo-300">
-                          {log.action}
-                        </span>
-                      </div>
-                      {log.details && (
-                        <div className="text-[11px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed mt-1 bg-white/70 dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-700/50">
+              <div
+                className="space-y-2 max-h-80 overflow-y-auto pr-1"
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) {
+                    setVisibleLogCount((n) => Math.min(n + LOGS_PAGE_SIZE, logsList.length));
+                  }
+                }}
+              >
+                {logsList.slice(0, visibleLogCount).map((log) => {
+                  const isOpen = expandedLogId === log.id;
+                  return (
+                    <div
+                      key={log.id}
+                      className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 rounded-xl text-xs"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setExpandedLogId(isOpen ? null : log.id)}
+                        aria-expanded={isOpen}
+                        className="w-full p-3 flex items-center justify-between gap-2 text-right cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                          <ChevronLeft
+                            className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? '-rotate-90' : ''}`}
+                          />
+                          <span className="font-bold text-slate-800 dark:text-slate-100 bg-slate-200/60 dark:bg-slate-700/60 px-2 py-0.5 rounded-md text-[11px]">
+                            {log.userName || 'کاربر سیستم'}
+                          </span>
+                          <span className="font-bold text-indigo-700 dark:text-indigo-300">
+                            {log.action}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded-lg">
+                          <Clock className="w-3 h-3 text-indigo-500" />
+                          <span>{formatToJalali(log.createdAt)}</span>
+                        </div>
+                      </button>
+                      {isOpen && log.details && (
+                        <div className="mx-3 mb-3 text-[11px] text-slate-600 dark:text-slate-300 font-medium leading-relaxed bg-white/70 dark:bg-slate-900/60 p-2 rounded-lg border border-slate-200/60 dark:border-slate-700/50">
                           {log.details.includes(' | ') ? (
                             <ul className="space-y-1 list-disc list-inside">
                               {log.details.split(' | ').map((item, idx) => (
@@ -1108,13 +1259,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         </div>
                       )}
                     </div>
-
-                    <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-1 rounded-lg">
-                      <Clock className="w-3 h-3 text-indigo-500" />
-                      <span>{formatToJalali(log.createdAt)}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

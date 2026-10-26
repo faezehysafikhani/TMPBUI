@@ -9,6 +9,23 @@ export type ReportTaskType = 'normal' | 'project' | 'recurring';
 
 export interface ReportPerson { userId: string; displayName: string; positionTitle: string | null }
 
+/**
+ * One stretch of time someone was on a task through one of its posts (where tasks are given to
+ * posts), with the position they had then. role «acting»: stand-in (جانشین) of its vacant post
+ * (postTitle / postCode). toUtc null: still on it.
+ */
+export interface ReportPeriod {
+  userId: string;
+  displayName: string;
+  role: 'creator' | 'responsible' | 'acting';
+  positionTitle: string;
+  postTitle: string;
+  postCode: string;
+  place: string;
+  fromUtc: string;
+  toUtc: string | null;
+}
+
 export interface ReportScopePerson extends ReportPerson { relation: 'self' | 'direct' | 'indirect' | 'all'; depth: number }
 
 export interface ReportScope {
@@ -47,6 +64,8 @@ export interface TaskReportRow {
   tags: string[];
   /** False: the task is in the report only because its people are the caller's subordinates. */
   canOpen: boolean;
+  /** Who was on the task when, oldest first (empty or missing where tasks are given to people). */
+  history?: ReportPeriod[];
 }
 
 export interface TaskReportSummary {
@@ -75,6 +94,7 @@ export async function getReportScope(): Promise<ReportScope | null> {
 
 export function getTaskReport(filters: TaskReportFilters): Promise<TaskReport> {
   return apiRequest<TaskReport>('GET', '/api/task-reports/tasks', {
+    cache: 'no-store',
     query: {
       personId: filters.personId,
       personRole: filters.personId || filters.positionId ? filters.personRole : undefined,

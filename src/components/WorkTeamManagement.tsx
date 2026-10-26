@@ -16,6 +16,7 @@ import {
   Trash2,
   Plus
 } from 'lucide-react';
+import { appConfirm } from '../utils/appDialog';
 
 interface WorkTeamManagementProps {
   currentUser: User;
@@ -150,7 +151,7 @@ export const WorkTeamManagement: React.FC<WorkTeamManagementProps> = ({ currentU
     }
 
     const targetTeam = teams.find((t) => t.id === teamId);
-    if (!window.confirm(`آیا از حذف تیم کاری «${targetTeam?.name}» اطمینان دارید؟`)) return;
+    if (!(await appConfirm(`آیا از حذف تیم کاری «${targetTeam?.name}» اطمینان دارید؟`))) return;
 
     await applyChange({ kind: 'delete', teamId }, 'تیم کاری حذف گردید.');
   };

@@ -1,13 +1,14 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2 } from 'lucide-react';
+import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
-import { ChartCompany, ChartMember, ChartTeam, ChartUnit, PersonRef, getChart, listPositions, listTeamsOutsideUnits, listUnplacedUsers } from '../../../services/orgStructureApi';
+import { ChartCompany, ChartMember, ChartPosition, ChartUnit, PersonRef, getChart, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
-import { ChartSelection, companyHeadcount, teamsOf, unitHeadcount } from './orgChartModel';
+import { ChartSelection, companyHeadcount, companyPostsOf, headPostOf, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
+import { appAlert } from '../../../utils/appDialog';
 
 const PersonLine: React.FC<{ person: PersonRef | null; empty: string }> = ({ person, empty }) => (
   person ? (
@@ -73,7 +74,7 @@ const MemberRow: React.FC<{ member: ChartMember; selected: boolean; onSelect: ()
   </button>
 );
 
-/** A work team (or the deputy's people in no team) under a deputy, with a branch line to it. */
+/** A position of a deputy (or the deputy's people with no position) under it, with a branch line to it. */
 const BranchCard: React.FC<{
   node: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -89,17 +90,20 @@ const BranchCard: React.FC<{
   selectedUserId: string | null;
   onSelectMember: (userId: string) => void;
   muted?: boolean;
-  /** Drawn on a deputy's branch line (not in the list of teams outside the deputies). */
-  onBranch?: boolean;
-}> = ({ node, icon: Icon, tone, title, subtitle, count, members, open, onToggle, selected, onSelect, selectedUserId, onSelectMember, muted, onBranch = true }) => (
+  /** A position nobody holds yet: drawn with a dashed border. */
+  vacant?: boolean;
+}> = ({ node, icon: Icon, tone, title, subtitle, count, members, open, onToggle, selected, onSelect, selectedUserId, onSelectMember, muted, vacant }) => (
   <div className="relative">
-    {onBranch && <span className="absolute -start-4 top-7 w-4 h-0.5 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />}
-    <NodeCard node={node} label={title} selected={selected} onSelect={onSelect} className={`w-60 ${muted ? 'opacity-70' : ''}`}>
+    <span className="absolute -start-4 top-7 w-4 h-0.5 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
+    <NodeCard node={node} label={title} selected={selected} onSelect={onSelect} className={`w-60 ${muted ? 'opacity-70' : ''} ${vacant && !selected ? 'border-dashed' : ''}`}>
       <div className="flex items-center gap-2.5 p-3">
         <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${tone}`}><Icon className="w-[18px] h-[18px]" /></span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">{title}</span>
-          <span className="flex items-center gap-1 text-[11px] text-slate-500 min-w-0"><Users className="w-3 h-3 shrink-0" /> <span className="truncate">{toPersianDigits(count)} نفر{subtitle ? ` · ${subtitle}` : ''}</span></span>
+          <span className="flex items-center gap-1 text-[11px] text-slate-500 min-w-0">
+            <Users className="w-3 h-3 shrink-0" />
+            <span className="truncate">{vacant ? 'خالی' : `${toPersianDigits(count)} نفر`}{subtitle ? ` · ${subtitle}` : ''}</span>
+          </span>
         </span>
         {count > 0 && <Toggle open={open} onClick={onToggle} label={title} />}
       </div>
@@ -112,14 +116,14 @@ const BranchCard: React.FC<{
   </div>
 );
 
-/** The card of a selection on the chart (a person can show in several teams: the first one). */
+/** The card of a selection on the chart (a person can hold several positions: the first one). */
 function nodeOf(selection: ChartSelection): string | null {
   switch (selection.kind) {
     case 'company': return `company:${selection.companyId}`;
     case 'direct': return `direct:${selection.companyId}`;
     case 'unit': return `unit:${selection.unitId}`;
-    case 'noTeam': return `noTeam:${selection.unitId}`;
-    case 'team': return `team:${selection.teamId}`;
+    case 'noPosition': return `noPosition:${selection.unitId}`;
+    case 'position': return `position:${selection.unitPositionId}`;
     case 'member': return `member:${selection.userId}`;
     default: return null;
   }
@@ -127,12 +131,12 @@ function nodeOf(selection: ChartSelection): string | null {
 
 // ---------------------------------------------------------------- layout
 
-/** Width of a deputy's column: its card, or its branch of team cards beside the line. */
+/** Width of a deputy's column: its card, or its branch of position cards beside the line. */
 const COLUMN_WIDTH = 322;
 
-/** Roughly how tall a deputy's column is with its teams closed. */
+/** Roughly how tall a deputy's column is with its positions closed. */
 function columnHeight(unit: ChartUnit): number {
-  const branches = teamsOf(unit).length + (unit.members.length > 0 ? 1 : 0);
+  const branches = positionsOf(unit).length + (unit.members.length > 0 ? 1 : 0);
   return 112 + (branches > 0 ? 16 + branches * 78 : 0);
 }
 
@@ -193,19 +197,19 @@ const ZoomControls: React.FC<{
 /** Persian text compared loosely: Arabic ی/ك, half-spaces and case do not matter. */
 const normalize = (text: string) => text.replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/‌/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 
-interface SearchHit { key: string; label: string; detail: string; kind: 'unit' | 'team' | 'person'; go: () => void }
+interface SearchHit { key: string; label: string; detail: string; kind: 'unit' | 'position' | 'person'; go: () => void }
 
-/** Finds a deputy, a team or a person in the chart and takes the chart to it. */
+/** Finds a deputy, a position or a person in the chart and takes the chart to it. */
 const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const query = normalize(text);
   const found = query ? hits.filter((h) => normalize(h.label).includes(query)).slice(0, 8) : [];
   const choose = (hit: SearchHit) => { hit.go(); setText(''); setOpen(false); };
-  const icons = { unit: Network, team: Users, person: UserRound };
+  const icons = { unit: Network, position: Briefcase, person: UserRound };
   const tones = {
     unit: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300',
-    team: 'bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300',
+    position: 'bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300',
     person: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
   };
   return (
@@ -220,7 +224,7 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
           if (e.key === 'Enter' && found[0]) { e.preventDefault(); choose(found[0]); }
           if (e.key === 'Escape') { setText(''); setOpen(false); }
         }}
-        placeholder="جستجوی معاونت، تیم یا فرد…"
+        placeholder="جستجوی معاونت، سمت یا فرد…"
         aria-label="جستجو در چارت"
         className="w-full ps-9 pe-8 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:outline-hidden focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-900"
       />
@@ -248,11 +252,11 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
 };
 
 /**
- * «چارت سازمانی»: the company at the top, its deputies under it, under each deputy the work teams
- * its people built and everyone in them (from any deputy; a person in several teams shows in each)
- * - and the deputy's people in no team, the teams whose builder is in no deputy, the company's people in
- * no deputy, and people with no place at all. Clicking any of them shows it in the side panel,
- * where it can be changed right away (as the user's permissions allow; the server checks again).
+ * «چارت سازمانی»: the company at the top, its head (رئیس کل) under it, then its deputies, under each
+ * deputy its positions in the deputy's order - vacant ones too - and who holds each (a person holding
+ * several positions shows in each), the deputy's people with no position, the company's people in no
+ * deputy, and people with no place at all. Clicking any of them shows it in the side panel, where it
+ * can be changed right away (as the user's permissions allow; the server checks again).
  *
  * The chart is a canvas: it opens at half size from the top, the wheel (or two fingers) zooms where the
  * pointer is, dragging moves it, and choosing a card while zoomed out - on the chart, in the side
@@ -260,13 +264,12 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
  */
 export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> = ({ can }) => {
   const data = useLoad(async () => {
-    const [chart, positions, unplaced, outsideTeams] = await Promise.all([
+    const [chart, positions, unplaced] = await Promise.all([
       getChart(),
       listPositions().catch(() => []),
       listUnplacedUsers().catch(() => []),
-      listTeamsOutsideUnits().catch(() => [] as ChartTeam[]),
     ]);
-    return { chart, positions, unplaced, outsideTeams };
+    return { chart, positions, unplaced };
   }, 'دریافت چارت سازمانی ممکن نشد.');
 
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -340,7 +343,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     if (node) setReveal((prev) => ({ node, force: !!options.force, seq: (prev?.seq || 0) + 1 }));
   };
 
-  const allGroupKeys = useMemo(() => (company ? company.units.flatMap((u) => [`none:${u.unitId}`, ...teamsOf(u).map((t) => `team:${t.teamId}`)]) : []), [company]);
+  const allGroupKeys = useMemo(() => (company ? company.units.flatMap((u) => [`none:${u.unitId}`, ...positionsOf(u).map((p) => `pos:${p.unitPositionId}`)]) : []), [company]);
   const allOpen = !!company && collapsedUnits.size === 0 && allGroupKeys.every((k) => openGroups.has(k));
   const expandAll = () => { setCollapsedUnits(new Set()); setOpenGroups(new Set(allGroupKeys)); };
   const collapseAll = () => { setOpenGroups(new Set()); };
@@ -350,22 +353,40 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     const hits: SearchHit[] = [];
     const people = new Set<string>();
     const openUnit = (unitId: string) => removeFrom(setCollapsedUnits, unitId);
+    for (const post of companyPostsOf(company)) {
+      const select: ChartSelection = { kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: post.unitPositionId };
+      hits.push({
+        key: `position:${post.unitPositionId}`, kind: 'position', label: postLabel(post),
+        detail: `پست مستقیم شرکت${post.holders.length === 0 ? ' · خالی' : ''}`,
+        go: () => choose(select, { force: true }),
+      });
+      for (const member of post.holders) {
+        if (people.has(member.userId)) continue;
+        people.add(member.userId);
+        hits.push({
+          key: `person:${member.userId}`, kind: 'person', label: member.displayName, detail: `${postLabel(post)} · ${company.name}`,
+          go: () => choose({ kind: 'member', userId: member.userId }, { force: true }),
+        });
+      }
+    }
     for (const unit of company.units) {
       hits.push({
         key: `unit:${unit.unitId}`, kind: 'unit', label: unit.name, detail: `معاونت · ${toPersianDigits(unitHeadcount(unit))} نفر`,
         go: () => { openUnit(unit.unitId); choose({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId }, { force: true }); },
       });
-      for (const team of teamsOf(unit)) {
+      for (const position of positionsOf(unit)) {
+        const select: ChartSelection = { kind: 'position', companyId: company.companyId, unitId: unit.unitId, unitPositionId: position.unitPositionId };
         hits.push({
-          key: `team:${team.teamId}`, kind: 'team', label: team.name, detail: `تیم · ${unit.name}`,
-          go: () => { openUnit(unit.unitId); choose({ kind: 'team', teamId: team.teamId }, { force: true }); },
+          key: `position:${position.unitPositionId}`, kind: 'position', label: postLabel(position),
+          detail: `پست · ${unit.name}${position.holders.length === 0 ? ' · خالی' : ''}`,
+          go: () => { openUnit(unit.unitId); choose(select, { force: true }); },
         });
-        for (const member of team.members) {
+        for (const member of position.holders) {
           if (people.has(member.userId)) continue;
           people.add(member.userId);
           hits.push({
-            key: `person:${member.userId}`, kind: 'person', label: member.displayName, detail: [member.positionTitle, team.name].filter(Boolean).join(' · '),
-            go: () => { openUnit(unit.unitId); addTo(setOpenGroups, `team:${team.teamId}`); choose({ kind: 'member', userId: member.userId }, { force: true }); },
+            key: `person:${member.userId}`, kind: 'person', label: member.displayName, detail: `${position.title} · ${unit.name}`,
+            go: () => { openUnit(unit.unitId); addTo(setOpenGroups, `pos:${position.unitPositionId}`); choose({ kind: 'member', userId: member.userId }, { force: true }); },
           });
         }
       }
@@ -375,7 +396,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         if (people.has(member.userId)) continue;
         people.add(member.userId);
         hits.push({
-          key: `person:${member.userId}`, kind: 'person', label: member.displayName, detail: [member.positionTitle, `${unit.name} · بدون تیم`].filter(Boolean).join(' · '),
+          key: `person:${member.userId}`, kind: 'person', label: member.displayName, detail: `${unit.name} · بدون سمت`,
           go: () => { openUnit(unit.unitId); addTo(setOpenGroups, `none:${unit.unitId}`); choose({ kind: 'member', userId: member.userId }, { force: true }); },
         });
       }
@@ -401,7 +422,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
 
   const unitTree = (unit: ChartUnit) => {
     const open = !collapsedUnits.has(unit.unitId);
-    const teams = teamsOf(unit);
+    const positions = positionsOf(unit);
+    const vacant = vacantCount(unit);
     return (
       <div className="flex flex-col items-center">
         <NodeCard
@@ -415,51 +437,54 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
             <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 flex items-center justify-center shrink-0"><Network className="w-5 h-5" /></span>
             <span className="min-w-0 flex-1 space-y-1">
               <span className="block text-sm font-extrabold text-slate-900 dark:text-white truncate">{unit.name}</span>
-              <PersonLine person={unit.manager} empty="بدون مدیر" />
+              {unit.manager && <PersonLine person={unit.manager} empty="" />}
             </span>
-            {(teams.length > 0 || unit.members.length > 0) && (
+            {(positions.length > 0 || unit.members.length > 0) && (
               <Toggle open={open} onClick={() => toggleIn(setCollapsedUnits, unit.unitId)} label={unit.name} />
             )}
           </div>
           <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-3.5 py-1.5 text-[11px] text-slate-500">
-            <span>{toPersianDigits(teams.length)} تیم</span>
+            <span>{toPersianDigits(positions.length)} سمت{vacant > 0 ? ` · ${toPersianDigits(vacant)} خالی` : ''}</span>
             <span>{toPersianDigits(unitHeadcount(unit))} نفر</span>
           </div>
         </NodeCard>
 
-        {open && (teams.length > 0 || unit.members.length > 0) && (
+        {open && (positions.length > 0 || unit.members.length > 0) && (
           <div className="self-stretch flex justify-center">
             <div className="relative mt-0 ms-8 ps-4 pt-4 space-y-3 border-s-2 border-slate-200 dark:border-slate-700">
-              {teams.map((team: ChartTeam) => (
+              {postTree(positions).map(({ position, depth }: { position: ChartPosition; depth: number }) => (
+                <div key={position.unitPositionId} style={depth ? { marginInlineStart: `${depth * 1.25}rem` } : undefined} className={depth ? 'relative before:absolute before:-start-3 before:top-5 before:w-2.5 before:h-0.5 before:bg-slate-300 dark:before:bg-slate-600' : undefined} data-post-depth={depth}>
                 <BranchCard
-                  key={team.teamId}
-                  node={`team:${team.teamId}`}
-                  icon={Users}
-                  tone="bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
-                  title={team.name}
-                  subtitle={`سازنده: ${team.owner.displayName}`}
-                  count={team.members.length}
-                  members={team.members}
-                  open={openGroups.has(`team:${team.teamId}`)}
-                  onToggle={() => toggleIn(setOpenGroups, `team:${team.teamId}`)}
-                  selected={isSelected({ kind: 'team', teamId: team.teamId })}
-                  onSelect={() => choose({ kind: 'team', teamId: team.teamId })}
+                  node={`position:${position.unitPositionId}`}
+                  icon={Briefcase}
+                  tone="bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300"
+                  title={postLabel(position)}
+                  subtitle={position.holders.length === 1 ? position.holders[0].displayName : undefined}
+                  count={position.holders.length}
+                  members={position.holders}
+                  vacant={position.holders.length === 0}
+                  muted={!position.isActive}
+                  open={openGroups.has(`pos:${position.unitPositionId}`)}
+                  onToggle={() => toggleIn(setOpenGroups, `pos:${position.unitPositionId}`)}
+                  selected={isSelected({ kind: 'position', companyId: company.companyId, unitId: unit.unitId, unitPositionId: position.unitPositionId })}
+                  onSelect={() => choose({ kind: 'position', companyId: company.companyId, unitId: unit.unitId, unitPositionId: position.unitPositionId })}
                   selectedUserId={selectedUserId}
                   onSelectMember={selectMember}
                 />
+                </div>
               ))}
               {unit.members.length > 0 && (
                 <BranchCard
-                  node={`noTeam:${unit.unitId}`}
+                  node={`noPosition:${unit.unitId}`}
                   icon={UserRound}
                   tone="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                  title="بدون تیم"
+                  title="بدون سمت"
                   count={unit.members.length}
                   members={unit.members}
                   open={openGroups.has(`none:${unit.unitId}`)}
                   onToggle={() => toggleIn(setOpenGroups, `none:${unit.unitId}`)}
-                  selected={isSelected({ kind: 'noTeam', companyId: company.companyId, unitId: unit.unitId })}
-                  onSelect={() => choose({ kind: 'noTeam', companyId: company.companyId, unitId: unit.unitId })}
+                  selected={isSelected({ kind: 'noPosition', companyId: company.companyId, unitId: unit.unitId })}
+                  onSelect={() => choose({ kind: 'noPosition', companyId: company.companyId, unitId: unit.unitId })}
                   selectedUserId={selectedUserId}
                   onSelectMember={selectMember}
                 />
@@ -527,7 +552,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
                 await downloadOrgChartPdf(content.current, `چارت سازمانی ${company.name}`, `org-chart-${day}.pdf`);
               } catch (err) {
                 console.error('Org chart PDF failed:', err);
-                window.alert('دریافت فایل PDF چارت انجام نشد.');
+                void appAlert('دریافت فایل PDF چارت انجام نشد.');
               } finally {
                 setExporting(false);
               }
@@ -563,9 +588,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           >
             <div className="flex items-center gap-3 p-4">
               <span className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/30"><Building2 className="w-5 h-5" /></span>
-              <span className="min-w-0 flex-1 space-y-1">
+              <span className="min-w-0 flex-1">
                 <span className="block text-base font-extrabold text-slate-900 dark:text-white truncate">{company.name}</span>
-                <PersonLine person={company.manager} empty="بدون مدیر ارشد" />
               </span>
             </div>
             <div className="flex items-center justify-between border-t border-indigo-100/70 dark:border-slate-800 px-4 py-1.5 text-[11px] text-slate-500">
@@ -573,6 +597,78 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
               <span>{toPersianDigits(companyHeadcount(company))} نفر</span>
             </div>
           </NodeCard>
+
+          {/* the head of the company, between it and its deputies */}
+          <span className={`w-0.5 h-6 ${line}`} aria-hidden="true" />
+          {!company.manager && headPostOf(company) ? (
+            <NodeCard
+              node={`position:${headPostOf(company)!.unitPositionId}`}
+              label={`رئیس کل: ${postLabel(headPostOf(company)!)}`}
+              selected={isSelected({ kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: headPostOf(company)!.unitPositionId })}
+              onSelect={() => choose({ kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: headPostOf(company)!.unitPositionId })}
+              className="w-64 border-dashed"
+            >
+              <div className="flex items-center gap-2.5 p-3">
+                <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300 flex items-center justify-center shrink-0"><Crown className="w-[18px] h-[18px]" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">رئیس کل · {postLabel(headPostOf(company)!)}</span>
+                  <span className="block text-xs text-slate-400">خالی</span>
+                </span>
+              </div>
+            </NodeCard>
+          ) : company.manager ? (
+            <NodeCard
+              node={`member:${company.manager.userId}`}
+              label={`رئیس کل: ${company.manager.displayName}`}
+              selected={selectedUserId === company.manager.userId}
+              onSelect={() => choose({ kind: 'member', userId: company.manager!.userId })}
+              className="w-64"
+            >
+              <div className="flex items-center gap-2.5 p-3">
+                <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300 flex items-center justify-center shrink-0"><Crown className="w-[18px] h-[18px]" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">رئیس کل{headPostOf(company)?.code ? ` · کد ${toPersianDigits(headPostOf(company)!.code!)}` : ''}</span>
+                  <PersonLine person={company.manager} empty="" />
+                </span>
+              </div>
+            </NodeCard>
+          ) : (
+            <div className="w-64 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-900/70 p-3 flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-xl bg-slate-100 text-slate-400 dark:bg-slate-800 flex items-center justify-center shrink-0"><Crown className="w-[18px] h-[18px]" /></span>
+              <span className="min-w-0">
+                <span className="block text-[11px] font-bold text-slate-500">رئیس کل</span>
+                <span className="block text-xs text-slate-400">تعیین نشده</span>
+              </span>
+            </div>
+          )}
+
+          {/* the company's other posts (board members, advisers...), right under its head */}
+          {companyPostsOf(company).some((p) => !p.isHead) && (
+            <div className="mt-2 flex flex-wrap justify-center gap-2 max-w-3xl">
+              {companyPostsOf(company).filter((p) => !p.isHead).map((post) => {
+                const select: ChartSelection = { kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: post.unitPositionId };
+                const holder = post.holders[0];
+                return (
+                  <NodeCard
+                    key={post.unitPositionId}
+                    node={`position:${post.unitPositionId}`}
+                    label={postLabel(post)}
+                    selected={isSelected(select)}
+                    onSelect={() => choose(select)}
+                    className={`w-56 ${holder ? '' : 'border-dashed'} ${post.isActive ? '' : 'opacity-70'}`}
+                  >
+                    <div className="flex items-center gap-2.5 p-2.5">
+                      <span className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-950/50 dark:text-sky-300 flex items-center justify-center shrink-0"><Briefcase className="w-4 h-4" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-xs font-extrabold text-slate-800 dark:text-slate-100 truncate">{postLabel(post)}</span>
+                        <span className="block text-[11px] text-slate-500 truncate">{holder ? holder.displayName : 'خالی'}</span>
+                      </span>
+                    </div>
+                  </NodeCard>
+                );
+              })}
+            </div>
+          )}
 
           {company.members.length > 0 && (
             <button
@@ -613,36 +709,6 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         </p>}
         <ZoomControls subscribe={subscribe} zoomBy={zoomBy} fit={fit} />
       </div>
-
-      {(data.data?.outsideTeams.length || 0) > 0 && (
-        <div className="border-t border-slate-100 dark:border-slate-800 px-5 py-3">
-          <p className="flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300 mb-1">
-            <Users className="w-4 h-4" /> تیم‌هایی که سازنده‌شان در هیچ معاونتی نیست ({toPersianDigits(data.data!.outsideTeams.length)})
-          </p>
-          <p className="text-[11px] text-slate-500 mb-2">با قرار دادن سازندهٔ تیم در یک معاونت، تیم زیر همان معاونت نمایش داده می‌شود.</p>
-          <div className="flex flex-wrap gap-3">
-            {data.data!.outsideTeams.map((team) => (
-              <BranchCard
-                key={team.teamId}
-                node={`outside:${team.teamId}`}
-                onBranch={false}
-                icon={Users}
-                tone="bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300"
-                title={team.name}
-                subtitle={`سازنده: ${team.owner.displayName}`}
-                count={team.members.length}
-                members={team.members}
-                open={openGroups.has(`team:${team.teamId}`)}
-                onToggle={() => toggleIn(setOpenGroups, `team:${team.teamId}`)}
-                selected={isSelected({ kind: 'team', teamId: team.teamId })}
-                onSelect={() => setSelection({ kind: 'team', teamId: team.teamId })}
-                selectedUserId={selectedUserId}
-                onSelectMember={(userId) => setSelection({ kind: 'member', userId })}
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       {(data.data?.unplaced.length || 0) > 0 && (
         <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-2 flex items-center gap-3">
@@ -686,7 +752,6 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         chart={chart}
         positions={data.data?.positions || []}
         unplaced={data.data?.unplaced || []}
-        outsideTeams={data.data?.outsideTeams || []}
         selection={selection}
         onSelect={(next) => choose(next)}
         onChanged={data.reload}
