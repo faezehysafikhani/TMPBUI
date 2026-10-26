@@ -1841,6 +1841,33 @@ export async function listRoles(): Promise<AdminRole[]> {
   return request<AdminRole[]>('GET', '/api/identity/roles', { query: { tenantId: getSessionTenantId() } });
 }
 
+/** A new custom role (roles.create); its permissions are set with setRolePermissions. */
+export async function createRole(name: string, description: string | null): Promise<AdminRole> {
+  return request<AdminRole>('POST', '/api/identity/roles', { body: { tenantId: getSessionTenantId(), name, description } });
+}
+
+/** Renames a custom role or changes its description (roles.update). */
+export async function updateRole(roleId: string, name: string, description: string | null): Promise<AdminRole> {
+  return request<AdminRole>('PUT', `/api/identity/roles/${requireGuid(roleId, 'نقش')}`, { body: { name, description } });
+}
+
+/** Replaces a custom role's permissions (roles.assign_permissions); the server adds their prerequisites. */
+export async function setRolePermissions(roleId: string, permissionIds: string[]): Promise<void> {
+  await request('PUT', `/api/identity/roles/${requireGuid(roleId, 'نقش')}/permissions`, { body: { permissionIds } });
+}
+
+export interface PermissionInfo {
+  id: string;
+  name: string;
+  module: string;
+  description: string;
+}
+
+/** Every permission this product manages, grouped by module (permissions.view). */
+export async function listPermissionGroups(): Promise<{ module: string; permissions: PermissionInfo[] }[]> {
+  return request<{ module: string; permissions: PermissionInfo[] }[]>('GET', '/api/identity/permissions');
+}
+
 export interface UserAccessEntry {
   permissionId: string;
   name: string;
