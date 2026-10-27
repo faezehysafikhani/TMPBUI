@@ -281,6 +281,11 @@ export interface NoteDto {
 
 interface StoredSession {
   accessToken: string;
+  /**
+   * The refresh token, when the server returns it in the body (Identity:Session:
+   * ReturnRefreshTokenInBody). Empty when it keeps it in an HttpOnly cookie instead, which
+   * this page can never read: the browser sends it to /api/identity/auth by itself.
+   */
   refreshToken: string;
   accessTokenExpiresAtUtc: string;
   user: UserDto;
@@ -331,7 +336,7 @@ function saveAuthResponse(auth: AuthResponse): void {
   const previous = readSession();
   writeSession({
     accessToken: auth.accessToken,
-    refreshToken: auth.refreshToken,
+    refreshToken: auth.refreshToken || '',
     accessTokenExpiresAtUtc: auth.accessTokenExpiresAtUtc,
     user: auth.user,
     // A renewed token keeps the known permissions; a new sign-in reads them from /me.
@@ -348,10 +353,11 @@ async function refreshSession(): Promise<boolean> {
 
   refreshInFlight = (async () => {
     const session = readSession();
-    if (!session?.refreshToken) return false;
+    // Without a stored token the session lives in the HttpOnly cookie, sent with the request.
+    if (!session?.user) return false;
     try {
       const auth = await request<AuthResponse>('POST', '/api/identity/auth/refresh', {
-        body: { refreshToken: session.refreshToken },
+        body: session.refreshToken ? { refreshToken: session.refreshToken } : {},
         auth: false,
         retryOnUnauthorized: false,
       });
@@ -400,6 +406,15 @@ interface RequestOptions {
   cache?: RequestCache;
 }
 
+/**
+ * Sign-in, refresh and sign-out: the browser sends and keeps the HttpOnly session cookie
+ * (credentials), and X-Requested-With - which a cross-site form cannot send - lets the server
+ * accept the cookie. Whether the refresh token travels in the cookie or in the body is the
+ * server's choice (Identity:Session); this page works with either.
+ */
+const SESSION_PATH = '/api/identity/auth/';
+const isSessionRequest = (path: string) => path.startsWith(SESSION_PATH) && !path.startsWith(`${SESSION_PATH}me`);
+
 function buildUrl(path: string, query?: RequestOptions['query']): string {
   const url = `${NEXUS_API_BASE_URL}${path}`;
   if (!query) return url;
@@ -437,6 +452,8 @@ async function request<T>(method: string, path: string, options: RequestOptions 
 
   const headers: Record<string, string> = { Accept: responseType === 'json' ? 'application/json' : '*/*' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const sessionRequest = isSessionRequest(path);
+  if (sessionRequest) headers['X-Requested-With'] = 'XMLHttpRequest';
   if (auth) {
     const session = readSession();
     if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
@@ -453,6 +470,7 @@ async function request<T>(method: string, path: string, options: RequestOptions 
       // FormData sets its own multipart boundary header.
       body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
       cache: options.cache,
+      credentials: sessionRequest ? 'include' : 'same-origin',
       signal: controller.signal,
     });
   } catch (err: any) {
@@ -981,7 +999,7 @@ export async function login(
 /** Signed-in user from the stored session, without a network call (used on first render). */
 export function getSessionUser(): User | null {
   const session = readSession();
-  return session?.refreshToken && session.user ? { ...mapUserDto(session.user), permissions: session.permissions } : null;
+  return session?.accessToken && session.user ? { ...mapUserDto(session.user), permissions: session.permissions } : null;
 }
 
 export function getSessionTenantId(): string | null {
@@ -1020,12 +1038,13 @@ export async function refreshCurrentUser(): Promise<User | null> {
  * tokens are discarded at once. The server call is best effort - sign-out never waits for it.
  */
 export function logout(): void {
-  const refreshToken = readSession()?.refreshToken;
+  const session = readSession();
   writeSession(null);
   clearLookups();
-  if (refreshToken) {
+  if (session) {
+    // The token from storage, or else the session cookie (which the server then also deletes).
     request<void>('POST', '/api/identity/auth/logout', {
-      body: { refreshToken },
+      body: session.refreshToken ? { refreshToken: session.refreshToken } : {},
       auth: false,
       retryOnUnauthorized: false,
     }).catch(() => undefined);
