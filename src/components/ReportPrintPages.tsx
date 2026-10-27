@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { STATUSES } from '../types';
 import { toPersianDigits } from '../utils/helpers';
 import { REPORT_TYPE_TITLES, TaskReportRow, TaskReportSummary } from '../services/taskReportApi';
+import { useBranding } from '../utils/branding';
 
 /** Rows on the first page (under the title) and on each following page. */
 const FIRST_PAGE_ROWS = 28;
@@ -55,6 +56,7 @@ export const ReportPrintPages: React.FC<{
   filtersText: string;
   generatedText: string;
 }> = ({ rows, scopeText, filtersText, generatedText }) => {
+  const brand = useBranding();
   // Rows fill each page by height: a row and its history lines stay together.
   const pages: PrintableRow[][] = [[]];
   let used = 0;
@@ -82,7 +84,7 @@ export const ReportPrintPages: React.FC<{
             <div style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: `2px solid ${C.head}`, paddingBottom: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <img src="/tm-logo.png" alt="" style={{ width: 34, height: 34, objectFit: 'contain' }} />
+                  <img src={brand.logo} alt="" style={{ width: 34, height: 34, objectFit: 'contain' }} />
                   <div style={{ fontSize: 20, fontWeight: 800, color: C.head }}>گزارش فعالیت‌ها</div>
                 </div>
                 <div style={{ fontSize: 11, color: C.muted }}>{generatedText}</div>
@@ -128,7 +130,7 @@ export const ReportPrintPages: React.FC<{
           {pageRows.length === 0 && <div style={{ textAlign: 'center', padding: 30, color: C.muted, fontSize: 12 }}>فعالیتی با این فیلترها پیدا نشد.</div>}
 
           <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', fontSize: 9, color: C.muted, paddingTop: 6 }}>
-            <span>سامانه مدیریت وظایف</span>
+            <span>{brand.customName || 'سامانه مدیریت وظایف'}</span>
             <span>صفحه {toPersianDigits(p + 1)} از {toPersianDigits(pages.length)}</span>
           </div>
         </div>
