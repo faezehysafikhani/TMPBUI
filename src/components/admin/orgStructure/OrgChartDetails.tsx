@@ -8,7 +8,7 @@ import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
   ChartCompany, ChartMember, ChartPosition, ChartUnit, LinkType, NodeType, OrgUiLevel, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
-  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, setCompanyUiLevel, deactivateNode, isConflict, reorderNode, setNodeManager, updateNode,
+  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, setCompanyUiLevel, setNodeDetails, deactivateNode, isConflict, reorderNode, setNodeManager, updateNode,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
   orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, unlinkUnit, updateCompany, updateOrgUnit,
   addCompanyPosition, postLabel, setPostParent, updateUnitPositionCode,
@@ -333,6 +333,12 @@ export const OrgChartDetails: React.FC<{
             color={unit.nodeType ? safeColor(unit.nodeType.color) : undefined}
           />
           <div>
+            {(() => {
+              const info = nodes.find((n) => n.id === unit.unitId);
+              if (!info) return null;
+              const rows: [string, string | null | undefined][] = [['کد', info.code], ['نام لاتین', info.latinName], ['عنوان مکاتباتی', info.correspondenceTitle], ['تلفن', info.phone], ['نشانی', info.address]];
+              return rows.filter(([, v]) => v).map(([label, v]) => <InfoRow key={label} label={label}><span className={label === 'نام لاتین' || label === 'تلفن' || label === 'کد' ? 'dir-ltr' : ''}>{v}</span></InfoRow>);
+            })()}
             {unit.nodeType && <InfoRow label="نوع"><NodeTypeBadge name={unit.nodeType.name} color={unit.nodeType.color} icon={unit.nodeType.icon} /></InfoRow>}
             {ancestorsOf(company, unit.unitId).length > 0 && (
               <InfoRow label="مسیر">
@@ -682,6 +688,7 @@ export const OrgChartDetails: React.FC<{
           onReload={async () => { setMessage(null); setDialog(null); await onChanged(); }}
           nodeTypes={nodeTypes}
           versionOf={versionOf}
+          nodeOf={(unitId) => nodes.find((n) => n.id === unitId)}
           useNodeApi={nodes.length > 0}
           can={can}
           busy={busy}
@@ -804,6 +811,7 @@ const ChartDialog: React.FC<{
   onReload: () => Promise<void> | void;
   nodeTypes: NodeType[];
   versionOf: (unitId: string) => string | null;
+  nodeOf: (unitId: string) => OrgNode | undefined;
   /** The backend has the node API: a node is changed through it (with its version) rather than as a plain unit. */
   useNodeApi: boolean;
   can: (permission: string) => boolean;
@@ -811,12 +819,20 @@ const ChartDialog: React.FC<{
   run: Run;
   onClose: () => void;
   onSelect: (selection: ChartSelection) => void;
-}> = ({ dialog, chart, positions, message, onReload, nodeTypes, versionOf, useNodeApi, can, busy, run, onClose, onSelect }) => {
+}> = ({ dialog, chart, positions, message, onReload, nodeTypes, versionOf, nodeOf, useNodeApi, can, busy, run, onClose, onSelect }) => {
   const [name, setName] = useState(
     dialog.kind === 'editCompany' ? dialog.company.name : dialog.kind === 'editUnit' ? dialog.unit.name : '',
   );
   const [code, setCode] = useState(dialog.kind === 'editCompany' ? dialog.company.code : '');
   const [typeId, setTypeId] = useState(dialog.kind === 'editUnit' ? dialog.unit.nodeType?.nodeTypeId ?? '' : '');
+  // A node's optional information (tabs: main, supplementary, contact), from the node list.
+  const editedNode = dialog.kind === 'editUnit' ? nodeOf(dialog.unit.unitId) : undefined;
+  const [tab, setTab] = useState<'main' | 'extra' | 'contact'>('main');
+  const [nodeCode, setNodeCode] = useState(editedNode?.code ?? '');
+  const [latinName, setLatinName] = useState(editedNode?.latinName ?? '');
+  const [letterTitle, setLetterTitle] = useState(editedNode?.correspondenceTitle ?? '');
+  const [phone, setPhone] = useState(editedNode?.phone ?? '');
+  const [address, setAddress] = useState(editedNode?.address ?? '');
   const initialPerson = dialog.kind === 'editCompany' ? dialog.company.manager : dialog.kind === 'editUnit' || dialog.kind === 'nodeManager' ? dialog.unit.manager : null;
   const [personId, setPersonId] = useState<string | null>(initialPerson?.userId || null);
   const [personName, setPersonName] = useState<string | null>(initialPerson?.displayName || null);
@@ -909,23 +925,60 @@ const ChartDialog: React.FC<{
     case 'editUnit': {
       title = useNodeApi ? 'ویرایش گره' : 'ویرایش معاونت';
       canSave = canSave && !!name.trim();
+      const unit = dialog.unit;
+      const mainChanged = name.trim() !== unit.name || typeId !== (unit.nodeType?.nodeTypeId ?? '');
+      const detailsChanged = nodeCode.trim() !== (editedNode?.code ?? '') || latinName.trim() !== (editedNode?.latinName ?? '')
+        || letterTitle.trim() !== (editedNode?.correspondenceTitle ?? '') || phone.trim() !== (editedNode?.phone ?? '') || address.trim() !== (editedNode?.address ?? '');
       save = async () => done(await run(
-        () => (useNodeApi
-          ? updateNode(dialog.unit.unitId, { name: name.trim(), nodeTypeId: typeId || null, rowVersion: versionOf(dialog.unit.unitId) })
-          : updateOrgUnit(dialog.unit.unitId, { name: name.trim(), managerUserId: personId, isActive: active })),
+        async () => {
+          if (!useNodeApi) return updateOrgUnit(unit.unitId, { name: name.trim(), managerUserId: personId, isActive: active });
+          // The name and type, then the optional information (it replaces all of it) on the version the first returned.
+          let version = versionOf(unit.unitId);
+          if (mainChanged) version = (await updateNode(unit.unitId, { name: name.trim(), nodeTypeId: typeId || null, rowVersion: version })).rowVersion;
+          if (detailsChanged) {
+            await setNodeDetails(unit.unitId, { code: nodeCode.trim() || null, latinName: latinName.trim() || null, correspondenceTitle: letterTitle.trim() || null, phone: phone.trim() || null, address: address.trim() || null, rowVersion: version });
+          }
+          return undefined;
+        },
         'گره ویرایش شد.', 'ویرایش گره انجام نشد.'));
+      const tabs = [{ id: 'main' as const, label: 'اطلاعات اصلی' }, { id: 'extra' as const, label: 'تکمیلی' }, { id: 'contact' as const, label: 'تماس' }];
       content = (
         <>
-          <Field label="نام" required><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} /></Field>
-          {useNodeApi && nodeTypes.length > 0 && (
-            <Field label="نوع گره" hint="با تغییر نوع، جای گره در ساختار عوض نمی‌شود؛ اگر با قاعده‌ی «چه زیر چه» نخواند، در صفحه‌ی قواعد در فهرست ناسازگارها می‌آید.">
-              <select className={inputClass} value={typeId} onChange={(e) => setTypeId(e.target.value)}>
-                <option value="">— بدون نوع (واحد ساده) —</option>
-                {nodeTypes.filter((t) => t.isActive || t.id === typeId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
-            </Field>
+          {useNodeApi && (
+            <div role="tablist" aria-label="بخش‌های فرم گره" className="flex gap-1 rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+              {tabs.map((t) => (
+                <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-bold cursor-pointer ${tab === t.id ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-xs' : 'text-slate-500'}`}>{t.label}</button>
+              ))}
+            </div>
           )}
-          {!useNodeApi && can(U.update) && <Toggle checked={active} onChange={setActive} label="فعال" />}
+          {(!useNodeApi || tab === 'main') && (
+            <>
+              <Field label="نام" required><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} /></Field>
+              {useNodeApi && nodeTypes.length > 0 && (
+                <Field label="نوع گره" hint="با تغییر نوع، جای گره در ساختار عوض نمی‌شود؛ اگر با قاعده‌ی «چه زیر چه» نخواند، در صفحه‌ی قواعد در فهرست ناسازگارها می‌آید.">
+                  <select className={inputClass} value={typeId} onChange={(e) => setTypeId(e.target.value)}>
+                    <option value="">— بدون نوع (واحد ساده) —</option>
+                    {nodeTypes.filter((t) => t.isActive || t.id === typeId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </Field>
+              )}
+              {useNodeApi && <Field label="کد گره" hint="اختیاری؛ در هر شرکت یکتاست (مثلاً کد شعبه)."><input className={`${inputClass} dir-ltr text-right`} value={nodeCode} onChange={(e) => setNodeCode(e.target.value)} maxLength={40} /></Field>}
+              {!useNodeApi && can(U.update) && <Toggle checked={active} onChange={setActive} label="فعال" />}
+            </>
+          )}
+          {useNodeApi && tab === 'extra' && (
+            <>
+              <Field label="نام لاتین" hint="اختیاری؛ مثلاً برای مکاتبات و گزارش‌های دوزبانه."><input className={`${inputClass} dir-ltr text-right`} value={latinName} onChange={(e) => setLatinName(e.target.value)} maxLength={200} /></Field>
+              <Field label="عنوان مکاتباتی" hint="اختیاری؛ عنوانی که در نامه‌ها به‌جای نام گره می‌آید."><input className={inputClass} value={letterTitle} onChange={(e) => setLetterTitle(e.target.value)} maxLength={200} /></Field>
+            </>
+          )}
+          {useNodeApi && tab === 'contact' && (
+            <>
+              <Field label="تلفن" hint="اختیاری؛ مثلاً تلفن شعبه."><input className={`${inputClass} dir-ltr text-right`} value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={60} /></Field>
+              <Field label="نشانی" hint="اختیاری."><textarea rows={3} className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={500} /></Field>
+            </>
+          )}
+          {useNodeApi && (tab !== 'main') && <p className="text-[11px] text-slate-500">خالی گذاشتن یک فیلد یعنی «ندارد».</p>}
         </>
       );
       break;

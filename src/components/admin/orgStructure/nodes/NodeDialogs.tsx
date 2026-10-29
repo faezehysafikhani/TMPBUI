@@ -20,6 +20,7 @@ export const AddNodeDialog: React.FC<{
   onClose: () => void;
 }> = ({ company, parent, types, onCreated, onClose }) => {
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [typeId, setTypeId] = useState(types.length === 1 ? types[0].id : '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export const AddNodeDialog: React.FC<{
         parentNodeId: parent?.unitId ?? null,
         companyId: parent ? null : company.companyId,
         nodeTypeId: typeId || null,
+        code: code.trim() || null,
       });
       await onCreated(node);
       onClose();
@@ -72,6 +74,9 @@ export const AddNodeDialog: React.FC<{
       </fieldset>
       <Field label="نام" required>
         <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} autoFocus placeholder="مثلاً: اداره کل حسابداری" onKeyDown={(e) => { if (e.key === 'Enter' && name.trim() && typeId && !busy) save(); }} />
+      </Field>
+      <Field label="کد (اختیاری)" hint="در هر شرکت یکتاست، مثلاً کد شعبه.">
+        <input className={`${inputClass} dir-ltr text-right`} value={code} onChange={(e) => setCode(e.target.value)} maxLength={40} />
       </Field>
     </AdminDialog>
   );

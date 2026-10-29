@@ -417,6 +417,7 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
         nodeType: type ? { nodeTypeId: type.id, name: type.name, color: type.color, icon: type.icon, isDomainBoundary: type.isDomainBoundary } : null,
       };
       (body.parentNodeId ? find(body.parentNodeId)!.unit.children! : company.units).push(unit);
+      if (body.code) details.set(unit.unitId, { code: body.code });
       return json(nodeOf(company, unit), 201);
     }
     const put = path.match(/^\/nodes\/([^/]+)$/);
