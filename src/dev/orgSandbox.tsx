@@ -1,5 +1,7 @@
 // Development only (dev/org-sandbox.html): the org structure components with mock data, to see
-// and check them without an API. ?mock=flat|nested|postBank|large40|large400 picks the chart.
+// and check them without an API. ?mock=flat|nested|postBank|large40|large400 picks the chart;
+// ?view=board shows the real chart board (OrgChartBoard) on that mock, with this page's fetch
+// answering its requests.
 import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../index.css';
@@ -11,9 +13,30 @@ import { NodeTypeStylePicker, type NodeTypeStyle } from '../components/admin/org
 import { OrgNodeCard } from '../components/admin/orgStructure/nodes/OrgNodeCard';
 import { NodeTypeRulesMatrix, ruleUsage, type NodeTypeRule } from '../components/admin/orgStructure/nodes/NodeTypeRulesMatrix';
 import { MergeNodesForm, type MergeNodesInput } from '../components/admin/orgStructure/nodes/MergeNodesForm';
+import { OrgChartBoard } from '../components/admin/orgStructure/OrgChartBoard';
 
 const params = new URLSearchParams(location.search);
 const mockName = (params.get('mock') as OrgChartMockName) in ORG_CHART_MOCKS ? (params.get('mock') as OrgChartMockName) : 'postBank';
+const boardView = params.get('view') === 'board';
+
+if (boardView) {
+  // This page only: the chart board's requests are answered from the mock (the rest: empty lists).
+  const chart = ORG_CHART_MOCKS[mockName]();
+  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  window.fetch = async (input: RequestInfo | URL) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
+    if (url.pathname.endsWith('/api/org-structure/chart')) return json(chart);
+    return json([]);
+  };
+}
+
+/** The real chart board on the mock, full width. */
+const BoardView: React.FC = () => (
+  <div className="p-4 space-y-2">
+    <p className="text-xs text-slate-500">چارت واقعی روی داده‌ی ساختگی <b data-testid="mock-name">{mockName}</b> (فقط در محیط توسعه)</p>
+    <OrgChartBoard can={() => false} />
+  </div>
+);
 
 const Section: React.FC<{ id: string; title: string; children: React.ReactNode }> = ({ id, title, children }) => (
   <AdminCard className="p-5 space-y-4">
@@ -96,4 +119,4 @@ const Sandbox: React.FC = () => {
   );
 };
 
-createRoot(document.getElementById('root')!).render(<Sandbox />);
+createRoot(document.getElementById('root')!).render(boardView ? <BoardView /> : <Sandbox />);

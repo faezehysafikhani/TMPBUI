@@ -8,6 +8,7 @@ import { ChartSelection, companyHeadcount, companyPostsOf, headPostOf, positions
 import { PersonAvatar } from './PersonAvatar';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
+import { OrgLinkLayer } from './OrgLinkLayer';
 import { appAlert } from '../../../utils/appDialog';
 
 const PersonLine: React.FC<{ person: PersonRef | null; empty: string }> = ({ person, empty }) => (
@@ -578,6 +579,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         className={`relative overflow-hidden touch-none select-none outline-hidden cursor-grab data-[dragging=true]:cursor-grabbing data-[dragging=true]:[&_*]:cursor-grabbing bg-slate-50/60 dark:bg-slate-950/40 ${fullscreen ? 'flex-1 min-h-0' : 'h-[65vh] min-h-[420px] xl:h-[calc(100vh-170px)] xl:min-h-[620px]'}`}
       >
         <div ref={content} className="absolute top-0 left-0 origin-top-left w-max px-10 py-10 flex flex-col items-center">
+          {/* secondary links (dotted / dashed lines between nodes), behind the cards; none: nothing */}
+          <OrgLinkLayer company={company} content={content} highlightNodeId={selection?.kind === 'unit' ? selection.unitId : null} />
           {/* the company */}
           <NodeCard
             node={`company:${company.companyId}`}

@@ -13,7 +13,7 @@ const PAD = 24;
 const topPad = (vp: HTMLElement) => (vp.clientWidth < 640 ? 64 : PAD);
 
 /** An element's place inside the zoomed content, unaffected by the current zoom. */
-function localRect(el: HTMLElement, content: HTMLElement) {
+export function localRect(el: HTMLElement, content: HTMLElement) {
   let x = 0;
   let y = 0;
   let node: HTMLElement | null = el;
