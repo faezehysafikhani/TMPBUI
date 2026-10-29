@@ -91,56 +91,62 @@ export function findUnit(chart: ChartCompany[], unitId: string): { company: Char
 
 // ------------------------------------------------------------------ nested structure (optional fields)
 
+/** Every node of the company: its top nodes and, at any depth, the nodes under them (each once). */
+export function allUnitsOf(company: ChartCompany): ChartUnit[] {
+  const out: ChartUnit[] = [];
+  const seen = new Set<string>();
+  const visit = (unit: ChartUnit) => {
+    if (seen.has(unit.unitId)) return;
+    seen.add(unit.unitId);
+    out.push(unit);
+    (unit.children || []).forEach(visit);
+  };
+  company.units.forEach(visit);
+  return out;
+}
+
 /** Whether the company's nodes sit under each other (a flat or older backend: no). */
-export const isNested = (company: ChartCompany): boolean => company.units.some((unit) => !!unit.parentNodeId);
+export const isNested = (company: ChartCompany): boolean => company.units.some((unit) => (unit.children?.length ?? 0) > 0);
 
 /**
- * The company's nodes as a tree: each node followed by the nodes under it (children's order, else
- * the list's), with its depth. Flat data: every node at depth 0 in the given order. A node whose
- * parent is missing is shown at the top; a loop is cut where it repeats.
+ * The company's nodes as a tree: each node followed by the nodes under it, in their order, with its
+ * depth. Flat data: every node at depth 0 in the given order.
  */
 export function unitTree(company: ChartCompany): { unit: ChartUnit; depth: number }[] {
-  const byId = new Map(company.units.map((unit) => [unit.unitId, unit] as const));
-  const under = new Map<string, ChartUnit[]>();
-  for (const unit of company.units) {
-    if (unit.parentNodeId && byId.has(unit.parentNodeId)) {
-      under.set(unit.parentNodeId, [...(under.get(unit.parentNodeId) || []), unit]);
-    }
-  }
-  const childrenOf = (unit: ChartUnit): ChartUnit[] => {
-    const listed = under.get(unit.unitId) || [];
-    if (!unit.children?.length) return listed;
-    const ordered = unit.children.map((id) => listed.find((child) => child.unitId === id)).filter((child): child is ChartUnit => !!child);
-    return [...ordered, ...listed.filter((child) => !ordered.includes(child))];
-  };
   const out: { unit: ChartUnit; depth: number }[] = [];
   const seen = new Set<string>();
   const visit = (unit: ChartUnit, depth: number) => {
     if (seen.has(unit.unitId)) return;
     seen.add(unit.unitId);
     out.push({ unit, depth });
-    childrenOf(unit).forEach((child) => visit(child, depth + 1));
+    (unit.children || []).forEach((child) => visit(child, depth + 1));
   };
-  company.units.filter((unit) => !unit.parentNodeId || !byId.has(unit.parentNodeId)).forEach((top) => visit(top, 0));
-  company.units.forEach((unit) => visit(unit, 0)); // anything left (a loop): at the top
+  company.units.forEach((unit) => visit(unit, 0));
   return out;
 }
 
-/** The nodes above a node, nearest first (none for a top-level node or flat data). */
+/** The node each node sits under (from the nesting itself), for walking up. */
+function parentsOf(company: ChartCompany): Map<string, ChartUnit> {
+  const parents = new Map<string, ChartUnit>();
+  for (const unit of allUnitsOf(company)) for (const child of unit.children || []) parents.set(child.unitId, unit);
+  return parents;
+}
+
+/** The nodes above a node, nearest first (none for a top node or flat data). */
 export function ancestorsOf(company: ChartCompany, unitId: string): ChartUnit[] {
-  const byId = new Map(company.units.map((unit) => [unit.unitId, unit] as const));
+  const parents = parentsOf(company);
   const out: ChartUnit[] = [];
   const seen = new Set([unitId]);
-  for (let id = byId.get(unitId)?.parentNodeId; id && !seen.has(id) && byId.has(id); id = byId.get(id)!.parentNodeId) {
-    seen.add(id);
-    out.push(byId.get(id)!);
+  for (let parent = parents.get(unitId); parent && !seen.has(parent.unitId); parent = parents.get(parent.unitId)) {
+    seen.add(parent.unitId);
+    out.push(parent);
   }
   return out;
 }
 
 /** Every secondary link of the company, with the node it starts from. */
 export const linksOf = (company: ChartCompany) =>
-  company.units.flatMap((unit) => (unit.links || []).map((link) => ({ source: unit, link })));
+  allUnitsOf(company).flatMap((unit) => (unit.links || []).map((link) => ({ source: unit, link })));
 
 /** Initials for a person without a picture: of the last two words, so a title before the name does not count. */
 export function initials(name: string): string {

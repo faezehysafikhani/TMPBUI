@@ -23,6 +23,7 @@ export class ChartBuilder {
   private people = 0;
   private posts = 0;
   private linkCount = 0;
+  /** Every node made, at any depth (the company's `units` are only the top ones, as GET /chart sends them). */
   readonly units: ChartUnit[] = [];
 
   constructor(private readonly prefix: string) {}
@@ -56,7 +57,7 @@ export class ChartBuilder {
 
   /**
    * A node with a manager post (held unless vacant) and its other posts, each held by someone
-   * reporting to the manager. Its parent's children list is kept in step.
+   * reporting to the manager. It is added to its parent's children (nested, as GET /chart sends them).
    */
   node(input: {
     key: string;
@@ -86,7 +87,7 @@ export class ChartBuilder {
       unit.children = [];
       unit.nodeType = input.type ?? null;
       unit.links = input.links || [];
-      if (input.parent) input.parent.children = [...(input.parent.children || []), unit.unitId];
+      if (input.parent) input.parent.children = [...(input.parent.children || []), unit];
     }
     keys.set(unit, input.key);
     this.units.push(unit);
@@ -123,7 +124,7 @@ export class ChartBuilder {
       isActive: true,
       manager: head ? asRef(head) : null,
       members: [],
-      units: this.units,
+      units: this.units.filter((unit) => !unit.parentNodeId),
       positions,
       peopleCount: (head ? 1 : 0) + this.units.reduce((sum, unit) => sum + (unit.peopleCount ?? 0), 0),
     };

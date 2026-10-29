@@ -171,10 +171,10 @@ export interface ChartLink {
  * positions: the deputy's positions in its order, vacant ones too (absent on an older backend).
  * members: the deputy's people who hold none of its positions. teams: no longer shown.
  *
- * Nested structure (all optional; absent on an older backend or a flat company, which is then
- * shown flat as before): `ChartCompany.units` still lists every node of the company; parentNodeId
- * is the node above (null: directly under the company), children the ids of the nodes directly
- * under it in their order, nodeType its type and links its secondary links.
+ * Nested structure (GET /chart v2; the new fields are optional, absent on an older backend):
+ * `ChartCompany.units` are the company's top nodes, and `children` the nodes directly under each
+ * node, nested, in their order (always empty on a flat structure). parentNodeId is the node above
+ * (null: directly under the company), nodeType its type and links its secondary links.
  */
 export interface ChartUnit {
   unitId: string;
@@ -186,7 +186,7 @@ export interface ChartUnit {
   peopleCount?: number;
   positions?: ChartPosition[];
   parentNodeId?: string | null;
-  children?: string[];
+  children?: ChartUnit[];
   nodeType?: ChartNodeType | null;
   links?: ChartLink[];
 }

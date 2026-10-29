@@ -8,7 +8,7 @@ import '../index.css';
 import { ORG_CHART_MOCKS, type OrgChartMockName } from '../mocks/orgChart/charts';
 import type { ChartNodeType } from '../services/orgStructureApi';
 import { AdminCard } from '../components/admin/AdminUi';
-import { unitTree } from '../components/admin/orgStructure/orgChartModel';
+import { allUnitsOf, unitTree } from '../components/admin/orgStructure/orgChartModel';
 import { NodeTypeStylePicker, type NodeTypeStyle } from '../components/admin/orgStructure/nodes/NodeTypeStylePicker';
 import { OrgNodeCard } from '../components/admin/orgStructure/nodes/OrgNodeCard';
 import { NodeTypeRulesMatrix, ruleUsage, type NodeTypeRule } from '../components/admin/orgStructure/nodes/NodeTypeRulesMatrix';
@@ -21,7 +21,12 @@ const boardView = params.get('view') === 'board';
 
 if (boardView) {
   // This page only: the chart board's requests are answered from the mock (the rest: empty lists).
-  const chart = ORG_CHART_MOCKS[mockName]();
+  // Today's chart board draws a company's top units only, so it gets the mock flat: every node at
+  // the top (in tree order, children emptied). The nested drawing comes with phase 3.
+  const chart = ORG_CHART_MOCKS[mockName]().map((company) => ({
+    ...company,
+    units: unitTree(company).map(({ unit }) => ({ ...unit, children: [] })),
+  }));
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
   window.fetch = async (input: RequestInfo | URL) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
@@ -53,7 +58,7 @@ const Sandbox: React.FC = () => {
   const company = chart[0];
   const types = useMemo(() => {
     const seen = new Map<string, ChartNodeType>();
-    company.units.forEach((u) => u.nodeType && seen.set(u.nodeType.nodeTypeId, u.nodeType));
+    allUnitsOf(company).forEach((u) => u.nodeType && seen.set(u.nodeType.nodeTypeId, u.nodeType));
     return [...seen.values()];
   }, [company]);
 
@@ -61,7 +66,7 @@ const Sandbox: React.FC = () => {
   const [selected, setSelected] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // The rules the mock's nodes use, as a start; the user ticks and unticks.
-  const usage = useMemo(() => ruleUsage(company.units), [company]);
+  const usage = useMemo(() => ruleUsage(allUnitsOf(company)), [company]);
   const [rules, setRules] = useState<NodeTypeRule[]>(() =>
     Object.keys(usage).map((key) => {
       const [parent, child] = key.split('>');
@@ -75,7 +80,7 @@ const Sandbox: React.FC = () => {
       <header className="space-y-1">
         <h1 className="text-xl font-extrabold text-slate-900 dark:text-white">پیش‌نمایش اجزای ساختار سازمانی</h1>
         <p className="text-sm text-slate-500">
-          داده‌ی ساختگی: <b data-testid="mock-name">{mockName}</b> · {company.units.length} گره · فقط در محیط توسعه
+          داده‌ی ساختگی: <b data-testid="mock-name">{mockName}</b> · {allUnitsOf(company).length} گره · فقط در محیط توسعه
         </p>
         <nav className="flex flex-wrap gap-2 text-xs">
           {(Object.keys(ORG_CHART_MOCKS) as OrgChartMockName[]).map((name) => (
