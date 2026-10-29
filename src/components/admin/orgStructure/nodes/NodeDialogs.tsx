@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, inputClass } from '../../AdminUi';
 import { userErrorMessage } from '../../../../utils/errorMessages';
-import { type ChartCompany, type ChartUnit, type NodeType, type NodeTypeRule, createNode, moveNode } from '../../../../services/orgStructureApi';
+import { type ChartCompany, type ChartUnit, type NodeType, type NodeTypeRule, type OrgNode, createNode, moveNode } from '../../../../services/orgStructureApi';
 import { allUnitsOf } from '../orgChartModel';
 import { moveTargets } from '../orgNodeRules';
 import { ImpactPreviewDialog } from './ImpactPreviewDialog';
@@ -16,7 +16,7 @@ export const AddNodeDialog: React.FC<{
   /** null: at the top of the company. */
   parent: ChartUnit | null;
   types: NodeType[];
-  onCreated: (unitId: string) => Promise<void> | void;
+  onCreated: (node: OrgNode) => Promise<void> | void;
   onClose: () => void;
 }> = ({ company, parent, types, onCreated, onClose }) => {
   const [name, setName] = useState('');
@@ -34,7 +34,7 @@ export const AddNodeDialog: React.FC<{
         companyId: parent ? null : company.companyId,
         nodeTypeId: typeId || null,
       });
-      await onCreated(node.id);
+      await onCreated(node);
       onClose();
     } catch (err) {
       setError(userErrorMessage(err, 'افزودن گره انجام نشد.'));

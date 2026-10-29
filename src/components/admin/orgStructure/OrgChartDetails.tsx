@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch, Move, ChevronsUp,
+  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch, Move, ChevronsUp, LayoutTemplate, Link2,
 } from 'lucide-react';
 import { AdminCard, AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
-  ChartCompany, ChartMember, ChartPosition, ChartUnit, NodeType, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
-  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, deactivateNode, isConflict, reorderNode, setNodeManager, updateNode,
+  ChartCompany, ChartMember, ChartPosition, ChartUnit, LinkType, NodeType, OrgUiLevel, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
+  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, setCompanyUiLevel, deactivateNode, isConflict, reorderNode, setNodeManager, updateNode,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
   orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, unlinkUnit, updateCompany, updateOrgUnit,
   addCompanyPosition, postLabel, setPostParent, updateUnitPositionCode,
@@ -17,6 +17,9 @@ import { UserPicker } from './orgShared';
 import { ChartSelection, allUnitsOf, ancestorsOf, isNested as isNestedCompany, companyHeadcount, companyPostsOf, findMember, findPosition, findUnit, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { NodeTypeBadge, NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
 import { addableTypes, checkMove } from './orgNodeRules';
+import { UI_LEVELS, atLeast, levelOf } from './orgUiLevel';
+import { AddLinkDialog, RemoveLinkDialog, linkSentence } from './nodes/LinkDialogs';
+import { SaveTemplateDialog } from './nodes/SaveTemplateDialog';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
 
@@ -175,6 +178,7 @@ export const OrgChartDetails: React.FC<{
   /** The nodes with their versions, and the node types (empty on a backend without the node API). */
   nodes?: OrgNode[];
   nodeTypes?: NodeType[];
+  linkTypes?: LinkType[];
   /** What may sit under what (empty: flat). */
   rules?: NodeTypeRule[];
   /** Opens the move dialog of a node, or the add dialog under a node (null: at the top of the company). */
@@ -183,8 +187,15 @@ export const OrgChartDetails: React.FC<{
   selection: ChartSelection | null;
   onSelect: (selection: ChartSelection) => void;
   onChanged: () => Promise<void> | void;
-}> = ({ can, chart, positions, unplaced, nodes = [], nodeTypes = [], rules = [], onRequestMove, onRequestAdd, selection, onSelect, onChanged }) => {
+}> = ({ can, chart, positions, unplaced, nodes = [], nodeTypes = [], linkTypes = [], rules = [], onRequestMove, onRequestAdd, selection, onSelect, onChanged }) => {
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  /** Dialogs that bring their own footer and steps: saving a template, adding or removing a link. */
+  const [extra, setExtra] = useState<
+    | { kind: 'saveTemplate'; company: ChartCompany }
+    | { kind: 'addLink'; company: ChartCompany; unit: ChartUnit }
+    | { kind: 'removeLink'; company: ChartCompany; unit: ChartUnit; linkId: string; targetId: string; targetName: string; linkTypeId: string }
+    | null
+  >(null);
   /** conflict: the change was refused because the structure changed meanwhile (or a rule); the chart can be reloaded. */
   const [message, setMessage] = useState<PanelMessage | null>(null);
   /** The version of a node as the chart was loaded: a change over a newer one is refused by the server. */
@@ -233,6 +244,19 @@ export const OrgChartDetails: React.FC<{
             <InfoRow label={isNestedCompany(company) ? 'گره‌ها' : 'معاونت‌ها'}>{toPersianDigits(nodeCount(company))}</InfoRow>
             <InfoRow label="سمت‌ها">{toPersianDigits(positionCount)}{vacant > 0 ? ` (${toPersianDigits(vacant)} خالی)` : ''}</InfoRow>
             <InfoRow label="تعداد افراد">{toPersianDigits(companyHeadcount(company))} نفر</InfoRow>
+            <InfoRow label="سطح نمایش">
+              {can(P.manageCompanies) ? (
+                <select
+                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 text-sm font-bold"
+                  value={levelOf(company)}
+                  aria-label="سطح نمایش"
+                  disabled={busy}
+                  onChange={(e) => run(() => setCompanyUiLevel(company.companyId, e.target.value as OrgUiLevel), 'سطح نمایش عوض شد؛ فقط نمایش تغییر می‌کند و داده‌ای پاک نمی‌شود.', 'تغییر سطح نمایش انجام نشد.')}
+                >
+                  {UI_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.title} — {l.hint}</option>)}
+                </select>
+              ) : UI_LEVELS.find((l) => l.id === levelOf(company))?.title}
+            </InfoRow>
           </div>
           {companyPostsOf(company).length > 0 && (
             <div className="space-y-1">
@@ -259,6 +283,9 @@ export const OrgChartDetails: React.FC<{
           <QuickActions>
             {can(P.manageCompanies) && <ActionTile icon={Pencil} label="ویرایش شرکت" onClick={() => setDialog({ kind: 'editCompany', company })} />}
             {nodes.length === 0 && can(P.manageCompanies) && can(U.create) && <ActionTile icon={Plus} label="افزودن معاونت" onClick={() => setDialog({ kind: 'addUnit', company })} />}
+            {atLeast(levelOf(company), 'advanced') && canNode(can, 'manageTemplates') && (
+              <ActionTile icon={LayoutTemplate} label="ذخیره به‌عنوان قالب" onClick={() => setExtra({ kind: 'saveTemplate', company })} />
+            )}
             {nodes.length > 0 && canNode(can, 'create') && onRequestAdd && (
               <ActionTile
                 icon={Plus}
@@ -320,6 +347,26 @@ export const OrgChartDetails: React.FC<{
             <InfoRow label="تعداد افراد">{toPersianDigits(unitHeadcount(unit))} نفر</InfoRow>
             <InfoRow label="بدون سمت">{toPersianDigits(unit.members.length)} نفر</InfoRow>
           </div>
+          {atLeast(levelOf(company), 'advanced') && nodes.length > 0 && (() => {
+            const typeOfLink = (id: string) => linkTypes.find((t) => t.id === id);
+            const outgoing = (unit.links || []).map((l) => ({ link: l, from: unit, to: allUnitsOf(company).find((u) => u.unitId === l.targetNodeId) }));
+            const incoming = allUnitsOf(company).flatMap((u) => (u.links || []).filter((l) => l.targetNodeId === unit.unitId).map((l) => ({ link: l, from: u, to: unit })));
+            const rows = [...outgoing.map((r) => ({ ...r, mine: true })), ...incoming.map((r) => ({ ...r, mine: false }))].filter((r) => r.to);
+            if (rows.length === 0) return null;
+            return (
+              <div className="space-y-1" data-testid="node-links">
+                <p className="text-xs font-bold text-slate-500">رابطه‌های فرعی ({toPersianDigits(rows.length)})</p>
+                {rows.map(({ link, from, to, mine }) => (
+                  <div key={link.linkId} className="flex items-start gap-1 rounded-xl px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                    <span className="flex-1 text-xs leading-6 text-slate-700 dark:text-slate-200">{linkSentence(from.name, to!.name, { name: link.name, lineStyle: link.lineStyle, countsAsManager: link.countsAsManager })}</span>
+                    {mine && canNode(can, 'update') && typeOfLink(link.linkTypeId) && (
+                      <button type="button" onClick={() => setExtra({ kind: 'removeLink', company, unit, linkId: link.linkId, targetId: link.targetNodeId, targetName: to!.name, linkTypeId: link.linkTypeId })} className="p-1 rounded-lg text-slate-400 hover:text-rose-600 cursor-pointer shrink-0" title="برداشتن رابطه" aria-label={`برداشتن رابطه‌ی ${from.name} به ${to!.name}`}><Trash2 className="w-3.5 h-3.5" /></button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {(unit.children?.length ?? 0) > 0 && (
             <div className="space-y-1">
               <p className="text-xs font-bold text-slate-500">زیرمجموعه‌ها ({toPersianDigits(unit.children!.length)})</p>
@@ -378,6 +425,9 @@ export const OrgChartDetails: React.FC<{
           </div>
           <QuickActions>
             {(nodes.length > 0 ? canNode(can, 'update') : can(U.update)) && <ActionTile icon={Pencil} label={nodes.length > 0 ? 'ویرایش گره' : 'ویرایش معاونت'} onClick={() => setDialog({ kind: 'editUnit', unit })} />}
+            {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'update') && (
+              <ActionTile icon={Link2} label="افزودن مافوق دوم" disabled={busy || unit.isActive === false} onClick={() => setExtra({ kind: 'addLink', company, unit })} />
+            )}
             {nodes.length > 0 && canNode(can, 'assign') && (
               <ActionTile icon={UserRound} label="تعیین مدیر گره" disabled={busy} onClick={() => setDialog({ kind: 'nodeManager', unit })} />
             )}
@@ -584,6 +634,21 @@ export const OrgChartDetails: React.FC<{
       </div>
       {message && !dialog && <MessageBox message={message} onClose={() => setMessage(null)} onReload={async () => { setMessage(null); await onChanged(); }} />}
       {body}
+      {extra && createPortal(
+        extra.kind === 'saveTemplate' ? (
+          <SaveTemplateDialog company={extra.company} onSaved={(name) => setMessage({ type: 'success', text: `قالب «${name}» ذخیره شد.` })} onClose={() => setExtra(null)} />
+        ) : extra.kind === 'addLink' ? (
+          <AddLinkDialog company={extra.company} from={extra.unit} linkTypes={linkTypes} onAdded={async () => { await onChanged(); setMessage({ type: 'success', text: 'رابطه اضافه شد.' }); }} onReload={onChanged} onClose={() => setExtra(null)} />
+        ) : linkTypes.find((t) => t.id === extra.linkTypeId) ? (
+          <RemoveLinkDialog
+            link={{ id: extra.linkId, from: extra.unit.name, to: extra.targetName, type: linkTypes.find((t) => t.id === extra.linkTypeId)! }}
+            onRemoved={async () => { await onChanged(); setMessage({ type: 'success', text: 'رابطه برداشته شد.' }); }}
+            onReload={onChanged}
+            onClose={() => setExtra(null)}
+          />
+        ) : null,
+        document.body,
+      )}
       {/* At the page root: the panel is sticky, and the chart's cards would otherwise cover a dialog opened inside it. */}
       {dialog && createPortal(
         <ChartDialog

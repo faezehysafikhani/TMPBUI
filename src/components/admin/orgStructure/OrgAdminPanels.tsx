@@ -6,10 +6,11 @@ import {
 import { userErrorMessage } from '../../../utils/errorMessages';
 import {
   Company, CompanyUnitLink, OrgUnit, Position, createCompany, createOrgUnit, createPosition, deactivateOrgUnit,
-  deleteCompany, deletePosition, linkUnitToCompany, listCompanies, listCompanyUnits, listNodes, listOrgUnits, type OrgNode,
+  deleteCompany, deletePosition, linkUnitToCompany, listCompanies, listCompanyUnits, listNodes, listOrgUnits, listTemplates, type OrgNode, type StructureTemplate,
   listAssignments, listPositions, sortOrgUnits, unlinkUnit, updateCompany, updateOrgUnit, updatePosition, UserAssignment,
 } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
+import { CompanyWizard } from './nodes/CompanyWizard';
 
 type Message = { type: 'success' | 'error'; text: string } | null;
 
@@ -43,12 +44,17 @@ interface CompanyDraft { id?: string; name: string; code: string; description: s
 
 export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean }> = ({ canManage, canSeeUnits }) => {
   const data = useLoad(async () => {
-    const [companies, links, units] = await Promise.all([listCompanies(), listCompanyUnits(), canSeeUnits ? listOrgUnits() : Promise.resolve([] as OrgUnit[])]);
-    return { companies, links, units };
+    const [companies, links, units, templates] = await Promise.all([
+      listCompanies(), listCompanyUnits(), canSeeUnits ? listOrgUnits() : Promise.resolve([] as OrgUnit[]),
+      // Ready structures to start a company from; a backend without them: the plain dialog.
+      listTemplates().catch(() => [] as StructureTemplate[]),
+    ]);
+    return { companies, links, units, templates };
   }, 'دریافت فهرست شرکت‌ها ممکن نشد.');
   const [message, setMessage] = useState<Message>(null);
   const [draft, setDraft] = useState<CompanyDraft | null>(null);
   const [unitsOf, setUnitsOf] = useState<Company | null>(null);
+  const [wizard, setWizard] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Company | null>(null);
   const { busy, run } = useAction(data.reload, setMessage);
   // A message from before the dialog opened is not the dialog's.
@@ -76,7 +82,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
             <p className="text-xs text-slate-500 mt-0.5">شرکت‌های این سازمان و معاونت‌هایی که هر کدام در اختیار دارد.</p>
           </div>
           {canManage && (
-            <PrimaryButton onClick={() => setDraft({ name: '', code: '', description: '', headName: null, isActive: true })}>
+            <PrimaryButton onClick={() => (data.data?.templates.length ? setWizard(true) : setDraft({ name: '', code: '', description: '', headName: null, isActive: true }))}>
               <Plus className="w-4 h-4" /> شرکت جدید
             </PrimaryButton>
           )}
@@ -115,6 +121,14 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
             </div>
           )}
       </AdminCard>
+
+      {wizard && data.data && (
+        <CompanyWizard
+          templates={data.data.templates}
+          onCreated={async () => { setMessage({ type: 'success', text: 'شرکت ساخته شد.' }); await data.reload(); }}
+          onClose={() => setWizard(false)}
+        />
+      )}
 
       {draft && (
         <AdminDialog

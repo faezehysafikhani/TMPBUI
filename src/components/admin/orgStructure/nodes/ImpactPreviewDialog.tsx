@@ -28,6 +28,8 @@ export function impactLines(item: ImpactPerson, taskLimitOn: boolean): { tone: '
   }
   if (item.substitutionAdded.length) lines.push({ tone: 'info', text: `پست‌های خالی تازه در کارتابل جانشینی: ${item.substitutionAdded.map((p) => p.title).join('، ')}` });
   if (item.substitutionRemoved.length) lines.push({ tone: 'info', text: `پست‌هایی که از کارتابل جانشینی‌اش خارج می‌شود: ${item.substitutionRemoved.map((p) => p.title).join('، ')}` });
+  if (item.extraManagersAdded?.length) lines.push({ tone: 'warn', text: `مدیر دوم تازه (از رابطه‌ی فرعی): ${names(item.extraManagersAdded)}` });
+  if (item.extraManagersRemoved?.length) lines.push({ tone: 'info', text: `دیگر مدیر دوم او نیستند: ${names(item.extraManagersRemoved)}` });
   if (item.teamAdded.length) lines.push({ tone: 'good', text: `اعضای تازه‌ای که می‌تواند به تیم کاری ببرد (${toPersianDigits(item.teamAdded.length)}): ${names(item.teamAdded)}` });
   if (item.teamRemoved.length) lines.push({ tone: 'warn', text: `اعضایی که دیگر نمی‌تواند به تیم کاری ببرد (${toPersianDigits(item.teamRemoved.length)}): ${names(item.teamRemoved)}` });
   return lines;

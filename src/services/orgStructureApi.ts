@@ -19,6 +19,9 @@ export interface Company {
 /** The head is not chosen here: it is whoever holds the company's position with no superior. */
 export interface CompanyInput { name: string; code: string; description?: string | null }
 
+/** A new company, optionally made from a structure template (a copy of its types, rules, positions and nodes). */
+export interface CompanyCreateInput extends CompanyInput { templateId?: string | null }
+
 export interface CompanyUnitLink { unitId: string; unitName: string; companyId: string; companyName: string }
 
 /**
@@ -241,6 +244,7 @@ export const ORG_NODE_PERMISSIONS = {
   deactivate: 'org_structure.node.deactivate',
   assign: 'org_structure.node.assign',
   manageRules: 'org_structure.manage_rules',
+  manageTemplates: 'org_structure.manage_templates',
 } as const;
 
 export type OrgNodeOperation = keyof typeof ORG_NODE_PERMISSIONS;
@@ -254,6 +258,7 @@ const NODE_OPERATION_PERMISSIONS: Record<OrgNodeOperation, string[]> = {
   deactivate: [ORG_NODE_PERMISSIONS.deactivate, 'organization_units.delete'],
   assign: [ORG_NODE_PERMISSIONS.assign, 'organization_units.update'],
   manageRules: [ORG_NODE_PERMISSIONS.manageRules],
+  manageTemplates: [ORG_NODE_PERMISSIONS.manageTemplates],
 };
 
 /** Whether the user may do a node operation (hiding only: the server checks again). */
@@ -290,7 +295,7 @@ export const getMySubordinates = (all: boolean) => apiRequest<Subordinate[]>('GE
 export const getChart = (companyId?: string) => apiRequest<ChartCompany[]>('GET', `${BASE}/chart`, { query: { companyId } });
 
 export const listCompanies = () => apiRequest<Company[]>('GET', `${BASE}/companies`);
-export const createCompany = (input: CompanyInput) => apiRequest<Company>('POST', `${BASE}/companies`, { body: input });
+export const createCompany = (input: CompanyCreateInput) => apiRequest<Company>('POST', `${BASE}/companies`, { body: input });
 export const updateCompany = (id: string, input: CompanyInput & { isActive: boolean }) =>
   apiRequest<Company>('PUT', `${BASE}/companies/${id}`, { body: input });
 export const deleteCompany = (id: string) => apiRequest<void>('DELETE', `${BASE}/companies/${id}`);
@@ -432,6 +437,8 @@ export interface OrgNode {
   sortOrder: number;
   childCount: number;
   rowVersion: string;
+  /** Only right after the node is made: automatic links with several possible targets, to choose from (POST /links). */
+  autoLinkChoices?: AutoLinkChoice[] | null;
 }
 
 export interface NodePathItem { id: string; name: string }
@@ -498,8 +505,12 @@ export const setNodeTypeRules = (rules: NodeTypeRule[]) => apiRequest<NodeTypeRu
  * null: none) or «unlink» (nodeId loses its company link).
  */
 export interface ImpactChange {
-  kind: 'move' | 'add' | 'manager' | 'unlink';
+  kind: 'move' | 'add' | 'manager' | 'unlink' | 'link' | 'unlink-link';
   nodeId?: string | null;
+  /** «link»: the node the secondary link goes to, and its type. «unlink-link»: the link that goes. */
+  toNodeId?: string | null;
+  linkTypeId?: string | null;
+  linkId?: string | null;
   parentNodeId?: string | null;
   companyId?: string | null;
   managerUserId?: string | null;
@@ -522,6 +533,9 @@ export interface ImpactPerson {
   substitutionRemoved: ImpactPost[];
   teamAdded: PersonRef[];
   teamRemoved: PersonRef[];
+  /** The managers someone gets / loses through secondary links that count as manager (their main manager does not change). */
+  extraManagersAdded?: PersonRef[] | null;
+  extraManagersRemoved?: PersonRef[] | null;
 }
 
 /** taskLimitOn: whether «cannot give tasks to» was compared (OrgStructure:LimitTaskAssignment). */
@@ -532,3 +546,73 @@ export const previewImpact = (changes: ImpactChange[]) => apiRequest<ImpactPrevi
 
 /** A save over someone else's newer change, or a business conflict: both answer 409. */
 export const isConflict = (err: unknown): boolean => err instanceof NexusApiError && err.httpStatus === 409;
+
+// ---------------------------------------------------------------- secondary links (phase 4)
+
+/** A kind of secondary link. lineStyle: how the chart draws it; a dotted one never counts as manager. */
+export interface LinkType { id: string; code: string; name: string; lineStyle: OrgLineStyle; countsAsManager: boolean; isActive: boolean; linkCount: number }
+export interface LinkTypeInput { name: string; code?: string | null; lineStyle: OrgLineStyle; countsAsManager: boolean }
+
+/** A node of the source type, when made, is linked to the one node of the target type (in its company). */
+export interface AutoLinkRule { sourceNodeTypeId: string; targetNodeTypeId: string; linkTypeId: string }
+
+export interface OrgLink {
+  id: string;
+  fromNodeId: string;
+  fromName: string;
+  toNodeId: string;
+  toName: string;
+  linkTypeId: string;
+  linkTypeName: string;
+  lineStyle: OrgLineStyle;
+  countsAsManager: boolean;
+}
+
+/** An automatic link with several possible targets: the user picks one. */
+export interface AutoLinkChoice { nodeId: string; nodeName: string; linkTypeId: string; linkTypeName: string; targets: NodePathItem[] }
+export interface ProposedLink { fromNodeId: string; fromName: string; toNodeId: string; toName: string; linkTypeId: string; linkTypeName: string }
+/** What the automatic rules would add to the existing nodes: links (one target each) and ambiguous ones (several targets: not added). */
+export interface AutoLinkPlan { links: ProposedLink[]; ambiguous: AutoLinkChoice[] }
+
+export const listLinkTypes = () => apiRequest<LinkType[]>('GET', `${BASE}/link-types`);
+export const createLinkType = (input: LinkTypeInput) => apiRequest<LinkType>('POST', `${BASE}/link-types`, { body: input });
+export const updateLinkType = (id: string, input: { name: string; lineStyle: OrgLineStyle; countsAsManager: boolean; isActive: boolean }) =>
+  apiRequest<LinkType>('PUT', `${BASE}/link-types/${id}`, { body: input });
+export const deleteLinkType = (id: string) => apiRequest<void>('DELETE', `${BASE}/link-types/${id}`);
+export const listAutoLinkRules = () => apiRequest<AutoLinkRule[]>('GET', `${BASE}/auto-link-rules`);
+export const setAutoLinkRules = (rules: AutoLinkRule[]) => apiRequest<AutoLinkRule[]>('PUT', `${BASE}/auto-link-rules`, { body: { rules } });
+/** What the automatic rules would add to the nodes that exist now (nothing is written). */
+export const planAutoLinks = () => apiRequest<AutoLinkPlan>('POST', `${BASE}/auto-link-rules/preview`);
+export const applyAutoLinks = (links: { fromNodeId: string; toNodeId: string; linkTypeId: string }[]) =>
+  apiRequest<OrgLink[]>('POST', `${BASE}/auto-link-rules/apply`, { body: { links } });
+export const listLinks = (nodeId?: string) => apiRequest<OrgLink[]>('GET', `${BASE}/links`, { query: { nodeId } });
+export const createLink = (input: { fromNodeId: string; toNodeId: string; linkTypeId: string }) => apiRequest<OrgLink>('POST', `${BASE}/links`, { body: input });
+export const deleteLink = (id: string) => apiRequest<void>('DELETE', `${BASE}/links/${id}`);
+export const setCompanyUiLevel = (companyId: string, uiLevel: OrgUiLevel) => apiRequest<void>('PUT', `${BASE}/companies/${companyId}/ui-level`, { body: { uiLevel } });
+/** The people who also count as someone's manager through a link (not the main manager). */
+export const getExtraManagers = (userId: string) => apiRequest<PersonRef[]>('GET', `${BASE}/users/${userId}/extra-managers`);
+
+// ---------------------------------------------------------------- structure templates (phase 4)
+
+/** A structure template: built in (isSystem) or saved from a company of this organization. */
+export interface StructureTemplate { id: string; code: string; name: string; description: string | null; isSystem: boolean; uiLevel: OrgUiLevel; nodeCount: number; nodeTypeCount: number }
+
+/** The template and its whole content (types, rules, positions, nodes, links...), in the shape of the template files. */
+export interface StructureTemplateDetail { template: StructureTemplate; content: TemplateContent }
+
+export interface TemplateNodeType { key: string; name: string; color?: string; icon?: string; isDomainBoundary?: boolean }
+export interface TemplateNode { key: string; name: string; type?: string | null; children?: TemplateNode[] }
+export interface TemplateContent {
+  nodeTypes?: TemplateNodeType[];
+  nodes?: TemplateNode[];
+  linkTypes?: { key: string; name: string; lineStyle?: string }[];
+  links?: unknown[];
+  positions?: { key: string; name: string }[];
+}
+
+export const listTemplates = () => apiRequest<StructureTemplate[]>('GET', `${BASE}/templates`);
+export const getTemplate = (id: string) => apiRequest<StructureTemplateDetail>('GET', `${BASE}/templates/${id}`);
+/** Saves a company's structure as a template of this organization (a copy). */
+export const saveTemplate = (input: { companyId: string; name: string; code?: string | null; description?: string | null }) =>
+  apiRequest<StructureTemplate>('POST', `${BASE}/templates`, { body: input });
+export const deleteTemplate = (id: string) => apiRequest<void>('DELETE', `${BASE}/templates/${id}`);

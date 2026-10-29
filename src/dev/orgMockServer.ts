@@ -1,7 +1,7 @@
 // Development only: answers the org-structure requests of the chart board from a mock chart, in
 // memory, so the board can be driven (and checked) without an API. Changes it accepts change the
 // chart it answers with next, as the real server would. Not part of the app.
-import type { ChartCompany, ChartNodeType, ChartUnit, ImpactChange, NodeType, NodeTypeRule, OrgNode } from '../services/orgStructureApi';
+import type { AutoLinkRule, ChartCompany, ChartLink, ChartNodeType, ChartUnit, ImpactChange, LinkType, NodeType, NodeTypeRule, OrgNode, StructureTemplate, TemplateContent } from '../services/orgStructureApi';
 import { allUnitsOf } from '../components/admin/orgStructure/orgChartModel';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -21,6 +21,19 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
   let rules: NodeTypeRule[] | null = null;
   const typeOverrides = new Map<string, Partial<NodeType>>();
   const extraTypes: NodeType[] = [];
+  let autoRules: AutoLinkRule[] = [];
+  const extraLinkTypes: LinkType[] = [];
+  const linkTypeOverrides = new Map<string, Partial<LinkType>>();
+  // Ready templates (small: the real ones are the core's template files) and the ones saved from companies.
+  const templateContent = (name: string): TemplateContent => ({
+    nodeTypes: [{ key: 'deputy', name: 'معاونت', color: '#0f766e', icon: 'building-2' }, { key: 'dept', name: 'اداره کل', color: '#2563eb', icon: 'folder-tree' }],
+    nodes: [{ key: 'a', name: `معاونت نمونه‌ی ${name}`, type: 'deputy', children: [{ key: 'a1', name: 'اداره کل نمونه', type: 'dept' }] }],
+  });
+  const templates: { template: StructureTemplate; content: TemplateContent }[] = [
+    { template: { id: 'tpl-simple', code: 'simple', name: 'ساده', description: 'فقط پست؛ بدون واحد.', isSystem: true, uiLevel: 'simple', nodeCount: 0, nodeTypeCount: 0 }, content: { nodeTypes: [], nodes: [] } },
+    { template: { id: 'tpl-deputy', code: 'deputy', name: 'معاونتی', description: 'معاونت‌ها و واحدهای زیر آن‌ها.', isSystem: true, uiLevel: 'normal', nodeCount: 2, nodeTypeCount: 2 }, content: templateContent('معاونتی') },
+    { template: { id: 'tpl-bank', code: 'bank', name: 'بانکی', description: 'مجمع، هیأت مدیره، کمیته‌ها با خط نقطه‌چین، معاونت‌ها و شعب.', isSystem: true, uiLevel: 'advanced', nodeCount: 2, nodeTypeCount: 2 }, content: templateContent('بانکی') },
+  ];
 
   const typesOf = (): NodeType[] => {
     const seen = new Map<string, ChartNodeType>();
@@ -43,6 +56,19 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     }));
     return [...found.values()];
   };
+
+  const linkTypesOf = (): LinkType[] => {
+    const seen = new Map<string, LinkType>();
+    chart.forEach((c) => allUnitsOf(c).forEach((u) => (u.links || []).forEach((l: ChartLink) => {
+      const known = seen.get(l.linkTypeId);
+      seen.set(l.linkTypeId, { id: l.linkTypeId, code: l.linkTypeId, name: l.name, lineStyle: l.lineStyle, countsAsManager: l.countsAsManager, isActive: true, linkCount: (known?.linkCount ?? 0) + 1 });
+    })));
+    return [...seen.values(), ...extraLinkTypes].map((t) => ({ ...t, ...linkTypeOverrides.get(t.id) }));
+  };
+  const allLinks = () => chart.flatMap((c) => allUnitsOf(c).flatMap((u) => (u.links || []).map((l: ChartLink) => {
+    const to = allUnitsOf(c).find((x) => x.unitId === l.targetNodeId);
+    return { id: l.linkId, fromNodeId: u.unitId, fromName: u.name, toNodeId: l.targetNodeId, toName: to?.name ?? '', linkTypeId: l.linkTypeId, linkTypeName: l.name, lineStyle: l.lineStyle, countsAsManager: l.countsAsManager };
+  })));
 
   const find = (unitId: string) => {
     for (const company of chart) {
@@ -69,7 +95,7 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     for (const change of changes) {
       const found = change.nodeId ? find(change.nodeId) : null;
       if (!found) continue;
-      for (const id of subtreeIds(found.unit)) {
+      for (const id of (change.kind === 'link' ? [found.unit.unitId] : subtreeIds(found.unit))) {
         const unit = find(id)!.unit;
         [...unit.members, ...(unit.positions || []).flatMap((p) => p.holders)].forEach((m) => people.set(m.userId, { displayName: m.displayName }));
       }
@@ -123,6 +149,46 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
       return json(typesOf().find((t) => t.id === id));
     }
     if (method === 'POST' && path === '/impact-preview') return json(preview(body.changes));
+
+    if (method === 'GET' && path === '/companies') return json(chart.map((c) => ({ id: c.companyId, name: c.name, code: c.code, description: null, manager: c.manager, isActive: c.isActive, linkedUnitIds: c.units.map((u) => u.unitId) })));
+    if (method === 'GET' && path === '/templates') return json(templates.map((t) => t.template));
+    const tpl = path.match(/^\/templates\/([^/]+)$/);
+    if (tpl && method === 'GET') { const t = templates.find((x) => x.template.id === tpl[1]); return t ? json(t) : problem(404, 'قالب پیدا نشد.', 'not_found'); }
+    if (tpl && method === 'DELETE') { const at = templates.findIndex((x) => x.template.id === tpl[1] && !x.template.isSystem); if (at < 0) return problem(409, 'قالب آماده حذف نمی‌شود.', 'conflict'); templates.splice(at, 1); return new Response(null, { status: 204 }); }
+    if (method === 'POST' && path === '/templates') {
+      const company = chart.find((c) => c.companyId === body.companyId);
+      if (!company) return problem(404, 'شرکت پیدا نشد.', 'not_found');
+      const template: StructureTemplate = { id: crypto.randomUUID(), code: crypto.randomUUID().slice(0, 8), name: body.name, description: body.description ?? null, isSystem: false, uiLevel: company.uiLevel ?? 'normal', nodeCount: allUnitsOf(company).length, nodeTypeCount: new Set(allUnitsOf(company).map((u) => u.nodeType?.nodeTypeId)).size };
+      templates.push({ template, content: templateContent(body.name) });
+      return json(template, 201);
+    }
+    if (method === 'POST' && path === '/companies') {
+      const t = templates.find((x) => x.template.id === body.templateId);
+      const company: ChartCompany = { companyId: crypto.randomUUID(), name: body.name, code: body.code, isActive: true, manager: null, members: [], units: [], peopleCount: 0, positions: [], uiLevel: t?.template.uiLevel ?? 'normal' };
+      chart.push(company);
+      return json({ id: company.companyId, name: company.name, code: company.code, description: body.description ?? null, manager: null, isActive: true, linkedUnitIds: [] }, 201);
+    }
+    const level = path.match(/^\/companies\/([^/]+)\/ui-level$/);
+    if (level && method === 'PUT') { const c = chart.find((x) => x.companyId === level[1]); if (!c) return problem(404, 'شرکت پیدا نشد.', 'not_found'); c.uiLevel = body.uiLevel; return new Response(null, { status: 204 }); }
+    if (method === 'GET' && path === '/link-types') return json(linkTypesOf());
+    if (method === 'POST' && path === '/link-types') { const t: LinkType = { id: crypto.randomUUID(), code: body.name, name: body.name, lineStyle: body.lineStyle, countsAsManager: body.countsAsManager, isActive: true, linkCount: 0 }; extraLinkTypes.push(t); return json(t, 201); }
+    const lt = path.match(/^\/link-types\/([^/]+)$/);
+    if (lt && method === 'PUT') { linkTypeOverrides.set(lt[1], { name: body.name, lineStyle: body.lineStyle, countsAsManager: body.countsAsManager, isActive: body.isActive }); return json(linkTypesOf().find((t) => t.id === lt[1])); }
+    if (lt && method === 'DELETE') { const t = linkTypesOf().find((x) => x.id === lt[1]); if (t && t.linkCount > 0) return problem(409, 'نوعی که رابطه دارد حذف نمی‌شود.', 'conflict'); const at = extraLinkTypes.findIndex((x) => x.id === lt[1]); if (at >= 0) extraLinkTypes.splice(at, 1); return new Response(null, { status: 204 }); }
+    if (method === 'GET' && path === '/auto-link-rules') return json(autoRules);
+    if (method === 'PUT' && path === '/auto-link-rules') { autoRules = body.rules; return json(autoRules); }
+    if (method === 'POST' && path === '/auto-link-rules/preview') return json({ links: [], ambiguous: [] });
+    if (method === 'POST' && path === '/auto-link-rules/apply') return json([]);
+    if (method === 'GET' && path === '/links') return json(allLinks());
+    if (method === 'POST' && path === '/links') {
+      const from = find(body.fromNodeId);
+      const type = linkTypesOf().find((t) => t.id === body.linkTypeId);
+      if (!from || !type) return problem(404, 'گره یا نوع رابطه پیدا نشد.', 'not_found');
+      from.unit.links = [...(from.unit.links || []), { linkId: crypto.randomUUID(), targetNodeId: body.toNodeId, linkTypeId: type.id, name: type.name, lineStyle: type.lineStyle, countsAsManager: type.countsAsManager }];
+      return json(allLinks().find((l) => l.fromNodeId === body.fromNodeId && l.toNodeId === body.toNodeId), 201);
+    }
+    const dl = path.match(/^\/links\/([^/]+)$/);
+    if (dl && method === 'DELETE') { chart.forEach((c) => allUnitsOf(c).forEach((u) => { u.links = (u.links || []).filter((l: ChartLink) => l.linkId !== dl[1]); })); return new Response(null, { status: 204 }); }
 
     const node = path.match(/^\/nodes\/([^/]+)(?:\/(\w+))?$/);
     if (node && method === 'POST') {

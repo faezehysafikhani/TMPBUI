@@ -3,12 +3,14 @@ import { createPortal } from 'react-dom';
 import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
-import { ChartCompany, ChartMember, ChartPosition, ChartUnit, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listNodeTypes, listNodes, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
+import { ChartCompany, ChartMember, ChartPosition, ChartUnit, AutoLinkChoice, LinkType, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listLinkTypes, listNodeTypes, listNodes, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
 import { ChartSelection, allUnitsOf, ancestorsOf, companyHeadcount, companyPostsOf, depthsOf, headPostOf, isNested, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
 import { AddNodeDialog, MoveNodeDialog } from './nodes/NodeDialogs';
+import { AutoLinkChoiceDialog } from './nodes/LinkDialogs';
 import { addableTypes, checkMove } from './orgNodeRules';
+import { atLeast, highestLevel, levelOf } from './orgUiLevel';
 import { PersonAvatar } from './PersonAvatar';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
@@ -295,9 +297,13 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
  * pointer is, dragging moves it, and choosing a card while zoomed out - on the chart, in the side
  * panel or by searching - takes the chart to it.
  */
-export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> = ({ can }) => {
+export const OrgChartBoard: React.FC<{
+  can: (permission: string) => boolean;
+  /** Told after each load: the highest display level among the companies (the section's tabs follow it). */
+  onLevelChange?: (level: import('../../../services/orgStructureApi').OrgUiLevel) => void;
+}> = ({ can, onLevelChange }) => {
   const data = useLoad(async () => {
-    const [chart, positions, unplaced, nodes, nodeTypes, nodeRules] = await Promise.all([
+    const [chart, positions, unplaced, nodes, nodeTypes, nodeRules, linkTypes] = await Promise.all([
       getChart(),
       listPositions().catch(() => []),
       listUnplacedUsers().catch(() => []),
@@ -305,8 +311,9 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
       listNodes().catch(() => [] as OrgNode[]),
       listNodeTypes().catch(() => [] as NodeType[]),
       getNodeTypeRules().then((r) => r.rules).catch(() => [] as NodeTypeRule[]),
+      listLinkTypes().catch(() => [] as LinkType[]),
     ]);
-    return { chart, positions, unplaced, nodes, nodeTypes, nodeRules };
+    return { chart, positions, unplaced, nodes, nodeTypes, nodeRules, linkTypes };
   }, 'دریافت چارت سازمانی ممکن نشد.');
 
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -323,6 +330,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropOver, setDropOver] = useState<{ id: string | null; ok: boolean } | null>(null);
   const [dragNote, setDragNote] = useState<string | null>(null);
+  const [linkChoices, setLinkChoices] = useState<AutoLinkChoice[] | null>(null);
   const [exporting, setExporting] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   /** How to move around, until the user first does. */
@@ -335,7 +343,10 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   const chart = data.data?.chart || [];
   const company: ChartCompany | undefined = chart.find((c) => c.companyId === companyId) || chart[0];
   const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company);
-  const nodeApi = (data.data?.nodes.length ?? 0) > 0;
+  const level = levelOf(company);
+  // The display level only hides: simple has no node tools, advanced adds the secondary links.
+  const nodeApi = (data.data?.nodes.length ?? 0) > 0 && atLeast(level, 'normal');
+  const showLinks = atLeast(level, 'advanced');
   const rules = data.data?.nodeRules || [];
   const canMoveNodes = nodeApi && canNode(can, 'move');
   const unitById = useMemo(() => new Map((company ? allUnitsOf(company) : []).map((u) => [u.unitId, u] as const)), [company]);
@@ -368,6 +379,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   }, [company]);
 
   const units = company?.units || [];
+  useEffect(() => { if (data.data) onLevelChange?.(highestLevel(data.data.chart)); }, [data.data]); // eslint-disable-line react-hooks/exhaustive-deps
   // A nested company's few top nodes stand in one row (their sub-nodes make them tall); a flat company's
   // many deputies are laid out in balanced rows.
   const nested = !!company && isNested(company);
@@ -748,7 +760,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
       >
         <div ref={content} className="absolute top-0 left-0 origin-top-left w-max px-10 py-10 flex flex-col items-center">
           {/* secondary links (dotted / dashed lines between nodes), behind the cards; none: nothing */}
-          <OrgLinkLayer company={company} content={content} highlightNodeId={selection?.kind === 'unit' ? selection.unitId : null} />
+          {showLinks && <OrgLinkLayer company={company} content={content} highlightNodeId={selection?.kind === 'unit' ? selection.unitId : null} />}
           {/* the company */}
           <NodeCard
             node={`company:${company.companyId}`}
@@ -929,8 +941,9 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         chart={chart}
         positions={data.data?.positions || []}
         unplaced={data.data?.unplaced || []}
-        nodes={data.data?.nodes || []}
+        nodes={nodeApi ? data.data?.nodes || [] : []}
         nodeTypes={data.data?.nodeTypes || []}
+        linkTypes={data.data?.linkTypes || []}
         rules={rules}
         onRequestMove={(unitId) => setMoveRequest({ unitId })}
         onRequestAdd={(parentId) => setAddRequest({ parentId })}
@@ -954,12 +967,21 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
       />,
       document.body,
     )}
+    {linkChoices && createPortal(
+      <AutoLinkChoiceDialog choices={linkChoices} onDone={data.reload} onClose={() => setLinkChoices(null)} />,
+      document.body,
+    )}
     {addRequest && createPortal(
       <AddNodeDialog
         company={company}
         parent={addRequest.parentId ? unitById.get(addRequest.parentId) ?? null : null}
         types={addableTypes(data.data?.nodeTypes || [], rules, addRequest.parentId ? unitById.get(addRequest.parentId) ?? null : null)}
-        onCreated={async (unitId) => { await data.reload(); choose({ kind: 'unit', companyId: company.companyId, unitId }, { force: true }); }}
+        onCreated={async (node) => {
+          await data.reload();
+          choose({ kind: 'unit', companyId: company.companyId, unitId: node.id }, { force: true });
+          // An automatic link rule with several possible targets: the user picks.
+          if (node.autoLinkChoices?.length) setLinkChoices(node.autoLinkChoices);
+        }}
         onClose={() => setAddRequest(null)}
       />,
       document.body,
