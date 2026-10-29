@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch,
+  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch, Move, ChevronsUp,
 } from 'lucide-react';
 import { AdminCard, AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
-  ChartCompany, ChartMember, ChartPosition, ChartUnit, NodeType, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
-  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, deactivateNode, isConflict, updateNode,
+  ChartCompany, ChartMember, ChartPosition, ChartUnit, NodeType, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
+  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, deactivateNode, isConflict, reorderNode, updateNode,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
   orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, unlinkUnit, updateCompany, updateOrgUnit,
   addCompanyPosition, postLabel, setPostParent, updateUnitPositionCode,
@@ -16,6 +16,7 @@ import {
 import { UserPicker } from './orgShared';
 import { ChartSelection, allUnitsOf, ancestorsOf, isNested as isNestedCompany, companyHeadcount, companyPostsOf, findMember, findPosition, findUnit, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { NodeTypeBadge, NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
+import { addableTypes, checkMove } from './orgNodeRules';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
 
@@ -158,10 +159,15 @@ export const OrgChartDetails: React.FC<{
   /** The nodes with their versions, and the node types (empty on a backend without the node API). */
   nodes?: OrgNode[];
   nodeTypes?: NodeType[];
+  /** What may sit under what (empty: flat). */
+  rules?: NodeTypeRule[];
+  /** Opens the move dialog of a node, or the add dialog under a node (null: at the top of the company). */
+  onRequestMove?: (unitId: string) => void;
+  onRequestAdd?: (parentId: string | null) => void;
   selection: ChartSelection | null;
   onSelect: (selection: ChartSelection) => void;
   onChanged: () => Promise<void> | void;
-}> = ({ can, chart, positions, unplaced, nodes = [], nodeTypes = [], selection, onSelect, onChanged }) => {
+}> = ({ can, chart, positions, unplaced, nodes = [], nodeTypes = [], rules = [], onRequestMove, onRequestAdd, selection, onSelect, onChanged }) => {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   /** conflict: the change was refused because the structure changed meanwhile (or a rule); the chart can be reloaded. */
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string; conflict?: boolean } | null>(null);
@@ -233,7 +239,15 @@ export const OrgChartDetails: React.FC<{
           )}
           <QuickActions>
             {can(P.manageCompanies) && <ActionTile icon={Pencil} label="ویرایش شرکت" onClick={() => setDialog({ kind: 'editCompany', company })} />}
-            {can(P.manageCompanies) && can(U.create) && <ActionTile icon={Plus} label="افزودن معاونت" onClick={() => setDialog({ kind: 'addUnit', company })} />}
+            {nodes.length === 0 && can(P.manageCompanies) && can(U.create) && <ActionTile icon={Plus} label="افزودن معاونت" onClick={() => setDialog({ kind: 'addUnit', company })} />}
+            {nodes.length > 0 && canNode(can, 'create') && onRequestAdd && (
+              <ActionTile
+                icon={Plus}
+                label="افزودن گره"
+                disabled={addableTypes(nodeTypes, rules, null).length === 0}
+                onClick={() => onRequestAdd(null)}
+              />
+            )}
             {can(P.managePositions) && positions.some((p) => p.companyIds !== undefined) && <ActionTile icon={Briefcase} label="افزودن پست در شرکت" onClick={() => setDialog({ kind: 'addCompanyPost', company })} />}
           </QuickActions>
         </>
@@ -290,13 +304,21 @@ export const OrgChartDetails: React.FC<{
           {(unit.children?.length ?? 0) > 0 && (
             <div className="space-y-1">
               <p className="text-xs font-bold text-slate-500">زیرمجموعه‌ها ({toPersianDigits(unit.children!.length)})</p>
-              {unit.children!.map((child) => (
-                <button key={child.unitId} type="button" onClick={() => onSelect({ kind: 'unit', companyId: company.companyId, unitId: child.unitId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
-                  <span className={`flex items-center gap-2 min-w-0 text-sm font-bold ${child.isActive === false ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100'}`}>
-                    <NodeTypeIcon icon={child.nodeType?.icon} className="w-4 h-4 shrink-0" color={child.nodeType?.color} /> <span className="truncate">{child.name}</span>
-                  </span>
-                  <span className="text-[11px] text-slate-500 whitespace-nowrap shrink-0">{toPersianDigits(unitHeadcount(child))} نفر</span>
-                </button>
+              {unit.children!.map((child, index) => (
+                <div key={child.unitId} className="flex items-center gap-1 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                  <button type="button" onClick={() => onSelect({ kind: 'unit', companyId: company.companyId, unitId: child.unitId })} className="flex-1 min-w-0 flex items-center justify-between gap-2 px-2 py-1.5 text-right cursor-pointer">
+                    <span className={`flex items-center gap-2 min-w-0 text-sm font-bold ${child.isActive === false ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100'}`}>
+                      <NodeTypeIcon icon={child.nodeType?.icon} className="w-4 h-4 shrink-0" color={child.nodeType?.color} /> <span className="truncate">{child.name}</span>
+                    </span>
+                    <span className="text-[11px] text-slate-500 whitespace-nowrap shrink-0">{toPersianDigits(unitHeadcount(child))} نفر</span>
+                  </button>
+                  {nodes.length > 0 && canNode(can, 'move') && unit.children!.length > 1 && (
+                    <>
+                      <button type="button" disabled={busy || index === 0} onClick={() => run(() => reorderNode(child.unitId, index - 1, versionOf(child.unitId)), 'ترتیب ذخیره شد.', 'تغییر ترتیب انجام نشد.')} className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 disabled:opacity-30 cursor-pointer" title="بالاتر" aria-label={`بالاتر بردن ${child.name}`}><ArrowUp className="w-3.5 h-3.5" /></button>
+                      <button type="button" disabled={busy || index === unit.children!.length - 1} onClick={() => run(() => reorderNode(child.unitId, index + 1, versionOf(child.unitId)), 'ترتیب ذخیره شد.', 'تغییر ترتیب انجام نشد.')} className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 disabled:opacity-30 cursor-pointer" title="پایین‌تر" aria-label={`پایین‌تر بردن ${child.name}`}><ArrowDown className="w-3.5 h-3.5" /></button>
+                    </>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -337,6 +359,17 @@ export const OrgChartDetails: React.FC<{
           </div>
           <QuickActions>
             {(nodes.length > 0 ? canNode(can, 'update') : can(U.update)) && <ActionTile icon={Pencil} label={nodes.length > 0 ? 'ویرایش گره' : 'ویرایش معاونت'} onClick={() => setDialog({ kind: 'editUnit', unit })} />}
+            {nodes.length > 0 && canNode(can, 'create') && onRequestAdd && (
+              <ActionTile
+                icon={Plus}
+                label="افزودن زیرمجموعه"
+                disabled={busy || unit.isActive === false || addableTypes(nodeTypes, rules, unit).length === 0}
+                onClick={() => onRequestAdd(unit.unitId)}
+              />
+            )}
+            {nodes.length > 0 && canNode(can, 'move') && onRequestMove && (
+              <ActionTile icon={Move} label="جابه‌جایی" disabled={busy} onClick={() => onRequestMove(unit.unitId)} />
+            )}
             {nodes.length > 0 && canNode(can, 'deactivate') && (
               unit.isActive === false ? (
                 <ActionTile

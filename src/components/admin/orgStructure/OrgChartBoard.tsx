@@ -1,11 +1,14 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
-import { ChartCompany, ChartMember, ChartPosition, ChartUnit, NodeType, OrgNode, PersonRef, getChart, listNodeTypes, listNodes, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
+import { ChartCompany, ChartMember, ChartPosition, ChartUnit, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listNodeTypes, listNodes, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
 import { ChartSelection, allUnitsOf, ancestorsOf, companyHeadcount, companyPostsOf, depthsOf, headPostOf, isNested, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
+import { AddNodeDialog, MoveNodeDialog } from './nodes/NodeDialogs';
+import { addableTypes, checkMove } from './orgNodeRules';
 import { PersonAvatar } from './PersonAvatar';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
@@ -42,9 +45,26 @@ const NodeCard: React.FC<{
   onSelect: () => void;
   className?: string;
   children: React.ReactNode;
-}> = ({ node, label, selected, onSelect, className = '', children }) => (
+  /** Moving a node by dragging: this card can be dragged, and/or dropped on. */
+  dnd?: {
+    draggable?: boolean;
+    over?: 'ok' | 'bad' | null;
+    onDragStart?: (e: React.DragEvent) => void;
+    onDragEnd?: () => void;
+    onDragOver?: (e: React.DragEvent) => void;
+    onDragLeave?: (e: React.DragEvent) => void;
+    onDrop?: (e: React.DragEvent) => void;
+  };
+}> = ({ node, label, selected, onSelect, className = '', children, dnd }) => (
   <div
     data-node={node}
+    data-draggable-node={dnd?.draggable ? '' : undefined}
+    draggable={dnd?.draggable || undefined}
+    onDragStart={dnd?.onDragStart}
+    onDragEnd={dnd?.onDragEnd}
+    onDragOver={dnd?.onDragOver}
+    onDragLeave={dnd?.onDragLeave}
+    onDrop={dnd?.onDrop}
     title={label}
     role="button"
     tabIndex={0}
@@ -52,10 +72,12 @@ const NodeCard: React.FC<{
     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
     aria-pressed={selected}
     className={`relative rounded-2xl border bg-white dark:bg-slate-900 cursor-pointer transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-      selected
-        ? 'border-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-900 shadow-lg shadow-indigo-500/10'
-        : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:shadow-md'
-    } ${className}`}
+      dnd?.over === 'ok' ? 'border-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-900'
+        : dnd?.over === 'bad' ? 'border-rose-400 ring-2 ring-rose-200 dark:ring-rose-900 opacity-80'
+        : selected
+          ? 'border-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-900 shadow-lg shadow-indigo-500/10'
+          : 'border-slate-200 dark:border-slate-700 hover:border-indigo-300 hover:shadow-md'
+    } ${dnd?.draggable ? 'active:cursor-grabbing' : ''} ${className}`}
   >
     {children}
   </div>
@@ -269,15 +291,16 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
  */
 export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> = ({ can }) => {
   const data = useLoad(async () => {
-    const [chart, positions, unplaced, nodes, nodeTypes] = await Promise.all([
+    const [chart, positions, unplaced, nodes, nodeTypes, nodeRules] = await Promise.all([
       getChart(),
       listPositions().catch(() => []),
       listUnplacedUsers().catch(() => []),
       // The nodes' versions (for the «changed meanwhile» check); an older backend or no permission: none.
       listNodes().catch(() => [] as OrgNode[]),
       listNodeTypes().catch(() => [] as NodeType[]),
+      getNodeTypeRules().then((r) => r.rules).catch(() => [] as NodeTypeRule[]),
     ]);
-    return { chart, positions, unplaced, nodes, nodeTypes };
+    return { chart, positions, unplaced, nodes, nodeTypes, nodeRules };
   }, 'دریافت چارت سازمانی ممکن نشد.');
 
   const [companyId, setCompanyId] = useState<string | null>(null);
@@ -287,6 +310,13 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set());
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [fullscreen, setFullscreen] = useState(false);
+  /** A node being moved (dragged to a place, or from its «جابه‌جایی»), or being added under a node. */
+  const [moveRequest, setMoveRequest] = useState<{ unitId: string; parentId?: string | null } | null>(null);
+  const [addRequest, setAddRequest] = useState<{ parentId: string | null } | null>(null);
+  /** Dragging a card: which one, and the card it is over (with whether it may go there). */
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropOver, setDropOver] = useState<{ id: string | null; ok: boolean } | null>(null);
+  const [dragNote, setDragNote] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   /** How to move around, until the user first does. */
@@ -299,6 +329,11 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   const chart = data.data?.chart || [];
   const company: ChartCompany | undefined = chart.find((c) => c.companyId === companyId) || chart[0];
   const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company);
+  const nodeApi = (data.data?.nodes.length ?? 0) > 0;
+  const rules = data.data?.nodeRules || [];
+  const canMoveNodes = nodeApi && canNode(can, 'move');
+  const unitById = useMemo(() => new Map((company ? allUnitsOf(company) : []).map((u) => [u.unitId, u] as const)), [company]);
+  const versionOf = (unitId: string) => data.data?.nodes.find((n) => n.id === unitId)?.rowVersion ?? null;
 
   // The company first shown is selected, so the side panel is never empty.
   useEffect(() => {
@@ -340,6 +375,12 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     const el = content.current?.querySelector<HTMLElement>(`[data-node="${CSS.escape(reveal.node)}"]`);
     if (el) focus(el, { onlyIfNeeded: !reveal.force });
   }, [reveal, focus]);
+
+  useEffect(() => {
+    if (!dragNote) return;
+    const timer = setTimeout(() => setDragNote(null), 5000);
+    return () => clearTimeout(timer);
+  }, [dragNote]);
 
   useEffect(() => {
     if (!fullscreen) return;
@@ -455,6 +496,43 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
 
   const line = 'bg-slate-300 dark:bg-slate-600';
 
+  /** Moving a node by dragging its card onto another (a node) or onto the company (the top); the preview comes before it is saved. */
+  const dndOf = (unit: ChartUnit | null) => {
+    const targetId = unit?.unitId ?? null;
+    return {
+      draggable: !!unit && canMoveNodes,
+      over: dragId && dropOver && dropOver.id === targetId ? (dropOver.ok ? 'ok' as const : 'bad' as const) : null,
+      onDragStart: unit && canMoveNodes ? (e: React.DragEvent) => {
+        e.dataTransfer.setData('text/plain', unit.unitId);
+        e.dataTransfer.effectAllowed = 'move';
+        setDragId(unit.unitId);
+        setDragNote(null);
+      } : undefined,
+      onDragEnd: () => { setDragId(null); setDropOver(null); },
+      onDragOver: canMoveNodes ? (e: React.DragEvent) => {
+        const dragged = dragId ? unitById.get(dragId) : undefined;
+        if (!dragged) return;
+        const ok = checkMove(dragged, unit, rules).ok;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = ok ? 'move' : 'none';
+        if (dropOver?.id !== targetId || dropOver.ok !== ok) setDropOver({ id: targetId, ok });
+      } : undefined,
+      onDragLeave: canMoveNodes ? (e: React.DragEvent) => {
+        if (!(e.currentTarget as Node).contains(e.relatedTarget as Node | null)) setDropOver((prev) => (prev?.id === targetId ? null : prev));
+      } : undefined,
+      onDrop: canMoveNodes ? (e: React.DragEvent) => {
+        e.preventDefault();
+        const dragged = dragId ? unitById.get(dragId) : undefined;
+        setDragId(null);
+        setDropOver(null);
+        if (!dragged) return;
+        const check = checkMove(dragged, unit, rules);
+        if ('reason' in check) setDragNote(check.reason);
+        else setMoveRequest({ unitId: dragged.unitId, parentId: targetId });
+      } : undefined,
+    };
+  };
+
   const renderUnit = (unit: ChartUnit): React.ReactNode => {
     const open = !collapsedUnits.has(unit.unitId);
     const positions = positionsOf(unit);
@@ -470,7 +548,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           label={unit.name}
           selected={isSelected({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
           onSelect={() => choose({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
-          className={`w-64 ${unit.isActive === false ? 'opacity-60 border-dashed' : ''}`}
+          className={`w-64 ${unit.isActive === false ? 'opacity-60 border-dashed' : ''} ${dragId === unit.unitId ? 'opacity-40' : ''}`}
+          dnd={dndOf(unit)}
         >
           {type && <span className="absolute inset-x-3 top-0 h-1 rounded-b-full" style={{ backgroundColor: color }} aria-hidden="true" />}
           <div className="flex items-center gap-2.5 p-3.5">
@@ -667,6 +746,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
             selected={isSelected({ kind: 'company', companyId: company.companyId })}
             onSelect={() => choose({ kind: 'company', companyId: company.companyId })}
             className="w-72 bg-gradient-to-br from-indigo-50/80 to-white dark:from-indigo-950/40 dark:to-slate-900"
+            dnd={dndOf(null)}
           >
             <div className="flex items-center gap-3 p-4">
               <span className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/30"><Building2 className="w-5 h-5" /></span>
@@ -789,6 +869,11 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           <span className="pointer-coarse:hidden">چرخ ماوس: بزرگ‌نمایی · کشیدن: جابه‌جایی · دوبار کلیک: نزدیک‌تر</span>
           <span className="hidden pointer-coarse:inline">دو انگشت: بزرگ‌نمایی · کشیدن: جابه‌جایی</span>
         </p>}
+        {(dragId || dragNote) && (
+          <p role="status" className={`pointer-events-none absolute top-3 start-3 z-10 max-w-md rounded-lg px-3 py-1.5 text-xs font-bold shadow-md ${dragNote ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200' : 'bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-300'}`}>
+            {dragNote || 'کارت را روی گره‌ی بالاتر جدید (یا روی شرکت، برای بالاترین سطح) رها کنید؛ پیش‌نمایش اثر قبل از ذخیره نشان داده می‌شود.'}
+          </p>
+        )}
         <ZoomControls subscribe={subscribe} zoomBy={zoomBy} fit={fit} />
       </div>
 
@@ -836,6 +921,9 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         unplaced={data.data?.unplaced || []}
         nodes={data.data?.nodes || []}
         nodeTypes={data.data?.nodeTypes || []}
+        rules={rules}
+        onRequestMove={(unitId) => setMoveRequest({ unitId })}
+        onRequestAdd={(parentId) => setAddRequest({ parentId })}
         selection={selection}
         onSelect={(next) => choose(next)}
         onChanged={data.reload}
@@ -843,6 +931,29 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
       </div>
       </div>
     </div>
+    {moveRequest && unitById.get(moveRequest.unitId) && createPortal(
+      <MoveNodeDialog
+        company={company}
+        unit={unitById.get(moveRequest.unitId)!}
+        rules={rules}
+        initialParentId={moveRequest.parentId}
+        rowVersion={versionOf(moveRequest.unitId)}
+        onMoved={async () => { await data.reload(); choose({ kind: 'unit', companyId: company.companyId, unitId: moveRequest.unitId }, { force: true }); }}
+        onReload={data.reload}
+        onClose={() => setMoveRequest(null)}
+      />,
+      document.body,
+    )}
+    {addRequest && createPortal(
+      <AddNodeDialog
+        company={company}
+        parent={addRequest.parentId ? unitById.get(addRequest.parentId) ?? null : null}
+        types={addableTypes(data.data?.nodeTypes || [], rules, addRequest.parentId ? unitById.get(addRequest.parentId) ?? null : null)}
+        onCreated={async (unitId) => { await data.reload(); choose({ kind: 'unit', companyId: company.companyId, unitId }, { force: true }); }}
+        onClose={() => setAddRequest(null)}
+      />,
+      document.body,
+    )}
     </>
   );
 };

@@ -264,7 +264,13 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
       action();
     };
 
-    const onDragStart = (e: DragEvent) => e.preventDefault();
+    // The browser's own drag of a picture or link is not wanted; a node card that can be moved (data-draggable-node) is.
+    const onDragStart = (e: DragEvent) => { if (!(e.target as Element).closest?.('[data-draggable-node]')) e.preventDefault(); };
+    // A drag the browser takes over (moving a card) cancels the pointer: it is neither a pan nor a click.
+    const onPointerCancel = (e: PointerEvent) => {
+      onPointerUp(e);
+      dragged.current = false;
+    };
 
     // Until the user moves the chart, it keeps fitting the canvas as the canvas changes size.
     const resize = new ResizeObserver(() => {
@@ -277,7 +283,7 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
     vp.addEventListener('pointerdown', onPointerDown);
     vp.addEventListener('pointermove', onPointerMove);
     vp.addEventListener('pointerup', onPointerUp);
-    vp.addEventListener('pointercancel', onPointerUp);
+    vp.addEventListener('pointercancel', onPointerCancel);
     vp.addEventListener('click', onClick, true);
     vp.addEventListener('dblclick', onDoubleClick);
     vp.addEventListener('keydown', onKey);
@@ -288,7 +294,7 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
       vp.removeEventListener('pointerdown', onPointerDown);
       vp.removeEventListener('pointermove', onPointerMove);
       vp.removeEventListener('pointerup', onPointerUp);
-      vp.removeEventListener('pointercancel', onPointerUp);
+      vp.removeEventListener('pointercancel', onPointerCancel);
       vp.removeEventListener('click', onClick, true);
       vp.removeEventListener('dblclick', onDoubleClick);
       vp.removeEventListener('keydown', onKey);
