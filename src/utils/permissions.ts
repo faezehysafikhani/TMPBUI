@@ -142,6 +142,7 @@ const PERMISSION_PREREQUISITES: Readonly<Record<string, readonly string[]>> = {
   'org_structure.node.deactivate': ['org_structure.node.view'],
   'org_structure.node.assign': ['org_structure.node.view', 'users.view'],
   'org_structure.manage_rules': ['org_structure.node.view'],
+  'org_structure.manage_templates': ['org_structure.node.view'],
   // Platform
   'settings.update': ['settings.view'],
   'sms_settings.update': ['sms_settings.view'],
