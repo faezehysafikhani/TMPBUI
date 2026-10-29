@@ -25,7 +25,10 @@ if (boardView) {
   const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
   window.fetch = async (input: RequestInfo | URL) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
-    if (url.pathname.endsWith('/api/org-structure/chart')) return json(chart);
+    if (url.pathname.endsWith('/api/org-structure/chart')) {
+      performance.mark('org-chart-response'); // scripts/measure-org-chart.mjs measures drawing from here
+      return json(chart);
+    }
     return json([]);
   };
 }
