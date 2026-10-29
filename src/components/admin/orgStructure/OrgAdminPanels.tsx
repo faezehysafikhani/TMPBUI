@@ -6,7 +6,7 @@ import {
 import { userErrorMessage } from '../../../utils/errorMessages';
 import {
   Company, CompanyUnitLink, OrgUnit, Position, createCompany, createOrgUnit, createPosition, deactivateOrgUnit,
-  deleteCompany, deletePosition, linkUnitToCompany, listCompanies, listCompanyUnits, listOrgUnits,
+  deleteCompany, deletePosition, linkUnitToCompany, listCompanies, listCompanyUnits, listNodes, listOrgUnits, type OrgNode,
   listAssignments, listPositions, sortOrgUnits, unlinkUnit, updateCompany, updateOrgUnit, updatePosition, UserAssignment,
 } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
@@ -219,8 +219,13 @@ interface UnitDraft { id?: string; name: string; managerUserId: string | null; m
 
 export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canDeactivate: boolean }> = ({ canCreate, canUpdate, canDeactivate }) => {
   const data = useLoad(async () => {
-    const [units, links] = await Promise.all([listOrgUnits(), listCompanyUnits().catch(() => [] as CompanyUnitLink[])]);
-    return { units, links };
+    const [units, links, nodes] = await Promise.all([
+      listOrgUnits(),
+      listCompanyUnits().catch(() => [] as CompanyUnitLink[]),
+      // Each unit's type and the node above it; a backend without the node API: none.
+      listNodes().catch(() => [] as OrgNode[]),
+    ]);
+    return { units, links, nodes };
   }, 'دریافت واحدهای سازمانی ممکن نشد.');
   const [message, setMessage] = useState<Message>(null);
   const [draft, setDraft] = useState<UnitDraft | null>(null);
@@ -234,8 +239,20 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
     const map = new Map<string, string>();
     if (!data.data) return map;
     for (const link of data.data.links) map.set(link.unitId, link.companyName);
+    // A nested node belongs to the company of the nearest node above it that is linked to one.
+    const byId = new Map<string, OrgNode>(data.data.nodes.map((n) => [n.id, n]));
+    for (const node of data.data.nodes) {
+      const seen = new Set<string>();
+      for (let current: OrgNode | undefined = node; current && !seen.has(current.id); current = current.parentNodeId ? byId.get(current.parentNodeId) : undefined) {
+        seen.add(current.id);
+        const name = map.get(current.id);
+        if (name) { map.set(node.id, name); break; }
+      }
+    }
     return map;
   }, [data.data]);
+  const nodeOf = useMemo(() => new Map((data.data?.nodes || []).map((n) => [n.id, n])), [data.data]);
+  const hasNodes = (data.data?.nodes.length ?? 0) > 0;
   const save = async () => {
     if (!draft) return;
     const ok = await run(
@@ -268,7 +285,10 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px]">
                 <thead className="bg-slate-50 dark:bg-slate-800/60"><tr>
-                  <th className={th}>نام واحد</th><th className={th}>شرکت</th><th className={th}>وضعیت</th><th className={th} />
+                  <th className={th}>نام واحد</th>
+                  {hasNodes && <th className={th}>نوع</th>}
+                  {hasNodes && <th className={th}>مافوق</th>}
+                  <th className={th}>شرکت</th><th className={th}>وضعیت</th><th className={th} />
                 </tr></thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {rows.map((u) => (
@@ -278,6 +298,8 @@ export const UnitsPanel: React.FC<{ canCreate: boolean; canUpdate: boolean; canD
                           <Network className="w-4 h-4 shrink-0 text-indigo-600" /> {u.name}
                         </span>
                       </td>
+                      {hasNodes && <td className={td}>{nodeOf.get(u.id)?.nodeTypeName || <span className="text-xs text-slate-400">—</span>}</td>}
+                      {hasNodes && <td className={td}>{(nodeOf.get(u.id)?.parentNodeId && nodeOf.get(nodeOf.get(u.id)!.parentNodeId!)?.name) || <span className="text-xs text-slate-400">بالاترین سطح</span>}</td>}
                       <td className={td}>{companyOf.get(u.id) || <span className="text-xs text-slate-400">بدون شرکت</span>}</td>
                       <td className={td}>{u.isActive ? <StatusBadge tone="green">فعال</StatusBadge> : <StatusBadge tone="red">غیرفعال</StatusBadge>}</td>
                       <td className={`${td} whitespace-nowrap text-left`}>

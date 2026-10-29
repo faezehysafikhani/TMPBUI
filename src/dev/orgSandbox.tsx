@@ -1,7 +1,7 @@
 // Development only (dev/org-sandbox.html): the org structure components with mock data, to see
 // and check them without an API. ?mock=flat|nested|postBank|large40|large400 picks the chart;
 // ?view=board shows the real chart board (OrgChartBoard) on that mock, with this page's fetch
-// answering its requests.
+// answering its requests from memory (orgMockServer.ts); ?can=all gives it every permission.
 import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../index.css';
@@ -14,35 +14,24 @@ import { OrgNodeCard } from '../components/admin/orgStructure/nodes/OrgNodeCard'
 import { NodeTypeRulesMatrix, ruleUsage, type NodeTypeRule } from '../components/admin/orgStructure/nodes/NodeTypeRulesMatrix';
 import { MergeNodesForm, type MergeNodesInput } from '../components/admin/orgStructure/nodes/MergeNodesForm';
 import { OrgChartBoard } from '../components/admin/orgStructure/OrgChartBoard';
+import { createMockServer } from './orgMockServer';
 
 const params = new URLSearchParams(location.search);
 const mockName = (params.get('mock') as OrgChartMockName) in ORG_CHART_MOCKS ? (params.get('mock') as OrgChartMockName) : 'postBank';
 const boardView = params.get('view') === 'board';
 
 if (boardView) {
-  // This page only: the chart board's requests are answered from the mock (the rest: empty lists).
-  // Today's chart board draws a company's top units only, so it gets the mock flat: every node at
-  // the top (in tree order, children emptied). The nested drawing comes with phase 3.
-  const chart = ORG_CHART_MOCKS[mockName]().map((company) => ({
-    ...company,
-    units: unitTree(company).map(({ unit }) => ({ ...unit, children: [] })),
-  }));
-  const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  window.fetch = async (input: RequestInfo | URL) => {
-    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
-    if (url.pathname.endsWith('/api/org-structure/chart')) {
-      performance.mark('org-chart-response'); // scripts/measure-org-chart.mjs measures drawing from here
-      return json(chart);
-    }
-    return json([]);
-  };
+  // This page only: the chart board's requests are answered from the mock, in memory (src/dev/orgMockServer.ts).
+  const server = createMockServer(ORG_CHART_MOCKS[mockName]());
+  (window as unknown as { __mockServer: typeof server }).__mockServer = server;
+  window.fetch = server.fetch;
 }
 
 /** The real chart board on the mock, full width. */
 const BoardView: React.FC = () => (
   <div className="p-4 space-y-2">
     <p className="text-xs text-slate-500">چارت واقعی روی داده‌ی ساختگی <b data-testid="mock-name">{mockName}</b> (فقط در محیط توسعه)</p>
-    <OrgChartBoard can={() => false} />
+    <OrgChartBoard can={() => params.get('can') === 'all'} />
   </div>
 );
 

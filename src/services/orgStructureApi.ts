@@ -228,6 +228,38 @@ export const ORG_STRUCTURE_PERMISSIONS = {
   manageAssignments: 'org_structure.manage_assignments',
 } as const;
 
+/**
+ * The nodes' own permissions (each operation on its own). The server also accepts the older
+ * permission that covered the same thing, so the user's permission list can hold either: use
+ * canNode() to ask.
+ */
+export const ORG_NODE_PERMISSIONS = {
+  view: 'org_structure.node.view',
+  create: 'org_structure.node.create',
+  update: 'org_structure.node.update',
+  move: 'org_structure.node.move',
+  deactivate: 'org_structure.node.deactivate',
+  assign: 'org_structure.node.assign',
+  manageRules: 'org_structure.manage_rules',
+} as const;
+
+export type OrgNodeOperation = keyof typeof ORG_NODE_PERMISSIONS;
+
+/** Which permissions let a user do each operation: its own, or the older one that covered it. */
+const NODE_OPERATION_PERMISSIONS: Record<OrgNodeOperation, string[]> = {
+  view: [ORG_NODE_PERMISSIONS.view, 'org_structure.view', 'org_structure.manage_companies', 'org_structure.manage_positions', 'org_structure.manage_assignments', 'organization_units.view'],
+  create: [ORG_NODE_PERMISSIONS.create, 'organization_units.create'],
+  update: [ORG_NODE_PERMISSIONS.update, 'organization_units.update'],
+  move: [ORG_NODE_PERMISSIONS.move, 'org_structure.manage_companies'],
+  deactivate: [ORG_NODE_PERMISSIONS.deactivate, 'organization_units.delete'],
+  assign: [ORG_NODE_PERMISSIONS.assign, 'organization_units.update'],
+  manageRules: [ORG_NODE_PERMISSIONS.manageRules],
+};
+
+/** Whether the user may do a node operation (hiding only: the server checks again). */
+export const canNode = (can: (permission: string) => boolean, operation: OrgNodeOperation): boolean =>
+  NODE_OPERATION_PERMISSIONS[operation].some(can);
+
 export const ORG_UNIT_PERMISSIONS = {
   view: 'organization_units.view',
   create: 'organization_units.create',
@@ -381,3 +413,122 @@ export const deleteTitle = (id: string) => apiRequest<void>('DELETE', `${BASE}/t
 export const getUserTitle = (userId: string) => apiRequest<UserTitle>('GET', `${BASE}/users/${userId}/title`);
 export const setUserTitle = (userId: string, honorificId: string | null) =>
   apiRequest<UserTitle>('PUT', `${BASE}/users/${userId}/title`, { body: { honorificId } });
+
+// ---------------------------------------------------------------- nodes, their types and rules
+
+/**
+ * A node as the node API gives it. rowVersion is the node's version: send back the one you read
+ * and a save over someone else's newer change is refused (409). parentNodeId null: at the top.
+ */
+export interface OrgNode {
+  id: string;
+  name: string;
+  parentNodeId: string | null;
+  nodeTypeId: string | null;
+  nodeTypeName: string | null;
+  companyId: string | null;
+  managerUserId: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  childCount: number;
+  rowVersion: string;
+}
+
+export interface NodePathItem { id: string; name: string }
+
+/** matchedOn: «name», «code» (one of its posts) or «person» (its manager or a post holder). */
+export interface NodeSearchResult { node: OrgNode; path: NodePathItem[]; matchedOn: 'name' | 'code' | 'person'; companyName: string | null }
+
+export interface NodeType {
+  id: string;
+  code: string;
+  name: string;
+  color: string;
+  icon: string;
+  isDomainBoundary: boolean;
+  sortOrder: number;
+  isActive: boolean;
+  nodeCount: number;
+}
+
+export interface NodeTypeInput { name: string; code?: string | null; color?: string | null; icon?: string | null; isDomainBoundary?: boolean }
+export interface NodeTypeUpdate { name: string; color: string | null; icon: string | null; isDomainBoundary: boolean; sortOrder: number; isActive: boolean }
+
+/** A node of the child type may sit under a node of the parent type (parentNodeTypeId null: directly under the company). */
+export interface NodeTypeRule { parentNodeTypeId: string | null; childNodeTypeId: string }
+
+/** A node that does not match the rules (nothing is changed or removed: it is only listed). */
+export interface RuleConflict { nodeId: string; nodeName: string; nodeTypeName: string | null; parentNodeId: string | null; parentName: string | null; parentTypeName: string | null }
+
+/** No rules at all: every node stays at the top (the flat structure). */
+export interface NodeTypeRules { rules: NodeTypeRule[]; conflicts: RuleConflict[] }
+
+export interface CreateNodeInput { name: string; parentNodeId?: string | null; companyId?: string | null; nodeTypeId?: string | null }
+
+export const listNodes = (companyId?: string) => apiRequest<OrgNode[]>('GET', `${BASE}/nodes`, { query: { companyId } });
+export const searchNodes = (q: string, companyId?: string) => apiRequest<NodeSearchResult[]>('GET', `${BASE}/nodes/search`, { query: { q, companyId } });
+export const getNodeAncestors = (id: string) => apiRequest<NodePathItem[]>('GET', `${BASE}/nodes/${id}/ancestors`);
+export const createNode = (input: CreateNodeInput) => apiRequest<OrgNode>('POST', `${BASE}/nodes`, { body: input });
+export const updateNode = (id: string, input: { name: string; nodeTypeId?: string | null; rowVersion?: string | null }) =>
+  apiRequest<OrgNode>('PUT', `${BASE}/nodes/${id}`, { body: input });
+export const setNodeManager = (id: string, managerUserId: string | null, rowVersion?: string | null) =>
+  apiRequest<OrgNode>('PUT', `${BASE}/nodes/${id}/manager`, { body: { managerUserId, rowVersion } });
+/** parentNodeId null: to the top of companyId (or of the node's own company). */
+export const moveNode = (id: string, input: { parentNodeId: string | null; companyId?: string | null; rowVersion?: string | null }) =>
+  apiRequest<OrgNode>('POST', `${BASE}/nodes/${id}/move`, { body: input });
+/** position: the node's new place among the nodes beside it, from 0. */
+export const reorderNode = (id: string, position: number, rowVersion?: string | null) =>
+  apiRequest<OrgNode>('POST', `${BASE}/nodes/${id}/reorder`, { body: { position, rowVersion } });
+export const deactivateNode = (id: string, rowVersion?: string | null) => apiRequest<OrgNode>('POST', `${BASE}/nodes/${id}/deactivate`, { body: { rowVersion } });
+export const activateNode = (id: string, rowVersion?: string | null) => apiRequest<OrgNode>('POST', `${BASE}/nodes/${id}/activate`, { body: { rowVersion } });
+
+export const listNodeTypes = () => apiRequest<NodeType[]>('GET', `${BASE}/node-types`);
+export const createNodeType = (input: NodeTypeInput) => apiRequest<NodeType>('POST', `${BASE}/node-types`, { body: input });
+export const updateNodeType = (id: string, input: NodeTypeUpdate) => apiRequest<NodeType>('PUT', `${BASE}/node-types/${id}`, { body: input });
+export const deleteNodeType = (id: string) => apiRequest<void>('DELETE', `${BASE}/node-types/${id}`);
+export const getNodeTypeRules = () => apiRequest<NodeTypeRules>('GET', `${BASE}/node-type-rules`);
+/** Replaces all the rules; answers with the new rules and the nodes that no longer match them. */
+export const setNodeTypeRules = (rules: NodeTypeRule[]) => apiRequest<NodeTypeRules>('PUT', `${BASE}/node-type-rules`, { body: { rules } });
+
+// ---------------------------------------------------------------- impact preview
+
+/**
+ * One proposed change. kind: «move» (nodeId under parentNodeId, or to the top of companyId),
+ * «add» (a new empty node: name, parentNodeId or companyId), «manager» (nodeId gets managerUserId;
+ * null: none) or «unlink» (nodeId loses its company link).
+ */
+export interface ImpactChange {
+  kind: 'move' | 'add' | 'manager' | 'unlink';
+  nodeId?: string | null;
+  parentNodeId?: string | null;
+  companyId?: string | null;
+  managerUserId?: string | null;
+  name?: string | null;
+}
+
+export interface ImpactPost { postId: string; title: string; code: string; place: string }
+
+/** What changes for one person; only what changes is listed. */
+export interface ImpactPerson {
+  person: PersonRef;
+  managerChanged: boolean;
+  managerBefore: PersonRef | null;
+  managerAfter: PersonRef | null;
+  subordinatesAdded: PersonRef[];
+  subordinatesRemoved: PersonRef[];
+  cannotAssignAdded: PersonRef[];
+  cannotAssignRemoved: PersonRef[];
+  substitutionAdded: ImpactPost[];
+  substitutionRemoved: ImpactPost[];
+  teamAdded: PersonRef[];
+  teamRemoved: PersonRef[];
+}
+
+/** taskLimitOn: whether «cannot give tasks to» was compared (OrgStructure:LimitTaskAssignment). */
+export interface ImpactPreview { peopleAffected: number; people: ImpactPerson[]; taskLimitOn: boolean }
+
+/** What the changes would do to people before they are made. Nothing is written. */
+export const previewImpact = (changes: ImpactChange[]) => apiRequest<ImpactPreview>('POST', `${BASE}/impact-preview`, { body: { changes } });
+
+/** A save over someone else's newer change, or a business conflict: both answer 409. */
+export const isConflict = (err: unknown): boolean => err instanceof NexusApiError && err.httpStatus === 409;

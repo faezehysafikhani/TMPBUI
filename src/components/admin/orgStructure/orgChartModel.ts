@@ -49,7 +49,7 @@ export const headPostOf = (company: ChartCompany): ChartPosition | undefined => 
 export const unitHeadcount = (unit: ChartUnit) => unit.peopleCount ?? unit.members.length;
 
 export const companyHeadcount = (company: ChartCompany) =>
-  company.peopleCount ?? company.members.length + company.units.reduce((sum, unit) => sum + unitHeadcount(unit), 0);
+  company.peopleCount ?? company.members.length + allUnitsOf(company).reduce((sum, unit) => sum + unitHeadcount(unit), 0);
 
 export const vacantCount = (unit: ChartUnit) => positionsOf(unit).filter((p) => p.holders.length === 0).length;
 
@@ -57,7 +57,7 @@ export const vacantCount = (unit: ChartUnit) => positionsOf(unit).filter((p) => 
 export function allPositions(chart: ChartCompany[]): PositionPlace[] {
   return chart.flatMap((company) => [
     ...companyPostsOf(company).map((position) => ({ company, unit: null, position })),
-    ...company.units.flatMap((unit) => positionsOf(unit).map((position) => ({ company, unit, position }))),
+    ...allUnitsOf(company).flatMap((unit) => positionsOf(unit).map((position) => ({ company, unit, position }))),
   ]);
 }
 
@@ -69,7 +69,7 @@ export function findPosition(chart: ChartCompany[], unitPositionId: string): Pos
 export function findMember(chart: ChartCompany[], userId: string): { member: ChartMember; positions: PositionPlace[] } | null {
   const positions = allPositions(chart).filter((p) => p.position.holders.some((m) => m.userId === userId));
   const member =
-    chart.flatMap((c) => [...c.members, ...c.units.flatMap((u) => u.members)]).find((m) => m.userId === userId)
+    chart.flatMap((c) => [...c.members, ...allUnitsOf(c).flatMap((u) => u.members)]).find((m) => m.userId === userId)
     || positions[0]?.position.holders.find((m) => m.userId === userId)
     || headAsMember(chart, userId);
   return member ? { member, positions } : null;
@@ -83,7 +83,7 @@ function headAsMember(chart: ChartCompany[], userId: string): ChartMember | unde
 
 export function findUnit(chart: ChartCompany[], unitId: string): { company: ChartCompany; unit: ChartUnit } | null {
   for (const company of chart) {
-    const unit = company.units.find((u) => u.unitId === unitId);
+    const unit = allUnitsOf(company).find((u) => u.unitId === unitId);
     if (unit) return { company, unit };
   }
   return null;
@@ -104,6 +104,9 @@ export function allUnitsOf(company: ChartCompany): ChartUnit[] {
   company.units.forEach(visit);
   return out;
 }
+
+/** How many nodes the company has, at any depth. */
+export const nodeCount = (company: ChartCompany): number => allUnitsOf(company).length;
 
 /** Whether the company's nodes sit under each other (a flat or older backend: no). */
 export const isNested = (company: ChartCompany): boolean => company.units.some((unit) => (unit.children?.length ?? 0) > 0);
@@ -130,6 +133,13 @@ function parentsOf(company: ChartCompany): Map<string, ChartUnit> {
   const parents = new Map<string, ChartUnit>();
   for (const unit of allUnitsOf(company)) for (const child of unit.children || []) parents.set(child.unitId, unit);
   return parents;
+}
+
+/** Each node of the company with the number of levels above it (a top node: 0). */
+export function depthsOf(company: ChartCompany): Map<string, number> {
+  const depths = new Map<string, number>();
+  unitTree(company).forEach(({ unit, depth }) => depths.set(unit.unitId, depth));
+  return depths;
 }
 
 /** The nodes above a node, nearest first (none for a top node or flat data). */

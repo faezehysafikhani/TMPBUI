@@ -1,10 +1,11 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
+import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
-import { ChartCompany, ChartMember, ChartPosition, ChartUnit, PersonRef, getChart, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
+import { ChartCompany, ChartMember, ChartPosition, ChartUnit, NodeType, OrgNode, PersonRef, getChart, listNodeTypes, listNodes, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
-import { ChartSelection, companyHeadcount, companyPostsOf, headPostOf, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
+import { ChartSelection, allUnitsOf, ancestorsOf, companyHeadcount, companyPostsOf, depthsOf, headPostOf, isNested, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
+import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
 import { PersonAvatar } from './PersonAvatar';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
@@ -134,6 +135,9 @@ function nodeOf(selection: ChartSelection): string | null {
 
 /** Width of a deputy's column: its card, or its branch of position cards beside the line. */
 const COLUMN_WIDTH = 322;
+
+/** Nodes under one node in a row; more go on to the next row. */
+const CHILDREN_PER_ROW = 4;
 
 /** Roughly how tall a deputy's column is with its positions closed. */
 function columnHeight(unit: ChartUnit): number {
@@ -265,17 +269,22 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
  */
 export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> = ({ can }) => {
   const data = useLoad(async () => {
-    const [chart, positions, unplaced] = await Promise.all([
+    const [chart, positions, unplaced, nodes, nodeTypes] = await Promise.all([
       getChart(),
       listPositions().catch(() => []),
       listUnplacedUsers().catch(() => []),
+      // The nodes' versions (for the «changed meanwhile» check); an older backend or no permission: none.
+      listNodes().catch(() => [] as OrgNode[]),
+      listNodeTypes().catch(() => [] as NodeType[]),
     ]);
-    return { chart, positions, unplaced };
+    return { chart, positions, unplaced, nodes, nodeTypes };
   }, 'دریافت چارت سازمانی ممکن نشد.');
 
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [selection, setSelection] = useState<ChartSelection | null>(null);
+  /** Nodes whose posts are hidden, and nodes whose sub-nodes are hidden. */
   const [collapsedUnits, setCollapsedUnits] = useState<Set<string>>(new Set());
+  const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set());
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [fullscreen, setFullscreen] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -305,8 +314,23 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
     return () => observer.disconnect();
   }, [!!company]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A company opens with its first two levels drawn and the posts of nodes with sub-nodes closed, so a
+  // big structure stays readable; a flat company opens exactly as before.
+  const openedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!company || openedFor.current === company.companyId) return;
+    openedFor.current = company.companyId;
+    const depths = depthsOf(company);
+    const parents = allUnitsOf(company).filter((u) => (u.children?.length ?? 0) > 0);
+    setCollapsedUnits(new Set(parents.map((u) => u.unitId)));
+    setCollapsedBranches(new Set(parents.filter((u) => (depths.get(u.unitId) ?? 0) >= 2).map((u) => u.unitId)));
+  }, [company]);
+
   const units = company?.units || [];
-  const perRow = useMemo(() => chooseColumns(units, canvasSize.width, canvasSize.height), [units, canvasSize.width, canvasSize.height]);
+  // A nested company's few top nodes stand in one row (their sub-nodes make them tall); a flat company's
+  // many deputies are laid out in balanced rows.
+  const nested = !!company && isNested(company);
+  const perRow = useMemo(() => (nested ? Math.max(1, units.length) : chooseColumns(units, canvasSize.width, canvasSize.height)), [nested, units, canvasSize.width, canvasSize.height]);
 
   // The chart opens at half size from the top: for another company, another layout or full screen too.
   useLayoutEffect(() => { home(); }, [company?.companyId, perRow, fullscreen, home]);
@@ -340,13 +364,19 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   /** Selects, and takes the chart to the card when it is out of sight or too small to read. */
   const choose = (next: ChartSelection, options: { force?: boolean; node?: string } = {}) => {
     setSelection(next);
+    // A card inside a closed branch: open the branches above it first.
+    const unitId = 'unitId' in next && next.unitId ? next.unitId : null;
+    if (company && unitId) {
+      const above = ancestorsOf(company, unitId).map((a) => a.unitId);
+      if (above.some((id) => collapsedBranches.has(id))) setCollapsedBranches((prev) => new Set([...prev].filter((id) => !above.includes(id))));
+    }
     const node = options.node || nodeOf(next);
     if (node) setReveal((prev) => ({ node, force: !!options.force, seq: (prev?.seq || 0) + 1 }));
   };
 
-  const allGroupKeys = useMemo(() => (company ? company.units.flatMap((u) => [`none:${u.unitId}`, ...positionsOf(u).map((p) => `pos:${p.unitPositionId}`)]) : []), [company]);
-  const allOpen = !!company && collapsedUnits.size === 0 && allGroupKeys.every((k) => openGroups.has(k));
-  const expandAll = () => { setCollapsedUnits(new Set()); setOpenGroups(new Set(allGroupKeys)); };
+  const allGroupKeys = useMemo(() => (company ? allUnitsOf(company).flatMap((u) => [`none:${u.unitId}`, ...positionsOf(u).map((p) => `pos:${p.unitPositionId}`)]) : []), [company]);
+  const allOpen = !!company && collapsedUnits.size === 0 && collapsedBranches.size === 0 && allGroupKeys.every((k) => openGroups.has(k));
+  const expandAll = () => { setCollapsedUnits(new Set()); setCollapsedBranches(new Set()); setOpenGroups(new Set(allGroupKeys)); };
   const collapseAll = () => { setOpenGroups(new Set()); };
 
   const searchHits = useMemo<SearchHit[]>(() => {
@@ -370,9 +400,11 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         });
       }
     }
-    for (const unit of company.units) {
+    for (const unit of allUnitsOf(company)) {
+      const path = ancestorsOf(company, unit.unitId).map((a) => a.name).reverse();
       hits.push({
-        key: `unit:${unit.unitId}`, kind: 'unit', label: unit.name, detail: `معاونت · ${toPersianDigits(unitHeadcount(unit))} نفر`,
+        key: `unit:${unit.unitId}`, kind: 'unit', label: unit.name,
+        detail: `${unit.nodeType?.name || 'معاونت'} · ${toPersianDigits(unitHeadcount(unit))} نفر${path.length ? ` · ${path.join(' ‹ ')}` : ''}`,
         go: () => { openUnit(unit.unitId); choose({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId }, { force: true }); },
       });
       for (const position of positionsOf(unit)) {
@@ -392,7 +424,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         }
       }
     }
-    for (const unit of company.units) {
+    for (const unit of allUnitsOf(company)) {
       for (const member of unit.members) {
         if (people.has(member.userId)) continue;
         people.add(member.userId);
@@ -421,10 +453,16 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
   if (data.error) return <Notice type="error">{data.error}</Notice>;
   if (!company) return <AdminCard><EmptyRow>هنوز شرکتی تعریف نشده است. ابتدا در بخش «شرکت‌ها» یک شرکت بسازید.</EmptyRow></AdminCard>;
 
-  const unitTree = (unit: ChartUnit) => {
+  const line = 'bg-slate-300 dark:bg-slate-600';
+
+  const renderUnit = (unit: ChartUnit): React.ReactNode => {
     const open = !collapsedUnits.has(unit.unitId);
     const positions = positionsOf(unit);
     const vacant = vacantCount(unit);
+    const children = unit.children || [];
+    const branchOpen = children.length > 0 && !collapsedBranches.has(unit.unitId);
+    const type = unit.nodeType;
+    const color = safeColor(type?.color);
     return (
       <div className="flex flex-col items-center">
         <NodeCard
@@ -432,24 +470,42 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           label={unit.name}
           selected={isSelected({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
           onSelect={() => choose({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
-          className={`w-64 ${unit.isActive === false ? 'opacity-60' : ''}`}
+          className={`w-64 ${unit.isActive === false ? 'opacity-60 border-dashed' : ''}`}
         >
+          {type && <span className="absolute inset-x-3 top-0 h-1 rounded-b-full" style={{ backgroundColor: color }} aria-hidden="true" />}
           <div className="flex items-center gap-2.5 p-3.5">
-            <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 flex items-center justify-center shrink-0"><Network className="w-5 h-5" /></span>
+            {type ? (
+              <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1a`, color }}>
+                <NodeTypeIcon icon={type.icon} className="w-5 h-5" />
+              </span>
+            ) : (
+              <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 flex items-center justify-center shrink-0"><Network className="w-5 h-5" /></span>
+            )}
             <span className="min-w-0 flex-1 space-y-1">
-              <span className="block text-sm font-extrabold text-slate-900 dark:text-white truncate">{unit.name}</span>
+              {type && type.name !== unit.name && <span className="block text-[10px] font-bold truncate" style={{ color }}>{type.name}</span>}
+              <span className={`block text-sm font-extrabold truncate ${unit.isActive === false ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>{unit.name}</span>
               {unit.manager && <PersonLine person={unit.manager} empty="" />}
             </span>
             {(positions.length > 0 || unit.members.length > 0) && (
-              <Toggle open={open} onClick={() => toggleIn(setCollapsedUnits, unit.unitId)} label={unit.name} />
+              <Toggle open={open} onClick={() => toggleIn(setCollapsedUnits, unit.unitId)} label={`پست‌های ${unit.name}`} />
             )}
           </div>
-          <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 px-3.5 py-1.5 text-[11px] text-slate-500">
-            <span>{toPersianDigits(positions.length)} سمت{vacant > 0 ? ` · ${toPersianDigits(vacant)} خالی` : ''}</span>
+          <div className="flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 px-3.5 py-1.5 text-[11px] text-slate-500">
+            <span>{toPersianDigits(positions.length)} پست{vacant > 0 ? ` · ${toPersianDigits(vacant)} خالی` : ''}</span>
+            {children.length > 0 && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); toggleIn(setCollapsedBranches, unit.unitId); }}
+                aria-expanded={branchOpen}
+                aria-label={`${branchOpen ? 'بستن' : 'باز کردن'} زیرمجموعه‌ی ${unit.name}`}
+                className="flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 px-2 py-0.5 font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 hover:border-indigo-300 cursor-pointer"
+              >
+                <GitBranch className="w-3 h-3" />{toPersianDigits(children.length)} زیرمجموعه {branchOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+            )}
             <span>{toPersianDigits(unitHeadcount(unit))} نفر</span>
           </div>
         </NodeCard>
-
         {open && (positions.length > 0 || unit.members.length > 0) && (
           <div className="self-stretch flex justify-center">
             <div className="relative mt-0 ms-8 ps-4 pt-4 space-y-3 border-s-2 border-slate-200 dark:border-slate-700">
@@ -493,11 +549,34 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
             </div>
           </div>
         )}
+
+        {branchOpen && (
+          <>
+            <span className={`w-0.5 h-8 ${line}`} aria-hidden="true" />
+            {childRows(children)}
+          </>
+        )}
       </div>
     );
   };
 
-  const line = 'bg-slate-300 dark:bg-slate-600';
+  /** The nodes under a node: a few per row, so a node with many does not make the chart wide. */
+  const childRows = (nodes: ChartUnit[]) => {
+    const rows = rowsOf(nodes, CHILDREN_PER_ROW);
+    return rows.length === 1 ? unitRow(rows[0], false) : (
+      <div className="flex flex-col items-start">
+        {rows.map((row, r) => (
+          <div key={row[0].unitId} className={`relative ${r > 0 ? 'pt-14' : ''}`}>
+            {r < rows.length - 1
+              ? <span aria-hidden="true" className={`absolute start-0 top-0 bottom-0 w-0.5 ${line}`} />
+              : <span aria-hidden="true" className={`absolute start-0 top-0 h-14 w-0.5 ${line}`} />}
+            {unitRow(row, true)}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const rows = rowsOf(units, perRow);
 
   /** One row of deputies hanging from a bar; with several rows the bar runs from the line down their start side. */
@@ -513,7 +592,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           <div key={unit.unitId} className="relative px-4 pt-8 flex flex-col items-center">
             {bar && <span aria-hidden="true" className={`absolute top-0 h-0.5 ${line} ${bar}`} />}
             <span className={`absolute top-0 start-1/2 w-0.5 h-8 ${line}`} aria-hidden="true" />
-            {unitTree(unit)}
+            {renderUnit(unit)}
           </div>
         );
       })}
@@ -596,7 +675,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
               </span>
             </div>
             <div className="flex items-center justify-between border-t border-indigo-100/70 dark:border-slate-800 px-4 py-1.5 text-[11px] text-slate-500">
-              <span>{toPersianDigits(units.length)} معاونت</span>
+              <span>{toPersianDigits(nodeCount(company))} گره</span>
               <span>{toPersianDigits(companyHeadcount(company))} نفر</span>
             </div>
           </NodeCard>
@@ -685,7 +764,7 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           )}
 
           {units.length === 0 ? (
-            <p className="mt-6 text-sm text-slate-500">این شرکت هنوز معاونتی ندارد. از پنل کنار، «افزودن معاونت» را بزنید.</p>
+            <p className="mt-6 text-sm text-slate-500">این شرکت هنوز گره‌ای ندارد. از پنل کنار، «افزودن معاونت» را بزنید.</p>
           ) : (
             <>
               <span className={`w-0.5 h-8 ${line}`} aria-hidden="true" />
@@ -755,6 +834,8 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
         chart={chart}
         positions={data.data?.positions || []}
         unplaced={data.data?.unplaced || []}
+        nodes={data.data?.nodes || []}
+        nodeTypes={data.data?.nodeTypes || []}
         selection={selection}
         onSelect={(next) => choose(next)}
         onChanged={data.reload}

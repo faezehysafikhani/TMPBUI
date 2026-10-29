@@ -1,20 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2,
+  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch,
 } from 'lucide-react';
 import { AdminCard, AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
-  ChartCompany, ChartMember, ChartPosition, ChartUnit, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
-  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U,
+  ChartCompany, ChartMember, ChartPosition, ChartUnit, NodeType, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
+  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, deactivateNode, isConflict, updateNode,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
   orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, unlinkUnit, updateCompany, updateOrgUnit,
   addCompanyPosition, postLabel, setPostParent, updateUnitPositionCode,
 } from '../../../services/orgStructureApi';
 import { UserPicker } from './orgShared';
-import { ChartSelection, companyHeadcount, companyPostsOf, findMember, findPosition, findUnit, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
+import { ChartSelection, allUnitsOf, ancestorsOf, isNested as isNestedCompany, companyHeadcount, companyPostsOf, findMember, findPosition, findUnit, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
+import { NodeTypeBadge, NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
 
@@ -65,9 +66,9 @@ const ActionTile: React.FC<{ icon: React.ComponentType<{ className?: string }>; 
   </button>
 );
 
-const Header: React.FC<{ icon: React.ComponentType<{ className?: string }>; tone: string; title: string; subtitle: string; badge?: React.ReactNode }> = ({ icon: Icon, tone, title, subtitle, badge }) => (
+const Header: React.FC<{ icon: React.ComponentType<{ className?: string }>; tone: string; title: string; subtitle: string; badge?: React.ReactNode; color?: string }> = ({ icon: Icon, tone, title, subtitle, badge, color }) => (
   <div className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-3">
-    <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${tone}`}><Icon className="w-6 h-6" /></span>
+    <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${tone}`} style={color ? { backgroundColor: color } : undefined}><Icon className="w-6 h-6" /></span>
     <span className="min-w-0 flex-1">
       <span className="block text-base font-extrabold text-slate-900 dark:text-white truncate">{title}</span>
       <span className="block text-xs text-slate-500 truncate">{subtitle}</span>
@@ -154,12 +155,18 @@ export const OrgChartDetails: React.FC<{
   chart: ChartCompany[];
   positions: Position[];
   unplaced: UnplacedUser[];
+  /** The nodes with their versions, and the node types (empty on a backend without the node API). */
+  nodes?: OrgNode[];
+  nodeTypes?: NodeType[];
   selection: ChartSelection | null;
   onSelect: (selection: ChartSelection) => void;
   onChanged: () => Promise<void> | void;
-}> = ({ can, chart, positions, unplaced, selection, onSelect, onChanged }) => {
+}> = ({ can, chart, positions, unplaced, nodes = [], nodeTypes = [], selection, onSelect, onChanged }) => {
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  /** conflict: the change was refused because the structure changed meanwhile (or a rule); the chart can be reloaded. */
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string; conflict?: boolean } | null>(null);
+  /** The version of a node as the chart was loaded: a change over a newer one is refused by the server. */
+  const versionOf = (unitId: string) => nodes.find((n) => n.id === unitId)?.rowVersion ?? null;
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setMessage(null), [JSON.stringify(selection)]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -174,7 +181,7 @@ export const OrgChartDetails: React.FC<{
       setMessage({ type: 'success', text: success });
       return true;
     } catch (err) {
-      setMessage({ type: 'error', text: userErrorMessage(err, failure) });
+      setMessage({ type: 'error', text: userErrorMessage(err, failure), conflict: isConflict(err) });
       return false;
     } finally {
       setBusy(false);
@@ -188,8 +195,8 @@ export const OrgChartDetails: React.FC<{
   if (selection?.kind === 'company' || selection?.kind === 'direct') {
     const company = chart.find((c) => c.companyId === selection.companyId);
     if (company) {
-      const positionCount = company.units.reduce((n, u) => n + positionsOf(u).length, 0);
-      const vacant = company.units.reduce((n, u) => n + vacantCount(u), 0);
+      const positionCount = allUnitsOf(company).reduce((n, u) => n + positionsOf(u).length, 0);
+      const vacant = allUnitsOf(company).reduce((n, u) => n + vacantCount(u), 0);
       body = selection.kind === 'company' ? (
         <>
           <Header icon={Building2} tone="bg-indigo-600 text-white" title={company.name} subtitle={`شرکت · کد ${company.code}`} badge={<ActiveBadge active={company.isActive} />} />
@@ -198,7 +205,7 @@ export const OrgChartDetails: React.FC<{
             {!company.manager && (
               <p className="text-[11px] leading-5 text-slate-500 py-2">رئیس کل کسی است که سمتِ بدون مافوقِ این شرکت را مستقیم در شرکت (بدون معاونت) داشته باشد.</p>
             )}
-            <InfoRow label="معاونت‌ها">{toPersianDigits(company.units.length)}</InfoRow>
+            <InfoRow label={isNestedCompany(company) ? 'گره‌ها' : 'معاونت‌ها'}>{toPersianDigits(nodeCount(company))}</InfoRow>
             <InfoRow label="سمت‌ها">{toPersianDigits(positionCount)}{vacant > 0 ? ` (${toPersianDigits(vacant)} خالی)` : ''}</InfoRow>
             <InfoRow label="تعداد افراد">{toPersianDigits(companyHeadcount(company))} نفر</InfoRow>
           </div>
@@ -215,7 +222,7 @@ export const OrgChartDetails: React.FC<{
           )}
           {company.units.length > 0 && (
             <div className="space-y-1">
-              <p className="text-xs font-bold text-slate-500">معاونت‌ها</p>
+              <p className="text-xs font-bold text-slate-500">{isNestedCompany(company) ? 'گره‌های بالایی' : 'معاونت‌ها'}</p>
               {company.units.map((u) => (
                 <button key={u.unitId} type="button" onClick={() => onSelect({ kind: 'unit', companyId: company.companyId, unitId: u.unitId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
                   <span className="flex items-center gap-2 min-w-0 text-sm font-bold text-slate-800 dark:text-slate-100"><Network className="w-4 h-4 text-emerald-600 shrink-0" /> {u.name}</span>
@@ -252,13 +259,47 @@ export const OrgChartDetails: React.FC<{
       };
       body = selection.kind === 'unit' ? (
         <>
-          <Header icon={Network} tone="bg-emerald-600 text-white" title={unit.name} subtitle={`معاونت · ${company.name}`} badge={<ActiveBadge active={unit.isActive !== false} />} />
+          <Header
+            icon={unit.nodeType ? ({ className }: { className?: string }) => <NodeTypeIcon icon={unit.nodeType!.icon} className={className} /> : Network}
+            tone={unit.nodeType ? 'text-white' : 'bg-emerald-600 text-white'}
+            title={unit.name}
+            subtitle={`${unit.nodeType?.name || 'معاونت'} · ${company.name}`}
+            badge={<ActiveBadge active={unit.isActive !== false} />}
+            color={unit.nodeType ? safeColor(unit.nodeType.color) : undefined}
+          />
           <div>
-            {unit.manager && <InfoRow label="مدیر معاونت"><PersonValue person={unit.manager} /></InfoRow>}
+            {unit.nodeType && <InfoRow label="نوع"><NodeTypeBadge name={unit.nodeType.name} color={unit.nodeType.color} icon={unit.nodeType.icon} /></InfoRow>}
+            {ancestorsOf(company, unit.unitId).length > 0 && (
+              <InfoRow label="مسیر">
+                <span className="flex flex-wrap items-center justify-end gap-x-1 gap-y-0.5 text-xs">
+                  {[...ancestorsOf(company, unit.unitId)].reverse().map((a) => (
+                    <React.Fragment key={a.unitId}>
+                      <button type="button" onClick={() => onSelect({ kind: 'unit', companyId: company.companyId, unitId: a.unitId })} className="text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer">{a.name}</button>
+                      <span className="text-slate-400">‹</span>
+                    </React.Fragment>
+                  ))}
+                  <span>{unit.name}</span>
+                </span>
+              </InfoRow>
+            )}
+            {unit.manager && <InfoRow label="مدیر"><PersonValue person={unit.manager} /></InfoRow>}
             <InfoRow label="سمت‌ها">{toPersianDigits(unitPositions.length)}{vacantCount(unit) > 0 ? ` (${toPersianDigits(vacantCount(unit))} خالی)` : ''}</InfoRow>
             <InfoRow label="تعداد افراد">{toPersianDigits(unitHeadcount(unit))} نفر</InfoRow>
             <InfoRow label="بدون سمت">{toPersianDigits(unit.members.length)} نفر</InfoRow>
           </div>
+          {(unit.children?.length ?? 0) > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-500">زیرمجموعه‌ها ({toPersianDigits(unit.children!.length)})</p>
+              {unit.children!.map((child) => (
+                <button key={child.unitId} type="button" onClick={() => onSelect({ kind: 'unit', companyId: company.companyId, unitId: child.unitId })} className="w-full flex items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-right hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
+                  <span className={`flex items-center gap-2 min-w-0 text-sm font-bold ${child.isActive === false ? 'text-slate-400 line-through' : 'text-slate-800 dark:text-slate-100'}`}>
+                    <NodeTypeIcon icon={child.nodeType?.icon} className="w-4 h-4 shrink-0" color={child.nodeType?.color} /> <span className="truncate">{child.name}</span>
+                  </span>
+                  <span className="text-[11px] text-slate-500 whitespace-nowrap shrink-0">{toPersianDigits(unitHeadcount(child))} نفر</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="space-y-1">
             <p className="text-xs font-bold text-slate-500">سمت‌های این معاونت (به ترتیب)</p>
             {unitPositions.length === 0 ? <p className="text-xs text-slate-400">هنوز سمتی برای این معاونت تعریف نشده است.</p> : unitPositions.map((pos, i) => (
@@ -295,10 +336,29 @@ export const OrgChartDetails: React.FC<{
             ))}
           </div>
           <QuickActions>
-            {can(U.update) && <ActionTile icon={Pencil} label="ویرایش معاونت" onClick={() => setDialog({ kind: 'editUnit', unit })} />}
+            {(nodes.length > 0 ? canNode(can, 'update') : can(U.update)) && <ActionTile icon={Pencil} label={nodes.length > 0 ? 'ویرایش گره' : 'ویرایش معاونت'} onClick={() => setDialog({ kind: 'editUnit', unit })} />}
+            {nodes.length > 0 && canNode(can, 'deactivate') && (
+              unit.isActive === false ? (
+                <ActionTile
+                  icon={Power}
+                  label="فعال کردن"
+                  disabled={busy}
+                  onClick={() => run(() => activateNode(unit.unitId, versionOf(unit.unitId)), `«${unit.name}» فعال شد.`, 'فعال کردن گره انجام نشد.')}
+                />
+              ) : (
+                <ActionTile
+                  icon={Power}
+                  tone="rose"
+                  label="غیرفعال کردن"
+                  disabled={busy}
+                  onClick={async () => await appConfirm(`گره «${unit.name}» غیرفعال شود؟`)
+                    && run(() => deactivateNode(unit.unitId, versionOf(unit.unitId)), `«${unit.name}» غیرفعال شد.`, 'غیرفعال کردن گره انجام نشد.')}
+                />
+              )
+            )}
             {canArrange && <ActionTile icon={Briefcase} label="افزودن سمت" onClick={() => setDialog({ kind: 'addUnitPosition', unit })} />}
             {can(P.manageAssignments) && <ActionTile icon={UserPlus} label="افزودن فرد" onClick={() => setDialog({ kind: 'addUnitMember', company, unit })} />}
-            {can(P.manageCompanies) && (
+            {can(P.manageCompanies) && !unit.parentNodeId && (
               <ActionTile
                 icon={Unlink}
                 tone="rose"
@@ -312,7 +372,7 @@ export const OrgChartDetails: React.FC<{
               />
             )}
           </QuickActions>
-          {can(P.manageCompanies) && unitHeadcount(unit) > 0 && <p className="text-[11px] text-slate-400">برای جدا کردن معاونت از شرکت، ابتدا افراد آن را جابه‌جا کنید.</p>}
+          {can(P.manageCompanies) && !unit.parentNodeId && unitHeadcount(unit) > 0 && <p className="text-[11px] text-slate-400">برای جدا کردن معاونت از شرکت، ابتدا افراد آن را جابه‌جا کنید.</p>}
         </>
       ) : (
         <>
@@ -466,7 +526,16 @@ export const OrgChartDetails: React.FC<{
         <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white"><Zap className="w-5 h-5 text-indigo-600" /> جزئیات</h3>
         <p className="text-xs text-slate-500 mt-0.5">اطلاعات و عملیات بخش انتخاب‌شده</p>
       </div>
-      {message && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
+      {message && (
+        <Notice type={message.type} onClose={() => setMessage(null)}>
+          {message.text}
+          {message.conflict && (
+            <button type="button" onClick={async () => { setMessage(null); await onChanged(); }} className="mt-2 flex items-center gap-1.5 text-xs font-bold underline cursor-pointer">
+              <RefreshCw className="w-3.5 h-3.5" /> بارگذاری دوباره‌ی چارت
+            </button>
+          )}
+        </Notice>
+      )}
       {body}
       {/* At the page root: the panel is sticky, and the chart's cards would otherwise cover a dialog opened inside it. */}
       {dialog && createPortal(
@@ -474,6 +543,9 @@ export const OrgChartDetails: React.FC<{
           dialog={dialog}
           chart={chart}
           positions={positions}
+          nodeTypes={nodeTypes}
+          versionOf={versionOf}
+          useNodeApi={nodes.length > 0}
           can={can}
           busy={busy}
           run={run}
@@ -590,16 +662,21 @@ const ChartDialog: React.FC<{
   dialog: Dialog;
   chart: ChartCompany[];
   positions: Position[];
+  nodeTypes: NodeType[];
+  versionOf: (unitId: string) => string | null;
+  /** The backend has the node API: a node is changed through it (with its version) rather than as a plain unit. */
+  useNodeApi: boolean;
   can: (permission: string) => boolean;
   busy: boolean;
   run: Run;
   onClose: () => void;
   onSelect: (selection: ChartSelection) => void;
-}> = ({ dialog, chart, positions, can, busy, run, onClose, onSelect }) => {
+}> = ({ dialog, chart, positions, nodeTypes, versionOf, useNodeApi, can, busy, run, onClose, onSelect }) => {
   const [name, setName] = useState(
     dialog.kind === 'editCompany' ? dialog.company.name : dialog.kind === 'editUnit' ? dialog.unit.name : '',
   );
   const [code, setCode] = useState(dialog.kind === 'editCompany' ? dialog.company.code : '');
+  const [typeId, setTypeId] = useState(dialog.kind === 'editUnit' ? dialog.unit.nodeType?.nodeTypeId ?? '' : '');
   const initialPerson = dialog.kind === 'editCompany' ? dialog.company.manager : dialog.kind === 'editUnit' ? dialog.unit.manager : null;
   const [personId, setPersonId] = useState<string | null>(initialPerson?.userId || null);
   const [personName, setPersonName] = useState<string | null>(initialPerson?.displayName || null);
@@ -690,13 +767,25 @@ const ChartDialog: React.FC<{
       break;
     }
     case 'editUnit': {
-      title = 'ویرایش معاونت';
+      title = useNodeApi ? 'ویرایش گره' : 'ویرایش معاونت';
       canSave = canSave && !!name.trim();
-      save = async () => done(await run(() => updateOrgUnit(dialog.unit.unitId, { name: name.trim(), managerUserId: personId, isActive: active }), 'معاونت ویرایش شد.', 'ویرایش معاونت انجام نشد.'));
+      save = async () => done(await run(
+        () => (useNodeApi
+          ? updateNode(dialog.unit.unitId, { name: name.trim(), nodeTypeId: typeId || null, rowVersion: versionOf(dialog.unit.unitId) })
+          : updateOrgUnit(dialog.unit.unitId, { name: name.trim(), managerUserId: personId, isActive: active })),
+        'گره ویرایش شد.', 'ویرایش گره انجام نشد.'));
       content = (
         <>
-          <Field label="نام معاونت" required><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} /></Field>
-          {can(U.update) && <Toggle checked={active} onChange={setActive} label="فعال" />}
+          <Field label="نام" required><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} /></Field>
+          {useNodeApi && nodeTypes.length > 0 && (
+            <Field label="نوع گره" hint="با تغییر نوع، جای گره در ساختار عوض نمی‌شود؛ اگر با قاعده‌ی «چه زیر چه» نخواند، در صفحه‌ی قواعد در فهرست ناسازگارها می‌آید.">
+              <select className={inputClass} value={typeId} onChange={(e) => setTypeId(e.target.value)}>
+                <option value="">— بدون نوع (واحد ساده) —</option>
+                {nodeTypes.filter((t) => t.isActive || t.id === typeId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </Field>
+          )}
+          {!useNodeApi && can(U.update) && <Toggle checked={active} onChange={setActive} label="فعال" />}
         </>
       );
       break;
