@@ -133,9 +133,48 @@ export interface ChartPosition {
 export const postLabel = (post: { title: string; code?: string | null }) =>
   post.code ? `${post.title} · کد ${post.code.replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)])}` : post.title;
 
+/** How much of the structure screens a company sees (hiding only): simple, normal or advanced. */
+export type OrgUiLevel = 'simple' | 'normal' | 'advanced';
+
+/** How a link is drawn in the chart. */
+export type OrgLineStyle = 'solid' | 'dotted' | 'dashed';
+
 /**
+ * A node's type (معاونت، اداره کل، کمیته...): its colour and lucide icon name.
+ * isDomainBoundary: the node starts its own domain («همان معاونت»); otherwise it belongs to the
+ * domain of the nearest node above it that does.
+ */
+export interface ChartNodeType {
+  nodeTypeId: string;
+  name: string;
+  color: string;
+  icon: string;
+  isDomainBoundary: boolean;
+}
+
+/**
+ * A secondary link from this node to another (besides its main parent), e.g. a committee's dotted
+ * line to the board. countsAsManager: the target's manager also counts as a manager (never for a
+ * dotted line).
+ */
+export interface ChartLink {
+  linkId: string;
+  targetNodeId: string;
+  linkTypeId: string;
+  name: string;
+  lineStyle: OrgLineStyle;
+  countsAsManager: boolean;
+}
+
+/**
+ * A node of the structure (a deputy, a general department, a committee...).
  * positions: the deputy's positions in its order, vacant ones too (absent on an older backend).
  * members: the deputy's people who hold none of its positions. teams: no longer shown.
+ *
+ * Nested structure (all optional; absent on an older backend or a flat company, which is then
+ * shown flat as before): `ChartCompany.units` still lists every node of the company; parentNodeId
+ * is the node above (null: directly under the company), children the ids of the nodes directly
+ * under it in their order, nodeType its type and links its secondary links.
  */
 export interface ChartUnit {
   unitId: string;
@@ -146,6 +185,10 @@ export interface ChartUnit {
   isActive?: boolean;
   peopleCount?: number;
   positions?: ChartPosition[];
+  parentNodeId?: string | null;
+  children?: string[];
+  nodeType?: ChartNodeType | null;
+  links?: ChartLink[];
 }
 
 export interface ChartCompany {
@@ -160,6 +203,8 @@ export interface ChartCompany {
   peopleCount?: number;
   /** Posts directly in the company (the head's first); absent on an older backend. */
   positions?: ChartPosition[];
+  /** How much of the structure screens show for this company; absent: as today. */
+  uiLevel?: OrgUiLevel;
 }
 
 /** An organization unit (a deputy, a department...) from Nexus.Organization. */
