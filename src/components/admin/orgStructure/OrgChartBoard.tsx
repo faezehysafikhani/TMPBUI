@@ -16,6 +16,8 @@ import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
 import { OrgLinkLayer } from './OrgLinkLayer';
 import { appAlert } from '../../../utils/appDialog';
+import { JalaliDatePicker } from '../../JalaliDatePicker';
+import { jalaliDay } from './nodes/HistoryDialogs';
 
 const PersonLine: React.FC<{ person: PersonRef | null; empty: string }> = ({ person, empty }) => (
   person ? (
@@ -301,10 +303,17 @@ export const OrgChartBoard: React.FC<{
   can: (permission: string) => boolean;
   /** Told after each load: the highest display level among the companies (the section's tabs follow it). */
   onLevelChange?: (level: import('../../../services/orgStructureApi').OrgUiLevel) => void;
-}> = ({ can, onLevelChange }) => {
+  /** Opens the chart on this company (from the group chart). */
+  initialCompanyId?: string;
+}> = ({ can: realCan, onLevelChange, initialCompanyId }) => {
+  /** «نمایش به تاریخ»: the chart as of a day (only which nodes existed); nothing can be changed then. */
+  const [asOf, setAsOf] = useState<string | undefined>(undefined);
+  const asOfRef = useRef(asOf);
+  asOfRef.current = asOf;
+  const can = asOf ? () => false : realCan;
   const data = useLoad(async () => {
     const [chart, positions, unplaced, nodes, nodeTypes, nodeRules, linkTypes] = await Promise.all([
-      getChart(),
+      getChart(undefined, asOfRef.current),
       listPositions().catch(() => []),
       listUnplacedUsers().catch(() => []),
       // The nodes' versions (for the «changed meanwhile» check); an older backend or no permission: none.
@@ -316,7 +325,7 @@ export const OrgChartBoard: React.FC<{
     return { chart, positions, unplaced, nodes, nodeTypes, nodeRules, linkTypes };
   }, 'دریافت چارت سازمانی ممکن نشد.');
 
-  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [companyId, setCompanyId] = useState<string | null>(initialCompanyId ?? null);
   const [selection, setSelection] = useState<ChartSelection | null>(null);
   /** Nodes whose posts are hidden, and nodes whose sub-nodes are hidden. */
   const [collapsedUnits, setCollapsedUnits] = useState<Set<string>>(new Set());
@@ -345,7 +354,7 @@ export const OrgChartBoard: React.FC<{
   const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company);
   const level = levelOf(company);
   // The display level only hides: simple has no node tools, advanced adds the secondary links.
-  const nodeApi = (data.data?.nodes.length ?? 0) > 0 && atLeast(level, 'normal');
+  const nodeApi = (data.data?.nodes.length ?? 0) > 0 && atLeast(level, 'normal') && !asOf;
   const showLinks = atLeast(level, 'advanced');
   const rules = data.data?.nodeRules || [];
   const canMoveNodes = nodeApi && canNode(can, 'move');
@@ -377,6 +386,16 @@ export const OrgChartBoard: React.FC<{
     setCollapsedUnits(new Set(parents.map((u) => u.unitId)));
     setCollapsedBranches(new Set(parents.filter((u) => (depths.get(u.unitId) ?? 0) >= 2).map((u) => u.unitId)));
   }, [company]);
+
+  const firstAsOf = useRef(true);
+  useEffect(() => {
+    if (firstAsOf.current) { firstAsOf.current = false; return; }
+    void data.reload();
+  }, [asOf]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Opened from the group chart on another company.
+  useEffect(() => {
+    if (initialCompanyId) { setCompanyId(initialCompanyId); setSelection({ kind: 'company', companyId: initialCompanyId }); }
+  }, [initialCompanyId]);
 
   const units = company?.units || [];
   useEffect(() => { if (data.data) onLevelChange?.(highestLevel(data.data.chart)); }, [data.data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -707,6 +726,12 @@ export const OrgChartBoard: React.FC<{
           <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white" title="روی هر بخش بزنید تا جزئیاتش را ببینید و همان‌جا تغییرش دهید."><GitFork className="w-5 h-5 text-indigo-600" /> چارت سازمانی</h3>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          {showLinks && (
+            <div className="flex items-center gap-1.5" data-testid="as-of">
+              <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">نمایش به تاریخ</span>
+              <JalaliDatePicker value={asOf} onChange={setAsOf} ariaLabel="نمایش چارت به تاریخ" placeholder="امروز" />
+            </div>
+          )}
           <ChartSearch hits={searchHits} />
           {chart.length > 1 && (
             <select
@@ -891,6 +916,11 @@ export const OrgChartBoard: React.FC<{
           <span className="pointer-coarse:hidden">چرخ ماوس: بزرگ‌نمایی · کشیدن: جابه‌جایی · دوبار کلیک: نزدیک‌تر</span>
           <span className="hidden pointer-coarse:inline">دو انگشت: بزرگ‌نمایی · کشیدن: جابه‌جایی</span>
         </p>}
+        {asOf && (
+          <p role="status" className="pointer-events-none absolute top-3 end-3 z-10 max-w-sm rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200 px-3 py-1.5 text-xs font-bold shadow-md">
+            چارت در تاریخ {jalaliDay(asOf)} (فقط نمایش؛ کدام گره‌ها وجود داشتند، نه جای آن‌ها آن روز)
+          </p>
+        )}
         {(dragId || dragNote) && (
           <p role="status" className={`pointer-events-none absolute top-3 start-3 z-10 max-w-md rounded-lg px-3 py-1.5 text-xs font-bold shadow-md ${dragNote ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200' : 'bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-300'}`}>
             {dragNote || 'کارت را روی گره‌ی بالاتر جدید (یا روی شرکت، برای بالاترین سطح) رها کنید؛ پیش‌نمایش اثر قبل از ذخیره نشان داده می‌شود.'}

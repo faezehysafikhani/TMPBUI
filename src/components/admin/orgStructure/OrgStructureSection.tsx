@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserRound, GitFork, Building2, Network, Briefcase, ListChecks, Link2, LayoutTemplate, FileSpreadsheet } from 'lucide-react';
+import { UserRound, GitFork, Building2, Network, Briefcase, ListChecks, Link2, LayoutTemplate, FileSpreadsheet, Layers } from 'lucide-react';
 import { PillTabs, TabItem } from '../AdminUi';
 import { ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, type OrgUiLevel, canNode, getChart } from '../../../services/orgStructureApi';
 import { MyPlacementPanel } from './OrgViews';
@@ -9,9 +9,10 @@ import { OrgRulesPanel } from './OrgRulesPanel';
 import { OrgLinksPanel } from './OrgLinksPanel';
 import { OrgTemplatesPanel } from './OrgTemplatesPanel';
 import { OrgImportPanel } from './OrgImportPanel';
+import { OrgGroupPanel } from './OrgGroupPanel';
 import { atLeast, highestLevel } from './orgUiLevel';
 
-type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions' | 'links' | 'templates' | 'import' | 'rules';
+type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions' | 'group' | 'links' | 'templates' | 'import' | 'rules';
 
 /**
  * «ساختار سازمانی»: companies, deputies/units, positions and who reports to whom. Shown only
@@ -35,6 +36,7 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
     ...(reader ? [{ id: 'companies' as const, label: 'شرکت‌ها', icon: Building2 }] : []),
     ...(can(U.view) && atLeast(level, 'normal') ? [{ id: 'units' as const, label: 'معاونت‌ها و واحدها', icon: Network }] : []),
     ...(reader ? [{ id: 'positions' as const, label: 'سمت‌ها', icon: Briefcase }] : []),
+    ...(advanced && reader ? [{ id: 'group' as const, label: 'چارت گروه', icon: Layers }] : []),
     ...(advanced && canNode(can, 'view') ? [{ id: 'links' as const, label: 'رابطه‌ها', icon: Link2 }] : []),
     ...(advanced && canNode(can, 'view') ? [{ id: 'templates' as const, label: 'قالب‌ها', icon: LayoutTemplate }] : []),
     ...(advanced && canNode(can, 'create') ? [{ id: 'import' as const, label: 'ورود از اکسل', icon: FileSpreadsheet }] : []),
@@ -42,14 +44,17 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
     ...(advanced && canNode(can, 'manageRules') ? [{ id: 'rules' as const, label: 'قواعد ساختار', icon: ListChecks }] : []),
   ];
   const [active, setActive] = useState<OrgTab>('me');
+  /** A company asked for from the group chart: its chart opens on it. */
+  const [chartCompanyId, setChartCompanyId] = useState<string | undefined>(undefined);
   const current = tabs.some((t) => t.id === active) ? active : 'me';
 
   return (
     <div className="space-y-4">
       {tabs.length > 1 && <PillTabs tabs={tabs} active={current} onChange={setActive} />}
       {current === 'me' && <MyPlacementPanel />}
-      {current === 'chart' && <OrgChartBoard can={can} onLevelChange={setLevel} />}
-      {current === 'companies' && <CompaniesPanel canManage={can(P.manageCompanies)} canSeeUnits={can(U.view)} />}
+      {current === 'chart' && <OrgChartBoard can={can} onLevelChange={setLevel} initialCompanyId={chartCompanyId} />}
+      {current === 'group' && <OrgGroupPanel canEdit={can(P.manageCompanies)} onOpenCompany={(id) => { setChartCompanyId(id); setActive('chart'); }} />}
+      {current === 'companies' && <CompaniesPanel canManage={can(P.manageCompanies)} canSeeUnits={can(U.view)} advanced={advanced} />}
       {current === 'units' && <UnitsPanel canCreate={can(U.create)} canUpdate={can(U.update)} canDeactivate={can(U.delete)} />}
       {current === 'positions' && <PositionsPanel canManage={can(P.managePositions)} />}
       {current === 'links' && <OrgLinksPanel canEditLinks={canNode(can, 'update')} canManageTypes={canNode(can, 'manageRules')} />}

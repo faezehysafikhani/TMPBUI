@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch, Move, ChevronsUp, LayoutTemplate, Link2,
+  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch, Move, ChevronsUp, LayoutTemplate, Link2, GitMerge, History, CalendarRange,
 } from 'lucide-react';
 import { AdminCard, AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
@@ -21,6 +21,7 @@ import { UI_LEVELS, atLeast, levelOf } from './orgUiLevel';
 import { AddLinkDialog, RemoveLinkDialog, linkSentence } from './nodes/LinkDialogs';
 import { SaveTemplateDialog } from './nodes/SaveTemplateDialog';
 import { NodePostTools } from './nodes/NodePostTools';
+import { MergeNodeDialog, NodeHistoryDialog, NodeValidityDialog } from './nodes/HistoryDialogs';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
 
@@ -194,6 +195,9 @@ export const OrgChartDetails: React.FC<{
   const [extra, setExtra] = useState<
     | { kind: 'saveTemplate'; company: ChartCompany }
     | { kind: 'addLink'; company: ChartCompany; unit: ChartUnit }
+    | { kind: 'merge'; company: ChartCompany; unit: ChartUnit }
+    | { kind: 'history'; company: ChartCompany; unit: ChartUnit }
+    | { kind: 'validity'; company: ChartCompany; unit: ChartUnit }
     | { kind: 'removeLink'; company: ChartCompany; unit: ChartUnit; linkId: string; targetId: string; targetName: string; linkTypeId: string }
     | null
   >(null);
@@ -429,6 +433,15 @@ export const OrgChartDetails: React.FC<{
           )}
           <QuickActions>
             {(nodes.length > 0 ? canNode(can, 'update') : can(U.update)) && <ActionTile icon={Pencil} label={nodes.length > 0 ? 'ویرایش گره' : 'ویرایش معاونت'} onClick={() => setDialog({ kind: 'editUnit', unit })} />}
+            {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'move') && (
+              <ActionTile icon={GitMerge} label="ادغام در گره‌ی دیگر" disabled={busy || unit.isActive === false} onClick={() => setExtra({ kind: 'merge', company, unit })} />
+            )}
+            {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'update') && (
+              <ActionTile icon={CalendarRange} label="تاریخ وجود" disabled={busy} onClick={() => setExtra({ kind: 'validity', company, unit })} />
+            )}
+            {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'view') && (
+              <ActionTile icon={History} label="تاریخچه و بازگردانی" onClick={() => setExtra({ kind: 'history', company, unit })} />
+            )}
             {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'update') && (
               <ActionTile icon={Link2} label="افزودن مافوق دوم" disabled={busy || unit.isActive === false} onClick={() => setExtra({ kind: 'addLink', company, unit })} />
             )}
@@ -641,6 +654,12 @@ export const OrgChartDetails: React.FC<{
       {extra && createPortal(
         extra.kind === 'saveTemplate' ? (
           <SaveTemplateDialog company={extra.company} onSaved={(name) => setMessage({ type: 'success', text: `قالب «${name}» ذخیره شد.` })} onClose={() => setExtra(null)} />
+        ) : extra.kind === 'merge' ? (
+          <MergeNodeDialog company={extra.company} unit={extra.unit} rowVersion={versionOf(extra.unit.unitId)} onMerged={async () => { await onChanged(); setMessage({ type: 'success', text: `«${extra.unit.name}» ادغام شد.` }); }} onReload={onChanged} onClose={() => setExtra(null)} />
+        ) : extra.kind === 'history' ? (
+          <NodeHistoryDialog unit={extra.unit} rowVersion={versionOf(extra.unit.unitId)} canUndo={canNode(can, 'move')} onUndone={onChanged} onClose={() => setExtra(null)} />
+        ) : extra.kind === 'validity' ? (
+          <NodeValidityDialog unit={extra.unit} rowVersion={versionOf(extra.unit.unitId)} onSaved={async () => { await onChanged(); setMessage({ type: 'success', text: 'تاریخ‌های گره ذخیره شد.' }); }} onClose={() => setExtra(null)} />
         ) : extra.kind === 'addLink' ? (
           <AddLinkDialog company={extra.company} from={extra.unit} linkTypes={linkTypes} onAdded={async () => { await onChanged(); setMessage({ type: 'success', text: 'رابطه اضافه شد.' }); }} onReload={onChanged} onClose={() => setExtra(null)} />
         ) : linkTypes.find((t) => t.id === extra.linkTypeId) ? (

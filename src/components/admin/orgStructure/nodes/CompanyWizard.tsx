@@ -15,13 +15,16 @@ export const CompanyWizard: React.FC<{
   templates: StructureTemplate[];
   /** A template chosen already (from the templates page). */
   initialTemplateId?: string | null;
+  /** Companies to choose a parent company (holding) from; none given: no such question (below the advanced level). */
+  parentChoices?: Pick<Company, 'id' | 'name' | 'isActive'>[];
   onCreated: (company: Company) => Promise<void> | void;
   onClose: () => void;
-}> = ({ templates, initialTemplateId = null, onCreated, onClose }) => {
+}> = ({ templates, initialTemplateId = null, parentChoices, onCreated, onClose }) => {
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [description, setDescription] = useState('');
+  const [parentId, setParentId] = useState('');
   /** '' : an empty company. */
   const [templateId, setTemplateId] = useState(initialTemplateId ?? '');
   const [busy, setBusy] = useState(false);
@@ -32,7 +35,7 @@ export const CompanyWizard: React.FC<{
     setBusy(true);
     setError(null);
     try {
-      const company = await createCompany({ name: name.trim(), code: code.trim(), description: description.trim() || null, templateId: templateId || null });
+      const company = await createCompany({ name: name.trim(), code: code.trim(), description: description.trim() || null, templateId: templateId || null, parentCompanyId: parentId || null });
       await onCreated(company);
       onClose();
     } catch (err) {
@@ -73,6 +76,14 @@ export const CompanyWizard: React.FC<{
             <Field label="کد شرکت" required hint="کد یکتا، مثلاً TJ"><input className={`${inputClass} dir-ltr text-right`} value={code} onChange={(e) => setCode(e.target.value)} maxLength={40} /></Field>
           </div>
           <Field label="توضیحات"><textarea rows={3} className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+          {parentChoices && parentChoices.length > 0 && (
+            <Field label="شرکت مادر (اختیاری)" hint="برای هلدینگ: این شرکت زیر شرکت مادر در «چارت گروه» می‌آید. فقط دسته‌بندی است.">
+              <select className={inputClass} value={parentId} onChange={(e) => setParentId(e.target.value)}>
+                <option value="">بدون شرکت مادر</option>
+                {parentChoices.filter((c) => c.isActive).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+          )}
         </>
       )}
 
@@ -100,6 +111,7 @@ export const CompanyWizard: React.FC<{
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
             <dt className="text-slate-500">نام</dt><dd className="font-bold">{name.trim()}</dd>
             <dt className="text-slate-500">کد</dt><dd className="font-bold dir-ltr text-right">{code.trim()}</dd>
+            {parentId && parentChoices && <><dt className="text-slate-500">شرکت مادر</dt><dd className="font-bold">{parentChoices.find((c) => c.id === parentId)?.name}</dd></>}
             <dt className="text-slate-500">قالب</dt><dd className="font-bold">{template ? template.name : 'شرکت خالی'}</dd>
             {template && template.nodeCount > 0 && <><dt className="text-slate-500">ساخته می‌شود</dt><dd>{toPersianDigits(template.nodeCount)} گره با {toPersianDigits(template.nodeTypeCount)} نوع، قاعده‌های «چه زیر چه» و رابطه‌های خودکار آن</dd></>}
           </dl>

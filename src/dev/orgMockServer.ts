@@ -45,6 +45,14 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
   const positionTitles = new Map<string, string>([['pos-vp', 'معاون'], ['pos-gm', 'مدیر کل'], ['pos-expert', 'کارشناس'], ['pos-secretary', 'منشی']]);
   const managerPosts = new Set<string>();
   let postSeq = 100;
+  const validity = new Map<string, { from: string | null; to: string | null }>();
+  const details = new Map<string, { code?: string | null; latinName?: string | null; correspondenceTitle?: string | null; phone?: string | null; address?: string | null }>();
+  const parentCompany = new Map<string, string | null>();
+  /** Per node, the changes (newest first) with what undoing the last one does. */
+  const log = new Map<string, { id: string; action: string; atUtc: string; details: string | null; undo: (() => void) | null }[]>();
+  const record = (unitId: string, action: string, undo: (() => void) | null, text: string | null = null) => {
+    log.set(unitId, [{ id: crypto.randomUUID(), action, atUtc: new Date().toISOString(), details: text, undo }, ...(log.get(unitId) || [])]);
+  };
   let autoRules: AutoLinkRule[] = [];
   const extraLinkTypes: LinkType[] = [];
   const linkTypeOverrides = new Map<string, Partial<LinkType>>();
@@ -109,9 +117,11 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     id: unit.unitId, name: unit.name, parentNodeId: unit.parentNodeId ?? null, nodeTypeId: unit.nodeType?.nodeTypeId ?? null,
     nodeTypeName: unit.nodeType?.name ?? null, companyId: company.companyId, managerUserId: unit.manager?.userId ?? null,
     isActive: unit.isActive !== false, sortOrder: siblingsOf(company, unit).indexOf(unit), childCount: unit.children?.length ?? 0, rowVersion: versionOf(unit.unitId),
+    ...details.get(unit.unitId),
   });
 
   const subtreeIds = (unit: ChartUnit): string[] => [unit.unitId, ...(unit.children || []).flatMap(subtreeIds)];
+  const isInSub = (unit: ChartUnit, id: string) => subtreeIds(unit).includes(id);
 
   /** Who would have a different manager if `moves` happened: everyone under the moved nodes. */
   const preview = (changes: ImpactChange[]) => {
@@ -137,7 +147,25 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
   const wouldLoop = (unit: ChartUnit, parentId: string) => subtreeIds(unit).includes(parentId);
 
   const handle = async (method: string, path: string, query: URLSearchParams, body: any): Promise<Response> => {
-    if (method === 'GET' && path === '/chart') return json(chart);
+    if (method === 'GET' && path === '/chart') {
+      const asOf = query.get('asOf');
+      if (!asOf) return json(chart);
+      const day = asOf.slice(0, 10);
+      const exists = (u: ChartUnit) => { const v = validity.get(u.unitId); return !v || ((!v.from || v.from <= day) && (!v.to || v.to >= day)); };
+      const prune = (u: ChartUnit): ChartUnit | null => (exists(u) ? { ...u, children: (u.children || []).map(prune).filter(Boolean) as ChartUnit[] } : null);
+      return json(chart.map((c) => ({ ...c, units: c.units.map(prune).filter(Boolean) })));
+    }
+    if (method === 'GET' && path === '/company-groups') {
+      const node = (c: ChartCompany): unknown => ({ id: c.companyId, name: c.name, code: c.code, isActive: c.isActive, children: chart.filter((x) => parentCompany.get(x.companyId) === c.companyId).map(node) });
+      return json(chart.filter((c) => !parentCompany.get(c.companyId)).map(node));
+    }
+    const cp = path.match(/^\/companies\/([^/]+)\/parent$/);
+    if (cp && method === 'PUT') {
+      let up: string | null | undefined = body.parentCompanyId;
+      while (up) { if (up === cp[1]) return problem(409, 'شرکت را نمی‌شود زیر خودش یا زیرمجموعه‌اش گذاشت.', 'conflict'); up = parentCompany.get(up); }
+      parentCompany.set(cp[1], body.parentCompanyId ?? null);
+      return new Response(null, { status: 204 });
+    }
     if (method === 'GET' && path === '/nodes') return json(chart.flatMap((c) => allUnitsOf(c).map((u) => nodeOf(c, u))));
     if (method === 'GET' && path === '/me') return json({ assignment: null, managementChain: [] });
     if (method === 'GET' && path === '/node-types') return json(typesOf());
@@ -190,6 +218,7 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
       const t = templates.find((x) => x.template.id === body.templateId);
       const company: ChartCompany = { companyId: crypto.randomUUID(), name: body.name, code: body.code, isActive: true, manager: null, members: [], units: [], peopleCount: 0, positions: [], uiLevel: t?.template.uiLevel ?? 'normal' };
       chart.push(company);
+      if (body.parentCompanyId) parentCompany.set(company.companyId, body.parentCompanyId);
       return json({ id: company.companyId, name: company.name, code: company.code, description: body.description ?? null, manager: null, isActive: true, linkedUnitIds: [] }, 201);
     }
     const level = path.match(/^\/companies\/([^/]+)\/ui-level$/);
@@ -288,6 +317,58 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     const mp = path.match(/^\/unit-positions\/([^/]+)\/manager-post$/);
     if (mp && method === 'PUT') { if (body.isManagerPost) managerPosts.add(mp[1]); else managerPosts.delete(mp[1]); return json({}); }
 
+    const nodeExtra = path.match(/^\/nodes\/([^/]+)\/(details|validity|merge|changes|undo)$/);
+    if (nodeExtra) {
+      const found = find(nodeExtra[1]);
+      if (!found) return problem(404, 'گره پیدا نشد.', 'not_found');
+      const { company, unit } = found;
+      if (method === 'GET' && nodeExtra[2] === 'changes') return json((log.get(unit.unitId) || []).map((c, i) => ({ id: c.id, action: c.action, userId: null, atUtc: c.atUtc, details: c.details, canUndo: i === 0 && !!c.undo })));
+      if (body?.rowVersion != null && body.rowVersion !== versionOf(unit.unitId)) return problem(409, 'این گره را کس دیگری همین حالا تغییر داده است؛ صفحه را تازه کنید و دوباره امتحان کنید.', 'conflict');
+      if (nodeExtra[2] === 'details') {
+        const before = details.get(unit.unitId);
+        details.set(unit.unitId, { code: body.code || null, latinName: body.latinName || null, correspondenceTitle: body.correspondenceTitle || null, phone: body.phone || null, address: body.address || null });
+        bump(unit.unitId);
+        record(unit.unitId, 'details', () => { if (before) details.set(unit.unitId, before); else details.delete(unit.unitId); });
+        return json(nodeOf(company, unit));
+      }
+      if (nodeExtra[2] === 'validity') {
+        const before = validity.get(unit.unitId);
+        validity.set(unit.unitId, { from: body.validFrom ? String(body.validFrom).slice(0, 10) : null, to: body.validTo ? String(body.validTo).slice(0, 10) : null });
+        bump(unit.unitId);
+        record(unit.unitId, 'validity', () => { if (before) validity.set(unit.unitId, before); else validity.delete(unit.unitId); });
+        return json(nodeOf(company, unit));
+      }
+      if (nodeExtra[2] === 'merge') {
+        const target = find(body.targetNodeId)?.unit;
+        if (!target || target.unitId === unit.unitId || isInSub(unit, target.unitId)) return problem(400, 'مقصد ادغام درست نیست.');
+        const movedChildren = unit.children || [];
+        movedChildren.forEach((c) => { c.parentNodeId = target.unitId; });
+        target.children = [...(target.children || []), ...movedChildren];
+        target.positions = [...(target.positions || []), ...(unit.positions || [])];
+        target.members = [...target.members, ...unit.members];
+        const before = { children: movedChildren, positions: unit.positions || [], members: unit.members };
+        unit.children = []; unit.positions = []; unit.members = []; unit.isActive = false;
+        bump(unit.unitId);
+        record(unit.unitId, 'merge', () => {
+          target.children = (target.children || []).filter((c) => !before.children.includes(c));
+          target.positions = (target.positions || []).filter((p) => !before.positions.includes(p));
+          target.members = target.members.filter((m) => !before.members.includes(m));
+          before.children.forEach((c) => { c.parentNodeId = unit.unitId; });
+          unit.children = before.children; unit.positions = before.positions; unit.members = before.members; unit.isActive = true;
+        }, `به «${target.name}»`);
+        return json(nodeOf(company, unit));
+      }
+      if (nodeExtra[2] === 'undo') {
+        const last = (log.get(unit.unitId) || [])[0];
+        if (!last?.undo) return problem(409, 'این تغییر برگردانده نمی‌شود.', 'conflict');
+        last.undo();
+        log.set(unit.unitId, (log.get(unit.unitId) || []).slice(1));
+        bump(unit.unitId);
+        record(unit.unitId, 'undo', null);
+        return json(nodeOf(company, unit));
+      }
+    }
+
     const node = path.match(/^\/nodes\/([^/]+)(?:\/(\w+))?$/);
     if (node && method === 'POST') {
       const found = find(node[1]);
@@ -298,10 +379,17 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
         const parentId: string | null = body.parentNodeId;
         if (parentId && wouldLoop(unit, parentId)) return problem(400, 'گره را نمی‌شود زیر خودش یا زیرمجموعه‌اش گذاشت.');
         const list = siblingsOf(company, unit);
+        const oldParent = unit.parentNodeId ?? null;
         list.splice(list.indexOf(unit), 1);
         unit.parentNodeId = parentId;
         (parentId ? find(parentId)!.unit.children! : company.units).push(unit);
         bump(unit.unitId);
+        record(unit.unitId, 'move', () => {
+          const now = siblingsOf(company, unit);
+          now.splice(now.indexOf(unit), 1);
+          unit.parentNodeId = oldParent;
+          (oldParent ? find(oldParent)!.unit.children! : company.units).push(unit);
+        });
         return json(nodeOf(company, unit));
       }
       if (node[2] === 'reorder') {
@@ -312,8 +400,10 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
         return json(nodeOf(company, unit));
       }
       if (node[2] === 'deactivate' || node[2] === 'activate') {
+        const was = unit.isActive;
         unit.isActive = node[2] === 'activate';
         bump(unit.unitId);
+        record(unit.unitId, node[2] as string, () => { unit.isActive = was; });
         return json(nodeOf(company, unit));
       }
     }

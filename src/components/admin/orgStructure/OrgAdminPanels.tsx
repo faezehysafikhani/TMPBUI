@@ -42,7 +42,7 @@ function useAction(reload: () => void, setMessage: (m: Message) => void) {
 
 interface CompanyDraft { id?: string; name: string; code: string; description: string; headName: string | null; isActive: boolean }
 
-export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean }> = ({ canManage, canSeeUnits }) => {
+export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean; advanced?: boolean }> = ({ canManage, canSeeUnits, advanced = false }) => {
   const data = useLoad(async () => {
     const [companies, links, units, templates] = await Promise.all([
       listCompanies(), listCompanyUnits(), canSeeUnits ? listOrgUnits() : Promise.resolve([] as OrgUnit[]),
@@ -125,6 +125,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
       {wizard && data.data && (
         <CompanyWizard
           templates={data.data.templates}
+          parentChoices={advanced ? data.data.companies : undefined}
           onCreated={async () => { setMessage({ type: 'success', text: 'شرکت ساخته شد.' }); await data.reload(); }}
           onClose={() => setWizard(false)}
         />
