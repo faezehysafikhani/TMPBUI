@@ -15,12 +15,36 @@ export interface MockServer {
   fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
 
+interface SheetRow { row: number; code: string; name: string; parent: string; type: string; manager: string }
+
+/** Reads a UTF-8 CSV sheet like the server does (a header row, then code, name, parent code, type, manager's position). */
+function readCsv(text: string): SheetRow[] {
+  const rows: string[][] = [];
+  let cell = '', row: string[] = [], quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') quoted = false; else cell += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); cell = ''; rows.push(row); row = []; }
+    else cell += ch;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.slice(1).map((r, i) => ({ row: i + 2, code: (r[0] || '').trim(), name: (r[1] || '').trim(), parent: (r[2] || '').trim(), type: (r[3] || '').trim(), manager: (r[4] || '').trim() }))
+    .filter((r) => r.code || r.name || r.parent || r.type || r.manager);
+}
+
 export function createMockServer(initial: ChartCompany[]): MockServer {
   let chart: ChartCompany[] = structuredClone(initial);
   const versions = new Map<string, number>();
   let rules: NodeTypeRule[] | null = null;
   const typeOverrides = new Map<string, Partial<NodeType>>();
   const extraTypes: NodeType[] = [];
+  const patterns = new Map<string, { positionId: string; title: string; isManagerPost: boolean }[]>();
+  const positionTitles = new Map<string, string>([['pos-vp', 'معاون'], ['pos-gm', 'مدیر کل'], ['pos-expert', 'کارشناس'], ['pos-secretary', 'منشی']]);
+  const managerPosts = new Set<string>();
+  let postSeq = 100;
   let autoRules: AutoLinkRule[] = [];
   const extraLinkTypes: LinkType[] = [];
   const linkTypeOverrides = new Map<string, Partial<LinkType>>();
@@ -39,7 +63,7 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     const seen = new Map<string, ChartNodeType>();
     chart.forEach((c) => allUnitsOf(c).forEach((u) => u.nodeType && seen.set(u.nodeType.nodeTypeId, u.nodeType)));
     return [...extraTypes, ...[...seen.values()].map((t, i) => ({
-      id: t.nodeTypeId, code: t.nodeTypeId, name: t.name, color: t.color, icon: t.icon, isDomainBoundary: t.isDomainBoundary, sortOrder: i, isActive: true,
+      id: t.nodeTypeId, code: t.nodeTypeId.replace(/^type-/, ''), name: t.name, color: t.color, icon: t.icon, isDomainBoundary: t.isDomainBoundary, sortOrder: i, isActive: true,
       nodeCount: chart.flatMap((c) => allUnitsOf(c)).filter((u) => u.nodeType?.nodeTypeId === t.nodeTypeId).length,
       ...typeOverrides.get(t.nodeTypeId),
     }))];
@@ -143,7 +167,7 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
       });
       return json({ rules, conflicts });
     }
-    if (method === 'PUT' && path.startsWith('/node-types/')) {
+    if (method === 'PUT' && /^\/node-types\/[^/]+$/.test(path)) {
       const id = path.split('/')[2];
       typeOverrides.set(id, { ...typeOverrides.get(id), ...body });
       return json(typesOf().find((t) => t.id === id));
@@ -189,6 +213,80 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     }
     const dl = path.match(/^\/links\/([^/]+)$/);
     if (dl && method === 'DELETE') { chart.forEach((c) => allUnitsOf(c).forEach((u) => { u.links = (u.links || []).filter((l: ChartLink) => l.linkId !== dl[1]); })); return new Response(null, { status: 204 }); }
+
+    if (method === 'POST' && (path === '/import/preview' || path === '/import/commit')) {
+      const file = body?.get?.('file') as File | null;
+      const rows = file ? readCsv((await file.text()).replace(/^\uFEFF/, '')) : [];
+      const errors: { row: number | null; code: string | null; message: string }[] = [];
+      const types = typesOf();
+      const allowed = new Set(currentRules().map((r) => `${r.parentNodeTypeId ?? 'company'}>${r.childNodeTypeId}`));
+      const byCode = new Map<string, SheetRow>();
+      for (const r of rows) {
+        if (!r.code) { errors.push({ row: r.row, code: 'missing_code', message: 'کد گره خالی است.' }); continue; }
+        if (byCode.has(r.code.toLowerCase())) { errors.push({ row: r.row, code: 'duplicate_code', message: `کد «${r.code}» تکراری است (اولین بار در سطر ${byCode.get(r.code.toLowerCase())!.row}).` }); continue; }
+        byCode.set(r.code.toLowerCase(), r);
+        if (!r.name) errors.push({ row: r.row, code: 'missing_name', message: 'نام گره خالی است.' });
+      }
+      for (const r of byCode.values()) {
+        if (r.parent && !byCode.has(r.parent.toLowerCase())) errors.push({ row: r.row, code: 'missing_parent', message: `والد «${r.parent}» برای گره «${r.code}» وجود ندارد.` });
+        const type = r.type ? types.find((t) => t.code === r.type) : undefined;
+        if (r.type && !type) { errors.push({ row: r.row, code: 'unknown_type', message: `نوع «${r.type}» تعریف نشده است.` }); continue; }
+        const parent = r.parent ? byCode.get(r.parent.toLowerCase()) : undefined;
+        if (type && (!r.parent || parent)) {
+          const parentType = parent?.type ? types.find((t) => t.code === parent.type) : undefined;
+          if (!allowed.has(`${parentType?.id ?? 'company'}>${type.id}`)) errors.push({ row: r.row, code: 'type_not_allowed', message: `گره «${r.code}» از نوع «${type.name}» را نمی‌شود ${parent ? `زیر «${parent.code}»` : 'در بالاترین سطح'} گذاشت.` });
+        }
+        // a loop: walk up
+        const seen = new Set([r.code.toLowerCase()]);
+        for (let up = parent; up; up = up.parent ? byCode.get(up.parent.toLowerCase()) : undefined) {
+          if (seen.has(up.code.toLowerCase())) { if (up.code.toLowerCase() === r.code.toLowerCase()) errors.push({ row: r.row, code: 'cycle', message: `حلقه در والدها از گره «${r.code}».` }); break; }
+          seen.add(up.code.toLowerCase());
+        }
+      }
+      errors.sort((a, b) => (a.row ?? 0) - (b.row ?? 0));
+      const depthOf = (r: SheetRow): number => { let d = 0; for (let up = r.parent ? byCode.get(r.parent.toLowerCase()) : undefined; up && d < 50; up = up.parent ? byCode.get(up.parent.toLowerCase()) : undefined) d++; return d; };
+      const nodes = rows.map((r) => ({ row: r.row, code: r.code, name: r.name, parentCode: r.parent || null, typeName: types.find((t) => t.code === r.type)?.name ?? 'واحد', managerPosition: r.manager || null, depth: depthOf(r) }));
+      if (path === '/import/preview') return json({ rowCount: rows.length, nodes: errors.length ? [] : nodes, errors });
+      if (errors.length) return problem(400, 'فایل خطا دارد؛ چیزی ساخته نشد.');
+      const company = body.get('companyId') ? chart.find((c) => c.companyId === body.get('companyId')) : find(String(body.get('parentNodeId')))?.company;
+      if (!company) return problem(404, 'شرکت پیدا نشد.', 'not_found');
+      const made = new Map<string, ChartUnit>();
+      const order = [...byCode.values()].sort((a, b) => depthOf(a) - depthOf(b));
+      for (const r of order) {
+        const type = types.find((t) => t.code === r.type);
+        const parent = r.parent ? made.get(r.parent.toLowerCase()) : body.get('parentNodeId') ? find(String(body.get('parentNodeId')))?.unit : undefined;
+        const unit: ChartUnit = { unitId: crypto.randomUUID(), name: r.name, manager: null, members: [], positions: [], children: [], isActive: true, peopleCount: 0, parentNodeId: parent?.unitId ?? null, nodeType: type ? { nodeTypeId: type.id, name: type.name, color: type.color, icon: type.icon, isDomainBoundary: type.isDomainBoundary } : null };
+        (parent ? parent.children! : company.units).push(unit);
+        made.set(r.code.toLowerCase(), unit);
+      }
+      return json({ nodes: [...made.values()].map((u) => nodeOf(company, u)), links: 0, posts: 0, autoLinkChoices: [], skippedPosts: [] }, 201);
+    }
+    const patternPath = path.match(/^\/node-types\/([^/]+)\/posts$/);
+    if (patternPath && method === 'GET') return json((patterns.get(patternPath[1]) || []).map((p, i) => ({ ...p, sortOrder: i })));
+    if (patternPath && method === 'PUT') {
+      const list = (body.posts as { positionId: string; isManagerPost: boolean }[]).map((p) => ({ positionId: p.positionId, title: positionTitles.get(p.positionId) || p.positionId, isManagerPost: p.isManagerPost }));
+      patterns.set(patternPath[1], list);
+      return json(list.map((p, i) => ({ ...p, sortOrder: i })));
+    }
+    if (method === 'GET' && path === '/positions') return json([...positionTitles].map(([id, title]) => ({ id, title, parentPositionId: null, isActive: true, companyIds: chart.map((c) => c.companyId) })));
+    if (method === 'POST' && path === '/post-templates/apply') {
+      const targets = body.nodeId ? [find(body.nodeId)?.unit].filter(Boolean) as ChartUnit[] : chart.flatMap((c) => allUnitsOf(c)).filter((u) => u.nodeType?.nodeTypeId === body.nodeTypeId && u.isActive !== false);
+      let created = 0;
+      for (const unit of targets) {
+        for (const p of patterns.get(unit.nodeType?.nodeTypeId || '') || []) {
+          if ((unit.positions || []).some((x) => x.positionId === p.positionId)) continue;
+          unit.positions = [...(unit.positions || []), { unitPositionId: crypto.randomUUID(), positionId: p.positionId, title: p.title, sortOrder: (unit.positions || []).length, isActive: true, holders: [], code: String(++postSeq) }];
+          created++;
+        }
+      }
+      return json({ created: Array.from({ length: created }, () => ({})), skipped: [] });
+    }
+    if (method === 'GET' && path === '/unit-positions') {
+      const u = query.get('unitId') ? find(query.get('unitId')!)?.unit : null;
+      return json((u?.positions || []).map((p) => ({ id: p.unitPositionId, unitId: u!.unitId, unitName: u!.name, positionId: p.positionId, title: p.title, sortOrder: p.sortOrder, isPositionActive: true, holders: p.holders, code: p.code, isManagerPost: managerPosts.has(p.unitPositionId) })));
+    }
+    const mp = path.match(/^\/unit-positions\/([^/]+)\/manager-post$/);
+    if (mp && method === 'PUT') { if (body.isManagerPost) managerPosts.add(mp[1]); else managerPosts.delete(mp[1]); return json({}); }
 
     const node = path.match(/^\/nodes\/([^/]+)(?:\/(\w+))?$/);
     if (node && method === 'POST') {
@@ -254,7 +352,8 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
       if (!url.pathname.includes(marker)) return json([]);
       const path = url.pathname.slice(url.pathname.indexOf(marker) + marker.length) || '/';
       let body: any = null;
-      try { body = init?.body ? JSON.parse(String(init.body)) : null; } catch { /* not JSON */ }
+      if (init?.body instanceof FormData) body = init.body;
+      else { try { body = init?.body ? JSON.parse(String(init.body)) : null; } catch { /* not JSON */ } }
       if (path === '/chart') performance.mark('org-chart-response'); // scripts/measure-org-chart.mjs measures drawing from here
       return handle((init?.method || 'GET').toUpperCase(), path, url.searchParams, body);
     },

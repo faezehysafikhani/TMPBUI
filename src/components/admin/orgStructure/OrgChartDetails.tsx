@@ -20,6 +20,7 @@ import { addableTypes, checkMove } from './orgNodeRules';
 import { UI_LEVELS, atLeast, levelOf } from './orgUiLevel';
 import { AddLinkDialog, RemoveLinkDialog, linkSentence } from './nodes/LinkDialogs';
 import { SaveTemplateDialog } from './nodes/SaveTemplateDialog';
+import { NodePostTools } from './nodes/NodePostTools';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
 
@@ -423,6 +424,9 @@ export const OrgChartDetails: React.FC<{
               </div>
             ))}
           </div>
+          {nodes.length > 0 && can(P.managePositions) && atLeast(levelOf(company), 'advanced') && (
+            <NodePostTools key={unit.unitId} unit={unit} hasPattern={!!unit.nodeType} onChanged={onChanged} />
+          )}
           <QuickActions>
             {(nodes.length > 0 ? canNode(can, 'update') : can(U.update)) && <ActionTile icon={Pencil} label={nodes.length > 0 ? 'ویرایش گره' : 'ویرایش معاونت'} onClick={() => setDialog({ kind: 'editUnit', unit })} />}
             {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'update') && (

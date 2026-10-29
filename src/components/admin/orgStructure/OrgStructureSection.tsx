@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserRound, GitFork, Building2, Network, Briefcase, ListChecks, Link2, LayoutTemplate } from 'lucide-react';
+import { UserRound, GitFork, Building2, Network, Briefcase, ListChecks, Link2, LayoutTemplate, FileSpreadsheet } from 'lucide-react';
 import { PillTabs, TabItem } from '../AdminUi';
 import { ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, type OrgUiLevel, canNode, getChart } from '../../../services/orgStructureApi';
 import { MyPlacementPanel } from './OrgViews';
@@ -8,9 +8,10 @@ import { CompaniesPanel, PositionsPanel, UnitsPanel } from './OrgAdminPanels';
 import { OrgRulesPanel } from './OrgRulesPanel';
 import { OrgLinksPanel } from './OrgLinksPanel';
 import { OrgTemplatesPanel } from './OrgTemplatesPanel';
+import { OrgImportPanel } from './OrgImportPanel';
 import { atLeast, highestLevel } from './orgUiLevel';
 
-type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions' | 'links' | 'templates' | 'rules';
+type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions' | 'links' | 'templates' | 'import' | 'rules';
 
 /**
  * «ساختار سازمانی»: companies, deputies/units, positions and who reports to whom. Shown only
@@ -36,6 +37,7 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
     ...(reader ? [{ id: 'positions' as const, label: 'سمت‌ها', icon: Briefcase }] : []),
     ...(advanced && canNode(can, 'view') ? [{ id: 'links' as const, label: 'رابطه‌ها', icon: Link2 }] : []),
     ...(advanced && canNode(can, 'view') ? [{ id: 'templates' as const, label: 'قالب‌ها', icon: LayoutTemplate }] : []),
+    ...(advanced && canNode(can, 'create') ? [{ id: 'import' as const, label: 'ورود از اکسل', icon: FileSpreadsheet }] : []),
     // Only with its own permission (the rules change what everyone may do with the structure).
     ...(advanced && canNode(can, 'manageRules') ? [{ id: 'rules' as const, label: 'قواعد ساختار', icon: ListChecks }] : []),
   ];
@@ -52,7 +54,8 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
       {current === 'positions' && <PositionsPanel canManage={can(P.managePositions)} />}
       {current === 'links' && <OrgLinksPanel canEditLinks={canNode(can, 'update')} canManageTypes={canNode(can, 'manageRules')} />}
       {current === 'templates' && <OrgTemplatesPanel canManageTemplates={canNode(can, 'manageTemplates')} canCreateCompany={can(P.manageCompanies)} />}
-      {current === 'rules' && <OrgRulesPanel />}
+      {current === 'import' && <OrgImportPanel />}
+      {current === 'rules' && <OrgRulesPanel canApplyPosts={can(P.managePositions)} />}
     </div>
   );
 };

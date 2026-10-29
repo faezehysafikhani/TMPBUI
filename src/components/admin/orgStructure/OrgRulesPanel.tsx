@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, Loader2, Pencil, Plus, Save, Trash2, Undo2 } from 'lucide-react';
+import { AlertTriangle, Briefcase, Loader2, Pencil, Plus, Save, Trash2, Undo2 } from 'lucide-react';
 import { AdminCard, AdminDialog, Field, IconAction, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
@@ -13,6 +13,7 @@ import { NodeTypeRulesMatrix, ruleUsage, type NodeTypeRule } from './nodes/NodeT
 import { NodeTypeStylePicker, type NodeTypeStyle } from './nodes/NodeTypeStylePicker';
 import { NodeTypeBadge, NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
 import { allUnitsOf } from './orgChartModel';
+import { PostPatternDialog } from './nodes/PostPatternDialog';
 
 type Message = { type: 'success' | 'error'; text: string } | null;
 
@@ -31,7 +32,7 @@ interface TypeDraft { id?: string; name: string; style: NodeTypeStyle; isDomainB
  * whether a node of the type starts its own «معاونت» - and the table of what may sit under what.
  * Changing a rule never deletes a node: the nodes that no longer match are listed, to be moved.
  */
-export const OrgRulesPanel: React.FC = () => {
+export const OrgRulesPanel: React.FC<{ canApplyPosts?: boolean }> = ({ canApplyPosts = false }) => {
   const data = useLoad(async () => {
     const [types, rules, chart] = await Promise.all([listNodeTypes(), getNodeTypeRules(), getChart().catch(() => [])]);
     return { types, rules, chart };
@@ -42,6 +43,7 @@ export const OrgRulesPanel: React.FC = () => {
   /** The rules being edited; null: as saved. */
   const [edited, setEdited] = useState<NodeTypeRule[] | null>(null);
   const [conflicts, setConflicts] = useState<RuleConflict[] | null>(null);
+  const [patternOf, setPatternOf] = useState<NodeType | null>(null);
 
   const types = data.data?.types || [];
   const saved = useMemo(() => toMatrix(data.data?.rules.rules || []), [data.data]);
@@ -135,6 +137,7 @@ export const OrgRulesPanel: React.FC = () => {
                   <span className="block text-[11px] text-slate-500">{toPersianDigits(type.nodeCount)} گره{type.isDomainBoundary ? ' · معاونت جدا (مرز هم‌معاونت)' : ''}</span>
                 </span>
                 {!type.isActive && <StatusBadge tone="red">غیرفعال</StatusBadge>}
+                <IconAction icon={Briefcase} label={`پست‌های پیش‌فرض ${type.name}`} onClick={() => setPatternOf(type)} />
                 <IconAction icon={Pencil} label={`ویرایش ${type.name}`} onClick={() => setDraft({ id: type.id, name: type.name, style: { color: type.color, icon: type.icon }, isDomainBoundary: type.isDomainBoundary, isActive: type.isActive })} />
                 <IconAction icon={Trash2} tone="rose" label={`حذف ${type.name}`} disabled={busy || type.nodeCount > 0} disabledReason="نوعی که گره‌ای از آن دارد حذف نمی‌شود" onClick={() => removeType(type)} />
               </div>
@@ -194,6 +197,8 @@ export const OrgRulesPanel: React.FC = () => {
           </div>
         )}
       </AdminCard>
+
+      {patternOf && <PostPatternDialog type={patternOf} canSave canApply={canApplyPosts} onClose={() => { setPatternOf(null); void data.reload(); }} />}
 
       {draft && (
         <AdminDialog

@@ -20,7 +20,7 @@ export interface Company {
 export interface CompanyInput { name: string; code: string; description?: string | null }
 
 /** A new company, optionally made from a structure template (a copy of its types, rules, positions and nodes). */
-export interface CompanyCreateInput extends CompanyInput { templateId?: string | null }
+export interface CompanyCreateInput extends CompanyInput { templateId?: string | null; parentCompanyId?: string | null }
 
 export interface CompanyUnitLink { unitId: string; unitName: string; companyId: string; companyName: string }
 
@@ -86,6 +86,8 @@ export interface UnitPosition {
   companyName?: string | null;
   /** The post above this one in its place (its holder manages this post's holder). */
   parentPostId?: string | null;
+  /** The node's manager post (at most one per node): its holder is the node's manager. */
+  isManagerPost?: boolean;
 }
 
 export interface Subordinate {
@@ -292,7 +294,8 @@ export const orgStructureLookupKey = (userId: string) => `${userId}:org-structur
 
 export const getMySubordinates = (all: boolean) => apiRequest<Subordinate[]>('GET', `${BASE}/me/subordinates`, { query: { all } });
 
-export const getChart = (companyId?: string) => apiRequest<ChartCompany[]>('GET', `${BASE}/chart`, { query: { companyId } });
+/** asOf (a date): only the nodes that exist on that day (a node's dates say when it exists; not where it sat then). */
+export const getChart = (companyId?: string, asOf?: string) => apiRequest<ChartCompany[]>('GET', `${BASE}/chart`, { query: { companyId, asOf } });
 
 export const listCompanies = () => apiRequest<Company[]>('GET', `${BASE}/companies`);
 export const createCompany = (input: CompanyCreateInput) => apiRequest<Company>('POST', `${BASE}/companies`, { body: input });
@@ -439,6 +442,12 @@ export interface OrgNode {
   rowVersion: string;
   /** Only right after the node is made: automatic links with several possible targets, to choose from (POST /links). */
   autoLinkChoices?: AutoLinkChoice[] | null;
+  /** Optional: its code (unique in its company), latin name, the title used in letters, phone and address. */
+  code?: string | null;
+  latinName?: string | null;
+  correspondenceTitle?: string | null;
+  phone?: string | null;
+  address?: string | null;
 }
 
 export interface NodePathItem { id: string; name: string }
@@ -470,7 +479,7 @@ export interface RuleConflict { nodeId: string; nodeName: string; nodeTypeName: 
 /** No rules at all: every node stays at the top (the flat structure). */
 export interface NodeTypeRules { rules: NodeTypeRule[]; conflicts: RuleConflict[] }
 
-export interface CreateNodeInput { name: string; parentNodeId?: string | null; companyId?: string | null; nodeTypeId?: string | null }
+export interface CreateNodeInput { name: string; parentNodeId?: string | null; companyId?: string | null; nodeTypeId?: string | null; code?: string | null }
 
 export const listNodes = (companyId?: string) => apiRequest<OrgNode[]>('GET', `${BASE}/nodes`, { query: { companyId } });
 export const searchNodes = (q: string, companyId?: string) => apiRequest<NodeSearchResult[]>('GET', `${BASE}/nodes/search`, { query: { q, companyId } });
@@ -505,7 +514,7 @@ export const setNodeTypeRules = (rules: NodeTypeRule[]) => apiRequest<NodeTypeRu
  * null: none) or «unlink» (nodeId loses its company link).
  */
 export interface ImpactChange {
-  kind: 'move' | 'add' | 'manager' | 'unlink' | 'link' | 'unlink-link';
+  kind: 'move' | 'add' | 'manager' | 'unlink' | 'link' | 'unlink-link' | 'merge';
   nodeId?: string | null;
   /** «link»: the node the secondary link goes to, and its type. «unlink-link»: the link that goes. */
   toNodeId?: string | null;
@@ -616,3 +625,67 @@ export const getTemplate = (id: string) => apiRequest<StructureTemplateDetail>('
 export const saveTemplate = (input: { companyId: string; name: string; code?: string | null; description?: string | null }) =>
   apiRequest<StructureTemplate>('POST', `${BASE}/templates`, { body: input });
 export const deleteTemplate = (id: string) => apiRequest<void>('DELETE', `${BASE}/templates/${id}`);
+
+// ---------------------------------------------------------------- volume and history (phase 6)
+
+/** The details of a node (each empty: none). They replace all of the node's details at once. */
+export interface NodeDetailsInput { code?: string | null; latinName?: string | null; correspondenceTitle?: string | null; phone?: string | null; address?: string | null; rowVersion?: string | null }
+export const setNodeDetails = (id: string, input: NodeDetailsInput) => apiRequest<OrgNode>('PUT', `${BASE}/nodes/${id}/details`, { body: input });
+
+/** When the node exists (each null: no limit). It only matters for the chart on a day (asOf). */
+export const setNodeValidity = (id: string, input: { validFrom: string | null; validTo: string | null; rowVersion?: string | null }) =>
+  apiRequest<OrgNode>('PUT', `${BASE}/nodes/${id}/validity`, { body: input });
+
+/** The node goes into targetNodeId (same company): its sub-nodes, posts (with holders) and people move; it ends on effectiveDate. */
+export const mergeNode = (id: string, input: { targetNodeId: string; effectiveDate?: string | null; rowVersion?: string | null }) =>
+  apiRequest<OrgNode>('POST', `${BASE}/nodes/${id}/merge`, { body: input });
+
+/** One change of a node, newest first. details: what changed (JSON text). canUndo: the kind can be undone (only the last one is). */
+export interface NodeChange { id: string; action: string; userId: string | null; atUtc: string; details: string | null; canUndo: boolean }
+export const listNodeChanges = (id: string, take?: number) => apiRequest<NodeChange[]>('GET', `${BASE}/nodes/${id}/changes`, { query: { take } });
+export const undoNodeChange = (id: string, rowVersion?: string | null) => apiRequest<OrgNode>('POST', `${BASE}/nodes/${id}/undo`, { body: { rowVersion } });
+
+/** A company and the companies under it in its group (a holding), at any depth. */
+export interface CompanyGroup { id: string; name: string; code: string; isActive: boolean; children: CompanyGroup[] }
+export const listCompanyGroups = () => apiRequest<CompanyGroup[]>('GET', `${BASE}/company-groups`);
+/** parentCompanyId null: a company of its own. A loop is refused (409). */
+export const setCompanyParent = (id: string, parentCompanyId: string | null) => apiRequest<void>('PUT', `${BASE}/companies/${id}/parent`, { body: { parentCompanyId } });
+
+// ---- posts from a pattern
+
+/** A post a node type gets: of this position; isManagerPost: the node's manager post (at most one). */
+export interface NodeTypePost { positionId: string; title: string; isManagerPost: boolean; sortOrder: number }
+export const getNodeTypePosts = (nodeTypeId: string) => apiRequest<NodeTypePost[]>('GET', `${BASE}/node-types/${nodeTypeId}/posts`);
+export const setNodeTypePosts = (nodeTypeId: string, posts: { positionId: string; isManagerPost: boolean }[]) =>
+  apiRequest<NodeTypePost[]>('PUT', `${BASE}/node-types/${nodeTypeId}/posts`, { body: { posts } });
+/** A post of the pattern that was not made, and why. */
+export interface SkippedPost { nodeId: string; nodeName: string; positionTitle: string | null; reason: string }
+export interface ApplyPostTemplatesResult { created: UnitPosition[]; skipped: SkippedPost[] }
+/** Makes the posts a node (or every active node of a type) lacks; running it again makes nothing. */
+export const applyPostTemplates = (target: { nodeId?: string; nodeTypeId?: string }) => apiRequest<ApplyPostTemplatesResult>('POST', `${BASE}/post-templates/apply`, { body: target });
+export const setManagerPost = (unitPositionId: string, isManagerPost: boolean) =>
+  apiRequest<UnitPosition>('PUT', `${BASE}/unit-positions/${unitPositionId}/manager-post`, { body: { isManagerPost } });
+
+// ---- import from a sheet
+
+/** A fault of the sheet; row: its row in the sheet (null: the file as a whole). */
+export interface ImportError { row: number | null; code: string | null; message: string }
+export interface ImportNodePreview { row: number; code: string; name: string; parentCode: string | null; typeName: string; managerPosition: string | null; depth: number }
+/** What the sheet would make. Nothing is made while errors is not empty (all or nothing). */
+export interface ImportPreview { rowCount: number; nodes: ImportNodePreview[]; errors: ImportError[] }
+export interface ImportResult { nodes: OrgNode[]; links: number; posts: number; autoLinkChoices: AutoLinkChoice[]; skippedPosts: SkippedPost[] }
+
+/** The sheet (.xlsx first sheet, or UTF-8 .csv; at most 5 MB and 5000 rows) goes to the top of a company or under a node. */
+function importForm(file: File, target: { companyId?: string | null; parentNodeId?: string | null }): FormData {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  if (target.companyId) form.append('companyId', target.companyId);
+  if (target.parentNodeId) form.append('parentNodeId', target.parentNodeId);
+  return form;
+}
+export const previewImport = (file: File, target: { companyId?: string | null; parentNodeId?: string | null }) =>
+  apiRequest<ImportPreview>('POST', `${BASE}/import/preview`, { form: importForm(file, target) });
+export const commitImport = (file: File, target: { companyId?: string | null; parentNodeId?: string | null }) =>
+  apiRequest<ImportResult>('POST', `${BASE}/import/commit`, { form: importForm(file, target) });
+export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
+export const IMPORT_COLUMNS = ['کد', 'نام', 'کد والد', 'نوع', 'سمت مدیر'] as const;
