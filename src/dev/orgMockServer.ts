@@ -10,6 +10,8 @@ const problem = (status: number, message: string, code = 'validation.error') =>
 
 export interface MockServer {
   chart: () => ChartCompany[];
+  /** Changes a node's version behind the page's back, as another user's save would. */
+  bump: (unitId: string) => void;
   fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
 
@@ -164,6 +166,7 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
 
   return {
     chart: () => chart,
+    bump,
     fetch: async (input, init) => {
       const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
       const marker = '/api/org-structure';

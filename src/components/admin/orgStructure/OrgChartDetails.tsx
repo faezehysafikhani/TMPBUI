@@ -8,7 +8,7 @@ import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
   ChartCompany, ChartMember, ChartPosition, ChartUnit, NodeType, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
-  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, deactivateNode, isConflict, reorderNode, updateNode,
+  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, deactivateNode, isConflict, reorderNode, setNodeManager, updateNode,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
   orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, unlinkUnit, updateCompany, updateOrgUnit,
   addCompanyPosition, postLabel, setPostParent, updateUnitPositionCode,
@@ -20,10 +20,25 @@ import { addableTypes, checkMove } from './orgNodeRules';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
 
+/** conflict: the change was refused because the structure changed meanwhile (or a rule); the chart can be reloaded. */
+type PanelMessage = { type: 'success' | 'error'; text: string; conflict?: boolean };
+
+const MessageBox: React.FC<{ message: PanelMessage; onClose?: () => void; onReload: () => void }> = ({ message, onClose, onReload }) => (
+  <Notice type={message.type} onClose={onClose}>
+    {message.text}
+    {message.conflict && (
+      <button type="button" onClick={onReload} className="mt-2 flex items-center gap-1.5 text-xs font-bold underline cursor-pointer">
+        <RefreshCw className="w-3.5 h-3.5" /> بارگذاری دوباره‌ی چارت
+      </button>
+    )}
+  </Notice>
+);
+
 type Dialog =
   | { kind: 'editCompany'; company: ChartCompany }
   | { kind: 'addUnit'; company: ChartCompany }
   | { kind: 'editUnit'; unit: ChartUnit }
+  | { kind: 'nodeManager'; unit: ChartUnit }
   | { kind: 'addUnitMember'; company: ChartCompany; unit: ChartUnit }
   | { kind: 'addUnitPosition'; unit: ChartUnit }
   | { kind: 'addHolder'; company: ChartCompany; unit: ChartUnit | null; position: ChartPosition }
@@ -51,9 +66,10 @@ const PersonValue: React.FC<{ person: { displayName: string; avatarUrl?: string 
 );
 
 /** One of the «عملیات سریع» tiles. */
-const ActionTile: React.FC<{ icon: React.ComponentType<{ className?: string }>; label: string; onClick: () => void; tone?: 'indigo' | 'rose'; disabled?: boolean }> = ({ icon: Icon, label, onClick, tone = 'indigo', disabled }) => (
+const ActionTile: React.FC<{ icon: React.ComponentType<{ className?: string }>; label: string; onClick: () => void; tone?: 'indigo' | 'rose'; disabled?: boolean; title?: string }> = ({ icon: Icon, label, onClick, tone = 'indigo', disabled, title }) => (
   <button
     type="button"
+    title={title}
     onClick={onClick}
     disabled={disabled}
     className={`flex flex-col items-center justify-center gap-1.5 rounded-2xl border px-2 py-3 text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
@@ -170,12 +186,15 @@ export const OrgChartDetails: React.FC<{
 }> = ({ can, chart, positions, unplaced, nodes = [], nodeTypes = [], rules = [], onRequestMove, onRequestAdd, selection, onSelect, onChanged }) => {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   /** conflict: the change was refused because the structure changed meanwhile (or a rule); the chart can be reloaded. */
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string; conflict?: boolean } | null>(null);
+  const [message, setMessage] = useState<PanelMessage | null>(null);
   /** The version of a node as the chart was loaded: a change over a newer one is refused by the server. */
   const versionOf = (unitId: string) => nodes.find((n) => n.id === unitId)?.rowVersion ?? null;
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setMessage(null), [JSON.stringify(selection)]); // eslint-disable-line react-hooks/exhaustive-deps
+  // A message from before the dialog opened is not the dialog's.
+  const dialogOpen = !!dialog;
+  useEffect(() => { if (dialogOpen) setMessage(null); }, [dialogOpen]);
 
   /** Runs a change, reports it and reloads the chart. */
   const run = async (action: () => Promise<unknown>, success: string, failure: string): Promise<boolean> => {
@@ -359,16 +378,20 @@ export const OrgChartDetails: React.FC<{
           </div>
           <QuickActions>
             {(nodes.length > 0 ? canNode(can, 'update') : can(U.update)) && <ActionTile icon={Pencil} label={nodes.length > 0 ? 'ویرایش گره' : 'ویرایش معاونت'} onClick={() => setDialog({ kind: 'editUnit', unit })} />}
+            {nodes.length > 0 && canNode(can, 'assign') && (
+              <ActionTile icon={UserRound} label="تعیین مدیر گره" disabled={busy} onClick={() => setDialog({ kind: 'nodeManager', unit })} />
+            )}
             {nodes.length > 0 && canNode(can, 'create') && onRequestAdd && (
               <ActionTile
                 icon={Plus}
                 label="افزودن زیرمجموعه"
+                title="افزودن زیرمجموعه (روی کارت: کلید N)"
                 disabled={busy || unit.isActive === false || addableTypes(nodeTypes, rules, unit).length === 0}
                 onClick={() => onRequestAdd(unit.unitId)}
               />
             )}
             {nodes.length > 0 && canNode(can, 'move') && onRequestMove && (
-              <ActionTile icon={Move} label="جابه‌جایی" disabled={busy} onClick={() => onRequestMove(unit.unitId)} />
+              <ActionTile icon={Move} label="جابه‌جایی" title="جابه‌جایی (روی کارت: کلید M)" disabled={busy} onClick={() => onRequestMove(unit.unitId)} />
             )}
             {nodes.length > 0 && canNode(can, 'deactivate') && (
               unit.isActive === false ? (
@@ -559,16 +582,7 @@ export const OrgChartDetails: React.FC<{
         <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white"><Zap className="w-5 h-5 text-indigo-600" /> جزئیات</h3>
         <p className="text-xs text-slate-500 mt-0.5">اطلاعات و عملیات بخش انتخاب‌شده</p>
       </div>
-      {message && (
-        <Notice type={message.type} onClose={() => setMessage(null)}>
-          {message.text}
-          {message.conflict && (
-            <button type="button" onClick={async () => { setMessage(null); await onChanged(); }} className="mt-2 flex items-center gap-1.5 text-xs font-bold underline cursor-pointer">
-              <RefreshCw className="w-3.5 h-3.5" /> بارگذاری دوباره‌ی چارت
-            </button>
-          )}
-        </Notice>
-      )}
+      {message && !dialog && <MessageBox message={message} onClose={() => setMessage(null)} onReload={async () => { setMessage(null); await onChanged(); }} />}
       {body}
       {/* At the page root: the panel is sticky, and the chart's cards would otherwise cover a dialog opened inside it. */}
       {dialog && createPortal(
@@ -576,6 +590,8 @@ export const OrgChartDetails: React.FC<{
           dialog={dialog}
           chart={chart}
           positions={positions}
+          message={message}
+          onReload={async () => { setMessage(null); setDialog(null); await onChanged(); }}
           nodeTypes={nodeTypes}
           versionOf={versionOf}
           useNodeApi={nodes.length > 0}
@@ -695,6 +711,9 @@ const ChartDialog: React.FC<{
   dialog: Dialog;
   chart: ChartCompany[];
   positions: Position[];
+  /** The last change's outcome: an error shows in the dialog (the panel is behind it). */
+  message: PanelMessage | null;
+  onReload: () => Promise<void> | void;
   nodeTypes: NodeType[];
   versionOf: (unitId: string) => string | null;
   /** The backend has the node API: a node is changed through it (with its version) rather than as a plain unit. */
@@ -704,13 +723,13 @@ const ChartDialog: React.FC<{
   run: Run;
   onClose: () => void;
   onSelect: (selection: ChartSelection) => void;
-}> = ({ dialog, chart, positions, nodeTypes, versionOf, useNodeApi, can, busy, run, onClose, onSelect }) => {
+}> = ({ dialog, chart, positions, message, onReload, nodeTypes, versionOf, useNodeApi, can, busy, run, onClose, onSelect }) => {
   const [name, setName] = useState(
     dialog.kind === 'editCompany' ? dialog.company.name : dialog.kind === 'editUnit' ? dialog.unit.name : '',
   );
   const [code, setCode] = useState(dialog.kind === 'editCompany' ? dialog.company.code : '');
   const [typeId, setTypeId] = useState(dialog.kind === 'editUnit' ? dialog.unit.nodeType?.nodeTypeId ?? '' : '');
-  const initialPerson = dialog.kind === 'editCompany' ? dialog.company.manager : dialog.kind === 'editUnit' ? dialog.unit.manager : null;
+  const initialPerson = dialog.kind === 'editCompany' ? dialog.company.manager : dialog.kind === 'editUnit' || dialog.kind === 'nodeManager' ? dialog.unit.manager : null;
   const [personId, setPersonId] = useState<string | null>(initialPerson?.userId || null);
   const [personName, setPersonName] = useState<string | null>(initialPerson?.displayName || null);
   const [active, setActive] = useState(
@@ -820,6 +839,22 @@ const ChartDialog: React.FC<{
           )}
           {!useNodeApi && can(U.update) && <Toggle checked={active} onChange={setActive} label="فعال" />}
         </>
+      );
+      break;
+    }
+    case 'nodeManager': {
+      title = `مدیر «${dialog.unit.name}»`;
+      save = async () => done(await run(
+        () => setNodeManager(dialog.unit.unitId, personId, versionOf(dialog.unit.unitId)),
+        personId ? `«${personName}» مدیر گره شد.` : 'مدیر گره برداشته شد.', 'تعیین مدیر گره انجام نشد.'));
+      content = (
+        <PersonField
+          label="مدیر گره"
+          personId={personId}
+          personName={personName}
+          onChange={(id, n) => { setPersonId(id); setPersonName(n); }}
+          hint="خالی بگذارید تا مدیر گره، دارنده‌ی «پست مدیر» آن باشد. مدیر تعیین‌شده بر دارنده‌ی پست مقدم است."
+        />
       );
       break;
     }
@@ -1048,6 +1083,7 @@ const ChartDialog: React.FC<{
         <PrimaryButton type="button" onClick={() => save?.()} disabled={!canSave}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
       </>}
     >
+      {message?.type === 'error' && <MessageBox message={message} onReload={onReload} />}
       {content}
     </AdminDialog>
   );

@@ -45,6 +45,8 @@ const NodeCard: React.FC<{
   onSelect: () => void;
   className?: string;
   children: React.ReactNode;
+  /** Keys the card answers beside Enter (select): M moves the node, N adds under it. */
+  onShortcut?: (key: string) => void;
   /** Moving a node by dragging: this card can be dragged, and/or dropped on. */
   dnd?: {
     draggable?: boolean;
@@ -55,7 +57,7 @@ const NodeCard: React.FC<{
     onDragLeave?: (e: React.DragEvent) => void;
     onDrop?: (e: React.DragEvent) => void;
   };
-}> = ({ node, label, selected, onSelect, className = '', children, dnd }) => (
+}> = ({ node, label, selected, onSelect, className = '', children, dnd, onShortcut }) => (
   <div
     data-node={node}
     data-draggable-node={dnd?.draggable ? '' : undefined}
@@ -69,7 +71,11 @@ const NodeCard: React.FC<{
     role="button"
     tabIndex={0}
     onClick={onSelect}
-    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
+    onKeyDown={(e) => {
+      if (e.target !== e.currentTarget) return;
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); }
+      else if (onShortcut && !e.ctrlKey && !e.metaKey && !e.altKey) onShortcut(e.key.toLowerCase());
+    }}
     aria-pressed={selected}
     className={`relative rounded-2xl border bg-white dark:bg-slate-900 cursor-pointer transition-all focus:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-400 ${
       dnd?.over === 'ok' ? 'border-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-900'
@@ -550,6 +556,10 @@ export const OrgChartBoard: React.FC<{ can: (permission: string) => boolean }> =
           onSelect={() => choose({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
           className={`w-64 ${unit.isActive === false ? 'opacity-60 border-dashed' : ''} ${dragId === unit.unitId ? 'opacity-40' : ''}`}
           dnd={dndOf(unit)}
+          onShortcut={nodeApi ? (key) => {
+            if (key === 'm' && canMoveNodes) setMoveRequest({ unitId: unit.unitId });
+            if (key === 'n' && canNode(can, 'create') && unit.isActive !== false && addableTypes(data.data?.nodeTypes || [], rules, unit).length > 0) setAddRequest({ parentId: unit.unitId });
+          } : undefined}
         >
           {type && <span className="absolute inset-x-3 top-0 h-1 rounded-b-full" style={{ backgroundColor: color }} aria-hidden="true" />}
           <div className="flex items-center gap-2.5 p-3.5">

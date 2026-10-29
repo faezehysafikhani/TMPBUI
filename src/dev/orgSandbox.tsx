@@ -27,11 +27,18 @@ if (boardView) {
   window.fetch = server.fetch;
 }
 
+/** ?can=all: every permission; ?can=nomove: every one except moving (and the older permission that allowed it); else none. */
+const canInSandbox = (permission: string) => {
+  const mode = params.get('can');
+  if (mode === 'nomove') return permission !== 'org_structure.node.move' && permission !== 'org_structure.manage_companies';
+  return mode === 'all';
+};
+
 /** The real chart board on the mock, full width. */
 const BoardView: React.FC = () => (
   <div className="p-4 space-y-2">
     <p className="text-xs text-slate-500">چارت واقعی روی داده‌ی ساختگی <b data-testid="mock-name">{mockName}</b> (فقط در محیط توسعه)</p>
-    <OrgChartBoard can={() => params.get('can') === 'all'} />
+    <OrgChartBoard can={(permission) => canInSandbox(permission)} />
   </div>
 );
 
