@@ -1,6 +1,6 @@
 // Development only (dev/org-sandbox.html): the org structure components with mock data, to see
 // and check them without an API. ?mock=flat|nested|postBank|large40|large400 picks the chart;
-// ?view=board shows the real chart board (OrgChartBoard) on that mock, with this page's fetch
+// ?view=section shows the whole «ساختار سازمانی» section (its tabs, the rules page too). ?view=board shows the real chart board (OrgChartBoard) on that mock, with this page's fetch
 // answering its requests from memory (orgMockServer.ts); ?can=all gives it every permission.
 import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -15,10 +15,12 @@ import { NodeTypeRulesMatrix, ruleUsage, type NodeTypeRule } from '../components
 import { MergeNodesForm, type MergeNodesInput } from '../components/admin/orgStructure/nodes/MergeNodesForm';
 import { OrgChartBoard } from '../components/admin/orgStructure/OrgChartBoard';
 import { createMockServer } from './orgMockServer';
+import { OrgStructureSection } from '../components/admin/orgStructure/OrgStructureSection';
 
 const params = new URLSearchParams(location.search);
 const mockName = (params.get('mock') as OrgChartMockName) in ORG_CHART_MOCKS ? (params.get('mock') as OrgChartMockName) : 'postBank';
-const boardView = params.get('view') === 'board';
+const boardView = params.get('view') === 'board' || params.get('view') === 'section';
+const sectionView = params.get('view') === 'section';
 
 if (boardView) {
   // This page only: the chart board's requests are answered from the mock, in memory (src/dev/orgMockServer.ts).
@@ -38,7 +40,7 @@ const canInSandbox = (permission: string) => {
 const BoardView: React.FC = () => (
   <div className="p-4 space-y-2">
     <p className="text-xs text-slate-500">چارت واقعی روی داده‌ی ساختگی <b data-testid="mock-name">{mockName}</b> (فقط در محیط توسعه)</p>
-    <OrgChartBoard can={(permission) => canInSandbox(permission)} />
+    {sectionView ? <OrgStructureSection can={(permission) => canInSandbox(permission)} /> : <OrgChartBoard can={(permission) => canInSandbox(permission)} />}
   </div>
 );
 

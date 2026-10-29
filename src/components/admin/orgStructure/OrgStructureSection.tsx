@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { UserRound, GitFork, Building2, Network, Briefcase } from 'lucide-react';
+import { UserRound, GitFork, Building2, Network, Briefcase, ListChecks } from 'lucide-react';
 import { PillTabs, TabItem } from '../AdminUi';
-import { ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U } from '../../../services/orgStructureApi';
+import { ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, canNode } from '../../../services/orgStructureApi';
 import { MyPlacementPanel } from './OrgViews';
 import { OrgChartBoard } from './OrgChartBoard';
 import { CompaniesPanel, PositionsPanel, UnitsPanel } from './OrgAdminPanels';
+import { OrgRulesPanel } from './OrgRulesPanel';
 
-type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions';
+type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions' | 'rules';
 
 /**
  * «ساختار سازمانی»: companies, deputies/units, positions and who reports to whom. Shown only
@@ -21,6 +22,8 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
     ...(reader ? [{ id: 'companies' as const, label: 'شرکت‌ها', icon: Building2 }] : []),
     ...(can(U.view) ? [{ id: 'units' as const, label: 'معاونت‌ها و واحدها', icon: Network }] : []),
     ...(reader ? [{ id: 'positions' as const, label: 'سمت‌ها', icon: Briefcase }] : []),
+    // Only with its own permission (the rules change what everyone may do with the structure).
+    ...(canNode(can, 'manageRules') ? [{ id: 'rules' as const, label: 'قواعد ساختار', icon: ListChecks }] : []),
   ];
   const [active, setActive] = useState<OrgTab>('me');
   const current = tabs.some((t) => t.id === active) ? active : 'me';
@@ -33,6 +36,7 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
       {current === 'companies' && <CompaniesPanel canManage={can(P.manageCompanies)} canSeeUnits={can(U.view)} />}
       {current === 'units' && <UnitsPanel canCreate={can(U.create)} canUpdate={can(U.update)} canDeactivate={can(U.delete)} />}
       {current === 'positions' && <PositionsPanel canManage={can(P.managePositions)} />}
+      {current === 'rules' && <OrgRulesPanel />}
     </div>
   );
 };

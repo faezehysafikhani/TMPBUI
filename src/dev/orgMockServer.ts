@@ -20,15 +20,16 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
   const versions = new Map<string, number>();
   let rules: NodeTypeRule[] | null = null;
   const typeOverrides = new Map<string, Partial<NodeType>>();
+  const extraTypes: NodeType[] = [];
 
   const typesOf = (): NodeType[] => {
     const seen = new Map<string, ChartNodeType>();
     chart.forEach((c) => allUnitsOf(c).forEach((u) => u.nodeType && seen.set(u.nodeType.nodeTypeId, u.nodeType)));
-    return [...seen.values()].map((t, i) => ({
+    return [...extraTypes, ...[...seen.values()].map((t, i) => ({
       id: t.nodeTypeId, code: t.nodeTypeId, name: t.name, color: t.color, icon: t.icon, isDomainBoundary: t.isDomainBoundary, sortOrder: i, isActive: true,
       nodeCount: chart.flatMap((c) => allUnitsOf(c)).filter((u) => u.nodeType?.nodeTypeId === t.nodeTypeId).length,
       ...typeOverrides.get(t.nodeTypeId),
-    }));
+    }))];
   };
 
   const currentRules = (): NodeTypeRule[] => {
@@ -88,7 +89,21 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
   const handle = async (method: string, path: string, query: URLSearchParams, body: any): Promise<Response> => {
     if (method === 'GET' && path === '/chart') return json(chart);
     if (method === 'GET' && path === '/nodes') return json(chart.flatMap((c) => allUnitsOf(c).map((u) => nodeOf(c, u))));
+    if (method === 'GET' && path === '/me') return json({ assignment: null, managementChain: [] });
     if (method === 'GET' && path === '/node-types') return json(typesOf());
+    if (method === 'POST' && path === '/node-types') {
+      const id = crypto.randomUUID();
+      extraTypes.push({ id, code: id, name: body.name, color: body.color || '#2563eb', icon: body.icon || 'folder', isDomainBoundary: body.isDomainBoundary !== false, sortOrder: 99, isActive: true, nodeCount: 0 });
+      return json(extraTypes[extraTypes.length - 1], 201);
+    }
+    if (method === 'DELETE' && path.startsWith('/node-types/')) {
+      const id = path.split('/')[2];
+      const type = typesOf().find((t) => t.id === id);
+      if (type && type.nodeCount > 0) return problem(409, 'نوعی که گره‌ای از آن دارد حذف نمی‌شود.', 'conflict');
+      const at = extraTypes.findIndex((t) => t.id === id);
+      if (at >= 0) extraTypes.splice(at, 1);
+      return new Response(null, { status: 204 });
+    }
     if (method === 'GET' && path === '/node-type-rules') return json({ rules: currentRules(), conflicts: [] });
     if (method === 'PUT' && path === '/node-type-rules') {
       rules = body.rules;
