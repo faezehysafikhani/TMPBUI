@@ -12,6 +12,8 @@ import { AutoLinkChoiceDialog } from './nodes/LinkDialogs';
 import { addableTypes, checkMove } from './orgNodeRules';
 import { atLeast, highestLevel, levelOf } from './orgUiLevel';
 import { PersonAvatar } from './PersonAvatar';
+import { TidyBoundary, TidyOrgChart } from './TidyOrgChart';
+import { type ChartView, allOpenSet, defaultOpenSet, defaultView, pathTo, readSavedView, saveView, vacantKey } from './tidyChartModel';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
 import { OrgLinkLayer } from './OrgLinkLayer';
@@ -305,6 +307,29 @@ const localToday = () => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
+/** «چارت درختی | چارت مرتب»: two pressed-state buttons; the arrow keys move between them. */
+const ViewSwitch: React.FC<{ view: ChartView; onChange: (view: ChartView) => void }> = ({ view, onChange }) => {
+  const items: { id: ChartView; label: string }[] = [{ id: 'tree', label: 'چارت درختی' }, { id: 'tidy', label: 'چارت مرتب' }];
+  return (
+    <div role="group" aria-label="نوع نمایش چارت" data-testid="chart-view-switch" className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 p-0.5 bg-slate-50 dark:bg-slate-800"
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        const next = items.find((i) => i.id !== view)!;
+        const group = e.currentTarget as HTMLElement;
+        onChange(next.id);
+        requestAnimationFrame(() => (group.querySelector(`[data-view="${next.id}"]`) as HTMLElement | null)?.focus());
+      }}>
+      {items.map((item) => (
+        <button key={item.id} type="button" data-view={item.id} aria-pressed={view === item.id} onClick={() => onChange(item.id)}
+          className={`px-3 py-1.5 rounded-[10px] text-xs font-bold cursor-pointer whitespace-nowrap ${view === item.id ? 'bg-white dark:bg-slate-900 text-indigo-700 dark:text-indigo-300 shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-indigo-600'}`}>
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+};
+
 export const OrgChartBoard: React.FC<{
   can: (permission: string) => boolean;
   /** Told after each load: the highest display level among the companies (the section's tabs follow it). */
@@ -387,8 +412,22 @@ export const OrgChartBoard: React.FC<{
     lastCompany.current = company.companyId;
     setUserCollapsedUnits(null);
     setUserCollapsedBranches(null);
+    setTidyOpenUser(null);
   }, [company?.companyId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company);
+  // Which drawing: the tree chart (as it always was) or the tidy chart; the user's choice (saved) beats the size-based default.
+  const [userView, setUserView] = useState<ChartView | null>(() => readSavedView());
+  const view: ChartView = userView ?? defaultView(company ? nodeCount(company) : 0);
+  const chooseView = (next: ChartView) => { setUserView(next); saveView(next); };
+  const [showEmpty, setShowEmpty] = useState(false);
+  /** Tidy chart: what is open (null: as a company opens - its nodes that have people). */
+  const [tidyOpenUser, setTidyOpenUser] = useState<Set<string> | null>(null);
+  const tidyDefault = useMemo(() => (company ? defaultOpenSet(company) : new Set<string>()), [company]);
+  const tidyOpen = tidyOpenUser ?? tidyDefault;
+  const toggleTidy = (key: string) => setTidyOpenUser((prev) => { const next = new Set(prev ?? tidyDefault); if (!next.delete(key)) next.add(key); return next; });
+  const tidyRoot = useRef<HTMLDivElement>(null);
+  /** Printing the tidy chart: everything open, no buttons, for the moment of the capture. */
+  const [printingTidy, setPrintingTidy] = useState(false);
+  const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company && view === 'tree');
   const level = levelOf(company);
   // The display level only hides: simple has no node tools, advanced adds the secondary links.
   const nodeApi = (data.data?.nodes.length ?? 0) > 0 && atLeast(level, 'normal') && !asOf;
@@ -410,7 +449,7 @@ export const OrgChartBoard: React.FC<{
       prev.width === el.clientWidth && prev.height === el.clientHeight ? prev : { width: el.clientWidth, height: el.clientHeight })));
     observer.observe(el);
     return () => observer.disconnect();
-  }, [!!company]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [!!company, view]); // eslint-disable-line react-hooks/exhaustive-deps
 
 
 
@@ -461,7 +500,7 @@ export const OrgChartBoard: React.FC<{
   const perRow = useMemo(() => (nested ? Math.max(1, Math.min(units.length, 5)) : chooseColumns(units, canvasSize.width, canvasSize.height)), [nested, units, canvasSize.width, canvasSize.height]);
 
   // The chart opens at half size from the top: for another company, another layout or full screen too.
-  useLayoutEffect(() => { home(); }, [company?.companyId, perRow, fullscreen, home]);
+  useLayoutEffect(() => { if (view === 'tree') home(); }, [company?.companyId, perRow, fullscreen, home, view]);
 
   useEffect(() => {
     if (!reveal) return;
@@ -509,10 +548,22 @@ export const OrgChartBoard: React.FC<{
     if (node) setReveal((prev) => ({ node, force: !!options.force, seq: (prev?.seq || 0) + 1 }));
   };
 
+  // The tidy chart opens what a chosen node, post or person sits under (search, side panel, a click).
+  useEffect(() => {
+    if (!company || !selection || view !== 'tidy') return;
+    let unitId: string | null = 'unitId' in selection && selection.unitId ? selection.unitId : null;
+    if (selection.kind === 'member') unitId = findMember(chart, selection.userId)?.positions[0]?.unit?.unitId ?? null;
+    if (!unitId) return;
+    const keys = [...pathTo(company, unitId), vacantKey(unitId)];
+    setTidyOpenUser((prev) => { const base = prev ?? tidyDefault; return keys.every((k) => base.has(k)) ? prev : new Set([...base, ...keys]); });
+  }, [selection, view]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const allGroupKeys = useMemo(() => (company ? allUnitsOf(company).flatMap((u) => [`none:${u.unitId}`, ...positionsOf(u).map((p) => `pos:${p.unitPositionId}`)]) : []), [company]);
-  const allOpen = !!company && collapsedUnits.size === 0 && collapsedBranches.size === 0 && allGroupKeys.every((k) => openGroups.has(k));
-  const expandAll = () => { setCollapsedUnits(new Set()); setCollapsedBranches(new Set()); setOpenGroups(new Set(allGroupKeys)); };
-  const collapseAll = () => { setOpenGroups(new Set()); };
+  const allTreeOpen = !!company && collapsedUnits.size === 0 && collapsedBranches.size === 0 && allGroupKeys.every((k) => openGroups.has(k));
+  const allTidyOpen = !!company && [...allOpenSet(company)].every((k) => tidyOpen.has(k));
+  const allOpen = view === 'tidy' ? allTidyOpen : allTreeOpen;
+  const expandAll = () => { if (view === 'tidy') { if (company) setTidyOpenUser(allOpenSet(company)); return; } setCollapsedUnits(new Set()); setCollapsedBranches(new Set()); setOpenGroups(new Set(allGroupKeys)); };
+  const collapseAll = () => { if (view === 'tidy') { setTidyOpenUser(new Set()); return; } setOpenGroups(new Set()); };
 
   const searchHits = useMemo<SearchHit[]>(() => {
     if (!company) return [];
@@ -796,6 +847,12 @@ export const OrgChartBoard: React.FC<{
               />
             </div>
           )}
+          <ViewSwitch view={view} onChange={chooseView} />
+          {view === 'tidy' && (
+            <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer whitespace-nowrap">
+              <input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} className="accent-indigo-600" /> نمایش پست‌های خالی
+            </label>
+          )}
           <ChartSearch hits={searchHits} />
           {chart.length > 1 && (
             <select
@@ -819,19 +876,25 @@ export const OrgChartBoard: React.FC<{
             type="button"
             disabled={exporting}
             onClick={async () => {
-              if (!content.current) return;
+              if (view === 'tree' && !content.current) return;
               setExporting(true);
               try {
+                // The tidy chart is printed with everything open and without its buttons; the tree chart as it was.
+                if (view === 'tidy') {
+                  setPrintingTidy(true);
+                  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+                }
                 const { downloadOrgChartPdf } = await import('../../../utils/orgChartPdf');
                 const { jalaliStamp } = await import('../../../utils/reportExport');
                 // The company's code and today's Jalali date (or the chart's day); ASCII on purpose, as every export here.
                 const code = (company.code || '').replace(/[^A-Za-z0-9_-]+/g, '') || 'company';
                 const day = asOf ? jalaliDay(asOf).replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/\//g, '-') : jalaliStamp();
-                await downloadOrgChartPdf(content.current, `چارت سازمانی ${company.name}`, `org-chart-${code}-${day}.pdf`);
+                await downloadOrgChartPdf((view === 'tidy' ? tidyRoot.current : content.current)!, `چارت سازمانی ${company.name}`, `org-chart-${code}-${day}.pdf`);
               } catch (err) {
                 console.error('Org chart PDF failed:', err);
                 void appAlert('دریافت فایل PDF چارت انجام نشد.');
               } finally {
+                setPrintingTidy(false);
                 setExporting(false);
               }
             }}
@@ -847,6 +910,27 @@ export const OrgChartBoard: React.FC<{
         </div>
       </div>
 
+      {view === 'tidy' ? (
+        <div className={`relative overflow-auto ${fullscreen ? 'flex-1 min-h-0' : 'max-h-[75vh] xl:max-h-[calc(100vh-170px)]'}`}>
+          <TidyBoundary onFail={() => setUserView('tree')}>
+            <TidyOrgChart
+              company={company}
+              selection={selection}
+              onSelect={(next) => choose(next)}
+              open={printingTidy ? allOpenSet(company) : tidyOpen}
+              onToggle={toggleTidy}
+              showEmpty={showEmpty}
+              printing={printingTidy}
+              rootRef={tidyRoot}
+            />
+          </TidyBoundary>
+          {asOf && (
+            <p role="status" className="sticky bottom-3 mx-3 mb-3 w-fit rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200 px-3 py-1.5 text-xs font-bold shadow-md">
+              چارت در تاریخ {jalaliDay(asOf)} (فقط نمایش)
+            </p>
+          )}
+        </div>
+      ) : (
       <div
         ref={viewport}
         tabIndex={0}
@@ -1001,6 +1085,7 @@ export const OrgChartBoard: React.FC<{
         )}
         <ZoomControls subscribe={subscribe} zoomBy={zoomBy} fit={fit} />
       </div>
+      )}
 
       {(data.data?.unplaced.length || 0) > 0 && (
         <div className="border-t border-slate-100 dark:border-slate-800 px-4 py-2 flex items-center gap-3">
