@@ -689,3 +689,32 @@ export const commitImport = (file: File, target: { companyId?: string | null; pa
   apiRequest<ImportResult>('POST', `${BASE}/import/commit`, { form: importForm(file, target) });
 export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
 export const IMPORT_COLUMNS = ['کد', 'نام', 'کد والد', 'نوع', 'سمت مدیر'] as const;
+
+// ---------------------------------------------------------------- appointments over time (phase 9)
+
+/** One appointment: who held (holds, will hold) which post, from when until when (null: no limit). */
+export interface Appointment {
+  id: string;
+  unitPositionId: string;
+  postTitle: string | null;
+  postCode: string | null;
+  place: string | null;
+  person: PersonRef;
+  startDate: string | null;
+  endDate: string | null;
+  /** On now (a later start or a past end: false). */
+  isActive: boolean;
+}
+
+/** The person takes the post now (startDate empty) or from a later day; whoever holds it ends then, in the same save. Never in the past. */
+export const appointToPost = (unitPositionId: string, userId: string, startDate?: string | null) =>
+  apiRequest<Appointment>('POST', `${BASE}/unit-positions/${unitPositionId}/appointment`, { body: { userId, startDate: startDate || null } });
+/** The present appointment ends now (endDate empty) or on a later day. */
+export const endPostAppointment = (unitPositionId: string, endDate?: string | null) =>
+  apiRequest<Appointment>('POST', `${BASE}/unit-positions/${unitPositionId}/appointment/end`, { body: { endDate: endDate || null } });
+export const getPostHistory = (unitPositionId: string) => apiRequest<Appointment[]>('GET', `${BASE}/unit-positions/${unitPositionId}/history`);
+export const getUserPositionHistory = (userId: string) => apiRequest<Appointment[]>('GET', `${BASE}/users/${userId}/positions/history`);
+
+/** Where an appointment stands now: «current», «waiting» (starts later) or «ended». */
+export const appointmentState = (a: Pick<Appointment, 'isActive' | 'startDate' | 'endDate'>, now = Date.now()): 'current' | 'waiting' | 'ended' =>
+  a.isActive ? 'current' : a.startDate && Date.parse(a.startDate) > now ? 'waiting' : 'ended';

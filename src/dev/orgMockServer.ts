@@ -45,6 +45,22 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
   const positionTitles = new Map<string, string>([['pos-vp', 'معاون'], ['pos-gm', 'مدیر کل'], ['pos-expert', 'کارشناس'], ['pos-secretary', 'منشی']]);
   const managerPosts = new Set<string>();
   let postSeq = 100;
+  /** Per post, its appointments (the first holders are already on, with no start). */
+  const appointments = new Map<string, { id: string; userId: string; displayName: string; startDate: string | null; endDate: string | null }[]>();
+  const appointmentsOf = (post: { unitPositionId: string; holders: { userId: string; displayName: string }[] }) => {
+    if (!appointments.has(post.unitPositionId)) appointments.set(post.unitPositionId, post.holders.map((h) => ({ id: crypto.randomUUID(), userId: h.userId, displayName: h.displayName, startDate: null, endDate: null })));
+    return appointments.get(post.unitPositionId)!;
+  };
+  const findPost = (id: string) => { for (const c of chart) for (const u of allUnitsOf(c)) { const p = (u.positions || []).find((x) => x.unitPositionId === id); if (p) return { company: c, unit: u, post: p }; } return null; };
+  const dto = (found: NonNullable<ReturnType<typeof findPost>>, a: { id: string; userId: string; displayName: string; startDate: string | null; endDate: string | null }) => {
+    const now = Date.now();
+    const active = (!a.startDate || Date.parse(a.startDate) <= now) && (!a.endDate || Date.parse(a.endDate) > now);
+    return { id: a.id, unitPositionId: found.post.unitPositionId, postTitle: found.post.title, postCode: found.post.code ?? null, place: found.unit.name, person: { userId: a.userId, displayName: a.displayName, isActive: true }, startDate: a.startDate, endDate: a.endDate, isActive: active };
+  };
+  const sync = (found: NonNullable<ReturnType<typeof findPost>>) => {
+    const now = Date.now();
+    found.post.holders = appointmentsOf(found.post).filter((a) => (!a.startDate || Date.parse(a.startDate) <= now) && (!a.endDate || Date.parse(a.endDate) > now)).map((a) => ({ userId: a.userId, displayName: a.displayName, isActive: true, positionTitle: found.post.title, managerUserId: null }));
+  };
   const validity = new Map<string, { from: string | null; to: string | null }>();
   const details = new Map<string, { code?: string | null; latinName?: string | null; correspondenceTitle?: string | null; phone?: string | null; address?: string | null }>();
   const parentCompany = new Map<string, string | null>();
@@ -203,6 +219,42 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     if (method === 'POST' && path === '/impact-preview') return json(preview(body.changes));
 
     if (method === 'GET' && path === '/companies') return json(chart.map((c) => ({ id: c.companyId, name: c.name, code: c.code, description: null, manager: c.manager, isActive: c.isActive, linkedUnitIds: c.units.map((u) => u.unitId) })));
+    const apt = path.match(/^\/unit-positions\/([^/]+)\/(appointment|appointment\/end|history)$/);
+    if (apt) {
+      const found = findPost(apt[1]);
+      if (!found) return problem(404, 'پست پیدا نشد.', 'not_found');
+      const list = appointmentsOf(found.post);
+      const now = Date.now();
+      if (method === 'GET') return json([...list].reverse().map((a) => dto(found, a)));
+      if (apt[2] === 'appointment') {
+        const start = body.startDate ? Date.parse(body.startDate) : now;
+        if (start < now - 60000) return problem(400, 'انتصاب از تاریخ گذشته ثبت نمی‌شود؛ سابقه بازنویسی نمی‌شود.');
+        if (list.some((a) => a.startDate && Date.parse(a.startDate) > now)) return problem(409, 'این پست یک انتصاب آینده دارد؛ اول آن را لغو کنید.', 'conflict');
+        if (found.post.holders.some((h) => h.userId === body.userId) && !body.startDate) return problem(409, 'این فرد همین حالا این پست را دارد.', 'conflict');
+        const at = new Date(Math.max(start, now)).toISOString();
+        list.filter((a) => !a.endDate || Date.parse(a.endDate) > Date.parse(at)).forEach((a) => { a.endDate = at; });
+        const person = ((window as unknown as { __people?: Record<string, string> }).__people || {})[body.userId] || body.userId;
+        const added = { id: crypto.randomUUID(), userId: body.userId, displayName: person, startDate: at, endDate: null };
+        list.push(added);
+        sync(found);
+        return json(dto(found, added), 201);
+      }
+      if (apt[2] === 'appointment/end') {
+        const end = body?.endDate ? Date.parse(body.endDate) : now;
+        if (end < now - 60000) return problem(400, 'پایان انتصاب در گذشته ثبت نمی‌شود؛ سابقه بازنویسی نمی‌شود.');
+        const present = list.find((a) => (!a.startDate || Date.parse(a.startDate) <= now) && (!a.endDate || Date.parse(a.endDate) > now));
+        if (!present) return problem(409, 'این پست الان کسی را ندارد.', 'conflict');
+        present.endDate = new Date(Math.max(end, now)).toISOString();
+        sync(found);
+        return json(dto(found, present));
+      }
+    }
+    const uh = path.match(/^\/users\/([^/]+)\/positions\/history$/);
+    if (uh && method === 'GET') {
+      const out: unknown[] = [];
+      for (const c of chart) for (const u of allUnitsOf(c)) for (const p of u.positions || []) { const f = findPost(p.unitPositionId)!; appointmentsOf(p).filter((a) => a.userId === uh[1]).forEach((a) => out.push(dto(f, a))); }
+      return json(out);
+    }
     if (method === 'GET' && path === '/templates') return json(templates.map((t) => t.template));
     const tpl = path.match(/^\/templates\/([^/]+)$/);
     if (tpl && method === 'GET') { const t = templates.find((x) => x.template.id === tpl[1]); return t ? json(t) : problem(404, 'قالب پیدا نشد.', 'not_found'); }
@@ -440,6 +492,14 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     fetch: async (input, init) => {
       const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href);
       const marker = '/api/org-structure';
+      if (url.pathname.endsWith('/api/identity/users')) {
+        const people = chart.flatMap((c) => allUnitsOf(c).flatMap((u) => [...u.members, ...(u.positions || []).flatMap((p) => p.holders)]));
+        const unique = [...new Map(people.map((m) => [m.userId, m] as const)).values()];
+        (window as unknown as { __people?: Record<string, string> }).__people = Object.fromEntries(unique.map((m) => [m.userId, m.displayName]));
+        const q = url.searchParams.get('search') || '';
+        const items = unique.filter((m) => m.displayName.includes(q)).map((m) => ({ id: m.userId, tenantId: 't', username: m.userId, firstName: m.displayName, lastName: '', displayName: m.displayName, email: null, phoneNumber: '', isActive: true, roles: [] }));
+        return json({ items, totalCount: items.length, pageNumber: 1, pageSize: 50 });
+      }
       if (!url.pathname.includes(marker)) return json([]);
       const path = url.pathname.slice(url.pathname.indexOf(marker) + marker.length) || '/';
       let body: any = null;

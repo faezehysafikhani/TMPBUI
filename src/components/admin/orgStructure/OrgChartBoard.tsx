@@ -445,8 +445,9 @@ export const OrgChartBoard: React.FC<{
     // A card inside a closed branch: open the branches above it first.
     const unitId = 'unitId' in next && next.unitId ? next.unitId : null;
     if (company && unitId) {
-      const above = ancestorsOf(company, unitId).map((a) => a.unitId);
-      if (above.some((id) => collapsedBranches.has(id))) setCollapsedBranches((prev) => new Set([...prev].filter((id) => !above.includes(id))));
+      // Functional update: the search hits keep the `choose` of an earlier render, so the current set must not be read here.
+      const above = new Set(ancestorsOf(company, unitId).map((a) => a.unitId));
+      setCollapsedBranches((prev) => (prev.size === 0 || ![...prev].some((id) => above.has(id)) ? prev : new Set([...prev].filter((id) => !above.has(id)))));
     }
     const node = options.node || nodeOf(next);
     if (node) setReveal((prev) => ({ node, force: !!options.force, seq: (prev?.seq || 0) + 1 }));

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch, Move, ChevronsUp, LayoutTemplate, Link2, GitMerge, History, CalendarRange,
+  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch, Move, ChevronsUp, LayoutTemplate, Link2, GitMerge, History, CalendarRange, UserCog, UserMinus,
 } from 'lucide-react';
 import { AdminCard, AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
@@ -21,6 +21,7 @@ import { UI_LEVELS, atLeast, levelOf } from './orgUiLevel';
 import { AddLinkDialog, RemoveLinkDialog, linkSentence } from './nodes/LinkDialogs';
 import { SaveTemplateDialog } from './nodes/SaveTemplateDialog';
 import { NodePostTools } from './nodes/NodePostTools';
+import { AppointDialog, EndAppointmentDialog, PostHistory, UserPositionHistory } from './nodes/AppointmentDialogs';
 import { MergeNodeDialog, NodeHistoryDialog, NodeValidityDialog } from './nodes/HistoryDialogs';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
@@ -196,6 +197,8 @@ export const OrgChartDetails: React.FC<{
     | { kind: 'saveTemplate'; company: ChartCompany }
     | { kind: 'addLink'; company: ChartCompany; unit: ChartUnit }
     | { kind: 'merge'; company: ChartCompany; unit: ChartUnit }
+    | { kind: 'appoint'; post: ChartPosition; placeName: string }
+    | { kind: 'endAppointment'; post: ChartPosition }
     | { kind: 'history'; company: ChartCompany; unit: ChartUnit }
     | { kind: 'validity'; company: ChartCompany; unit: ChartUnit }
     | { kind: 'removeLink'; company: ChartCompany; unit: ChartUnit; linkId: string; targetId: string; targetName: string; linkTypeId: string }
@@ -603,6 +606,12 @@ export const OrgChartDetails: React.FC<{
           </div>
           <QuickActions>
             {can(P.manageAssignments) && position.isActive && position.holders.length === 0 && <ActionTile icon={UserPlus} label="گذاشتن فرد در این پست" onClick={() => setDialog({ kind: 'addHolder', company, unit, position })} />}
+            {can(P.manageAssignments) && position.isActive && (
+              <ActionTile icon={UserCog} label={position.holders.length ? 'تعویض مسئول' : 'انتصاب با تاریخ'} title="انتصاب از امروز یا از روزی بعد؛ مسئول فعلی همان روز پایان می‌یابد" disabled={busy} onClick={() => setExtra({ kind: 'appoint', post: position, placeName })} />
+            )}
+            {can(P.manageAssignments) && position.holders.length > 0 && (
+              <ActionTile icon={UserMinus} tone="rose" label="پایان انتصاب" disabled={busy} onClick={() => setExtra({ kind: 'endAppointment', post: position })} />
+            )}
             {can(P.managePositions) && (
               <ActionTile
                 icon={Trash2}
@@ -617,7 +626,11 @@ export const OrgChartDetails: React.FC<{
               />
             )}
           </QuickActions>
-          {position.holders.length > 0 && <p className="text-[11px] text-slate-400">هر پست فقط یک نفر دارد؛ برای گذاشتن فرد دیگر یا حذف پست، ابتدا دارندهٔ فعلی را بردارید.</p>}
+          {position.holders.length > 0 && <p className="text-[11px] text-slate-400">هر پست فقط یک نفر دارد؛ برای فرد دیگر «تعویض مسئول» را بزنید (مسئول فعلی در تاریخچه می‌ماند) یا برای حذف پست، ابتدا دارندهٔ فعلی را بردارید.</p>}
+          <details className="rounded-xl border border-slate-100 dark:border-slate-800 p-3" data-testid="post-history">
+            <summary className="cursor-pointer text-xs font-bold text-slate-500">تاریخچه‌ی صاحبان این پست</summary>
+            <div className="mt-2"><PostHistory key={`${position.unitPositionId}:${position.holders.map((h) => h.userId).join()}`} unitPositionId={position.unitPositionId} /></div>
+          </details>
         </>
       );
     }
@@ -658,7 +671,11 @@ export const OrgChartDetails: React.FC<{
       {message && !dialog && <MessageBox message={message} onClose={() => setMessage(null)} onReload={async () => { setMessage(null); await onChanged(); }} />}
       {body}
       {extra && createPortal(
-        extra.kind === 'saveTemplate' ? (
+        extra.kind === 'appoint' ? (
+          <AppointDialog post={extra.post} placeName={extra.placeName} onDone={async (text) => { await onChanged(); setMessage({ type: 'success', text }); }} onClose={() => setExtra(null)} />
+        ) : extra.kind === 'endAppointment' ? (
+          <EndAppointmentDialog post={extra.post} onDone={async (text) => { await onChanged(); setMessage({ type: 'success', text }); }} onClose={() => setExtra(null)} />
+        ) : extra.kind === 'saveTemplate' ? (
           <SaveTemplateDialog company={extra.company} onSaved={(name) => setMessage({ type: 'success', text: `قالب «${name}» ذخیره شد.` })} onClose={() => setExtra(null)} />
         ) : extra.kind === 'merge' ? (
           <MergeNodeDialog company={extra.company} unit={extra.unit} rowVersion={versionOf(extra.unit.unitId)} onMerged={async () => { await onChanged(); setMessage({ type: 'success', text: `«${extra.unit.name}» ادغام شد.` }); }} onReload={onChanged} onClose={() => setExtra(null)} />
@@ -797,6 +814,10 @@ const MemberDetails: React.FC<{
           </SecondaryButton>
         )}
       </div>
+      <details className="rounded-xl border border-slate-100 dark:border-slate-800 p-3" data-testid="user-history">
+        <summary className="cursor-pointer text-xs font-bold text-slate-500">سابقه‌ی سمت‌های این فرد</summary>
+        <div className="mt-2"><UserPositionHistory userId={member.userId} /></div>
+      </details>
     </>
   );
 };
