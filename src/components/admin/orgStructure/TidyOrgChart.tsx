@@ -226,11 +226,21 @@ export const TidyOrgChart: React.FC<{
       if (at >= PAGE_SIZE) grow.set(key, Math.ceil((at + 1) / PAGE_SIZE) * PAGE_SIZE);
     }
     if (grow.size) setShown((prev: Map<string, number>) => { const next = new Map<string, number>(prev); grow.forEach((v: number, k: string) => next.set(k, Math.max(v, next.get(k) ?? 0))); return next; });
-    // Bring the chosen card into view once it is drawn (its branches open and its page of the list shown first).
-    const timer = window.setTimeout(() => {
-      (document.querySelector('[data-testid="tidy-chart"] [data-tidy-selected="true"]') as HTMLElement | null)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }, 200);
-    return () => window.clearTimeout(timer);
+    // Bring the chosen card into view once it is drawn (its branches open and its page of the list shown first):
+    // first inside the chart's own scroll box, then the page itself. Instant, because smooth scrolls of the
+    // box and the page cancel each other; tried again after the side panel and the layout have settled.
+    const reveal = () => {
+      const el = document.querySelector('[data-testid="tidy-chart"] [data-tidy-selected="true"]') as HTMLElement | null;
+      if (!el) return;
+      const box = el.closest('.overflow-auto') as HTMLElement | null;
+      if (box) {
+        const inBox = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+        box.scrollTop = Math.max(0, inBox - box.clientHeight / 2 + el.offsetHeight / 2);
+      }
+      el.scrollIntoView({ block: 'center', behavior: 'auto' });
+    };
+    const timers = [200, 700].map((ms) => window.setTimeout(reveal, ms));
+    return () => timers.forEach((t) => window.clearTimeout(t));
   }, [selection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (layout.roots.length === 0 && layout.committees.length === 0) return <p className="p-6 text-sm text-slate-500">این شرکت هنوز گره‌ای ندارد.</p>;
