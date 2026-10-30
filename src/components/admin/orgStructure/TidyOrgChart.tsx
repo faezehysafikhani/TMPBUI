@@ -213,15 +213,21 @@ export const TidyOrgChart: React.FC<{
 
   // A node chosen elsewhere (search, side panel) is on a page of a long list: show up to it.
   React.useEffect(() => {
-    const id = selection && 'unitId' in selection && selection.unitId ? selection.unitId : null;
-    if (!id) return;
+    if (!selection) return;
+    // A person is on the page of the node they sit in (a post of it, or none).
+    let id: string | null = 'unitId' in selection && selection.unitId ? selection.unitId : null;
+    if (!id && selection.kind === 'member') {
+      const userId = selection.userId;
+      id = allUnitsOf(company).find((u) => u.members.some((m) => m.userId === userId) || (u.positions || []).some((p) => p.holders.some((h) => h.userId === userId)))?.unitId ?? null;
+    }
     const lists: [string, ChartUnit[]][] = [
       ...layout.roots.flatMap((r) => r.columns).map((c) => [`col:${c.key}`, c.nodes] as [string, ChartUnit[]]),
       ...allUnitsOf(company).map((u) => [u.unitId, u.children || []] as [string, ChartUnit[]]),
     ];
     const grow = new Map<string, number>();
-    const has = (u: ChartUnit): boolean => u.unitId === id || (u.children || []).some(has);
-    for (const [key, nodes] of lists) {
+    const target = id;
+    const has = (u: ChartUnit): boolean => u.unitId === target || (u.children || []).some(has);
+    for (const [key, nodes] of (target ? lists : [])) {
       const at = nodes.findIndex(has);
       if (at >= PAGE_SIZE) grow.set(key, Math.ceil((at + 1) / PAGE_SIZE) * PAGE_SIZE);
     }
