@@ -219,14 +219,14 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     if (method === 'POST' && path === '/impact-preview') return json(preview(body.changes));
 
     if (method === 'GET' && path === '/companies') return json(chart.map((c) => ({ id: c.companyId, name: c.name, code: c.code, description: null, manager: c.manager, isActive: c.isActive, linkedUnitIds: c.units.map((u) => u.unitId) })));
-    const apt = path.match(/^\/unit-positions\/([^/]+)\/(appointment|appointment\/end|history)$/);
+    const apt = path.match(/^\/unit-positions\/([^/]+)\/(appointment|appointment\/end|appointment\/cancel|history)$/);
     if (apt) {
       const found = findPost(apt[1]);
       if (!found) return problem(404, 'پست پیدا نشد.', 'not_found');
       const list = appointmentsOf(found.post);
       const now = Date.now();
       if (method === 'GET') return json([...list].reverse().map((a) => dto(found, a)));
-      if (apt[2] === 'appointment') {
+      if (apt[2] === 'appointment' && method === 'POST') {
         const start = body.startDate ? Date.parse(body.startDate) : now;
         if (start < now - 60000) return problem(400, 'انتصاب از تاریخ گذشته ثبت نمی‌شود؛ سابقه بازنویسی نمی‌شود.');
         if (list.some((a) => a.startDate && Date.parse(a.startDate) > now)) return problem(409, 'این پست یک انتصاب آینده دارد؛ اول آن را لغو کنید.', 'conflict');
@@ -238,6 +238,15 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
         list.push(added);
         sync(found);
         return json(dto(found, added), 201);
+      }
+      // Cancelling the appointment waiting to start: it goes; the present one (ending when it started) stays on.
+      if ((apt[2] === 'appointment/cancel' && method === 'POST') || (apt[2] === 'appointment' && method === 'DELETE')) {
+        const waiting = list.find((a) => a.startDate && Date.parse(a.startDate) > now);
+        if (!waiting) return problem(404, 'این پست انتصاب آینده‌ای ندارد.', 'not_found');
+        list.filter((a) => a.endDate === waiting.startDate).forEach((a) => { a.endDate = null; });
+        list.splice(list.indexOf(waiting), 1);
+        sync(found);
+        return json(dto(found, waiting));
       }
       if (apt[2] === 'appointment/end') {
         const end = body?.endDate ? Date.parse(body.endDate) : now;
@@ -375,7 +384,7 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
       if (!found) return problem(404, 'گره پیدا نشد.', 'not_found');
       const { company, unit } = found;
       if (method === 'GET' && nodeExtra[2] === 'changes') return json((log.get(unit.unitId) || []).map((c, i) => ({ id: c.id, action: c.action, userId: null, atUtc: c.atUtc, details: c.details, canUndo: i === 0 && !!c.undo })));
-      if (body?.rowVersion != null && body.rowVersion !== versionOf(unit.unitId)) return problem(409, 'این گره را کس دیگری همین حالا تغییر داده است؛ صفحه را تازه کنید و دوباره امتحان کنید.', 'conflict');
+      if (body?.rowVersion != null && body.rowVersion !== versionOf(unit.unitId)) return problem(409, 'این گره را کس دیگری همین حالا تغییر داده است؛ صفحه را تازه کنید و دوباره امتحان کنید.', 'conflict.changed');
       if (nodeExtra[2] === 'details') {
         const before = details.get(unit.unitId);
         details.set(unit.unitId, { code: body.code || null, latinName: body.latinName || null, correspondenceTitle: body.correspondenceTitle || null, phone: body.phone || null, address: body.address || null });
@@ -425,7 +434,7 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     if (node && method === 'POST') {
       const found = find(node[1]);
       if (!found) return problem(404, 'گره پیدا نشد.', 'not_found');
-      if (body?.rowVersion != null && body.rowVersion !== versionOf(node[1])) return problem(409, 'این گره را کس دیگری همین حالا تغییر داده است؛ صفحه را تازه کنید و دوباره امتحان کنید.', 'conflict');
+      if (body?.rowVersion != null && body.rowVersion !== versionOf(node[1])) return problem(409, 'این گره را کس دیگری همین حالا تغییر داده است؛ صفحه را تازه کنید و دوباره امتحان کنید.', 'conflict.changed');
       const { company, unit } = found;
       if (node[2] === 'move') {
         const parentId: string | null = body.parentNodeId;
@@ -476,7 +485,7 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     if (put && method === 'PUT') {
       const found = find(put[1]);
       if (!found) return problem(404, 'گره پیدا نشد.', 'not_found');
-      if (body?.rowVersion != null && body.rowVersion !== versionOf(put[1])) return problem(409, 'این گره را کس دیگری همین حالا تغییر داده است؛ صفحه را تازه کنید و دوباره امتحان کنید.', 'conflict');
+      if (body?.rowVersion != null && body.rowVersion !== versionOf(put[1])) return problem(409, 'این گره را کس دیگری همین حالا تغییر داده است؛ صفحه را تازه کنید و دوباره امتحان کنید.', 'conflict.changed');
       found.unit.name = body.name;
       const type = typesOf().find((t) => t.id === body.nodeTypeId);
       found.unit.nodeType = type ? { nodeTypeId: type.id, name: type.name, color: type.color, icon: type.icon, isDomainBoundary: type.isDomainBoundary } : found.unit.nodeType;

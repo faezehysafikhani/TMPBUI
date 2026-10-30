@@ -7,7 +7,7 @@ import { AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge
 import { JalaliDatePicker } from '../../../JalaliDatePicker';
 import { userErrorMessage } from '../../../../utils/errorMessages';
 import { toPersianDigits } from '../../../../utils/helpers';
-import { type Appointment, type ChartPosition, appointToPost, appointmentState, endPostAppointment, getPostHistory, getUserPositionHistory, postLabel } from '../../../../services/orgStructureApi';
+import { type Appointment, type ChartPosition, appointToPost, appointmentState, cancelUpcomingAppointment, endPostAppointment, getPostHistory, getUserPositionHistory, postLabel } from '../../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, UserPicker, useLoad } from '../orgShared';
 import { jalaliDay } from './HistoryDialogs';
 
@@ -44,12 +44,59 @@ export const AppointmentList: React.FC<{ appointments: Appointment[]; showPost?:
   )
 );
 
-/** A post's holders over time. */
-export const PostHistory: React.FC<{ unitPositionId: string }> = ({ unitPositionId }) => {
+/**
+ * «لغو انتصاب در انتظار»: an appointment from a later day can be cancelled before it starts; the
+ * present holder then stays on. `canChange`: whoever may appoint (the server checks again).
+ */
+export const CancelWaitingAppointment: React.FC<{
+  unitPositionId: string;
+  appointments: Appointment[];
+  onCancelled: (text: string) => Promise<void> | void;
+}> = ({ unitPositionId, appointments, onCancelled }) => {
+  const waiting = appointments.find((a) => appointmentState(a) === 'waiting');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!waiting) return null;
+  const cancel = async () => {
+    if (!window.confirm(`انتصاب «${waiting.person.displayName}» که ${periodText(waiting)} شروع می‌شد لغو شود؟ مسئول فعلی سر جایش می‌ماند.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await cancelUpcomingAppointment(unitPositionId);
+      await onCancelled(`انتصاب در انتظارِ «${waiting.person.displayName}» لغو شد.`);
+    } catch (err) {
+      setError(userErrorMessage(err, 'لغو انتصاب انجام نشد.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="space-y-1.5">
+      {error && <Notice type="error" onClose={() => setError(null)}>{error}</Notice>}
+      <SecondaryButton type="button" onClick={cancel} disabled={busy} data-testid="cancel-waiting-appointment">
+        {busy && <Loader2 className="w-4 h-4 animate-spin" />} لغو انتصاب در انتظار ({waiting.person.displayName})
+      </SecondaryButton>
+    </div>
+  );
+};
+
+/** A post's holders over time; with `canChange`, an appointment waiting to start can be cancelled here. */
+export const PostHistory: React.FC<{ unitPositionId: string; canChange?: boolean; onChanged?: () => Promise<void> | void }> = ({ unitPositionId, canChange = false, onChanged }) => {
   const history = useLoad(() => getPostHistory(unitPositionId), 'دریافت تاریخچه‌ی پست ممکن نشد.');
   if (history.loading) return <LoadingRow />;
   if (history.error) return <Notice type="error">{history.error}</Notice>;
-  return <AppointmentList appointments={history.data || []} />;
+  return (
+    <div className="space-y-2">
+      <AppointmentList appointments={history.data || []} />
+      {canChange && (
+        <CancelWaitingAppointment
+          unitPositionId={unitPositionId}
+          appointments={history.data || []}
+          onCancelled={async () => { await history.reload(); await onChanged?.(); }}
+        />
+      )}
+    </div>
+  );
 };
 
 /** A person's posts over time (their chart panel, the users page). */
@@ -102,7 +149,8 @@ export const AppointDialog: React.FC<{
       </>}
     >
       {error && <Notice type="error" onClose={() => setError(null)}>{error}</Notice>}
-      {waiting && <Notice type="info">این پست یک انتصاب در انتظار شروع دارد؛ تا آن نیامده، انتصاب تازه ثبت نمی‌شود.</Notice>}
+      {waiting && <Notice type="info">این پست یک انتصاب در انتظار شروع دارد؛ برای ثبت انتصاب تازه اول آن را لغو کنید.</Notice>}
+      {waiting && <CancelWaitingAppointment unitPositionId={post.unitPositionId} appointments={history.data || []} onCancelled={history.reload} />}
       <div className="space-y-1.5">
         <span className="block text-xs font-bold text-slate-700 dark:text-slate-300">مسئول جدید</span>
         <UserPicker value={userId} valueLabel={userName} onChange={(id, name) => { setUserId(id); setUserName(name); }} />

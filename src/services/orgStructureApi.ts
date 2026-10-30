@@ -554,7 +554,11 @@ export interface ImpactPreview { peopleAffected: number; people: ImpactPerson[];
 export const previewImpact = (changes: ImpactChange[]) => apiRequest<ImpactPreview>('POST', `${BASE}/impact-preview`, { body: { changes } });
 
 /** A save over someone else's newer change, or a business conflict: both answer 409. */
-export const isConflict = (err: unknown): boolean => err instanceof NexusApiError && err.httpStatus === 409;
+/**
+ * Someone else changed it meanwhile (or is changing it now): reading again and retrying resolves it, so the
+ * screens offer «بارگذاری دوباره». Other 409s (a code or a name already in use...) are not offered it.
+ */
+export const isConflict = (err: unknown): boolean => err instanceof NexusApiError && err.httpStatus === 409 && err.code === 'conflict.changed';
 
 // ---------------------------------------------------------------- secondary links (phase 4)
 
@@ -712,6 +716,9 @@ export const appointToPost = (unitPositionId: string, userId: string, startDate?
 /** The present appointment ends now (endDate empty) or on a later day. */
 export const endPostAppointment = (unitPositionId: string, endDate?: string | null) =>
   apiRequest<Appointment>('POST', `${BASE}/unit-positions/${unitPositionId}/appointment/end`, { body: { endDate: endDate || null } });
+/** Cancels the post's appointment that has not started yet (the present holder stays on). */
+export const cancelUpcomingAppointment = (unitPositionId: string) =>
+  apiRequest<Appointment>('POST', `${BASE}/unit-positions/${unitPositionId}/appointment/cancel`);
 export const getPostHistory = (unitPositionId: string) => apiRequest<Appointment[]>('GET', `${BASE}/unit-positions/${unitPositionId}/history`);
 export const getUserPositionHistory = (userId: string) => apiRequest<Appointment[]>('GET', `${BASE}/users/${userId}/positions/history`);
 

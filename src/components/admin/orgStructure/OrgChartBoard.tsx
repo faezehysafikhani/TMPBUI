@@ -299,6 +299,12 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
  * pointer is, dragging moves it, and choosing a card while zoomed out - on the chart, in the side
  * panel or by searching - takes the chart to it.
  */
+/** Today as the date picker gives it (yyyy-MM-dd, local day). */
+const localToday = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+};
+
 export const OrgChartBoard: React.FC<{
   can: (permission: string) => boolean;
   /** Told after each load: the highest display level among the companies (the section's tabs follow it). */
@@ -338,7 +344,8 @@ export const OrgChartBoard: React.FC<{
   const [addRequest, setAddRequest] = useState<{ parentId: string | null } | null>(null);
   /** Dragging a card: which one, and the card it is over (with whether it may go there). */
   const [dragId, setDragId] = useState<string | null>(null);
-  const [dropOver, setDropOver] = useState<{ id: string | null; ok: boolean } | null>(null);
+  /** The card being dragged over, whether the node may go there, and (if not) why - shown while hovering. */
+  const [dropOver, setDropOver] = useState<{ id: string | null; ok: boolean; reason?: string } | null>(null);
   const [dragNote, setDragNote] = useState<string | null>(null);
   const [linkChoices, setLinkChoices] = useState<AutoLinkChoice[] | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -410,8 +417,8 @@ export const OrgChartBoard: React.FC<{
   }, [asOf]); // eslint-disable-line react-hooks/exhaustive-deps
   // Opened from the group chart on another company.
   useEffect(() => {
-    if (initialCompanyId) { setCompanyId(initialCompanyId); setSelection({ kind: 'company', companyId: initialCompanyId }); }
-  }, [initialCompanyId]);
+    if (initialCompanyId) { setCompanyId(initialCompanyId); setSelection({ kind: 'company', companyId: initialCompanyId }); void data.reload(); }
+  }, [initialCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const units = company?.units || [];
   useEffect(() => { if (data.data) onLevelChange?.(highestLevel(data.data.chart)); }, [data.data]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -566,10 +573,11 @@ export const OrgChartBoard: React.FC<{
       onDragOver: canMoveNodes ? (e: React.DragEvent) => {
         const dragged = dragId ? unitById.get(dragId) : undefined;
         if (!dragged) return;
-        const ok = checkMove(dragged, unit, rules).ok;
+        const check = checkMove(dragged, unit, rules);
+        const ok = check.ok;
         e.preventDefault();
         e.dataTransfer.dropEffect = ok ? 'move' : 'none';
-        if (dropOver?.id !== targetId || dropOver.ok !== ok) setDropOver({ id: targetId, ok });
+        if (dropOver?.id !== targetId || dropOver.ok !== ok) setDropOver({ id: targetId, ok, reason: 'reason' in check ? check.reason : undefined });
       } : undefined,
       onDragLeave: canMoveNodes ? (e: React.DragEvent) => {
         if (!(e.currentTarget as Node).contains(e.relatedTarget as Node | null)) setDropOver((prev) => (prev?.id === targetId ? null : prev));
@@ -746,7 +754,13 @@ export const OrgChartBoard: React.FC<{
           {showLinks && (
             <div className="flex items-center gap-1.5" data-testid="as-of">
               <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">نمایش به تاریخ</span>
-              <JalaliDatePicker value={asOf} onChange={setAsOf} ariaLabel="نمایش چارت به تاریخ" placeholder="امروز" />
+              <JalaliDatePicker
+                value={asOf}
+                // Today is the live chart (editable), not a view «as of today».
+                onChange={(day) => setAsOf(day && day !== localToday() ? day : undefined)}
+                ariaLabel="نمایش چارت به تاریخ"
+                placeholder="امروز"
+              />
             </div>
           )}
           <ChartSearch hits={searchHits} />
@@ -754,7 +768,12 @@ export const OrgChartBoard: React.FC<{
             <select
               className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold"
               value={company.companyId}
-              onChange={(e) => { setCompanyId(e.target.value); setSelection({ kind: 'company', companyId: e.target.value }); }}
+              onChange={(e) => {
+                setCompanyId(e.target.value);
+                setSelection({ kind: 'company', companyId: e.target.value });
+                // Whatever changed meanwhile (another tab, another person, the API) shows on arrival.
+                void data.reload();
+              }}
               aria-label="شرکت"
             >
               {chart.map((c) => <option key={c.companyId} value={c.companyId}>{c.name}</option>)}
@@ -771,8 +790,11 @@ export const OrgChartBoard: React.FC<{
               setExporting(true);
               try {
                 const { downloadOrgChartPdf } = await import('../../../utils/orgChartPdf');
-                const day = new Date().toISOString().slice(0, 10);
-                await downloadOrgChartPdf(content.current, `چارت سازمانی ${company.name}`, `org-chart-${day}.pdf`);
+                const { jalaliStamp } = await import('../../../utils/reportExport');
+                // The company's code and today's Jalali date (or the chart's day); ASCII on purpose, as every export here.
+                const code = (company.code || '').replace(/[^A-Za-z0-9_-]+/g, '') || 'company';
+                const day = asOf ? jalaliDay(asOf).replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/\//g, '-') : jalaliStamp();
+                await downloadOrgChartPdf(content.current, `چارت سازمانی ${company.name}`, `org-chart-${code}-${day}.pdf`);
               } catch (err) {
                 console.error('Org chart PDF failed:', err);
                 void appAlert('دریافت فایل PDF چارت انجام نشد.');
@@ -939,8 +961,9 @@ export const OrgChartBoard: React.FC<{
           </p>
         )}
         {(dragId || dragNote) && (
-          <p role="status" className={`pointer-events-none absolute top-3 start-3 z-10 max-w-md rounded-lg px-3 py-1.5 text-xs font-bold shadow-md ${dragNote ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200' : 'bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-300'}`}>
-            {dragNote || 'کارت را روی گره‌ی بالاتر جدید (یا روی شرکت، برای بالاترین سطح) رها کنید؛ پیش‌نمایش اثر قبل از ذخیره نشان داده می‌شود.'}
+          <p role="status" className={`pointer-events-none absolute top-3 start-3 z-10 max-w-md rounded-lg px-3 py-1.5 text-xs font-bold shadow-md ${dragNote || (dragId && dropOver?.reason) ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200' : 'bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-300'}`}>
+            {/* While hovering a place the node may not go: why, at once (not only after letting go). */}
+            {dragNote || (dragId && dropOver?.reason) || 'کارت را روی گره‌ی بالاتر جدید (یا روی شرکت، برای بالاترین سطح) رها کنید؛ پیش‌نمایش اثر قبل از ذخیره نشان داده می‌شود.'}
           </p>
         )}
         <ZoomControls subscribe={subscribe} zoomBy={zoomBy} fit={fit} />

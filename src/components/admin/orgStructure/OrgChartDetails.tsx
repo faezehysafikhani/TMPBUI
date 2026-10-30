@@ -643,7 +643,7 @@ export const OrgChartDetails: React.FC<{
           {position.holders.length > 0 && <p className="text-[11px] text-slate-400">هر پست فقط یک نفر دارد؛ برای فرد دیگر «تعویض مسئول» را بزنید (مسئول فعلی در تاریخچه می‌ماند) یا برای حذف پست، ابتدا دارندهٔ فعلی را بردارید.</p>}
           <details className="rounded-xl border border-slate-100 dark:border-slate-800 p-3" data-testid="post-history">
             <summary className="cursor-pointer text-xs font-bold text-slate-500">تاریخچه‌ی صاحبان این پست</summary>
-            <div className="mt-2"><PostHistory key={`${position.unitPositionId}:${position.holders.map((h) => h.userId).join()}`} unitPositionId={position.unitPositionId} /></div>
+            <div className="mt-2"><PostHistory key={`${position.unitPositionId}:${position.holders.map((h) => h.userId).join()}`} unitPositionId={position.unitPositionId} canChange={can(P.manageAssignments)} onChanged={onChanged} /></div>
           </details>
         </>
       );
