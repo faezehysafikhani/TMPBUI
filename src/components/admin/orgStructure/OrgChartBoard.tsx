@@ -5,7 +5,7 @@ import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
 import { ChartCompany, ChartMember, ChartPosition, ChartUnit, AutoLinkChoice, LinkType, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listLinkTypes, listNodeTypes, listNodes, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
-import { ChartSelection, allUnitsOf, ancestorsOf, companyHeadcount, companyPostsOf, depthsOf, headPostOf, isNested, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
+import { ChartSelection, allUnitsOf, ancestorsOf, companyHeadcount, companyPostsOf, depthsOf, findMember, findPosition, headPostOf, isNested, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
 import { AddNodeDialog, MoveNodeDialog } from './nodes/NodeDialogs';
 import { AutoLinkChoiceDialog } from './nodes/LinkDialogs';
@@ -311,7 +311,11 @@ export const OrgChartBoard: React.FC<{
   onLevelChange?: (level: import('../../../services/orgStructureApi').OrgUiLevel) => void;
   /** Opens the chart on this company (from the group chart). */
   initialCompanyId?: string;
-}> = ({ can: realCan, onLevelChange, initialCompanyId }) => {
+  /** Told when the selection changes: where it is (company, unit, position) and who, for the placement form beside the chart. */
+  /** Changes when the data was changed elsewhere (the placement form): the chart is read again. */
+  reloadToken?: number;
+  onPlacementPick?: (pick: { companyId: string; unitId?: string; positionId?: string; userId?: string | null; userName?: string | null }) => void;
+}> = ({ can: realCan, onLevelChange, initialCompanyId, onPlacementPick, reloadToken }) => {
   /** «نمایش به تاریخ»: the chart as of a day (only which nodes existed); nothing can be changed then. */
   const [asOf, setAsOf] = useState<string | undefined>(undefined);
   const asOfRef = useRef(asOf);
@@ -422,6 +426,35 @@ export const OrgChartBoard: React.FC<{
 
   const units = company?.units || [];
   useEffect(() => { if (data.data) onLevelChange?.(highestLevel(data.data.chart)); }, [data.data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const firstToken = useRef(reloadToken);
+  useEffect(() => {
+    if (reloadToken === firstToken.current) return;
+    firstToken.current = reloadToken;
+    void data.reload();
+  }, [reloadToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!onPlacementPick || !selection || !data.data) return;
+    const chart = data.data.chart;
+    switch (selection.kind) {
+      case 'company': case 'direct': onPlacementPick({ companyId: selection.companyId }); break;
+      case 'unit': case 'noPosition': onPlacementPick({ companyId: selection.companyId, unitId: selection.unitId }); break;
+      case 'position': {
+        const place = findPosition(chart, selection.unitPositionId);
+        const holder = place?.position.holders[0];
+        onPlacementPick({ companyId: selection.companyId, unitId: selection.unitId || undefined, positionId: place?.position.positionId, userId: holder?.userId, userName: holder?.displayName });
+        break;
+      }
+      case 'member': {
+        const found = findMember(chart, selection.userId);
+        const place = found?.positions[0];
+        if (found && place) onPlacementPick({ companyId: place.company.companyId, unitId: place.unit?.unitId, positionId: place.position.positionId, userId: found.member.userId, userName: found.member.displayName });
+        break;
+      }
+      default: break;
+    }
+  }, [selection]); // eslint-disable-line react-hooks/exhaustive-deps
   // A nested company's few top nodes stand in one row (their sub-nodes make them tall); a flat company's
   // many deputies are laid out in balanced rows.
   const nested = !!company && isNested(company);

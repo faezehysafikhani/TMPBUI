@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronLeft, Plus, Check, X } from 'lucide-react';
-import { AdminCard, Field, Notice, PrimaryButton, SecondaryButton, inputClass } from '../AdminUi';
+import { AdminCard, Notice, PrimaryButton, SecondaryButton, inputClass } from '../AdminUi';
 import { JalaliDatePicker } from '../../JalaliDatePicker';
 import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
@@ -118,7 +118,8 @@ export const OrgPlacementForm: React.FC<{
   canCreateUnits: boolean;
   canCreatePositions: boolean;
   onSaved: () => Promise<void>;
-}> = ({ board, pick, canAssign, canCreateUnits, canCreatePositions, onSaved }) => {
+  onTool?: (tool: 'templates' | 'links') => void;
+}> = ({ board, pick, canAssign, canCreateUnits, canCreatePositions, onSaved, onTool }) => {
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -286,18 +287,18 @@ export const OrgPlacementForm: React.FC<{
           </button>
           {more && (
             <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="placement-more">
-              <Field label="نوع رابطه گزارش‌دهی" hint="هنوز در سرور ذخیره نمی‌شود؛ همه‌ی جایگاه‌ها مستقیم ثبت می‌شوند.">
-                <select disabled value="direct" aria-label="نوع رابطه گزارش‌دهی" className={inputClass}>
-                  <option value="direct">مستقیم</option>
-                  <option value="matrix">ماتریسی</option>
-                </select>
-              </Field>
-              <Field label="قالب آماده" hint="هنوز در سرور پشتیبانی نمی‌شود.">
-                <select disabled value="" aria-label="قالب آماده" className={inputClass}><option value="">بدون قالب</option></select>
-              </Field>
-              <Field label="توضیحات" hint="هنوز در سرور ذخیره نمی‌شود." className="md:col-span-2">
-                <textarea disabled rows={2} aria-label="توضیحات" className={inputClass} />
-              </Field>
+              {onTool && (
+                <>
+                  <button type="button" onClick={() => onTool('links')} className="text-start rounded-xl border border-slate-200 dark:border-slate-700 p-3 hover:border-indigo-300 cursor-pointer">
+                    <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">نوع رابطه گزارش‌دهی</span>
+                    <span className="block text-[11px] text-slate-500 dark:text-slate-400">رابطه‌های مستقیم و ماتریسی بین گره‌ها در «رابطه‌ها» تنظیم می‌شود.</span>
+                  </button>
+                  <button type="button" onClick={() => onTool('templates')} className="text-start rounded-xl border border-slate-200 dark:border-slate-700 p-3 hover:border-indigo-300 cursor-pointer">
+                    <span className="block text-sm font-bold text-slate-900 dark:text-slate-100">قالب آماده</span>
+                    <span className="block text-[11px] text-slate-500 dark:text-slate-400">ساخت یا اعمال ساختار از روی قالب در «قالب‌ها».</span>
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
