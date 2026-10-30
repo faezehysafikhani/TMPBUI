@@ -14,6 +14,7 @@ import {
 import { moduleTitle, toggleUserAccess, clearPrerequisiteDenials, clearPrerequisiteDenialsForPermissions, preservePrerequisitesWhenDisabling, preservePermissionPrerequisites, enabledDependentForPrerequisite, hasKnownPermissionDependents, rolePermissionNames, isListedPermission } from '../../utils/permissions';
 import { userErrorMessage } from '../../utils/errorMessages';
 import { LoadingRow } from './orgStructure/orgShared';
+import { UserPositionHistory } from './orgStructure/nodes/AppointmentDialogs';
 import { OrgPlacementFields, useOrgPlacementData, EMPTY_PLACEMENT_DRAFT, OrgPlacementDraft } from './orgStructure/OrgPlacementFields';
 import { appConfirm } from '../../utils/appDialog';
 
@@ -438,6 +439,13 @@ const UserFormDialog: React.FC<{
                 data={placementData.data!}
                 excludeManagerIds={user ? [user.id] : []}
               />
+            )}
+            {/* The person's posts over time (appointments; an older server has none: the list says so). */}
+            {user && !isNew && (
+              <details className="rounded-xl border border-slate-100 dark:border-slate-800 p-3">
+                <summary className="cursor-pointer text-xs font-bold text-slate-500">سابقه‌ی سمت‌های این کاربر</summary>
+                <div className="mt-2"><UserPositionHistory userId={user.id} /></div>
+              </details>
             )}
           </div>
         )}
