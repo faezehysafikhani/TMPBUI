@@ -6,20 +6,29 @@ import { ORG_CHART_MOCKS } from '../src/mocks/orgChart/charts';
 import type { ChartCompany, ChartPosition, ChartUnit } from '../src/services/orgStructureApi';
 import { allUnitsOf } from '../src/components/admin/orgStructure/orgChartModel';
 import {
-  CHART_VIEW_KEY, allOpenSet, defaultOpenSet, defaultView, layoutOf, peopleCountOf, postRowsOf, readSavedView, saveView,
+  CHART_VIEW_KEY, allOpenSet, defaultOpenSet, defaultView, isCommittee, layoutOf, peopleCountOf, postRowsOf, readSavedCompany, readSavedView, saveCompany, saveView,
 } from '../src/components/admin/orgStructure/tidyChartModel';
 
 // ---- the bank: a chain, five committees, columns by type
 const bank = ORG_CHART_MOCKS.postBank()[0];
 const layout = layoutOf(bank);
-console.log('chain:', layout.chain.map((u) => u.name).join(' ‹ '));
-console.log('committees:', layout.committees.length, 'columns:', layout.columns.map((c) => `${c.title}=${c.nodes.length}`).join(', '));
-assert.ok(layout.chain.length >= 2, 'the chain runs down to the first node with several children');
+assert.equal(layout.roots.length, 1, 'one root');
+const { chain, columns } = layout.roots[0];
+console.log('chain:', chain.map((u) => u.name).join(' ‹ '));
+console.log('committees:', layout.committees.length, 'columns:', columns.map((c) => `${c.title}=${c.nodes.length}`).join(', '));
+assert.ok(chain.length >= 2, 'the chain runs down to the first node with several children');
 assert.equal(layout.committees.length, 5, 'five committees');
-assert.equal(layout.columns.length, 4, 'four columns');
-const last = layout.chain[layout.chain.length - 1];
-assert.equal(layout.columns.reduce((n, c) => n + c.nodes.length, 0), last.children!.length, 'every child is in a column');
-for (const column of layout.columns) assert.ok(column.nodes.every((n) => n.nodeType?.nodeTypeId === column.nodes[0].nodeType?.nodeTypeId), 'one type per column');
+assert.equal(columns.length, 4, 'four columns');
+assert.equal(columns.reduce((n, c) => n + c.nodes.length, 0), chain[chain.length - 1].children!.length, 'every child is in a column');
+for (const column of columns) assert.ok(column.nodes.every((n) => n.nodeType?.nodeTypeId === column.nodes[0].nodeType?.nodeTypeId), 'one type per column');
+assert.ok(layout.committees.every(isCommittee), 'committees are of the committee type');
+
+// ---- a second root of another type is its own root, not a committee
+const second: ChartUnit = { ...bank.units.find((u) => !isCommittee(u))!, unitId: 'second-root', children: [], nodeType: { nodeTypeId: 'assembly', name: 'مجمع عمومی', color: '#000', icon: 'x', isDomainBoundary: true } };
+const two = layoutOf({ ...bank, units: [...bank.units, second] });
+assert.equal(two.roots.length, 2, 'two roots');
+assert.equal(two.committees.length, 5, 'still five committees');
+assert.equal(two.roots[0].chain[0].unitId !== 'second-root', true, 'the bigger root comes first');
 
 // ---- everything is reachable, and a flat chart works too
 for (const name of Object.keys(ORG_CHART_MOCKS) as (keyof typeof ORG_CHART_MOCKS)[]) {
@@ -27,12 +36,11 @@ for (const name of Object.keys(ORG_CHART_MOCKS) as (keyof typeof ORG_CHART_MOCKS
   const l = layoutOf(company);
   const shown = new Set<string>();
   const walk = (u: ChartUnit) => { shown.add(u.unitId); (u.children || []).forEach(walk); };
-  l.chain.slice(0, -1).forEach((u) => shown.add(u.unitId));
-  if (l.chain.length) walk(l.chain[l.chain.length - 1]);
+  for (const root of l.roots) { root.chain.slice(0, -1).forEach((u) => shown.add(u.unitId)); walk(root.chain[root.chain.length - 1]); }
   l.committees.forEach(walk);
   assert.equal(shown.size, allUnitsOf(company).length, `${name}: the tidy chart shows every node`);
 }
-assert.deepEqual(layoutOf({ ...bank, units: [] }), { chain: [], committees: [], columns: [] }, 'empty company');
+assert.deepEqual(layoutOf({ ...bank, units: [] }), { roots: [], committees: [] }, 'empty company');
 
 // ---- posts: filled, vacant, collapsing
 const post = (id: string, sortOrder: number, holders: string[], isActive = true): ChartPosition => ({
@@ -68,5 +76,8 @@ const broken = { getItem: () => { throw new Error('blocked'); }, setItem: () => 
 assert.equal(readSavedView(broken), null, 'a failing read gives the default');
 assert.doesNotThrow(() => saveView('tree', broken), 'a failing write is ignored');
 assert.equal(readSavedView(null), null);
+assert.equal(readSavedCompany({ getItem: () => 'c1' }), 'c1');
+assert.equal(readSavedCompany({ getItem: () => { throw new Error('blocked'); } }), null);
+assert.doesNotThrow(() => saveCompany('c1', { setItem: () => { throw new Error('blocked'); } }));
 
 console.log('org tidy chart OK');

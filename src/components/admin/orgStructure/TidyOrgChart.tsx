@@ -50,11 +50,11 @@ const PostRow: React.FC<{ ctx: Ctx; unit: ChartUnit; post: ChartPosition; holder
   const select: ChartSelection = { kind: 'member', userId: holder.userId };
   const on = ctx.selection?.kind === 'member' && ctx.selection.userId === holder.userId;
   return (
-    <button type="button" onClick={() => ctx.onSelect(select)} aria-pressed={on} className={`${rowBase} ${pick(on)} ${holder.isActive ? '' : 'opacity-50'}`}>
+    <button type="button" onClick={() => ctx.onSelect(select)} aria-current={on ? 'true' : undefined} data-tidy-selected={on ? 'true' : undefined} className={`${rowBase} ${pick(on)} ${holder.isActive ? '' : 'opacity-50'}`}>
       <PersonAvatar name={holder.displayName} url={holder.avatarUrl} />
       <span className="min-w-0 flex-1">
-        <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{holder.displayName}</span>
-        <span className="block text-[11px] text-slate-500 dark:text-slate-400 truncate">{postLabel(post)}</span>
+        <span className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate" title={holder.displayName}>{holder.displayName}</span>
+        <span className="block text-[11px] text-slate-500 dark:text-slate-400 truncate" title={postLabel(post)}>{postLabel(post)}</span>
       </span>
       {isManager && <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-300 shrink-0" aria-label="پست مدیر" />}
     </button>
@@ -65,9 +65,9 @@ const VacantRow: React.FC<{ ctx: Ctx; unit: ChartUnit; post: ChartPosition }> = 
   const select: ChartSelection = { kind: 'position', companyId: ctx.company.companyId, unitId: unit.unitId, unitPositionId: post.unitPositionId };
   const on = ctx.selection?.kind === 'position' && ctx.selection.unitPositionId === post.unitPositionId;
   return (
-    <button type="button" onClick={() => ctx.onSelect(select)} aria-pressed={on} className={`${rowBase} border border-dashed border-amber-400 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 ${on ? 'ring-1 ring-indigo-300' : ''}`}>
+    <button type="button" onClick={() => ctx.onSelect(select)} aria-current={on ? 'true' : undefined} data-tidy-selected={on ? 'true' : undefined} className={`${rowBase} border border-dashed border-amber-400 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 ${on ? 'ring-1 ring-indigo-300' : ''}`}>
       <Briefcase className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-      <span className="text-xs font-bold truncate">{postLabel(post)} خالی</span>
+      <span className="text-xs font-bold truncate" title={`${postLabel(post)} خالی`}>{postLabel(post)} خالی</span>
     </button>
   );
 };
@@ -81,7 +81,7 @@ const Posts: React.FC<{ ctx: Ctx; unit: ChartUnit }> = ({ ctx, unit }) => {
       {unit.members.map((m) => (
         <button key={m.userId} type="button" onClick={() => ctx.onSelect({ kind: 'member', userId: m.userId })} className={`${rowBase} ${pick(ctx.selection?.kind === 'member' && ctx.selection.userId === m.userId)}`}>
           <PersonAvatar name={m.displayName} url={m.avatarUrl} />
-          <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{m.displayName}</span><span className="block text-[11px] text-slate-500 truncate">بدون سمت</span></span>
+          <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-slate-800 dark:text-slate-100 truncate" title={m.displayName}>{m.displayName}</span><span className="block text-[11px] text-slate-500 truncate">بدون سمت</span></span>
         </button>
       ))}
       {rows.collapseVacant ? (
@@ -124,8 +124,8 @@ const NodeRow: React.FC<{ ctx: Ctx; unit: ChartUnit; depth: number }> = ({ ctx, 
             {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         )}
-        <button type="button" onClick={() => ctx.onSelect({ kind: 'unit', companyId: ctx.company.companyId, unitId: unit.unitId })} aria-pressed={on} className="flex-1 min-w-0 flex items-center gap-2 py-1 pe-2 text-start cursor-pointer">
-          <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{unit.name}{inactive ? ' (غیرفعال)' : ''}</span>
+        <button type="button" onClick={() => ctx.onSelect({ kind: 'unit', companyId: ctx.company.companyId, unitId: unit.unitId })} aria-current={on ? 'true' : undefined} data-tidy-selected={on ? 'true' : undefined} className="flex-1 min-w-0 flex items-center gap-2 py-1 pe-2 text-start cursor-pointer">
+          <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={unit.name}>{unit.name}{inactive ? ' (غیرفعال)' : ''}</span>
           <Headcount n={people} />
         </button>
       </div>
@@ -153,7 +153,7 @@ const Column: React.FC<{ ctx: Ctx; column: TidyColumn; index: number }> = ({ ctx
   return (
     <section aria-label={column.title} className={`rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 border-t-4 ${column.color ? '' : fallback} p-3 space-y-2 min-w-0`} style={column.color ? { borderTopColor: safeColor(column.color) } : undefined}>
       <header className="flex items-center justify-between gap-2">
-        <h4 className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{column.title}</h4>
+        <h4 className="text-sm font-extrabold text-slate-900 dark:text-white truncate" title={column.title}>{column.title}</h4>
         <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{toPersianDigits(column.nodes.length)} گره · <Users className="inline w-3 h-3" aria-hidden="true" /> {toPersianDigits(column.people)}</span>
       </header>
       <ul className="space-y-1">
@@ -166,13 +166,23 @@ const Column: React.FC<{ ctx: Ctx; column: TidyColumn; index: number }> = ({ ctx
   );
 };
 
+/** The top-level committees, in a dashed strip; each opens on a click. */
+const CommitteeStrip: React.FC<{ ctx: Ctx; committees: ChartUnit[] }> = ({ ctx, committees }) => committees.length === 0 ? null : (
+  <section aria-label="کمیته‌ها" className="rounded-2xl border-2 border-dashed border-violet-400 dark:border-violet-700 p-3 space-y-1.5">
+    <h4 className="text-xs font-extrabold text-violet-700 dark:text-violet-300">کمیته‌ها ({toPersianDigits(committees.length)})</h4>
+    <ul className="grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]">
+      {committees.map((c) => <NodeRow key={c.unitId} ctx={ctx} unit={c} depth={0} />)}
+    </ul>
+  </section>
+);
+
 /** One card of the chain: the node, its people and (open) its posts. */
 const ChainCard: React.FC<{ ctx: Ctx; unit: ChartUnit; last: boolean }> = ({ ctx, unit, last }) => {
   const on = ctx.selection?.kind === 'unit' && ctx.selection.unitId === unit.unitId;
   return (
     <div data-tidy-node={unit.unitId} className={`w-full max-w-md rounded-2xl border bg-white dark:bg-slate-900 p-3 space-y-1.5 ${on ? 'border-indigo-400 ring-2 ring-indigo-200 dark:ring-indigo-900' : 'border-slate-200 dark:border-slate-700'}`}>
-      <button type="button" onClick={() => ctx.onSelect({ kind: 'unit', companyId: ctx.company.companyId, unitId: unit.unitId })} aria-pressed={on} className="w-full flex items-center justify-between gap-2 text-start cursor-pointer">
-        <span className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{unit.name}</span>
+      <button type="button" onClick={() => ctx.onSelect({ kind: 'unit', companyId: ctx.company.companyId, unitId: unit.unitId })} aria-current={on ? 'true' : undefined} data-tidy-selected={on ? 'true' : undefined} className="w-full flex items-center justify-between gap-2 text-start cursor-pointer">
+        <span className="text-sm font-extrabold text-slate-900 dark:text-white truncate" title={unit.name}>{unit.name}</span>
         <Headcount n={last ? peopleCountOf(unit) : 0} />
       </button>
       {(unit.links?.length ?? 0) > 0 && <LinksLine ctx={ctx} links={unit.links!} />}
@@ -206,7 +216,7 @@ export const TidyOrgChart: React.FC<{
     const id = selection && 'unitId' in selection && selection.unitId ? selection.unitId : null;
     if (!id) return;
     const lists: [string, ChartUnit[]][] = [
-      ...layout.columns.map((c) => [`col:${c.key}`, c.nodes] as [string, ChartUnit[]]),
+      ...layout.roots.flatMap((r) => r.columns).map((c) => [`col:${c.key}`, c.nodes] as [string, ChartUnit[]]),
       ...allUnitsOf(company).map((u) => [u.unitId, u.children || []] as [string, ChartUnit[]]),
     ];
     const grow = new Map<string, number>();
@@ -216,40 +226,38 @@ export const TidyOrgChart: React.FC<{
       if (at >= PAGE_SIZE) grow.set(key, Math.ceil((at + 1) / PAGE_SIZE) * PAGE_SIZE);
     }
     if (grow.size) setShown((prev: Map<string, number>) => { const next = new Map<string, number>(prev); grow.forEach((v: number, k: string) => next.set(k, Math.max(v, next.get(k) ?? 0))); return next; });
-    // Bring the card into view once it is drawn.
-    const frame = requestAnimationFrame(() => document.querySelector(`[data-tidy-node="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
-    return () => cancelAnimationFrame(frame);
+    // Bring the chosen card into view once it is drawn (its branches open and its page of the list shown first).
+    const timer = window.setTimeout(() => {
+      (document.querySelector('[data-testid="tidy-chart"] [data-tidy-selected="true"]') as HTMLElement | null)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 200);
+    return () => window.clearTimeout(timer);
   }, [selection]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (layout.chain.length === 0) return <p className="p-6 text-sm text-slate-500">این شرکت هنوز گره‌ای ندارد.</p>;
+  if (layout.roots.length === 0 && layout.committees.length === 0) return <p className="p-6 text-sm text-slate-500">این شرکت هنوز گره‌ای ندارد.</p>;
   return (
     <div ref={rootRef} data-testid="tidy-chart" className="p-4 sm:p-6 space-y-5 bg-slate-50/60 dark:bg-slate-950/40">
-      <div className="flex flex-col items-center">
-        {layout.chain.map((unit, i) => (
-          <React.Fragment key={unit.unitId}>
-            {i > 0 && <span className="w-0.5 h-5 bg-slate-300 dark:bg-slate-600" aria-hidden="true" />}
-            <ChainCard ctx={ctx} unit={unit} last={i === layout.chain.length - 1} />
-          </React.Fragment>
-        ))}
-      </div>
-
-      {layout.committees.length > 0 && (
-        <section aria-label="کمیته‌ها" className="rounded-2xl border-2 border-dashed border-violet-400 dark:border-violet-700 p-3 space-y-1.5">
-          <h4 className="text-xs font-extrabold text-violet-700 dark:text-violet-300">کمیته‌ها ({toPersianDigits(layout.committees.length)})</h4>
-          <ul className="grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]">
-            {layout.committees.map((c) => <NodeRow key={c.unitId} ctx={ctx} unit={c} depth={0} />)}
-          </ul>
-        </section>
-      )}
-
-      {layout.columns.length > 0 && (
-        <>
-          <div className="flex justify-center"><span className="w-0.5 h-4 bg-slate-300 dark:bg-slate-600" aria-hidden="true" /></div>
-          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))] max-sm:grid-cols-1">
-            {layout.columns.map((column, i) => <Column key={column.key} ctx={ctx} column={column} index={i} />)}
+      {layout.roots.length === 0 && <CommitteeStrip ctx={ctx} committees={layout.committees} />}
+      {layout.roots.map((root, index) => (
+        <div key={root.chain[0].unitId} className="space-y-5" data-testid="tidy-root">
+          <div className="flex flex-col items-center">
+            {root.chain.map((unit, i) => (
+              <React.Fragment key={unit.unitId}>
+                {i > 0 && <span className="w-0.5 h-5 bg-slate-300 dark:bg-slate-600" aria-hidden="true" />}
+                <ChainCard ctx={ctx} unit={unit} last={i === root.chain.length - 1} />
+              </React.Fragment>
+            ))}
           </div>
-        </>
-      )}
+          {index === 0 && <CommitteeStrip ctx={ctx} committees={layout.committees} />}
+          {root.columns.length > 0 && (
+            <>
+              <div className="flex justify-center"><span className="w-0.5 h-4 bg-slate-300 dark:bg-slate-600" aria-hidden="true" /></div>
+              <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))] max-sm:grid-cols-1">
+                {root.columns.map((column, i) => <Column key={column.key} ctx={ctx} column={column} index={i} />)}
+              </div>
+            </>
+          )}
+        </div>
+      ))}
     </div>
   );
 };

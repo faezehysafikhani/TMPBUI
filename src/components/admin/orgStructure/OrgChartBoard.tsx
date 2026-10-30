@@ -13,7 +13,7 @@ import { addableTypes, checkMove } from './orgNodeRules';
 import { atLeast, highestLevel, levelOf } from './orgUiLevel';
 import { PersonAvatar } from './PersonAvatar';
 import { TidyBoundary, TidyOrgChart } from './TidyOrgChart';
-import { type ChartView, allOpenSet, defaultOpenSet, defaultView, pathTo, readSavedView, saveView, vacantKey } from './tidyChartModel';
+import { type ChartView, allOpenSet, defaultOpenSet, defaultView, pathTo, readSavedCompany, readSavedView, saveCompany, saveView, vacantKey } from './tidyChartModel';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
 import { OrgLinkLayer } from './OrgLinkLayer';
@@ -360,7 +360,8 @@ export const OrgChartBoard: React.FC<{
     return { chart, positions, unplaced, nodes, nodeTypes, nodeRules, linkTypes };
   }, 'دریافت چارت سازمانی ممکن نشد.');
 
-  const [companyId, setCompanyId] = useState<string | null>(initialCompanyId ?? null);
+  const [companyId, setCompanyIdState] = useState<string | null>(() => initialCompanyId ?? readSavedCompany());
+  const setCompanyId = (id: string) => { setCompanyIdState(id); saveCompany(id); };
   const [selection, setSelection] = useState<ChartSelection | null>(null);
   /** Nodes whose posts are hidden, and nodes whose sub-nodes are hidden. */
   // null: as a company opens (see openingState); a set: what the user has opened or closed since.
@@ -418,6 +419,8 @@ export const OrgChartBoard: React.FC<{
   const [userView, setUserView] = useState<ChartView | null>(() => readSavedView());
   const view: ChartView = userView ?? defaultView(company ? nodeCount(company) : 0);
   const chooseView = (next: ChartView) => { setUserView(next); saveView(next); };
+  // The company on screen is remembered, so leaving the page and coming back opens on it.
+  useEffect(() => { if (company) saveCompany(company.companyId); }, [company?.companyId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [showEmpty, setShowEmpty] = useState(false);
   /** Tidy chart: what is open (null: as a company opens - its nodes that have people). */
   const [tidyOpenUser, setTidyOpenUser] = useState<Set<string> | null>(null);

@@ -58,30 +58,32 @@ export interface TidyColumn {
   people: number;
 }
 
-export interface TidyLayout {
-  /** From the root to the first node that does not have exactly one child. */
+/** One root of the company: its chain down to the first node with several children, and the columns below. */
+export interface TidyRoot {
   chain: ChartUnit[];
-  /** The other top-level nodes. */
-  committees: ChartUnit[];
   columns: TidyColumn[];
 }
 
-/** The tidy chart's three parts. The root is the top-level node with the biggest subtree. */
-export function layoutOf(company: ChartCompany): TidyLayout {
-  const tops = company.units;
-  if (tops.length === 0) return { chain: [], committees: [], columns: [] };
-  const root = tops.reduce((best, unit) => (subtreeSize(unit) > subtreeSize(best) ? unit : best), tops[0]);
-  const committees = tops.filter((unit) => unit !== root);
-  const chain: ChartUnit[] = [root];
+export interface TidyLayout {
+  /** Every top-level node that is not a committee, the biggest first (a company may have several). */
+  roots: TidyRoot[];
+  /** The top-level nodes of the committee type. */
+  committees: ChartUnit[];
+}
+
+/** A committee is told by its type's name (the chart data has no type code). */
+export const isCommittee = (unit: ChartUnit): boolean => (unit.nodeType?.name ?? '').includes('کمیته');
+
+function rootOf(top: ChartUnit): TidyRoot {
+  const chain: ChartUnit[] = [top];
   while ((chain[chain.length - 1].children?.length ?? 0) === 1) chain.push(chain[chain.length - 1].children![0]);
   const last = chain[chain.length - 1];
-
   const byType = new Map<string, TidyColumn>();
   for (const child of last.children || []) {
     const key = child.nodeType?.nodeTypeId ?? 'none';
     let column = byType.get(key);
     if (!column) {
-      column = { key, title: child.nodeType?.name ?? 'بدون نوع', color: child.nodeType?.color ?? null, nodes: [], people: 0 };
+      column = { key: `${top.unitId}:${key}`, title: child.nodeType?.name ?? 'بدون نوع', color: child.nodeType?.color ?? null, nodes: [], people: 0 };
       byType.set(key, column);
     }
     column.nodes.push(child);
@@ -92,7 +94,19 @@ export function layoutOf(company: ChartCompany): TidyLayout {
     for (const node of column.nodes) peopleIn(node).forEach((id) => ids.add(id));
     column.people = ids.size;
   }
-  return { chain, committees, columns };
+  return { chain, columns };
+}
+
+/**
+ * The tidy chart's parts: committees (top-level nodes of the committee type) in their own strip,
+ * every other top-level node as a root with its own chain and columns.
+ */
+export function layoutOf(company: ChartCompany): TidyLayout {
+  const committees = company.units.filter(isCommittee);
+  const roots = company.units.filter((u) => !isCommittee(u))
+    .sort((a, b) => subtreeSize(b) - subtreeSize(a))
+    .map(rootOf);
+  return { roots, committees };
 }
 
 export interface PostRows {
@@ -139,3 +153,24 @@ export function allOpenSet(company: ChartCompany): Set<string> {
 
 /** A node and the nodes above it: what must be open for it to be seen. */
 export const pathTo = (company: ChartCompany, unitId: string): string[] => [...ancestorsOf(company, unitId).map((u) => u.unitId), unitId];
+
+const COMPANY_KEY = 'orgchart_company_v1';
+
+/** The company last looked at (so leaving the page and coming back keeps it); null when none or storage fails. */
+export function readSavedCompany(storage?: Pick<Storage, 'getItem'> | null): string | null {
+  try {
+    const store = storage === undefined ? (typeof sessionStorage === 'undefined' ? null : sessionStorage) : storage;
+    return store?.getItem(COMPANY_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveCompany(companyId: string, storage?: Pick<Storage, 'setItem'> | null): void {
+  try {
+    const store = storage === undefined ? (typeof sessionStorage === 'undefined' ? null : sessionStorage) : storage;
+    store?.setItem(COMPANY_KEY, companyId);
+  } catch {
+    /* it just does not last */
+  }
+}
