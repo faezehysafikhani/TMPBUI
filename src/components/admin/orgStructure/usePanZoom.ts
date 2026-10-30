@@ -101,9 +101,14 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
     const s = clampScale(START_SCALE);
     const w = el.offsetWidth * s;
     const h = el.offsetHeight * s;
+    // A chart wider than the canvas even at the opening size (hundreds of nodes) opens whole, not cut at its sides.
+    if (w > vp.clientWidth - 2 * PAD) {
+      fit(animate);
+      return;
+    }
     moved.current = false;
     set({ s, x: (vp.clientWidth - w) / 2, y: h <= vp.clientHeight - top - PAD ? (vp.clientHeight - h) / 2 : top }, animate);
-  }, [clampScale, content, set, viewport]);
+  }, [clampScale, content, fit, set, viewport]);
 
   const zoomAt = useCallback((px: number, py: number, factor: number, animate = false) => {
     const { x, y, s } = view.current;

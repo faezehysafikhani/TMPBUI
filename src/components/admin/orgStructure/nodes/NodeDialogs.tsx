@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, inputClass } from '../../AdminUi';
 import { userErrorMessage } from '../../../../utils/errorMessages';
+import { NexusApiError } from '../../../../services/nexusApi';
 import { type ChartCompany, type ChartUnit, type NodeType, type NodeTypeRule, type OrgNode, createNode, moveNode } from '../../../../services/orgStructureApi';
 import { allUnitsOf } from '../orgChartModel';
 import { moveTargets } from '../orgNodeRules';
@@ -114,6 +115,8 @@ export const MoveNodeDialog: React.FC<{
         changes={[{ kind: 'move', nodeId: unit.unitId, parentNodeId: target.unitId }]}
         confirmLabel="جابه‌جا کن"
         onConfirm={async () => {
+          // Without the node's version the server could not tell that someone changed it first: refuse here.
+          if (!rowVersion) throw new NexusApiError('نسخه‌ی این گره دریافت نشده؛ چارت را دوباره بارگذاری کنید و دوباره امتحان کنید.', 409);
           await moveNode(unit.unitId, { parentNodeId: target.unitId, rowVersion });
           await onMoved();
           onClose();

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { AdminCard, AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
+import { NexusApiError } from '../../../services/nexusApi';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
   ChartCompany, ChartMember, ChartPosition, ChartUnit, LinkType, NodeType, OrgUiLevel, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
@@ -208,6 +209,18 @@ export const OrgChartDetails: React.FC<{
   const [message, setMessage] = useState<PanelMessage | null>(null);
   /** The version of a node as the chart was loaded: a change over a newer one is refused by the server. */
   const versionOf = (unitId: string) => nodes.find((n) => n.id === unitId)?.rowVersion ?? null;
+  const NO_VERSION = 'نسخه‌ی این گره دریافت نشده؛ چارت را دوباره بارگذاری کنید و دوباره امتحان کنید.';
+  /** The version a change must be sent with. Without it the server could not tell that someone else changed the node first, so nothing is sent. */
+  const needVersion = (unitId: string): string => {
+    const version = versionOf(unitId);
+    if (!version) throw new NexusApiError(NO_VERSION, 409);
+    return version;
+  };
+  /** Opens a node's merge / history / dates dialog only when its version is known. */
+  const openWithVersion = (unit: ChartUnit, next: NonNullable<typeof extra>) => {
+    if (versionOf(unit.unitId)) setExtra(next);
+    else setMessage({ type: 'error', text: NO_VERSION, conflict: true });
+  };
   const [busy, setBusy] = useState(false);
 
   useEffect(() => setMessage(null), [JSON.stringify(selection)]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -261,10 +274,11 @@ export const OrgChartDetails: React.FC<{
                   disabled={busy}
                   onChange={(e) => run(() => setCompanyUiLevel(company.companyId, e.target.value as OrgUiLevel), 'سطح نمایش عوض شد؛ فقط نمایش تغییر می‌کند و داده‌ای پاک نمی‌شود.', 'تغییر سطح نمایش انجام نشد.')}
                 >
-                  {UI_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.title} — {l.hint}</option>)}
+                  {UI_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
                 </select>
               ) : UI_LEVELS.find((l) => l.id === levelOf(company))?.title}
             </InfoRow>
+            <p className="text-[11px] leading-5 text-slate-500 pb-2">{UI_LEVELS.find((l) => l.id === levelOf(company))?.hint} تغییر سطح فقط نمایش را عوض می‌کند.</p>
           </div>
           {companyPostsOf(company).length > 0 && (
             <div className="space-y-1">
@@ -394,8 +408,8 @@ export const OrgChartDetails: React.FC<{
                   </button>
                   {nodes.length > 0 && canNode(can, 'move') && unit.children!.length > 1 && (
                     <>
-                      <button type="button" disabled={busy || index === 0} onClick={() => run(() => reorderNode(child.unitId, index - 1, versionOf(child.unitId)), 'ترتیب ذخیره شد.', 'تغییر ترتیب انجام نشد.')} className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 disabled:opacity-30 cursor-pointer" title="بالاتر" aria-label={`بالاتر بردن ${child.name}`}><ArrowUp className="w-3.5 h-3.5" /></button>
-                      <button type="button" disabled={busy || index === unit.children!.length - 1} onClick={() => run(() => reorderNode(child.unitId, index + 1, versionOf(child.unitId)), 'ترتیب ذخیره شد.', 'تغییر ترتیب انجام نشد.')} className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 disabled:opacity-30 cursor-pointer" title="پایین‌تر" aria-label={`پایین‌تر بردن ${child.name}`}><ArrowDown className="w-3.5 h-3.5" /></button>
+                      <button type="button" disabled={busy || index === 0} onClick={() => run(() => reorderNode(child.unitId, index - 1, needVersion(child.unitId)), 'ترتیب ذخیره شد.', 'تغییر ترتیب انجام نشد.')} className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 disabled:opacity-30 cursor-pointer" title="بالاتر" aria-label={`بالاتر بردن ${child.name}`}><ArrowUp className="w-3.5 h-3.5" /></button>
+                      <button type="button" disabled={busy || index === unit.children!.length - 1} onClick={() => run(() => reorderNode(child.unitId, index + 1, needVersion(child.unitId)), 'ترتیب ذخیره شد.', 'تغییر ترتیب انجام نشد.')} className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 disabled:opacity-30 cursor-pointer" title="پایین‌تر" aria-label={`پایین‌تر بردن ${child.name}`}><ArrowDown className="w-3.5 h-3.5" /></button>
                     </>
                   )}
                 </div>
@@ -443,13 +457,13 @@ export const OrgChartDetails: React.FC<{
           <QuickActions>
             {(nodes.length > 0 ? canNode(can, 'update') : can(U.update)) && <ActionTile icon={Pencil} label={nodes.length > 0 ? 'ویرایش گره' : 'ویرایش معاونت'} onClick={() => setDialog({ kind: 'editUnit', unit })} />}
             {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'move') && (
-              <ActionTile icon={GitMerge} label="ادغام در گره‌ی دیگر" disabled={busy || unit.isActive === false} onClick={() => setExtra({ kind: 'merge', company, unit })} />
+              <ActionTile icon={GitMerge} label="ادغام در گره‌ی دیگر" disabled={busy || unit.isActive === false} onClick={() => openWithVersion(unit, { kind: 'merge', company, unit })} />
             )}
             {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'update') && (
-              <ActionTile icon={CalendarRange} label="تاریخ وجود" disabled={busy} onClick={() => setExtra({ kind: 'validity', company, unit })} />
+              <ActionTile icon={CalendarRange} label="تاریخ وجود" disabled={busy} onClick={() => openWithVersion(unit, { kind: 'validity', company, unit })} />
             )}
             {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'view') && (
-              <ActionTile icon={History} label="تاریخچه و بازگردانی" onClick={() => setExtra({ kind: 'history', company, unit })} />
+              <ActionTile icon={History} label="تاریخچه و بازگردانی" onClick={() => openWithVersion(unit, { kind: 'history', company, unit })} />
             )}
             {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'update') && (
               <ActionTile icon={Link2} label="افزودن مافوق دوم" disabled={busy || unit.isActive === false} onClick={() => setExtra({ kind: 'addLink', company, unit })} />
@@ -475,7 +489,7 @@ export const OrgChartDetails: React.FC<{
                   icon={Power}
                   label="فعال کردن"
                   disabled={busy}
-                  onClick={() => run(() => activateNode(unit.unitId, versionOf(unit.unitId)), `«${unit.name}» فعال شد.`, 'فعال کردن گره انجام نشد.')}
+                  onClick={() => run(() => activateNode(unit.unitId, needVersion(unit.unitId)), `«${unit.name}» فعال شد.`, 'فعال کردن گره انجام نشد.')}
                 />
               ) : (
                 <ActionTile
@@ -484,7 +498,7 @@ export const OrgChartDetails: React.FC<{
                   label="غیرفعال کردن"
                   disabled={busy}
                   onClick={async () => await appConfirm(`گره «${unit.name}» غیرفعال شود؟`)
-                    && run(() => deactivateNode(unit.unitId, versionOf(unit.unitId)), `«${unit.name}» غیرفعال شد.`, 'غیرفعال کردن گره انجام نشد.')}
+                    && run(() => deactivateNode(unit.unitId, needVersion(unit.unitId)), `«${unit.name}» غیرفعال شد.`, 'غیرفعال کردن گره انجام نشد.')}
                 />
               )
             )}
@@ -704,7 +718,7 @@ export const OrgChartDetails: React.FC<{
           message={message}
           onReload={async () => { setMessage(null); setDialog(null); await onChanged(); }}
           nodeTypes={nodeTypes}
-          versionOf={versionOf}
+          versionOf={needVersion}
           nodeOf={(unitId) => nodes.find((n) => n.id === unitId)}
           useNodeApi={nodes.length > 0}
           can={can}

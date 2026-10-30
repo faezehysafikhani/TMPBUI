@@ -328,8 +328,9 @@ export const OrgChartBoard: React.FC<{
   const [companyId, setCompanyId] = useState<string | null>(initialCompanyId ?? null);
   const [selection, setSelection] = useState<ChartSelection | null>(null);
   /** Nodes whose posts are hidden, and nodes whose sub-nodes are hidden. */
-  const [collapsedUnits, setCollapsedUnits] = useState<Set<string>>(new Set());
-  const [collapsedBranches, setCollapsedBranches] = useState<Set<string>>(new Set());
+  // null: as a company opens (see openingState); a set: what the user has opened or closed since.
+  const [userCollapsedUnits, setUserCollapsedUnits] = useState<Set<string> | null>(null);
+  const [userCollapsedBranches, setUserCollapsedBranches] = useState<Set<string> | null>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const [fullscreen, setFullscreen] = useState(false);
   /** A node being moved (dragged to a place, or from its «جابه‌جایی»), or being added under a node. */
@@ -351,6 +352,31 @@ export const OrgChartBoard: React.FC<{
 
   const chart = data.data?.chart || [];
   const company: ChartCompany | undefined = chart.find((c) => c.companyId === companyId) || chart[0];
+  // A company opens with its first two levels drawn and the posts of nodes with sub-nodes closed, so a big structure stays
+  // readable (and is drawn small the first time, not as hundreds of open cards); a flat company opens exactly as before.
+  const opening = useMemo(() => {
+    if (!company) return { units: new Set<string>(), branches: new Set<string>() };
+    const depths = depthsOf(company);
+    const parents = allUnitsOf(company).filter((u) => (u.children?.length ?? 0) > 0);
+    return {
+      units: new Set(parents.map((u) => u.unitId)),
+      branches: new Set(parents.filter((u) => (depths.get(u.unitId) ?? 0) >= 2).map((u) => u.unitId)),
+    };
+  }, [company]);
+  const collapsedUnits = userCollapsedUnits ?? opening.units;
+  const collapsedBranches = userCollapsedBranches ?? opening.branches;
+  const setCollapsedUnits: React.Dispatch<React.SetStateAction<Set<string>>> = (next) =>
+    setUserCollapsedUnits((prev) => (typeof next === 'function' ? next(prev ?? opening.units) : next));
+  const setCollapsedBranches: React.Dispatch<React.SetStateAction<Set<string>>> = (next) =>
+    setUserCollapsedBranches((prev) => (typeof next === 'function' ? next(prev ?? opening.branches) : next));
+  // Another company: it opens as a company opens, not as the last one was left.
+  const lastCompany = useRef<string | null>(null);
+  useEffect(() => {
+    if (!company || lastCompany.current === company.companyId) return;
+    lastCompany.current = company.companyId;
+    setUserCollapsedUnits(null);
+    setUserCollapsedBranches(null);
+  }, [company?.companyId]); // eslint-disable-line react-hooks/exhaustive-deps
   const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company);
   const level = levelOf(company);
   // The display level only hides: simple has no node tools, advanced adds the secondary links.
@@ -375,17 +401,7 @@ export const OrgChartBoard: React.FC<{
     return () => observer.disconnect();
   }, [!!company]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A company opens with its first two levels drawn and the posts of nodes with sub-nodes closed, so a
-  // big structure stays readable; a flat company opens exactly as before.
-  const openedFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (!company || openedFor.current === company.companyId) return;
-    openedFor.current = company.companyId;
-    const depths = depthsOf(company);
-    const parents = allUnitsOf(company).filter((u) => (u.children?.length ?? 0) > 0);
-    setCollapsedUnits(new Set(parents.map((u) => u.unitId)));
-    setCollapsedBranches(new Set(parents.filter((u) => (depths.get(u.unitId) ?? 0) >= 2).map((u) => u.unitId)));
-  }, [company]);
+
 
   const firstAsOf = useRef(true);
   useEffect(() => {
@@ -402,7 +418,7 @@ export const OrgChartBoard: React.FC<{
   // A nested company's few top nodes stand in one row (their sub-nodes make them tall); a flat company's
   // many deputies are laid out in balanced rows.
   const nested = !!company && isNested(company);
-  const perRow = useMemo(() => (nested ? Math.max(1, units.length) : chooseColumns(units, canvasSize.width, canvasSize.height)), [nested, units, canvasSize.width, canvasSize.height]);
+  const perRow = useMemo(() => (nested ? Math.max(1, Math.min(units.length, 5)) : chooseColumns(units, canvasSize.width, canvasSize.height)), [nested, units, canvasSize.width, canvasSize.height]);
 
   // The chart opens at half size from the top: for another company, another layout or full screen too.
   useLayoutEffect(() => { home(); }, [company?.companyId, perRow, fullscreen, home]);
