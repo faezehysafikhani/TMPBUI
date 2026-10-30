@@ -670,30 +670,6 @@ export const applyPostTemplates = (target: { nodeId?: string; nodeTypeId?: strin
 export const setManagerPost = (unitPositionId: string, isManagerPost: boolean) =>
   apiRequest<UnitPosition>('PUT', `${BASE}/unit-positions/${unitPositionId}/manager-post`, { body: { isManagerPost } });
 
-// ---- import from a sheet
-
-/** A fault of the sheet; row: its row in the sheet (null: the file as a whole). */
-export interface ImportError { row: number | null; code: string | null; message: string }
-export interface ImportNodePreview { row: number; code: string; name: string; parentCode: string | null; typeName: string; managerPosition: string | null; depth: number }
-/** What the sheet would make. Nothing is made while errors is not empty (all or nothing). */
-export interface ImportPreview { rowCount: number; nodes: ImportNodePreview[]; errors: ImportError[] }
-export interface ImportResult { nodes: OrgNode[]; links: number; posts: number; autoLinkChoices: AutoLinkChoice[]; skippedPosts: SkippedPost[] }
-
-/** The sheet (.xlsx first sheet, or UTF-8 .csv; at most 5 MB and 5000 rows) goes to the top of a company or under a node. */
-function importForm(file: File, target: { companyId?: string | null; parentNodeId?: string | null }): FormData {
-  const form = new FormData();
-  form.append('file', file, file.name);
-  if (target.companyId) form.append('companyId', target.companyId);
-  if (target.parentNodeId) form.append('parentNodeId', target.parentNodeId);
-  return form;
-}
-export const previewImport = (file: File, target: { companyId?: string | null; parentNodeId?: string | null }) =>
-  apiRequest<ImportPreview>('POST', `${BASE}/import/preview`, { form: importForm(file, target) });
-export const commitImport = (file: File, target: { companyId?: string | null; parentNodeId?: string | null }) =>
-  apiRequest<ImportResult>('POST', `${BASE}/import/commit`, { form: importForm(file, target) });
-export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
-export const IMPORT_COLUMNS = ['کد', 'نام', 'کد والد', 'نوع', 'سمت مدیر'] as const;
-
 // ---------------------------------------------------------------- appointments over time (phase 9)
 
 /** One appointment: who held (holds, will hold) which post, from when until when (null: no limit). */

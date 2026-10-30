@@ -15,26 +15,6 @@ export interface MockServer {
   fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 }
 
-interface SheetRow { row: number; code: string; name: string; parent: string; type: string; manager: string }
-
-/** Reads a UTF-8 CSV sheet like the server does (a header row, then code, name, parent code, type, manager's position). */
-function readCsv(text: string): SheetRow[] {
-  const rows: string[][] = [];
-  let cell = '', row: string[] = [], quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (quoted) {
-      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') quoted = false; else cell += ch;
-    } else if (ch === '"') quoted = true;
-    else if (ch === ',') { row.push(cell); cell = ''; }
-    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); cell = ''; rows.push(row); row = []; }
-    else cell += ch;
-  }
-  if (cell || row.length) { row.push(cell); rows.push(row); }
-  return rows.slice(1).map((r, i) => ({ row: i + 2, code: (r[0] || '').trim(), name: (r[1] || '').trim(), parent: (r[2] || '').trim(), type: (r[3] || '').trim(), manager: (r[4] || '').trim() }))
-    .filter((r) => r.code || r.name || r.parent || r.type || r.manager);
-}
-
 export function createMockServer(initial: ChartCompany[]): MockServer {
   let chart: ChartCompany[] = structuredClone(initial);
   const versions = new Map<string, number>();
@@ -304,59 +284,30 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
     const dl = path.match(/^\/links\/([^/]+)$/);
     if (dl && method === 'DELETE') { chart.forEach((c) => allUnitsOf(c).forEach((u) => { u.links = (u.links || []).filter((l: ChartLink) => l.linkId !== dl[1]); })); return new Response(null, { status: 204 }); }
 
-    if (method === 'POST' && (path === '/import/preview' || path === '/import/commit')) {
-      const file = body?.get?.('file') as File | null;
-      const rows = file ? readCsv((await file.text()).replace(/^\uFEFF/, '')) : [];
-      const errors: { row: number | null; code: string | null; message: string }[] = [];
-      const types = typesOf();
-      const allowed = new Set(currentRules().map((r) => `${r.parentNodeTypeId ?? 'company'}>${r.childNodeTypeId}`));
-      const byCode = new Map<string, SheetRow>();
-      for (const r of rows) {
-        if (!r.code) { errors.push({ row: r.row, code: 'missing_code', message: 'کد گره خالی است.' }); continue; }
-        if (byCode.has(r.code.toLowerCase())) { errors.push({ row: r.row, code: 'duplicate_code', message: `کد «${r.code}» تکراری است (اولین بار در سطر ${byCode.get(r.code.toLowerCase())!.row}).` }); continue; }
-        byCode.set(r.code.toLowerCase(), r);
-        if (!r.name) errors.push({ row: r.row, code: 'missing_name', message: 'نام گره خالی است.' });
-      }
-      for (const r of byCode.values()) {
-        if (r.parent && !byCode.has(r.parent.toLowerCase())) errors.push({ row: r.row, code: 'missing_parent', message: `والد «${r.parent}» برای گره «${r.code}» وجود ندارد.` });
-        const type = r.type ? types.find((t) => t.code === r.type) : undefined;
-        if (r.type && !type) { errors.push({ row: r.row, code: 'unknown_type', message: `نوع «${r.type}» تعریف نشده است.` }); continue; }
-        const parent = r.parent ? byCode.get(r.parent.toLowerCase()) : undefined;
-        if (type && (!r.parent || parent)) {
-          const parentType = parent?.type ? types.find((t) => t.code === parent.type) : undefined;
-          if (!allowed.has(`${parentType?.id ?? 'company'}>${type.id}`)) errors.push({ row: r.row, code: 'type_not_allowed', message: `گره «${r.code}» از نوع «${type.name}» را نمی‌شود ${parent ? `زیر «${parent.code}»` : 'در بالاترین سطح'} گذاشت.` });
-        }
-        // a loop: walk up
-        const seen = new Set([r.code.toLowerCase()]);
-        for (let up = parent; up; up = up.parent ? byCode.get(up.parent.toLowerCase()) : undefined) {
-          if (seen.has(up.code.toLowerCase())) { if (up.code.toLowerCase() === r.code.toLowerCase()) errors.push({ row: r.row, code: 'cycle', message: `حلقه در والدها از گره «${r.code}».` }); break; }
-          seen.add(up.code.toLowerCase());
-        }
-      }
-      errors.sort((a, b) => (a.row ?? 0) - (b.row ?? 0));
-      const depthOf = (r: SheetRow): number => { let d = 0; for (let up = r.parent ? byCode.get(r.parent.toLowerCase()) : undefined; up && d < 50; up = up.parent ? byCode.get(up.parent.toLowerCase()) : undefined) d++; return d; };
-      const nodes = rows.map((r) => ({ row: r.row, code: r.code, name: r.name, parentCode: r.parent || null, typeName: types.find((t) => t.code === r.type)?.name ?? 'واحد', managerPosition: r.manager || null, depth: depthOf(r) }));
-      if (path === '/import/preview') return json({ rowCount: rows.length, nodes: errors.length ? [] : nodes, errors });
-      if (errors.length) return problem(400, 'فایل خطا دارد؛ چیزی ساخته نشد.');
-      const company = body.get('companyId') ? chart.find((c) => c.companyId === body.get('companyId')) : find(String(body.get('parentNodeId')))?.company;
-      if (!company) return problem(404, 'شرکت پیدا نشد.', 'not_found');
-      const made = new Map<string, ChartUnit>();
-      const order = [...byCode.values()].sort((a, b) => depthOf(a) - depthOf(b));
-      for (const r of order) {
-        const type = types.find((t) => t.code === r.type);
-        const parent = r.parent ? made.get(r.parent.toLowerCase()) : body.get('parentNodeId') ? find(String(body.get('parentNodeId')))?.unit : undefined;
-        const unit: ChartUnit = { unitId: crypto.randomUUID(), name: r.name, manager: null, members: [], positions: [], children: [], isActive: true, peopleCount: 0, parentNodeId: parent?.unitId ?? null, nodeType: type ? { nodeTypeId: type.id, name: type.name, color: type.color, icon: type.icon, isDomainBoundary: type.isDomainBoundary } : null };
-        (parent ? parent.children! : company.units).push(unit);
-        made.set(r.code.toLowerCase(), unit);
-      }
-      return json({ nodes: [...made.values()].map((u) => nodeOf(company, u)), links: 0, posts: 0, autoLinkChoices: [], skippedPosts: [] }, 201);
-    }
     const patternPath = path.match(/^\/node-types\/([^/]+)\/posts$/);
     if (patternPath && method === 'GET') return json((patterns.get(patternPath[1]) || []).map((p, i) => ({ ...p, sortOrder: i })));
     if (patternPath && method === 'PUT') {
       const list = (body.posts as { positionId: string; isManagerPost: boolean }[]).map((p) => ({ positionId: p.positionId, title: positionTitles.get(p.positionId) || p.positionId, isManagerPost: p.isManagerPost }));
       patterns.set(patternPath[1], list);
       return json(list.map((p, i) => ({ ...p, sortOrder: i })));
+    }
+    if (method === 'POST' && path === '/positions') {
+      const id = crypto.randomUUID();
+      positionTitles.set(id, body.title);
+      return json({ id, title: body.title, parentPositionId: null, isActive: true, companyIds: body.companyIds || [] }, 201);
+    }
+    const asg = path.match(/^\/assignments\/([^/]+)$/);
+    if (asg && method === 'PUT') {
+      const found = body.unitId ? find(body.unitId) : null;
+      if (!found) return problem(404, 'واحد پیدا نشد.', 'not_found');
+      const unit = found.unit;
+      let post = (unit.positions || []).find((p) => p.positionId === body.positionId);
+      if (!post) {
+        post = { unitPositionId: crypto.randomUUID(), positionId: body.positionId, title: positionTitles.get(body.positionId) || body.positionId, sortOrder: (unit.positions || []).length, isActive: true, holders: [], code: String(++postSeq) };
+        unit.positions = [...(unit.positions || []), post];
+      }
+      if (!post.holders.some((h) => h.userId === asg[1])) post.holders = [...post.holders, { userId: asg[1], displayName: ((window as unknown as { __people?: Record<string, string> }).__people?.[asg[1]] ?? 'کاربر'), isActive: true, positionTitle: post.title, managerUserId: null }];
+      return json({ userId: asg[1], companyId: found.company.companyId, unitId: unit.unitId, positionId: body.positionId });
     }
     if (method === 'GET' && path === '/positions') return json([...positionTitles].map(([id, title]) => ({ id, title, parentPositionId: null, isActive: true, companyIds: chart.map((c) => c.companyId) })));
     if (method === 'POST' && path === '/post-templates/apply') {
@@ -372,6 +323,9 @@ export function createMockServer(initial: ChartCompany[]): MockServer {
       return json({ created: Array.from({ length: created }, () => ({})), skipped: [] });
     }
     if (method === 'GET' && path === '/unit-positions') {
+      if (!query.get('unitId')) {
+        return json(chart.flatMap((c) => allUnitsOf(c).flatMap((u) => (u.positions || []).map((p) => ({ id: p.unitPositionId, unitId: u.unitId, unitName: u.name, companyId: c.companyId, positionId: p.positionId, title: p.title, sortOrder: p.sortOrder, isPositionActive: true, holders: p.holders, code: p.code, isManagerPost: managerPosts.has(p.unitPositionId) })))));
+      }
       const u = query.get('unitId') ? find(query.get('unitId')!)?.unit : null;
       return json((u?.positions || []).map((p) => ({ id: p.unitPositionId, unitId: u!.unitId, unitName: u!.name, positionId: p.positionId, title: p.title, sortOrder: p.sortOrder, isPositionActive: true, holders: p.holders, code: p.code, isManagerPost: managerPosts.has(p.unitPositionId) })));
     }

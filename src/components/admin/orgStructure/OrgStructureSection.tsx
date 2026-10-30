@@ -1,66 +1,64 @@
-import React, { useEffect, useState } from 'react';
-import { UserRound, GitFork, Building2, Network, Briefcase, ListChecks, Link2, LayoutTemplate, FileSpreadsheet, Layers } from 'lucide-react';
-import { PillTabs, TabItem } from '../AdminUi';
-import { ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, type OrgUiLevel, canNode, getChart } from '../../../services/orgStructureApi';
-import { MyPlacementPanel } from './OrgViews';
-import { OrgChartBoard } from './OrgChartBoard';
-import { CompaniesPanel, PositionsPanel, UnitsPanel } from './OrgAdminPanels';
+import React, { useState } from 'react';
+import { AdminDialog, Notice, SecondaryButton } from '../AdminUi';
+import { ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, canNode } from '../../../services/orgStructureApi';
 import { OrgRulesPanel } from './OrgRulesPanel';
 import { OrgLinksPanel } from './OrgLinksPanel';
 import { OrgTemplatesPanel } from './OrgTemplatesPanel';
-import { OrgImportPanel } from './OrgImportPanel';
-import { OrgGroupPanel } from './OrgGroupPanel';
-import { atLeast, highestLevel } from './orgUiLevel';
+import { OrgPlacementForm } from './OrgPlacementForm';
+import { OrgStructureChart, type ToolId } from './OrgStructureChart';
+import { LoadingRow, useLoad } from './orgShared';
+import { PlacementPick, loadPlacementBoard } from './orgPlacementData';
 
-type OrgTab = 'me' | 'chart' | 'companies' | 'units' | 'positions' | 'group' | 'links' | 'templates' | 'import' | 'rules';
+const TOOL_TITLES: Record<ToolId, string> = { templates: 'قالب‌ها', rules: 'قواعد ساختار', links: 'رابطه‌ها' };
 
 /**
- * «ساختار سازمانی»: companies, deputies/units, positions and who reports to whom. Shown only
- * when the backend has the organization-structure module (see SystemAdministration). Everyone
- * sees their own place; the rest follows the user's permissions (the server checks again).
+ * «ساختار سازمانی»: one page with two cards - the «ثبت جایگاه» form and the chart it fills in.
+ * Templates, structure rules and links open from the chart's header. Shown only when the backend
+ * has the organization-structure module (see SystemAdministration); the server checks every
+ * permission again. «جایگاه من» is on the profile page.
  */
 export const OrgStructureSection: React.FC<{ can: (permission: string) => boolean }> = ({ can }) => {
   const reader = Object.values(P).some(can);
-  // The display level (hiding only): simple shows posts and people, normal adds the nodes, advanced adds the rest.
-  const [level, setLevel] = useState<OrgUiLevel>('normal');
-  useEffect(() => {
-    if (!reader) return;
-    let alive = true;
-    getChart().then((chart) => alive && setLevel(highestLevel(chart))).catch(() => {});
-    return () => { alive = false; };
-  }, [reader]);
-  const advanced = atLeast(level, 'advanced');
-  const tabs: TabItem<OrgTab>[] = [
-    { id: 'me', label: 'جایگاه من', icon: UserRound },
-    ...(reader ? [{ id: 'chart' as const, label: 'چارت سازمانی', icon: GitFork }] : []),
-    ...(reader ? [{ id: 'companies' as const, label: 'شرکت‌ها', icon: Building2 }] : []),
-    ...(can(U.view) && atLeast(level, 'normal') ? [{ id: 'units' as const, label: 'معاونت‌ها و واحدها', icon: Network }] : []),
-    ...(reader ? [{ id: 'positions' as const, label: 'سمت‌ها', icon: Briefcase }] : []),
-    ...(advanced && reader ? [{ id: 'group' as const, label: 'چارت گروه', icon: Layers }] : []),
-    ...(advanced && canNode(can, 'view') ? [{ id: 'links' as const, label: 'رابطه‌ها', icon: Link2 }] : []),
-    ...(advanced && canNode(can, 'view') ? [{ id: 'templates' as const, label: 'قالب‌ها', icon: LayoutTemplate }] : []),
-    ...(advanced && canNode(can, 'create') ? [{ id: 'import' as const, label: 'ورود از اکسل', icon: FileSpreadsheet }] : []),
-    // Only with its own permission (the rules change what everyone may do with the structure).
-    ...(advanced && canNode(can, 'manageRules') ? [{ id: 'rules' as const, label: 'قواعد ساختار', icon: ListChecks }] : []),
-  ];
-  const [active, setActive] = useState<OrgTab>('me');
-  /** A company asked for from the group chart: its chart opens on it. */
-  const [chartCompanyId, setChartCompanyId] = useState<string | undefined>(undefined);
-  const current = tabs.some((t) => t.id === active) ? active : 'me';
+  const board = useLoad(loadPlacementBoard, 'دریافت اطلاعات ساختار سازمانی ممکن نشد.');
+  const [pick, setPick] = useState<PlacementPick | null>(null);
+  const [tool, setTool] = useState<ToolId | null>(null);
 
+  const tools: { id: ToolId; label: string }[] = [
+    ...(canNode(can, 'manageTemplates') || canNode(can, 'view') ? [{ id: 'templates' as const, label: TOOL_TITLES.templates }] : []),
+    ...(canNode(can, 'manageRules') ? [{ id: 'rules' as const, label: TOOL_TITLES.rules }] : []),
+    ...(canNode(can, 'view') ? [{ id: 'links' as const, label: TOOL_TITLES.links }] : []),
+  ];
+
+  if (!reader) return <Notice type="info">دسترسی به ساختار سازمانی برای شما فعال نیست.</Notice>;
+  if (board.loading && !board.data) return <LoadingRow />;
+  if (!board.data) return <Notice type="error">{board.error ?? 'دریافت اطلاعات ساختار سازمانی ممکن نشد.'}</Notice>;
+
+  const refresh = async () => { await board.reload(); };
   return (
     <div className="space-y-4">
-      {tabs.length > 1 && <PillTabs tabs={tabs} active={current} onChange={setActive} />}
-      {current === 'me' && <MyPlacementPanel />}
-      {current === 'chart' && <OrgChartBoard can={can} onLevelChange={setLevel} initialCompanyId={chartCompanyId} />}
-      {current === 'group' && <OrgGroupPanel canEdit={can(P.manageCompanies)} onOpenCompany={(id) => { setChartCompanyId(id); setActive('chart'); }} />}
-      {current === 'companies' && <CompaniesPanel canManage={can(P.manageCompanies)} canSeeUnits={can(U.view)} advanced={advanced} />}
-      {current === 'units' && <UnitsPanel canCreate={can(U.create)} canUpdate={can(U.update)} canDeactivate={can(U.delete)} />}
-      {current === 'positions' && <PositionsPanel canManage={can(P.managePositions)} />}
-      {current === 'links' && <OrgLinksPanel canEditLinks={canNode(can, 'update')} canManageTypes={canNode(can, 'manageRules')} />}
-      {current === 'templates' && <OrgTemplatesPanel canManageTemplates={canNode(can, 'manageTemplates')} canCreateCompany={can(P.manageCompanies)} />}
-      {current === 'import' && <OrgImportPanel />}
-      {current === 'rules' && <OrgRulesPanel canApplyPosts={can(P.managePositions)} />}
+      {board.error && <Notice type="error">{board.error}</Notice>}
+      <OrgPlacementForm
+        board={board.data}
+        pick={pick}
+        canAssign={can(P.manageAssignments)}
+        canCreateUnits={canNode(can, 'create') || can(U.create)}
+        canCreatePositions={can(P.managePositions)}
+        onSaved={refresh}
+      />
+      <OrgStructureChart
+        board={board.data}
+        selected={pick}
+        onPick={(next) => setPick({ ...next, at: Date.now() })}
+        tools={tools}
+        onTool={setTool}
+      />
+      {tool && (
+        <AdminDialog wide title={TOOL_TITLES[tool]} onClose={() => { setTool(null); void refresh(); }} footer={<SecondaryButton onClick={() => { setTool(null); void refresh(); }}>بستن</SecondaryButton>}>
+          {tool === 'templates' && <OrgTemplatesPanel canManageTemplates={canNode(can, 'manageTemplates')} canCreateCompany={can(P.manageCompanies)} />}
+          {tool === 'rules' && <OrgRulesPanel canApplyPosts={can(P.managePositions)} />}
+          {tool === 'links' && <OrgLinksPanel canEditLinks={canNode(can, 'update')} canManageTypes={canNode(can, 'manageRules')} />}
+        </AdminDialog>
+      )}
     </div>
   );
 };
