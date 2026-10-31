@@ -71,7 +71,7 @@ export const AddNodeDialog: React.FC<{
             );
           })}
         </div>
-        <p className="text-[11px] text-slate-500">فقط اجزایی که قاعده‌ی «چه زیر چه» اینجا اجازه می‌دهد نشان داده می‌شود.</p>
+        <p className="text-[11px] text-slate-500">فقط اجزایی که قاعده‌ی «سلسله‌مراتب مجاز» اینجا اجازه می‌دهد نشان داده می‌شود.</p>
       </fieldset>
       <Field label="نام" required>
         <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} autoFocus placeholder="مثلاً: اداره کل حسابداری" onKeyDown={(e) => { if (e.key === 'Enter' && name.trim() && typeId && !busy) save(); }} />
@@ -138,9 +138,9 @@ export const MoveNodeDialog: React.FC<{
       </>}
     >
       {empty ? (
-        <Notice type="info">با قاعده‌های «چه زیر چه» فعلی، جای دیگری برای این گره مجاز نیست.{rules.length === 0 ? ' هنوز قاعده‌ای تعریف نشده و ساختار مسطح است.' : ''}</Notice>
+        <Notice type="info">با قاعده‌های «سلسله‌مراتب مجاز» فعلی، جای دیگری برای این گره مجاز نیست.{rules.length === 0 ? ' هنوز قاعده‌ای تعریف نشده و ساختار مسطح است.' : ''}</Notice>
       ) : (
-        <Field label="گره‌ی بالاتر جدید" required hint="فقط جاهایی که قاعده‌ی «چه زیر چه» اجازه می‌دهد فهرست شده است.">
+        <Field label="گره‌ی بالاتر جدید" required hint="فقط جاهایی که قاعده‌ی «سلسله‌مراتب مجاز» اجازه می‌دهد فهرست شده است.">
           <select className={inputClass} value={choice} onChange={(e) => setChoice(e.target.value)} autoFocus>
             <option value="">— انتخاب کنید —</option>
             {top && <option value="__top">بالاترین سطح شرکت</option>}

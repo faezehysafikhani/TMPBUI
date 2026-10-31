@@ -113,7 +113,7 @@ export const CompanyWizard: React.FC<{
             <dt className="text-slate-500">کد</dt><dd className="font-bold dir-ltr text-right">{code.trim()}</dd>
             {parentId && parentChoices && <><dt className="text-slate-500">سازمان بالادستی</dt><dd className="font-bold">{parentChoices.find((c) => c.id === parentId)?.name}</dd></>}
             <dt className="text-slate-500">قالب</dt><dd className="font-bold">{template ? template.name : 'شرکت خالی'}</dd>
-            {template && template.nodeCount > 0 && <><dt className="text-slate-500">ساخته می‌شود</dt><dd>{toPersianDigits(template.nodeCount)} گره با {toPersianDigits(template.nodeTypeCount)} جزء چارت، قاعده‌های «چه زیر چه» و رابطه‌های خودکار آن</dd></>}
+            {template && template.nodeCount > 0 && <><dt className="text-slate-500">ساخته می‌شود</dt><dd>{toPersianDigits(template.nodeCount)} گره با {toPersianDigits(template.nodeTypeCount)} جزء چارت، قاعده‌های «سلسله‌مراتب مجاز» و رابطه‌های خودکار آن</dd></>}
           </dl>
           <p className="text-[11px] leading-5 text-slate-500">قالب فقط کپی می‌شود و بعد از ساخت به آن وصل نیست. پست‌ها و افراد را بعد از ساخت در چارت اضافه کنید.</p>
         </div>

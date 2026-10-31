@@ -1,12 +1,12 @@
 import React from 'react';
-import { AlertTriangle, ChevronDown, ChevronLeft, Crown, Link2, Briefcase, Users } from 'lucide-react';
-import type { ChartCompany, ChartLink, ChartMember, ChartPosition, ChartUnit } from '../../../services/orgStructureApi';
-import { postLabel } from '../../../services/orgStructureApi';
+import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Crown, Briefcase, Users } from 'lucide-react';
+import type { ChartCompany, ChartMember, ChartPosition, ChartUnit } from '../../../services/orgStructureApi';
+import { headTitleOf, postLabel } from '../../../services/orgStructureApi';
 import { toPersianDigits } from '../../../utils/helpers';
-import { ChartSelection, allUnitsOf } from './orgChartModel';
+import { ChartSelection, allUnitsOf, headPostOf } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
-import { safeColor } from './nodes/nodeTypeStyle';
-import { PAGE_SIZE, TidyColumn, layoutOf, peopleCountOf, postRowsOf, vacantKey } from './tidyChartModel';
+import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
+import { PAGE_SIZE, peopleCountOf, postRowsOf, vacantKey } from './tidyChartModel';
 
 /** A render crash in the tidy chart: the board falls back to the tree chart (see OrgChartBoard). */
 export class TidyBoundary extends React.Component<{ onFail: () => void; children: React.ReactNode }, { failed: boolean }> {
@@ -21,8 +21,6 @@ export class TidyBoundary extends React.Component<{ onFail: () => void; children
       : this.props.children;
   }
 }
-
-const FALLBACK_COLORS = ['border-indigo-500', 'border-emerald-500', 'border-amber-500', 'border-sky-500', 'border-rose-500', 'border-violet-500'];
 
 interface Ctx {
   company: ChartCompany;
@@ -98,15 +96,6 @@ const Posts: React.FC<{ ctx: Ctx; unit: ChartUnit }> = ({ ctx, unit }) => {
   );
 };
 
-const LinksLine: React.FC<{ ctx: Ctx; links: ChartLink[] }> = ({ ctx, links }) => (
-  <details className="ms-8 text-[11px] text-slate-500 dark:text-slate-400" open={ctx.printing || undefined}>
-    <summary className="cursor-pointer inline-flex items-center gap-1 font-bold"><Link2 className="w-3 h-3" aria-hidden="true" /> رابطه‌ها ({toPersianDigits(links.length)})</summary>
-    <ul className="mt-1 space-y-0.5 ps-4 list-disc">
-      {links.map((l) => <li key={l.linkId}>{l.name}: به {ctx.nameOf.get(l.targetNodeId) ?? '—'} وصل است</li>)}
-    </ul>
-  </details>
-);
-
 /** A node as a row that opens: its posts, then the nodes under it, indented under a thin line. */
 const NodeRow: React.FC<{ ctx: Ctx; unit: ChartUnit; depth: number }> = ({ ctx, unit, depth }) => {
   const isOpen = ctx.printing || ctx.open.has(unit.unitId);
@@ -115,21 +104,24 @@ const NodeRow: React.FC<{ ctx: Ctx; unit: ChartUnit; depth: number }> = ({ ctx, 
   const people = peopleCountOf(unit);
   const on = ctx.selection?.kind === 'unit' && ctx.selection.unitId === unit.unitId;
   const inactive = unit.isActive === false;
-  const limit = ctx.shown.get(unit.unitId) ?? PAGE_SIZE;
+  // Everything in one list: a node shows all of its children.
+  const limit = kids.length;
   return (
     <li data-tidy-node={unit.unitId} className="space-y-1">
-      <div className={`flex items-center gap-1 rounded-lg ${pick(on)} ${inactive ? 'opacity-60 border border-dashed border-slate-300 dark:border-slate-600' : ''}`}>
+      <div data-tidy-row={unit.unitId} className={`flex items-center gap-1 rounded-lg ${pick(on)} ${inactive ? 'opacity-60 border border-dashed border-slate-300 dark:border-slate-600' : ''}`}>
         {!ctx.printing && (
           <button type="button" disabled={!hasInside} onClick={() => ctx.toggle(unit.unitId)} aria-expanded={isOpen} aria-label={`${isOpen ? 'بستن' : 'باز کردن'} ${unit.name}`} className="w-7 h-7 shrink-0 rounded-md text-slate-500 hover:text-indigo-600 disabled:opacity-30 flex items-center justify-center cursor-pointer">
             {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         )}
         <button type="button" onClick={() => ctx.onSelect({ kind: 'unit', companyId: ctx.company.companyId, unitId: unit.unitId })} aria-current={on ? 'true' : undefined} data-tidy-selected={on ? 'true' : undefined} className="flex-1 min-w-0 flex items-center gap-2 py-1 pe-2 text-start cursor-pointer">
+          <NodeTypeIcon icon={unit.nodeType?.icon} className="w-[18px] h-[18px] shrink-0" color={unit.nodeType?.color} />
           <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={unit.name}>{unit.name}{inactive ? ' (غیرفعال)' : ''}</span>
+          {unit.nodeType && <span className="text-[11px] font-bold shrink-0" style={{ color: safeColor(unit.nodeType.color) }}>{unit.nodeType.name}</span>}
+          <span className="flex-1" />
           <Headcount n={people} />
         </button>
       </div>
-      {(unit.links?.length ?? 0) > 0 && <LinksLine ctx={ctx} links={unit.links!} />}
       {isOpen && hasInside && (
         <div className="ms-3 ps-3 border-s border-slate-200 dark:border-slate-700 space-y-1" data-depth={depth}>
           <Posts ctx={ctx} unit={unit} />
@@ -147,53 +139,79 @@ const NodeRow: React.FC<{ ctx: Ctx; unit: ChartUnit; depth: number }> = ({ ctx, 
   );
 };
 
-const Column: React.FC<{ ctx: Ctx; column: TidyColumn; index: number }> = ({ ctx, column, index }) => {
-  const limit = ctx.shown.get(`col:${column.key}`) ?? PAGE_SIZE;
-  const fallback = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
-  return (
-    <section aria-label={column.title} className={`rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 border-t-4 ${column.color ? '' : fallback} p-3 space-y-2 min-w-0`} style={column.color ? { borderTopColor: safeColor(column.color) } : undefined}>
-      <header className="flex items-center justify-between gap-2">
-        <h4 className="text-sm font-extrabold text-slate-900 dark:text-white truncate" title={column.title}>{column.title}</h4>
-        <span className="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{toPersianDigits(column.nodes.length)} گره · <Users className="inline w-3 h-3" aria-hidden="true" /> {toPersianDigits(column.people)}</span>
-      </header>
-      <ul className="space-y-1">
-        {(ctx.printing ? column.nodes : column.nodes.slice(0, limit)).map((n) => <NodeRow key={n.unitId} ctx={ctx} unit={n} depth={0} />)}
-        {!ctx.printing && column.nodes.length > limit && (
-          <li><button type="button" onClick={() => ctx.more(`col:${column.key}`)} className="ms-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 cursor-pointer">نمایش {toPersianDigits(Math.min(PAGE_SIZE, column.nodes.length - limit))} مورد بعدی</button></li>
-        )}
-      </ul>
-    </section>
-  );
-};
 
-/** The top-level committees, in a dashed strip; each opens on a click. */
-const CommitteeStrip: React.FC<{ ctx: Ctx; committees: ChartUnit[] }> = ({ ctx, committees }) => committees.length === 0 ? null : (
-  <section aria-label="کمیته‌ها" className="rounded-2xl border-2 border-dashed border-violet-400 dark:border-violet-700 p-3 space-y-1.5">
-    <h4 className="text-xs font-extrabold text-violet-700 dark:text-violet-300">کمیته‌ها ({toPersianDigits(committees.length)})</h4>
-    <ul className="grid gap-1.5 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))]">
-      {committees.map((c) => <NodeRow key={c.unitId} ctx={ctx} unit={c} depth={0} />)}
-    </ul>
-  </section>
-);
+/** The dashed arrows of the nodes' links (e.g. «گزارش‌دهی نقطه‌چین»): a half circle in the right margin, from the row of the node to the row of its target (each a little wider). A row that is closed away is not drawn. */
+const LANE = 16;
+const LinkArrows: React.FC<{ company: ChartCompany; deps: unknown[]; children: React.ReactNode }> = ({ company, deps, children }) => {
+  const box = React.useRef<HTMLDivElement>(null);
+  const links = React.useMemo(() => allUnitsOf(company).flatMap((u) => (u.links || []).map((l) => ({ ...l, from: u.unitId, fromName: u.name }))), [company]);
+  const nameOf = React.useMemo(() => new Map(allUnitsOf(company).map((u) => [u.unitId, u.name] as const)), [company]);
+  const [paths, setPaths] = React.useState<{ key: string; d: string; title: string; style: string }[]>([]);
+  const gutter = links.length ? 24 + links.length * LANE : 0;
 
-/** One card of the chain: the node, its people and (open) its posts. */
-const ChainCard: React.FC<{ ctx: Ctx; unit: ChartUnit; last: boolean }> = ({ ctx, unit, last }) => {
-  const on = ctx.selection?.kind === 'unit' && ctx.selection.unitId === unit.unitId;
+  const measure = React.useCallback(() => {
+    const el = box.current;
+    if (!el || links.length === 0) { setPaths([]); return; }
+    const outer = el.getBoundingClientRect();
+    const rowOf = (id: string) => el.querySelector(`[data-tidy-row="${CSS.escape(id)}"]`) as HTMLElement | null;
+    const next: { key: string; d: string; title: string; style: string }[] = [];
+    links.forEach((l, i) => {
+      const a = rowOf(l.from);
+      const b = rowOf(l.targetNodeId);
+      if (!a || !b) return;
+      const ra = a.getBoundingClientRect();
+      const rb = b.getBoundingClientRect();
+      // Right to left: a row starts at its right edge.
+      const xa = ra.right - outer.left + 2;
+      const xb = rb.right - outer.left + 2;
+      const ya = ra.top - outer.top + ra.height / 2;
+      const yb = rb.top - outer.top + rb.height / 2;
+      // A half circle (squeezed into the margin) from the start of one row to the start of the other.
+      const edge = outer.width - gutter + 4;
+      const rx = 16 + i * LANE;
+      const ry = Math.abs(yb - ya) / 2;
+      const sweep = ya < yb ? 1 : 0;
+      next.push({ key: l.linkId, d: `M ${xa} ${ya} H ${edge} A ${rx} ${ry} 0 0 ${sweep} ${edge} ${yb} H ${xb + 4}`, title: `${l.fromName} ← ${l.name} ← ${nameOf.get(l.targetNodeId) ?? ''}`, style: l.lineStyle });
+    });
+    setPaths(next);
+  }, [links, nameOf, gutter]);
+
+  React.useLayoutEffect(() => { measure(); }, [measure, ...deps]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure]);
+
   return (
-    <div data-tidy-node={unit.unitId} className={`w-full max-w-md rounded-2xl border bg-white dark:bg-slate-900 p-3 space-y-1.5 ${on ? 'border-indigo-400 ring-2 ring-indigo-200 dark:ring-indigo-900' : 'border-slate-200 dark:border-slate-700'}`}>
-      <button type="button" onClick={() => ctx.onSelect({ kind: 'unit', companyId: ctx.company.companyId, unitId: unit.unitId })} aria-current={on ? 'true' : undefined} data-tidy-selected={on ? 'true' : undefined} className="w-full flex items-center justify-between gap-2 text-start cursor-pointer">
-        <span className="text-sm font-extrabold text-slate-900 dark:text-white truncate" title={unit.name}>{unit.name}</span>
-        <Headcount n={last ? peopleCountOf(unit) : 0} />
-      </button>
-      {(unit.links?.length ?? 0) > 0 && <LinksLine ctx={ctx} links={unit.links!} />}
-      <Posts ctx={ctx} unit={unit} />
+    <div ref={box} className="relative" style={{ paddingInlineStart: gutter }}>
+      {children}
+      {paths.length > 0 && (
+        <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" aria-hidden="true" data-testid="tidy-links">
+          <defs>
+            <marker id="tidy-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L8,4 L0,8 z" className="fill-violet-500" />
+            </marker>
+          </defs>
+          {paths.map((p) => (
+            <path key={p.key} d={p.d} fill="none" className="stroke-violet-500" strokeWidth={1.6}
+              strokeDasharray={p.style === 'solid' ? undefined : p.style === 'dashed' ? '6 4' : '2 3'} markerEnd="url(#tidy-arrow)">
+              <title>{p.title}</title>
+            </path>
+          ))}
+        </svg>
+      )}
     </div>
   );
 };
 
 /**
- * «چارت مرتب»: a chain from the root to the first node with several children, a strip of
- * committees and a column per node type (see tidyChartModel). Uses the board's selection and data.
+ * «چارت مرتب»: the whole company as one indented list - the company, its head, then every node
+ * with an open/close arrow, its icon and the name of its part of the chart; a node's posts and
+ * people sit under it. Dotted links («مافوق دوم») are dashed arrows in the margin on the right.
+ * Uses the board's selection, so a click shows the node in the details panel as before.
  */
 export const TidyOrgChart: React.FC<{
   company: ChartCompany;
@@ -205,7 +223,6 @@ export const TidyOrgChart: React.FC<{
   printing?: boolean;
   rootRef?: React.Ref<HTMLDivElement>;
 }> = ({ company, selection, onSelect, open, onToggle, showEmpty, printing = false, rootRef }) => {
-  const layout = React.useMemo(() => layoutOf(company), [company]);
   const nameOf = React.useMemo(() => new Map(allUnitsOf(company).map((u) => [u.unitId, u.name] as const)), [company]);
   const [shown, setShown] = React.useState<Map<string, number>>(new Map());
   const more = (key: string) => setShown((prev: Map<string, number>) => new Map<string, number>(prev).set(key, (prev.get(key) ?? PAGE_SIZE) + PAGE_SIZE));
@@ -221,7 +238,7 @@ export const TidyOrgChart: React.FC<{
       id = allUnitsOf(company).find((u) => u.members.some((m) => m.userId === userId) || (u.positions || []).some((p) => p.holders.some((h) => h.userId === userId)))?.unitId ?? null;
     }
     const lists: [string, ChartUnit[]][] = [
-      ...layout.roots.flatMap((r) => r.columns).map((c) => [`col:${c.key}`, c.nodes] as [string, ChartUnit[]]),
+      ['top', company.units] as [string, ChartUnit[]],
       ...allUnitsOf(company).map((u) => [u.unitId, u.children || []] as [string, ChartUnit[]]),
     ];
     const grow = new Map<string, number>();
@@ -229,7 +246,8 @@ export const TidyOrgChart: React.FC<{
     const has = (u: ChartUnit): boolean => u.unitId === target || (u.children || []).some(has);
     for (const [key, nodes] of (target ? lists : [])) {
       const at = nodes.findIndex(has);
-      if (at >= PAGE_SIZE) grow.set(key, Math.ceil((at + 1) / PAGE_SIZE) * PAGE_SIZE);
+      const page = key === 'top' ? PAGE_SIZE * 3 : PAGE_SIZE;
+      if (at >= page) grow.set(key, Math.ceil((at + 1) / PAGE_SIZE) * PAGE_SIZE);
     }
     if (grow.size) setShown((prev: Map<string, number>) => { const next = new Map<string, number>(prev); grow.forEach((v: number, k: string) => next.set(k, Math.max(v, next.get(k) ?? 0))); return next; });
     // Bring the chosen card into view once it is drawn (its branches open and its page of the list shown first):
@@ -249,31 +267,45 @@ export const TidyOrgChart: React.FC<{
     return () => timers.forEach((t) => window.clearTimeout(t));
   }, [selection]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (layout.roots.length === 0 && layout.committees.length === 0) return <p className="p-6 text-sm text-slate-500">این شرکت هنوز گره‌ای ندارد.</p>;
+  const head = headPostOf(company);
+  const companyOn = selection?.kind === 'company' && selection.companyId === company.companyId;
+  const headSelect: ChartSelection | null = company.manager
+    ? { kind: 'member', userId: company.manager.userId }
+    : head ? { kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: head.unitPositionId } : null;
+  const headOn = !!headSelect && (headSelect.kind === 'member'
+    ? selection?.kind === 'member' && selection.userId === headSelect.userId
+    : selection?.kind === 'position' && selection.unitPositionId === (head?.unitPositionId ?? ''));
+  const limit = company.units.length;
   return (
-    <div ref={rootRef} data-testid="tidy-chart" className="p-4 sm:p-6 space-y-5 bg-slate-50/60 dark:bg-slate-950/40">
-      {layout.roots.length === 0 && <CommitteeStrip ctx={ctx} committees={layout.committees} />}
-      {layout.roots.map((root, index) => (
-        <div key={root.chain[0].unitId} className="space-y-5" data-testid="tidy-root">
-          <div className="flex flex-col items-center">
-            {root.chain.map((unit, i) => (
-              <React.Fragment key={unit.unitId}>
-                {i > 0 && <span className="w-0.5 h-5 bg-slate-300 dark:bg-slate-600" aria-hidden="true" />}
-                <ChainCard ctx={ctx} unit={unit} last={i === root.chain.length - 1} />
-              </React.Fragment>
-            ))}
-          </div>
-          {index === 0 && <CommitteeStrip ctx={ctx} committees={layout.committees} />}
-          {root.columns.length > 0 && (
-            <>
-              <div className="flex justify-center"><span className="w-0.5 h-4 bg-slate-300 dark:bg-slate-600" aria-hidden="true" /></div>
-              <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(250px,1fr))] max-sm:grid-cols-1">
-                {root.columns.map((column, i) => <Column key={column.key} ctx={ctx} column={column} index={i} />)}
-              </div>
-            </>
-          )}
-        </div>
-      ))}
+    <div ref={rootRef} data-testid="tidy-chart" className="p-3 sm:p-5 bg-slate-50/60 dark:bg-slate-950/40">
+      <div className="relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 py-3 ps-3" style={{ paddingInlineEnd: 12 }}>
+        <LinkArrows company={company} deps={[open, shown, showEmpty, printing]}>
+          <ul className="space-y-1">
+            <li>
+              <button type="button" onClick={() => onSelect({ kind: 'company', companyId: company.companyId })} aria-current={companyOn ? 'true' : undefined} data-tidy-selected={companyOn ? 'true' : undefined} className={`${rowBase} ${pick(companyOn)}`}>
+                <Building2 className="w-[18px] h-[18px] text-indigo-600 shrink-0" aria-hidden="true" />
+                <span className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{company.name}</span>
+                <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-300 shrink-0">شرکت</span>
+              </button>
+            </li>
+            {headSelect && (
+              <li>
+                <button type="button" onClick={() => onSelect(headSelect)} aria-current={headOn ? 'true' : undefined} data-tidy-selected={headOn ? 'true' : undefined} className={`${rowBase} ${pick(headOn)}`}>
+                  <Crown className="w-[18px] h-[18px] text-amber-600 shrink-0" aria-hidden="true" />
+                  <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{company.manager?.displayName ?? (head ? `${postLabel(head)} (خالی)` : '')}</span>
+                  <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 shrink-0">{headTitleOf(company)}</span>
+                </button>
+              </li>
+            )}
+            {company.units.length === 0
+              ? <li className="p-4 text-sm text-slate-500">این شرکت هنوز گره‌ای ندارد.</li>
+              : (printing ? company.units : company.units.slice(0, limit)).map((u) => <NodeRow key={u.unitId} ctx={ctx} unit={u} depth={0} />)}
+            {!printing && company.units.length > limit && (
+              <li><button type="button" onClick={() => more('top')} className="ms-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 cursor-pointer">نمایش {toPersianDigits(Math.min(PAGE_SIZE, company.units.length - limit))} مورد بعدی</button></li>
+            )}
+          </ul>
+        </LinkArrows>
+      </div>
     </div>
   );
 };
