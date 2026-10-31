@@ -6,6 +6,7 @@ import { toPersianDigits } from '../../../utils/helpers';
 import { ChartSelection, allUnitsOf, headPostOf } from './orgChartModel';
 import { PersonAvatar } from './PersonAvatar';
 import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
+import { CompanyLogo } from './nodes/CompanyLogo';
 import { PAGE_SIZE, peopleCountOf, postRowsOf, vacantKey } from './tidyChartModel';
 
 /** A render crash in the tidy chart: the board falls back to the tree chart (see OrgChartBoard). */
@@ -283,7 +284,7 @@ export const TidyOrgChart: React.FC<{
           <ul className="space-y-1">
             <li>
               <button type="button" onClick={() => onSelect({ kind: 'company', companyId: company.companyId })} aria-current={companyOn ? 'true' : undefined} data-tidy-selected={companyOn ? 'true' : undefined} className={`${rowBase} ${pick(companyOn)}`}>
-                <Building2 className="w-[18px] h-[18px] text-indigo-600 shrink-0" aria-hidden="true" />
+                <CompanyLogo logoUrl={company.logoUrl} name={company.name} className="w-7 h-7" fallback={<Building2 className="w-[18px] h-[18px] text-indigo-600 shrink-0" aria-hidden="true" />} />
                 <span className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{company.name}</span>
                 <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-300 shrink-0">شرکت</span>
               </button>

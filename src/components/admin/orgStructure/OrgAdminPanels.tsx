@@ -11,6 +11,7 @@ import {
 } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
 import { CompanyFormDialog } from './nodes/CompanyFormDialog';
+import { CompanyLogo } from './nodes/CompanyLogo';
 
 type Message = { type: 'success' | 'error'; text: string } | null;
 
@@ -80,7 +81,7 @@ export const CompaniesPanel: React.FC<{ canManage: boolean; canSeeUnits: boolean
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {data.data!.companies.map((c) => (
                     <tr key={c.id}>
-                      <td className={`${td} font-bold text-slate-900 dark:text-slate-100`}>{c.name}</td>
+                      <td className={`${td} font-bold text-slate-900 dark:text-slate-100`}><span className="flex items-center gap-2"><CompanyLogo logoUrl={c.logoUrl} name={c.name} className="w-8 h-8" fallback={null} />{c.name}</span></td>
                       <td className={`${td} dir-ltr text-right text-slate-500`}>{c.code}</td>
                       <td className={td}>{c.manager ? <>{c.manager.displayName} <span className="text-[11px] text-slate-400">({headTitleOf(c)})</span></> : '—'}</td>
                       <td className={td}>

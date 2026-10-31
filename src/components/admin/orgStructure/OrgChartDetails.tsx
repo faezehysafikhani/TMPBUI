@@ -25,6 +25,7 @@ import { NodePostTools } from './nodes/NodePostTools';
 import { AppointDialog, EndAppointmentDialog, PostHistory, UserPositionHistory } from './nodes/AppointmentDialogs';
 import { MergeNodeDialog, NodeHistoryDialog } from './nodes/HistoryDialogs';
 import { CompanyFormDialog } from './nodes/CompanyFormDialog';
+import { CompanyLogo } from './nodes/CompanyLogo';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
 
@@ -257,7 +258,16 @@ export const OrgChartDetails: React.FC<{
       const vacant = allUnitsOf(company).reduce((n, u) => n + vacantCount(u), 0);
       body = selection.kind === 'company' ? (
         <>
-          <Header icon={Building2} tone="bg-indigo-600 text-white" title={company.name} subtitle={`شرکت · کد ${company.code}`} badge={<ActiveBadge active={company.isActive} />} />
+          {company.logoUrl ? (
+            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 p-3">
+              <CompanyLogo logoUrl={company.logoUrl} name={company.name} className="w-12 h-12" fallback={<span className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-indigo-600 text-white"><Building2 className="w-6 h-6" /></span>} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-base font-extrabold text-slate-900 dark:text-white truncate">{company.name}</span>
+                <span className="block text-xs text-slate-500 truncate">شرکت · کد {company.code}</span>
+              </span>
+              <ActiveBadge active={company.isActive} />
+            </div>
+          ) : <Header icon={Building2} tone="bg-indigo-600 text-white" title={company.name} subtitle={`شرکت · کد ${company.code}`} badge={<ActiveBadge active={company.isActive} />} />}
           <div>
             <InfoRow label={headTitleOf(company)}><PersonValue person={company.manager} empty="تعیین نشده" /></InfoRow>
             {!company.manager && (
@@ -768,7 +778,8 @@ const MemberDetails: React.FC<{
   const isHead = chart.some((c) => c.manager?.userId === member.userId);
   // Every position they hold, the main one first (from the chart while their place is loading).
   const held = assignment?.positions
-    || place.positions.map((p) => ({ unitPositionId: p.position.unitPositionId, unitId: p.unit.unitId, unitName: p.unit.name, positionId: p.position.positionId, title: p.position.title }));
+    || place.positions.map((p) => ({ unitPositionId: p.position.unitPositionId, unitId: p.unit?.unitId ?? null, unitName: p.unit?.name ?? p.company.name, positionId: p.position.positionId, title: p.position.title }));
+  // (a post directly in the company - the head's - has no node: it is shown as «مستقیم در <شرکت>»)
   // A position held directly in the company (e.g. the head's), outside any deputy.
   const companyPosition = assignment && !assignment.unitId && assignment.positionTitle && !held.some((h) => !h.unitId) ? assignment.positionTitle : null;
   const heldCount = held.length + (companyPosition ? 1 : 0);
