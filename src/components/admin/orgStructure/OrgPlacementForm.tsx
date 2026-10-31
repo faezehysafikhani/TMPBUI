@@ -5,8 +5,10 @@ import { JalaliDatePicker } from '../../JalaliDatePicker';
 import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
-  addUnitPosition, appointToPost, createNode, createPosition, positionsForCompany, setAssignment,
+  type HeldPosition, type UnitPosition,
+  addUnitPosition, appointToPost, createNode, createPosition, getAssignment, positionsForCompany, setAssignment,
 } from '../../../services/orgStructureApi';
+import { type PostChoice, type PostOption, PostChoiceDialog, endPosts } from './nodes/PostChoices';
 import { UserPicker } from './orgShared';
 import { OrgPlacementBoard, PlacementPick, nodePath } from './orgPlacementData';
 
@@ -14,6 +16,9 @@ const todayIso = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
+
+/** What a save needs to know once the questions are answered. */
+interface SaveContext { later: boolean; inCompany: boolean; sameHeld: UnitPosition | null; vacant: UnitPosition[] }
 
 interface Draft {
   companyId: string;
@@ -168,6 +173,11 @@ export const OrgPlacementForm: React.FC<{
     { text: draft.userName, empty: 'کاربر' },
   ];
 
+  // The questions asked before a save (previous posts; a filled post), and the save waiting on them.
+  const [asking, setAsking] = useState<{ filled: PostOption[] | null; vacant: PostOption[]; allowReplace: boolean; previous: HeldPosition[]; andNext: boolean; context: SaveContext } | null>(null);
+
+  const postLabelOf = (p: UnitPosition) => `${p.title}${p.code ? ` · کد ${toPersianDigits(p.code)}` : ''}`;
+
   const save = async (andNext: boolean) => {
     if (!ready || !canAssign) return;
     setBusy(true);
@@ -175,22 +185,73 @@ export const OrgPlacementForm: React.FC<{
     try {
       const userId = draft.userId!;
       const later = !!draft.startDate && draft.startDate > todayIso();
-      if (later) {
-        // From a later day: the user takes the post then (the post is made if the unit has none).
-        const posts = board.posts.filter((p) => p.unitId === draft.unitId && p.positionId === draft.positionId);
-        const post = posts[0] ?? await addUnitPosition(draft.unitId, draft.positionId);
-        await appointToPost(post.id, userId, draft.startDate);
-      } else {
-        await setAssignment(userId, {
-          companyId: draft.companyId,
-          unitId: draft.unitId,
-          positionId: draft.positionId,
-          managerUserId: draft.managerUserId,
+      const place = await getAssignment(userId);
+      const held = place?.positions ?? [];
+      const here = board.posts.filter((p) => p.unitId === draft.unitId && p.positionId === draft.positionId);
+      const sameHeld = here.find((p) => held.some((h) => h.unitPositionId === p.id)) ?? null;
+      const vacant = here.filter((p) => p.holders.length === 0);
+      const filled = here.filter((p) => p.holders.length > 0 && !p.holders.some((h) => h.userId === userId));
+      const previous = held.filter((h) => h.unitPositionId !== sameHeld?.id);
+      const context: SaveContext = { later, inCompany: !!place && place.companyId === draft.companyId, sameHeld, vacant };
+      const askTarget = !sameHeld && vacant.length === 0 && filled.length > 0;
+      if (askTarget || previous.length > 0) {
+        setAsking({
+          filled: askTarget ? filled.map((p) => ({ postId: p.id, label: postLabelOf(p), holderName: p.holders[0]?.displayName })) : null,
+          vacant: askTarget
+            ? board.posts.filter((p) => p.unitId === draft.unitId && p.holders.length === 0).map((p) => ({ postId: p.id, label: postLabelOf(p) }))
+            : [],
+          allowReplace: later || context.inCompany,
+          previous,
+          andNext,
+          context,
         });
+        return;
       }
-      await onSaved();
-      setMessage({ type: 'success', text: later ? `جایگاه «${draft.userName}» از تاریخ انتخاب‌شده ثبت شد.` : `جایگاه «${draft.userName}» ثبت شد.` });
-      setDraft(andNext ? { ...EMPTY, companyId: draft.companyId, unitId: draft.unitId, positionId: '' } : draft);
+      await perform({ target: null, endPostIds: [] }, andNext, context, previous);
+    } catch (err) {
+      setMessage({ type: 'error', text: userErrorMessage(err, 'ثبت جایگاه انجام نشد.') });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const perform = async (choice: PostChoice, andNext: boolean, context: SaveContext, previous: HeldPosition[]) => {
+    const userId = draft.userId!;
+    const { later } = context;
+    // The post the person takes: the one chosen, else the one they hold here, else a vacant one, else a new one.
+    let postId: string | null = choice.target && choice.target.kind !== 'new' ? choice.target.postId : null;
+    if (!postId && choice.target?.kind !== 'new') postId = context.sameHeld?.id ?? context.vacant[0]?.id ?? null;
+    if (!postId) postId = (await addUnitPosition(draft.unitId, draft.positionId)).id;
+    const positionId = board.posts.find((p) => p.id === postId)?.positionId ?? draft.positionId;
+
+    if (later) {
+      // From a later day: the person takes the post then; the posts they give up end the same day.
+      await appointToPost(postId, userId, draft.startDate);
+      await endPosts(choice.endPostIds, draft.startDate);
+    } else {
+      // Someone else's post: they end now and this person takes it.
+      if (choice.target?.kind === 'replace') await appointToPost(postId, userId, null);
+      const kept = previous.filter((h) => !choice.endPostIds.includes(h.unitPositionId)).map((h) => h.unitPositionId);
+      await setAssignment(userId, {
+        companyId: draft.companyId,
+        unitId: draft.unitId,
+        positionId,
+        managerUserId: draft.managerUserId,
+        unitPositionIds: [postId, ...kept.filter((id) => id !== postId)],
+      });
+    }
+    await onSaved();
+    setMessage({ type: 'success', text: later ? `جایگاه «${draft.userName}» از تاریخ انتخاب‌شده ثبت شد.` : `جایگاه «${draft.userName}» ثبت شد.` });
+    setDraft(andNext ? { ...EMPTY, companyId: draft.companyId, unitId: draft.unitId, positionId: '' } : draft);
+  };
+
+  const confirmAsked = async (choice: PostChoice) => {
+    if (!asking) return;
+    const { andNext, context, previous } = asking;
+    setAsking(null);
+    setBusy(true);
+    try {
+      await perform(choice, andNext, context, previous);
     } catch (err) {
       setMessage({ type: 'error', text: userErrorMessage(err, 'ثبت جایگاه انجام نشد.') });
     } finally {
@@ -311,6 +372,18 @@ export const OrgPlacementForm: React.FC<{
       </form>
       {draft.startDate && draft.startDate > todayIso() && (
         <p className="text-[11px] text-slate-500 dark:text-slate-400">با تاریخ شروع در آینده، کاربر از همان روز به این سمت منصوب می‌شود ({toPersianDigits(draft.startDate)}).</p>
+      )}
+      {asking && (
+        <PostChoiceDialog
+          personName={draft.userName || 'کاربر'}
+          filled={asking.filled}
+          vacant={asking.vacant}
+          allowNew
+          allowReplace={asking.allowReplace}
+          previous={asking.previous}
+          onConfirm={(choice) => void confirmAsked(choice)}
+          onCancel={() => setAsking(null)}
+        />
       )}
     </AdminCard>
   );

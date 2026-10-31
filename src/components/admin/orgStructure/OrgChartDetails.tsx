@@ -23,6 +23,7 @@ import { AddLinkDialog, RemoveLinkDialog, linkSentence } from './nodes/LinkDialo
 import { SaveTemplateDialog } from './nodes/SaveTemplateDialog';
 import { NodePostTools } from './nodes/NodePostTools';
 import { AppointDialog, EndAppointmentDialog, PostHistory, UserPositionHistory } from './nodes/AppointmentDialogs';
+import { StandInDialog } from './nodes/StandInDialog';
 import { MergeNodeDialog, NodeHistoryDialog } from './nodes/HistoryDialogs';
 import { CompanyFormDialog } from './nodes/CompanyFormDialog';
 import { CompanyLogo } from './nodes/CompanyLogo';
@@ -203,6 +204,7 @@ export const OrgChartDetails: React.FC<{
     | { kind: 'merge'; company: ChartCompany; unit: ChartUnit }
     | { kind: 'appoint'; post: ChartPosition; placeName: string }
     | { kind: 'endAppointment'; post: ChartPosition }
+    | { kind: 'standIn'; post: ChartPosition }
     | { kind: 'history'; company: ChartCompany; unit: ChartUnit }
     | { kind: 'removeLink'; company: ChartCompany; unit: ChartUnit; linkId: string; targetId: string; targetName: string; linkTypeId: string }
     | null
@@ -627,6 +629,9 @@ export const OrgChartDetails: React.FC<{
             {can(P.manageAssignments) && position.isActive && (
               <ActionTile icon={UserCog} label={position.holders.length ? 'تعویض مسئول' : 'انتصاب با تاریخ'} title="انتصاب از امروز یا از روزی بعد؛ مسئول فعلی همان روز پایان می‌یابد" disabled={busy} onClick={() => setExtra({ kind: 'appoint', post: position, placeName })} />
             )}
+            {can(P.manageAssignments) && position.isActive && (
+              <ActionTile icon={UserCog} label="تعیین جانشین" title="جانشین از همین واحد: تا پر شدن پست، یا از تاریخی تا تاریخی (مرخصی، مأموریت)" disabled={busy} onClick={() => setExtra({ kind: 'standIn', post: position })} />
+            )}
             {can(P.manageAssignments) && position.holders.length > 0 && (
               <ActionTile icon={UserMinus} tone="rose" label="پایان انتصاب" disabled={busy} onClick={() => setExtra({ kind: 'endAppointment', post: position })} />
             )}
@@ -693,6 +698,8 @@ export const OrgChartDetails: React.FC<{
           <AppointDialog post={extra.post} placeName={extra.placeName} onDone={async (text) => { await onChanged(); setMessage({ type: 'success', text }); }} onClose={() => setExtra(null)} />
         ) : extra.kind === 'endAppointment' ? (
           <EndAppointmentDialog post={extra.post} onDone={async (text) => { await onChanged(); setMessage({ type: 'success', text }); }} onClose={() => setExtra(null)} />
+        ) : extra.kind === 'standIn' ? (
+          <StandInDialog post={extra.post} onDone={async (text) => { await onChanged(); setMessage({ type: 'success', text }); }} onClose={() => setExtra(null)} />
         ) : extra.kind === 'editCompany' ? (
           <CompanyFormDialog
             company={extra.company}
@@ -771,7 +778,7 @@ const MemberDetails: React.FC<{
     let alive = true;
     getAssignment(member.userId).then((a) => alive && setAssignmentState(a)).catch(() => alive && setAssignmentState(null));
     return () => { alive = false; };
-  }, [member.userId, member.positionTitle]);
+  }, [member.userId, member.positionTitle, chart]); // the chart reloads after every change (e.g. «تغییر سمت‌ها»)
 
   const company = assignment ? chart.find((c) => c.companyId === assignment.companyId) : undefined;
   const path = assignment ? [assignment.companyName, assignment.unitName].filter(Boolean).join(' ‹ ') : null;
@@ -1152,10 +1159,15 @@ const ChartDialog: React.FC<{
       const toggle = (id: string) => setChosenSeats((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
       save = async () => {
         if (!memberAssignment) return;
+        // The main post given up: the first chosen one becomes the main one, and the person's
+        // place (and so their direct manager) moves with it.
+        const keptMain = (memberAssignment.positions || []).find((p) => p.positionId === memberAssignment.positionId && p.unitId === memberAssignment.unitId);
+        const mainGone = !keptMain || !chosenSeats.includes(keptMain.unitPositionId);
+        const newMain = mainGone ? (allSeats || []).find((seat) => seat.id === chosenSeats[0]) : undefined;
         done(await run(() => setAssignment(dialog.userId, {
-          companyId: memberAssignment.companyId,
-          unitId: memberAssignment.unitId,
-          positionId: memberAssignment.positionId,
+          companyId: newMain?.companyId ?? memberAssignment.companyId,
+          unitId: newMain ? newMain.unitId : memberAssignment.unitId,
+          positionId: newMain ? newMain.positionId : memberAssignment.positionId,
           managerUserId: memberAssignment.explicitManagerUserId,
           unitPositionIds: chosenSeats,
         }), 'سمت‌ها ذخیره شد.', 'ذخیره سمت‌ها انجام نشد.'));

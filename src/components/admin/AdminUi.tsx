@@ -197,6 +197,15 @@ export const Notice: React.FC<{ type: 'success' | 'error' | 'info'; children: Re
     info: 'bg-indigo-50 border-indigo-200 text-indigo-800 dark:bg-indigo-950/50 dark:border-indigo-800 dark:text-indigo-200',
   };
   const Icon = type === 'success' ? CheckCircle2 : AlertCircle;
+  // A closable success or error message goes away by itself after 7 seconds.
+  const close = React.useRef(onClose);
+  close.current = onClose;
+  const closable = !!onClose && type !== 'info';
+  React.useEffect(() => {
+    if (!closable) return undefined;
+    const timer = window.setTimeout(() => close.current?.(), 7000);
+    return () => window.clearTimeout(timer);
+  }, [closable, children]);
   return (
     <div role={type === 'error' ? 'alert' : 'status'} className={`flex items-start gap-2 p-3 rounded-xl border text-sm ${styles[type]}`}>
       <Icon className="w-4 h-4 shrink-0 mt-0.5" />

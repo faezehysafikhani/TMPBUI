@@ -540,6 +540,7 @@ export default function App() {
             prev.map((t) => (t.id === created.id ? { ...t, logs: [newLog, ...(t.logs || []).filter((l) => l.action !== TASK_CREATED_ACTION)] } : t))
           );
         }
+        showToast(`فعالیت «${created.title}» ساخته شد.`, 'ok');
       }
       setPbError(null);
     } catch (err: any) {
