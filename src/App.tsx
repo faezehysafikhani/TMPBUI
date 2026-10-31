@@ -240,6 +240,7 @@ export default function App() {
   const [initialStatusForNewTask, setInitialStatusForNewTask] = useState<TaskStatus>('todo');
   const [initialDueDateForNewTask, setInitialDueDateForNewTask] = useState<string | undefined>(undefined);
   const [initialTitleForNewTask, setInitialTitleForNewTask] = useState<string>('');
+  const [initialTagsForNewTask, setInitialTagsForNewTask] = useState<string[]>([]);
   const [lockInitialDescription, setLockInitialDescription] = useState<boolean>(false);
   const [parentForNewTask, setParentForNewTask] = useState<{ id: string; title: string } | null>(null);
   const [initialDescriptionForNewTask, setInitialDescriptionForNewTask] = useState<string>('');
@@ -747,9 +748,11 @@ export default function App() {
     isoDate?: string,
     initialTitle: string = '',
     initialDescription: string = '',
-    parent?: { id: string; title: string }
+    parent?: { id: string; title: string },
+    initialTags: string[] = []
   ) => {
     if (!can(currentUser, PERMISSIONS.tasksCreate)) return;
+    setInitialTagsForNewTask(initialTags);
     setTaskToEdit(null);
     setInitialStatusForNewTask(status);
     // No date chosen (e.g. not from the calendar): the form's own default (end of today).
@@ -774,6 +777,7 @@ export default function App() {
     setTaskToEdit(task);
     setInitialDueDateForNewTask(undefined);
     setInitialTitleForNewTask('');
+    setInitialTagsForNewTask([]);
     setInitialDescriptionForNewTask('');
     setParentForNewTask(null);
     setIsFormModalOpen(true);
@@ -1401,7 +1405,7 @@ export default function App() {
                   tasks={visibleTasks}
                   currentUser={currentUser}
                   onOpenCreateForDate={canCreateTask ? (isoDate) => handleOpenCreateModal('todo', isoDate) : undefined}
-                  onConvertMeetingToTask={canCreateTask ? (title, meetingDate) => handleOpenCreateModal('todo', meetingDate && !schedulingBlockReason(meetingDate) ? iranDateTimeToISO(meetingDate, '23:59') : undefined, title) : undefined}
+                  onConvertMeetingToTask={canCreateTask ? (title, meetingDate, tags) => handleOpenCreateModal('todo', meetingDate && !schedulingBlockReason(meetingDate) ? iranDateTimeToISO(meetingDate, '23:59') : undefined, title, '', undefined, tags) : undefined}
                   onEditTask={handleOpenEditModal}
                   onDeleteTask={handleDeleteTask}
                   onStatusChange={handleStatusChange}
@@ -1521,6 +1525,7 @@ export default function App() {
             initialStatus={initialStatusForNewTask}
             initialDueDate={initialDueDateForNewTask}
             initialTitle={initialTitleForNewTask}
+            initialTags={initialTagsForNewTask}
             initialDescription={initialDescriptionForNewTask}
             lockInitialDescription={lockInitialDescription}
             parentTask={parentForNewTask}

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarDays, Users, ListOrdered, CheckSquare, Plus, Trash2, Loader2, Clock3, Video, Building2, BellRing, FileText, ListPlus } from 'lucide-react';
-import { Task, User } from '../types';
+import { CalendarDays, Users, ListOrdered, CheckSquare, Plus, Trash2, Loader2, Clock3, Video, Building2, BellRing, FileText, ListPlus, FileDown } from 'lucide-react';
+import { STATUSES, Task, User } from '../types';
 import { Meeting, MeetingInput, MeetingPeopleOptions, getMeetingPeople, saveMeeting } from '../services/meetingApi';
+import { downloadMeetingReport } from '../utils/meetingReportPdf';
 import { userErrorMessage } from '../utils/errorMessages';
 import { toPersianDigits } from '../utils/helpers';
 import { JalaliDatePicker } from './JalaliDatePicker';
@@ -17,16 +18,17 @@ const tabs = [
   { id: 'details', label: 'مشخصات رویداد', icon: CalendarDays },
   { id: 'people', label: 'افراد مرتبط', icon: Users },
   { id: 'agenda', label: 'دستور جلسه', icon: ListOrdered },
-  { id: 'minutes', label: 'صورت‌جلسه', icon: FileText },
+  { id: 'minutes', label: 'مصوبات صورت‌جلسه', icon: FileText },
   { id: 'tasks', label: 'ارتباط با وظایف', icon: CheckSquare },
+  { id: 'report', label: 'گزارش', icon: FileDown },
 ] as const;
 type Tab = typeof tabs[number]['id'];
 
 export function MeetingFormModal({ initialDate, meeting, currentUser, people, tasks, onClose, onSaved, onConvertToTask }: {
   initialDate: string; meeting?: Meeting; currentUser: User; people: User[]; tasks: Task[];
   onClose: () => void; onSaved: (meeting: Meeting) => void;
-  /** Opens the ordinary new-task form with the meeting's title; unset when the user may not create tasks. */
-  onConvertToTask?: (title: string, isoDate: string) => void;
+  /** Opens the ordinary new-task form, labelled with the meeting and agenda item it resolves; unset when the user may not create tasks. */
+  onConvertToTask?: (title: string, isoDate: string, tags: string[]) => void;
 }) {
   const [form, setForm] = useState<MeetingInput>(() => meeting ? { ...meeting.details, version: meeting.version } : {
     title: '', type: 'meeting', date: initialDate, startTime: '09:00', endTime: '10:00', location: '', organizerUserId: currentUser.id,
@@ -34,6 +36,8 @@ export function MeetingFormModal({ initialDate, meeting, currentUser, people, ta
   });
   const [active, setActive] = useState<Tab>('details');
   const [busy, setBusy] = useState(false);
+  const [resolutionAgenda, setResolutionAgenda] = useState<string>('');
+  const [reportBusy, setReportBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const readonly = !!meeting && !meeting.canEdit;
   const [peopleOptions, setPeopleOptions] = useState<MeetingPeopleOptions | null>(null);
@@ -74,15 +78,43 @@ export function MeetingFormModal({ initialDate, meeting, currentUser, people, ta
   };
 
   // The minutes belong to a meeting that already exists: the first save has no such tab.
-  const visibleTabs = meeting ? tabs : tabs.filter(t => t.id !== 'minutes');
-  const counts:Record<Tab,number>={details:0,people:form.participantIds.length,agenda:form.agenda.length,minutes:form.minutes.trim()?1:0,tasks:form.taskIds.length};
+  const visibleTabs = meeting ? tabs : tabs.filter(t => t.id !== 'minutes' && t.id !== 'report');
+  const counts:Record<Tab,number>={details:0,people:form.participantIds.length,agenda:form.agenda.length,minutes:form.minutes.trim()?1:0,tasks:form.taskIds.length,report:0};
   const start=normalizeMeetingTime(form.startTime),end=normalizeMeetingTime(form.endTime);
   const toMinutes=(time:string)=>Number(time.slice(0,2))*60+Number(time.slice(3));
   const duration=start&&end?toMinutes(end)-toMinutes(start):0;
   const durationLabel=duration>0 ? [Math.floor(duration/60)>0?toPersianDigits(Math.floor(duration/60))+' ساعت':'',duration%60?toPersianDigits(duration%60)+' دقیقه':''].filter(Boolean).join(' و ') : 'زمان را مشخص کنید';
   const date=form.date?parseISOToJalali(form.date):null;
   const dateSummary=date?toPersianDigits(date.jd)+' '+PERSIAN_MONTH_NAMES[date.jm-1]:'';
-  const navigation=<nav role="tablist" aria-label="بخش‌های جلسه" className={'grid gap-1 '+(visibleTabs.length>4?'grid-cols-5':'grid-cols-4')}>
+  const clip = (text: string) => text.length > 60 ? text.slice(0, 59).trimEnd() + '…' : text;
+  const createResolutionTask = () => {
+    if (!onConvertToTask) return;
+    const item = resolutionAgenda !== '' ? form.agenda[Number(resolutionAgenda)] : undefined;
+    const tags = ['جلسه: ' + clip(form.title.trim())];
+    if (item?.title.trim()) tags.push('دستور جلسه: ' + clip(item.title.trim()));
+    onConvertToTask(item?.title.trim() || form.title.trim(), form.date, tags);
+  };
+  const nameOf = (id: string | null) => !id ? '' : people.find(p => p.id === id)?.name || peopleOptions?.people.find(p => p.id === id)?.name || 'فرد ثبت‌شده در جلسه';
+  const downloadReport = async () => {
+    setReportBusy(true);
+    try {
+      const typeLabel = ({meeting:'جلسه حضوری',online:'جلسه آنلاین',committee:'کمیته'} as const)[form.type];
+      const dayText = (iso: string) => { const j = iso ? parseISOToJalali(iso.slice(0, 10)) : null; return j ? toPersianDigits(j.jd) + ' ' + PERSIAN_MONTH_NAMES[j.jm - 1] + ' ' + toPersianDigits(j.jy) : ''; };
+      const now = new Date();
+      await downloadMeetingReport({
+        title: form.title, typeLabel, dateText: dayText(form.date),
+        timeText: start && end ? toPersianDigits(start) + ' تا ' + toPersianDigits(end) : '', location: form.location,
+        organizer: nameOf(form.organizerUserId), description: form.description || '',
+        participants: form.participantIds.map(nameOf),
+        agenda: form.agenda.map(a => ({ title: a.title, durationText: a.durationMinutes ? toPersianDigits(a.durationMinutes) + ' دقیقه' : '', presenter: nameOf(a.presenterUserId) })),
+        minutes: form.minutes || '',
+        tasks: form.taskIds.map(id => tasks.find(t => t.id === id)).filter((t): t is Task => !!t).map(t => ({ title: t.title, statusText: STATUSES[t.status]?.title || t.status, dueText: dayText(t.dueDate || '') })),
+        generatedText: 'تهیه‌شده در ' + dayText(now.toISOString().slice(0, 10)),
+      }, 'meeting-report-' + form.date + '.pdf');
+    } catch (err) { setError(userErrorMessage(err, 'ساخت گزارش PDF انجام نشد.')); }
+    finally { setReportBusy(false); }
+  };
+  const navigation=<nav role="tablist" aria-label="بخش‌های جلسه" className={'grid gap-1 '+(visibleTabs.length>5?'grid-cols-6':visibleTabs.length>4?'grid-cols-5':'grid-cols-4')}>
     {visibleTabs.map(({id,label,icon:Icon})=><button type="button" role="tab" title={label} aria-label={label} aria-selected={active===id} key={id} onClick={()=>setActive(id)} className={'flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold border-b-2 transition-colors '+(active===id?'border-indigo-600 text-indigo-700 dark:text-indigo-300':'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200')}><Icon className="w-[18px] h-[18px] shrink-0"/><span className="hidden md:inline whitespace-nowrap">{label}</span>{counts[id]>0&&<span className={'rounded-md px-1.5 py-0.5 text-[10px] '+(active===id?'bg-indigo-100 dark:bg-indigo-950':'bg-slate-100 dark:bg-slate-800')}>{toPersianDigits(counts[id])}</span>}</button>)}
   </nav>;
   return <MeetingDialog title={meeting ? (readonly ? 'مشاهده جلسه «'+form.title+'»' : 'ویرایش جلسه') : 'ایجاد جلسه جدید'} subtitle="زمان و افراد جلسه را مشخص کنید؛ تصمیم‌ها را همین‌جا پیگیری کنید." summary={meeting && <div className="text-left space-y-1"><div>{dateSummary}</div><div dir="ltr" className="text-[11px]">{start&&end?toPersianDigits(start)+' — '+toPersianDigits(end):''}</div></div>} navigation={navigation} onClose={()=>!busy&&onClose()}
@@ -147,14 +179,22 @@ export function MeetingFormModal({ initialDate, meeting, currentUser, people, ta
           </div>)}
         </div>}
         {active === 'minutes' && meeting && <div className="space-y-3">
-          <Field label="صورت‌جلسه"><textarea className={inputClass} rows={10} maxLength={12000} placeholder="خلاصه مذاکرات، مصوبات و تصمیم‌های جلسه…" value={form.minutes||''} onChange={e=>set('minutes',e.target.value)}/></Field>
+          <Field label="مصوبات صورت‌جلسه"><textarea className={inputClass} rows={10} maxLength={12000} placeholder="خلاصه مذاکرات، مصوبات و تصمیم‌های جلسه…" value={form.minutes||''} onChange={e=>set('minutes',e.target.value)}/></Field>
         </div>}
         {active === 'tasks' && <MeetingTaskPicker selectedIds={form.taskIds} onChange={ids=>set('taskIds',ids)} initialTasks={tasks}/>}
       </fieldset>
     </form>
     {active === 'minutes' && meeting && onConvertToTask && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/60 dark:bg-indigo-950/30 p-3">
-      <SecondaryButton type="button" onClick={()=>onConvertToTask(form.title.trim(), form.date)}><ListPlus className="w-4 h-4" />تبدیل به وظیفه</SecondaryButton>
-      <span className="text-[11px] text-slate-500">فرم ثبت فعالیت با عنوان جلسه باز می‌شود؛ عنوان قابل ویرایش است.</span>
+      {form.agenda.some(a=>a.title.trim()) && <select aria-label="بند دستور جلسه" className={inputClass+' max-w-xs'} value={resolutionAgenda} onChange={e=>setResolutionAgenda(e.target.value)}>
+        <option value="">— بدون بند مشخص از دستور جلسه —</option>
+        {form.agenda.map((a,i)=>a.title.trim()?<option key={i} value={String(i)}>{toPersianDigits(i+1)}. {a.title}</option>:null)}
+      </select>}
+      <SecondaryButton type="button" onClick={createResolutionTask}><ListPlus className="w-4 h-4" />ایجاد وظیفه</SecondaryButton>
+      <span className="text-[11px] text-slate-500">فرم ثبت فعالیت باز می‌شود و برچسب جلسه{form.agenda.some(a=>a.title.trim())?' و بند دستور جلسه':''} خودکار روی آن می‌نشیند.</span>
+    </div>}
+    {active === 'report' && meeting && <div className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+      <p className="text-sm text-slate-600 dark:text-slate-300">گزارش کامل این جلسه شامل مشخصات، افراد، دستور جلسه، مصوبات صورت‌جلسه و وظایف مرتبط به‌صورت فایل PDF ساخته می‌شود.</p>
+      <PrimaryButton type="button" disabled={reportBusy} onClick={downloadReport}>{reportBusy?<Loader2 className="w-4 h-4 animate-spin"/>:<FileDown className="w-4 h-4"/>}دریافت گزارش PDF</PrimaryButton>
     </div>}
   </MeetingDialog>;
 }
