@@ -149,7 +149,7 @@ export const OrgRulesPanel: React.FC<{ canApplyPosts?: boolean }> = ({ canApplyP
       <AdminCard>
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">چه زیر چه</h3>
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-white">سلسله‌مراتب مجاز</h3>
             <p className="text-xs text-slate-500 mt-0.5">هر ردیف یک جزء «والد» است؛ ستون‌هایی که تیک دارند، اجزایی‌اند که می‌شود زیرش گذاشت. ردیف اول: مستقیم زیر شرکت. بدون هیچ تیکی، ساختار مسطح است.</p>
           </div>
           <div className="flex items-center gap-2">

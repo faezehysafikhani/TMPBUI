@@ -1,4 +1,4 @@
-// «چه زیر چه»: a check table of which node type may sit under which (a row: the parent, the first
+// «سلسله‌مراتب مجاز»: a check table of which node type may sit under which (a row: the parent, the first
 // row: directly under the company; a column: the child). Standalone: rules in, onChange out.
 // usage (optional) says how many existing nodes sit under each pair: unticking such a pair is
 // allowed, but marked - the nodes stay and are listed as not matching the rules (nothing is deleted).

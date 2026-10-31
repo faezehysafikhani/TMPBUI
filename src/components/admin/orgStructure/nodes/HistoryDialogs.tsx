@@ -1,9 +1,7 @@
-// A node's history (phase 7.2): the merge form with its impact preview, the change log with «بازگردانی»,
-// and the dates between which the node exists («نمایش به تاریخ» in the chart uses them).
+// A node's history (phase 7.2): the merge form with its impact preview and the change log with «بازگردانی».
 import React, { useState } from 'react';
 import { Loader2, RotateCcw } from 'lucide-react';
-import { AdminDialog, Field, Notice, PrimaryButton, SecondaryButton } from '../../AdminUi';
-import { JalaliDatePicker } from '../../../JalaliDatePicker';
+import { AdminDialog, Notice, PrimaryButton, SecondaryButton } from '../../AdminUi';
 import { userErrorMessage } from '../../../../utils/errorMessages';
 import { formatToJalali, toPersianDigits } from '../../../../utils/helpers';
 import { gregorianToJalali } from '../../../../utils/jalali';
@@ -16,7 +14,7 @@ export const jalaliDay = (iso: string): string => {
   return toPersianDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`);
 };
 import { appConfirm } from '../../../../utils/appDialog';
-import { type ChartCompany, type ChartUnit, type NodeChange, isConflict, listCompanies, listNodeChanges, listNodeTypes, listNodes, mergeNode, setNodeValidity, undoNodeChange } from '../../../../services/orgStructureApi';
+import { type ChartCompany, type ChartUnit, type NodeChange, isConflict, listCompanies, listNodeChanges, listNodeTypes, listNodes, mergeNode, undoNodeChange } from '../../../../services/orgStructureApi';
 import { fetchUsers } from '../../../../services/nexusApi';
 import { type ChangeNames, describeChange } from './changeDetails';
 import { useLoad } from '../orgShared';
@@ -132,49 +130,6 @@ export const NodeHistoryDialog: React.FC<{
             ))}
           </ol>
         )}
-    </AdminDialog>
-  );
-};
-
-/** The dates between which a node exists. They only matter for the chart on a day. */
-export const NodeValidityDialog: React.FC<{
-  unit: ChartUnit;
-  rowVersion: string | null;
-  onSaved: () => Promise<void> | void;
-  onClose: () => void;
-}> = ({ unit, rowVersion, onSaved, onClose }) => {
-  const [from, setFrom] = useState<string | undefined>(undefined);
-  const [to, setTo] = useState<string | undefined>(undefined);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const bad = !!from && !!to && from > to;
-
-  const save = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await setNodeValidity(unit.unitId, { validFrom: from ?? null, validTo: to ?? null, rowVersion });
-      await onSaved();
-      onClose();
-    } catch (err) {
-      setError(userErrorMessage(err, 'ذخیره‌ی تاریخ‌ها انجام نشد.'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <AdminDialog title={`تاریخ وجود «${unit.name}»`} onClose={() => !busy && onClose()} footer={<>
-      <SecondaryButton type="button" onClick={onClose} disabled={busy}>انصراف</SecondaryButton>
-      <PrimaryButton type="button" onClick={save} disabled={busy || bad}>{busy && <Loader2 className="w-4 h-4 animate-spin" />} ذخیره</PrimaryButton>
-    </>}>
-      {error && <Notice type="error" onClose={() => setError(null)}>{error}</Notice>}
-      <Notice type="info">هر دو تاریخ با مقدار این فرم جایگزین می‌شود (خالی: بدون محدودیت). تغییر تاریخ، گره را غیرفعال یا جابه‌جا نمی‌کند؛ فقط «نمایش به تاریخ» در چارت از آن استفاده می‌کند.</Notice>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="وجود دارد از"><JalaliDatePicker value={from} onChange={setFrom} ariaLabel="گره از این تاریخ وجود دارد" placeholder="بدون محدودیت" /></Field>
-        <Field label="وجود دارد تا"><JalaliDatePicker value={to} onChange={setTo} ariaLabel="گره تا این تاریخ وجود دارد" placeholder="بدون محدودیت" /></Field>
-      </div>
-      {bad && <Notice type="error">تاریخ شروع نمی‌تواند بعد از تاریخ پایان باشد.</Notice>}
     </AdminDialog>
   );
 };

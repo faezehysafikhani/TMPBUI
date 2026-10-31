@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2, Network, UserRound, Pencil, Plus, UserPlus, Unlink, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch, Move, ChevronsUp, LayoutTemplate, Link2, GitMerge, History, CalendarRange, UserCog, UserMinus,
+  Building2, Network, UserRound, Pencil, Plus, UserPlus, Zap, Loader2, Briefcase, LogOut, ArrowUp, ArrowDown, Trash2, Power, RefreshCw, GitBranch, Move, ChevronsUp, LayoutTemplate, Link2, GitMerge, History, UserCog, UserMinus,
 } from 'lucide-react';
 import { AdminCard, AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge, Toggle, inputClass } from '../AdminUi';
 import { userErrorMessage } from '../../../utils/errorMessages';
@@ -11,7 +11,7 @@ import {
   type Company, ChartCompany, ChartMember, ChartPosition, ChartUnit, LinkType, NodeType, OrgUiLevel, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
   ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, setCompanyUiLevel, setNodeDetails, deactivateNode, isConflict, reorderNode, setNodeManager, updateNode,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
-  orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, unlinkUnit, updateCompany, updateOrgUnit,
+  orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, updateCompany, updateOrgUnit,
   addCompanyPosition, headTitleOf, postLabel, setPostParent, updateUnitPositionCode,
 } from '../../../services/orgStructureApi';
 import { UserPicker } from './orgShared';
@@ -23,7 +23,7 @@ import { AddLinkDialog, RemoveLinkDialog, linkSentence } from './nodes/LinkDialo
 import { SaveTemplateDialog } from './nodes/SaveTemplateDialog';
 import { NodePostTools } from './nodes/NodePostTools';
 import { AppointDialog, EndAppointmentDialog, PostHistory, UserPositionHistory } from './nodes/AppointmentDialogs';
-import { MergeNodeDialog, NodeHistoryDialog, NodeValidityDialog } from './nodes/HistoryDialogs';
+import { MergeNodeDialog, NodeHistoryDialog } from './nodes/HistoryDialogs';
 import { CompanyFormDialog } from './nodes/CompanyFormDialog';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
@@ -203,7 +203,6 @@ export const OrgChartDetails: React.FC<{
     | { kind: 'appoint'; post: ChartPosition; placeName: string }
     | { kind: 'endAppointment'; post: ChartPosition }
     | { kind: 'history'; company: ChartCompany; unit: ChartUnit }
-    | { kind: 'validity'; company: ChartCompany; unit: ChartUnit }
     | { kind: 'removeLink'; company: ChartCompany; unit: ChartUnit; linkId: string; targetId: string; targetName: string; linkTypeId: string }
     | null
   >(null);
@@ -470,9 +469,6 @@ export const OrgChartDetails: React.FC<{
             {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'move') && (
               <ActionTile icon={GitMerge} label="ادغام در گره‌ی دیگر" disabled={busy || unit.isActive === false} onClick={() => openWithVersion(unit, { kind: 'merge', company, unit })} />
             )}
-            {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'update') && (
-              <ActionTile icon={CalendarRange} label="تاریخ وجود" disabled={busy} onClick={() => openWithVersion(unit, { kind: 'validity', company, unit })} />
-            )}
             {nodes.length > 0 && atLeast(levelOf(company), 'advanced') && canNode(can, 'view') && (
               <ActionTile icon={History} label="تاریخچه و بازگردانی" onClick={() => openWithVersion(unit, { kind: 'history', company, unit })} />
             )}
@@ -701,8 +697,6 @@ export const OrgChartDetails: React.FC<{
           <MergeNodeDialog company={extra.company} unit={extra.unit} rowVersion={versionOf(extra.unit.unitId)} onMerged={async () => { await onChanged(); setMessage({ type: 'success', text: `«${extra.unit.name}» ادغام شد.` }); }} onReload={onChanged} onClose={() => setExtra(null)} />
         ) : extra.kind === 'history' ? (
           <NodeHistoryDialog unit={extra.unit} rowVersion={versionOf(extra.unit.unitId)} canUndo={canNode(can, 'move')} onUndone={onChanged} onClose={() => setExtra(null)} />
-        ) : extra.kind === 'validity' ? (
-          <NodeValidityDialog unit={extra.unit} rowVersion={versionOf(extra.unit.unitId)} onSaved={async () => { await onChanged(); setMessage({ type: 'success', text: 'تاریخ‌های گره ذخیره شد.' }); }} onClose={() => setExtra(null)} />
         ) : extra.kind === 'addLink' ? (
           <AddLinkDialog company={extra.company} from={extra.unit} linkTypes={linkTypes} onAdded={async () => { await onChanged(); setMessage({ type: 'success', text: 'رابطه اضافه شد.' }); }} onReload={onChanged} onClose={() => setExtra(null)} />
         ) : linkTypes.find((t) => t.id === extra.linkTypeId) ? (
@@ -996,7 +990,7 @@ const ChartDialog: React.FC<{
             <>
               <Field label="نام" required><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} /></Field>
               {useNodeApi && nodeTypes.length > 0 && (
-                <Field label="جزء چارت" hint="با تغییر جزء، جای گره در ساختار عوض نمی‌شود؛ اگر با قاعده‌ی «چه زیر چه» نخواند، در صفحه‌ی قواعد در فهرست ناسازگارها می‌آید.">
+                <Field label="جزء چارت" hint="با تغییر جزء، جای گره در ساختار عوض نمی‌شود؛ اگر با قاعده‌ی «سلسله‌مراتب مجاز» نخواند، در صفحه‌ی قواعد در فهرست ناسازگارها می‌آید.">
                   <select className={inputClass} value={typeId} onChange={(e) => setTypeId(e.target.value)}>
                     <option value="">— بدون جزء (واحد ساده) —</option>
                     {nodeTypes.filter((t) => t.isActive || t.id === typeId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}

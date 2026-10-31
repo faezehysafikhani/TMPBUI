@@ -13,7 +13,7 @@ import { addableTypes, checkMove } from './orgNodeRules';
 import { atLeast, highestLevel, levelOf } from './orgUiLevel';
 import { PersonAvatar } from './PersonAvatar';
 import { TidyBoundary, TidyOrgChart } from './TidyOrgChart';
-import { type ChartView, allOpenSet, defaultOpenSet, defaultView, pathTo, readSavedCompany, readSavedView, saveCompany, saveView, vacantKey } from './tidyChartModel';
+import { type ChartView, allOpenSet, defaultView, pathTo, readSavedCompany, readSavedView, saveCompany, saveView, vacantKey } from './tidyChartModel';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
 import { OrgLinkLayer } from './OrgLinkLayer';
@@ -424,7 +424,8 @@ export const OrgChartBoard: React.FC<{
   const [showEmpty, setShowEmpty] = useState(false);
   /** Tidy chart: what is open (null: as a company opens - its nodes that have people). */
   const [tidyOpenUser, setTidyOpenUser] = useState<Set<string> | null>(null);
-  const tidyDefault = useMemo(() => (company ? defaultOpenSet(company) : new Set<string>()), [company]);
+  // The list view shows the whole structure at first: every node open (the bars of vacant posts stay closed).
+  const tidyDefault = useMemo(() => (company ? new Set<string>(allUnitsOf(company).map((u) => u.unitId)) : new Set<string>()), [company]);
   const tidyOpen = tidyOpenUser ?? tidyDefault;
   const toggleTidy = (key: string) => setTidyOpenUser((prev) => { const next = new Set(prev ?? tidyDefault); if (!next.delete(key)) next.add(key); return next; });
   const tidyRoot = useRef<HTMLDivElement>(null);
