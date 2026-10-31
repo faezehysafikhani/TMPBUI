@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { TaskTitleContext } from './components/TaskCardList';
 import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification, setMaxAttachmentBytes, SubTaskProgress } from './types';
 import { getUploadPolicy, refreshUploadPolicy } from './utils/uploadPolicy';
@@ -241,6 +241,8 @@ export default function App() {
   const [initialDueDateForNewTask, setInitialDueDateForNewTask] = useState<string | undefined>(undefined);
   const [initialTitleForNewTask, setInitialTitleForNewTask] = useState<string>('');
   const [initialTagsForNewTask, setInitialTagsForNewTask] = useState<string[]>([]);
+  // Runs once with the id of the task the open «new task» form creates (a meeting resolution links itself to its meeting).
+  const onTaskCreatedRef = useRef<((taskId: string) => void) | null>(null);
   const [lockInitialDescription, setLockInitialDescription] = useState<boolean>(false);
   const [parentForNewTask, setParentForNewTask] = useState<{ id: string; title: string } | null>(null);
   const [initialDescriptionForNewTask, setInitialDescriptionForNewTask] = useState<string>('');
@@ -542,6 +544,9 @@ export default function App() {
           );
         }
         showToast(`فعالیت «${created.title}» ساخته شد.`, 'ok');
+        const afterCreate = onTaskCreatedRef.current;
+        onTaskCreatedRef.current = null;
+        afterCreate?.(created.id);
       }
       setPbError(null);
     } catch (err: any) {
@@ -749,10 +754,12 @@ export default function App() {
     initialTitle: string = '',
     initialDescription: string = '',
     parent?: { id: string; title: string },
-    initialTags: string[] = []
+    initialTags: string[] = [],
+    onCreated?: (taskId: string) => void
   ) => {
     if (!can(currentUser, PERMISSIONS.tasksCreate)) return;
     setInitialTagsForNewTask(initialTags);
+    onTaskCreatedRef.current = onCreated || null;
     setTaskToEdit(null);
     setInitialStatusForNewTask(status);
     // No date chosen (e.g. not from the calendar): the form's own default (end of today).
@@ -778,6 +785,7 @@ export default function App() {
     setInitialDueDateForNewTask(undefined);
     setInitialTitleForNewTask('');
     setInitialTagsForNewTask([]);
+    onTaskCreatedRef.current = null;
     setInitialDescriptionForNewTask('');
     setParentForNewTask(null);
     setIsFormModalOpen(true);
@@ -1405,7 +1413,7 @@ export default function App() {
                   tasks={visibleTasks}
                   currentUser={currentUser}
                   onOpenCreateForDate={canCreateTask ? (isoDate) => handleOpenCreateModal('todo', isoDate) : undefined}
-                  onConvertMeetingToTask={canCreateTask ? (title, meetingDate, tags) => handleOpenCreateModal('todo', meetingDate && !schedulingBlockReason(meetingDate) ? iranDateTimeToISO(meetingDate, '23:59') : undefined, title, '', undefined, tags) : undefined}
+                  onConvertMeetingToTask={canCreateTask ? (title, meetingDate, tags, onCreated) => handleOpenCreateModal('todo', meetingDate && !schedulingBlockReason(meetingDate) ? iranDateTimeToISO(meetingDate, '23:59') : undefined, title, '', undefined, tags, onCreated) : undefined}
                   onEditTask={handleOpenEditModal}
                   onDeleteTask={handleDeleteTask}
                   onStatusChange={handleStatusChange}
@@ -1519,7 +1527,7 @@ export default function App() {
         {isFormModalOpen && (
           <TaskFormModal
             isOpen={isFormModalOpen}
-            onClose={() => setIsFormModalOpen(false)}
+            onClose={() => { onTaskCreatedRef.current = null; setIsFormModalOpen(false); }}
             onSave={handleSaveTask}
             taskToEdit={taskToEdit}
             initialStatus={initialStatusForNewTask}
