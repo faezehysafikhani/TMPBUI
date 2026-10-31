@@ -7,8 +7,9 @@ import { AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, StatusBadge
 import { JalaliDatePicker } from '../../../JalaliDatePicker';
 import { userErrorMessage } from '../../../../utils/errorMessages';
 import { toPersianDigits } from '../../../../utils/helpers';
-import { type Appointment, type ChartPosition, appointToPost, appointmentState, cancelUpcomingAppointment, endPostAppointment, getPostHistory, getUserPositionHistory, postLabel } from '../../../../services/orgStructureApi';
+import { type Appointment, type ChartPosition, type HeldPosition, appointToPost, appointmentState, cancelUpcomingAppointment, endPostAppointment, getPostHistory, getUserPositionHistory, postLabel } from '../../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, UserPicker, useLoad } from '../orgShared';
+import { PostChoiceDialog, endPosts, heldPostsOf, moveMainToHeldPost } from './PostChoices';
 import { jalaliDay } from './HistoryDialogs';
 
 /** Today as a Gregorian day (yyyy-MM-dd), for «not in the past». */
@@ -124,19 +125,47 @@ export const AppointDialog: React.FC<{
   const waiting = (history.data || []).some((a) => appointmentState(a) === 'waiting');
   const inPast = !!start && start < today();
 
+  const [previous, setPrevious] = useState<HeldPosition[] | null>(null);
+
+  // First: the posts the new person already holds - each stays or is removed (asked in a dialog).
   const save = async () => {
     if (!userId) return;
     setBusy(true);
     setError(null);
     try {
-      await appointToPost(post.unitPositionId, userId, start || null);
-      await onDone(start ? `«${userName}» از ${jalaliDay(start)} مسئول «${post.title}» می‌شود.` : `«${userName}» مسئول «${post.title}» شد.`);
-      onClose();
+      const held = (await heldPostsOf(userId)).filter((h) => h.unitPositionId !== post.unitPositionId);
+      if (held.length > 0) {
+        setPrevious(held);
+        return;
+      }
+      await appoint([]);
     } catch (err) {
       setError(userErrorMessage(err, 'ثبت انتصاب انجام نشد.'));
     } finally {
       setBusy(false);
     }
+  };
+
+  const confirmPrevious = async (endPostIds: string[]) => {
+    setPrevious(null);
+    setBusy(true);
+    setError(null);
+    try {
+      await appoint(endPostIds);
+    } catch (err) {
+      setError(userErrorMessage(err, 'ثبت انتصاب انجام نشد.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const appoint = async (endPostIds: string[]) => {
+    if (!userId) return;
+    await appointToPost(post.unitPositionId, userId, start || null);
+    await endPosts(endPostIds, start || null);
+    if (!start && endPostIds.length > 0) await moveMainToHeldPost(userId, post.unitPositionId);
+    await onDone(start ? `«${userName}» از ${jalaliDay(start)} مسئول «${post.title}» می‌شود.` : `«${userName}» مسئول «${post.title}» شد.`);
+    onClose();
   };
 
   return (
@@ -160,6 +189,18 @@ export const AppointDialog: React.FC<{
         <JalaliDatePicker value={start} onChange={setStart} ariaLabel="تاریخ شروع انتصاب" placeholder="از همین الان" />
       </Field>
       {inPast && <Notice type="error">تاریخ شروع نباید گذشته باشد.</Notice>}
+      {previous && (
+        <PostChoiceDialog
+          personName={userName || 'کاربر'}
+          filled={null}
+          vacant={[]}
+          allowNew={false}
+          allowReplace={false}
+          previous={previous}
+          onConfirm={(choice) => void confirmPrevious(choice.endPostIds)}
+          onCancel={() => setPrevious(null)}
+        />
+      )}
       {holder && <Notice type="info">«{holder.displayName}» که الان مسئول این پست است، همان روز پایان می‌یابد و در تاریخچه می‌ماند. کارهای بازِ پست به مسئول جدید می‌رسد؛ آنچه مسئول قبلی انجام داده برای خودش می‌ماند.</Notice>}
     </AdminDialog>
   );

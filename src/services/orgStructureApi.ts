@@ -402,7 +402,11 @@ export const removeUnitPosition = (unitPositionId: string) => apiRequest<void>('
 /** The substitution inbox (کارتابل جانشینی): vacant posts' open tasks and who stands in for them. */
 export interface ActingPost { postId: string; title: string; code: string; place: string; holderUserId: string | null; holderName: string | null }
 export interface SubstitutionTask { taskId: string; title: string; dueDate: string; status: string }
-export interface VacantPost { postId: string; title: string; code: string; place: string; acting: ActingPost | null; tasks: SubstitutionTask[]; candidates: ActingPost[] }
+/** holderUserId/holderName: the post's own holder (a stand-in for a set time); actingFrom/actingUntil: that time (absent on an older backend). */
+export interface VacantPost {
+  postId: string; title: string; code: string; place: string; acting: ActingPost | null; tasks: SubstitutionTask[]; candidates: ActingPost[];
+  holderUserId?: string | null; holderName?: string | null; actingFrom?: string | null; actingUntil?: string | null;
+}
 export interface SubstitutionInbox { enabled: boolean; canManageAll: boolean; posts: VacantPost[] }
 
 /** Null where the backend has no inbox (404). */
@@ -414,8 +418,13 @@ export async function getSubstitutionInbox(): Promise<SubstitutionInbox | null> 
     throw err;
   }
 }
-export const setActingPost = (vacantPostId: string, actingPostId: string) =>
-  apiRequest<void>('PUT', `${BASE}/substitution/${vacantPostId}`, { body: { actingPostId } });
+/** A stand-in for the post: while it is vacant, or (with endDate) for a set time - also while it has a holder. */
+export const setActingPost = (vacantPostId: string, actingPostId: string, startDate?: string | null, endDate?: string | null) =>
+  apiRequest<void>('PUT', `${BASE}/substitution/${vacantPostId}`, {
+    body: endDate ? { actingPostId, startDate: startDate || null, endDate } : { actingPostId },
+  });
+/** One post for «تعیین جانشین»: its stand-in and who may stand in (its own unit and below). */
+export const getActingForPost = (postId: string) => apiRequest<VacantPost>('GET', `${BASE}/substitution/${postId}`);
 export const clearActingPost = (vacantPostId: string) => apiRequest<void>('DELETE', `${BASE}/substitution/${vacantPostId}`);
 
 export const listAssignments = (filter: { companyId?: string; unitId?: string } = {}) =>

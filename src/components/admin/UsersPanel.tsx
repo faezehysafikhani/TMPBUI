@@ -272,7 +272,8 @@ const UserFormDialog: React.FC<{
     if (!isNew || !canAssignRoles) return;
     listRoles().then((list) => {
       setRoles(list);
-      const member = list.find((r) => r.name === 'Member');
+      // «کاربر عادی» is every new user's role (the server gives it too); older setups: Member.
+      const member = list.find((r) => r.name === 'کاربر عادی') ?? list.find((r) => r.name === 'Member');
       if (member) setRoleIds([member.id]);
     }).catch(() => setRoles([]));
   }, [isNew, canAssignRoles]);
@@ -339,7 +340,8 @@ const UserFormDialog: React.FC<{
         if (persistedUser) await adminUpdateUser(persistedUser, form);
       }
 
-      if (isNew && canAssignRoles && roleIds.length) await setUserRoles(savedUserId, roleIds);
+      // Even with none ticked: the default role the server gave is then taken away.
+      if (isNew && canAssignRoles && roles.length) await setUserRoles(savedUserId, roleIds);
 
       // Saving the name rebuilds it from first and last name, so a title is put back each time.
       if (showTitle && (titleId || originalTitleId)) {
