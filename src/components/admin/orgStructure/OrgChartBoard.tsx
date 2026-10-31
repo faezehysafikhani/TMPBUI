@@ -13,6 +13,7 @@ import { addableTypes, checkMove } from './orgNodeRules';
 import { atLeast, highestLevel, levelOf } from './orgUiLevel';
 import { PersonAvatar } from './PersonAvatar';
 import { TidyBoundary, TidyOrgChart } from './TidyOrgChart';
+import { CompanyLogo } from './nodes/CompanyLogo';
 import { type ChartView, allOpenSet, defaultView, pathTo, readSavedCompany, readSavedView, saveCompany, saveView, vacantKey } from './tidyChartModel';
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
@@ -289,6 +290,19 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
     </div>
   );
 };
+
+/** A failure in the details panel stays in the panel (the page is not blanked); choosing something else starts it again. */
+class DetailsBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+  declare props: { children: React.ReactNode };
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error: Error) { console.error('Org chart details failed:', error); }
+  render() {
+    return this.state.failed
+      ? <p role="alert" className="m-4 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200 px-3 py-2 text-sm">نمایش جزئیات این مورد انجام نشد؛ مورد دیگری را انتخاب کنید یا صفحه را دوباره بارگذاری کنید.</p>
+      : this.props.children;
+  }
+}
 
 /**
  * «چارت سازمانی»: the company at the top, its head (رئیس کل) under it, then its deputies, under each
@@ -956,7 +970,7 @@ export const OrgChartBoard: React.FC<{
             dnd={dndOf(null)}
           >
             <div className="flex items-center gap-3 p-4">
-              <span className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/30"><Building2 className="w-5 h-5" /></span>
+              <CompanyLogo logoUrl={company.logoUrl} name={company.name} fallback={<span className="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/30"><Building2 className="w-5 h-5" /></span>} />
               <span className="min-w-0 flex-1">
                 <span className="block text-base font-extrabold text-slate-900 dark:text-white truncate">{company.name}</span>
               </span>
@@ -1128,6 +1142,7 @@ export const OrgChartBoard: React.FC<{
       <div className={fullscreen ? 'min-h-0 flex flex-col' : ''}>{board}</div>
       <div className={fullscreen ? 'overflow-y-auto min-h-0' : '2xl:relative'}>
       <div className={fullscreen ? '' : '2xl:absolute 2xl:inset-0'}>
+      <DetailsBoundary key={JSON.stringify(selection)}>
       <OrgChartDetails
         can={can}
         chart={chart}
@@ -1143,6 +1158,7 @@ export const OrgChartBoard: React.FC<{
         onSelect={(next) => choose(next)}
         onChanged={data.reload}
       />
+      </DetailsBoundary>
       </div>
       </div>
     </div>
