@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
-import { ChartCompany, ChartMember, ChartPosition, ChartUnit, AutoLinkChoice, LinkType, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listLinkTypes, listNodeTypes, listNodes, listPositions, listUnplacedUsers, postLabel } from '../../../services/orgStructureApi';
+import { ChartCompany, ChartMember, ChartPosition, ChartUnit, AutoLinkChoice, LinkType, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listLinkTypes, listNodeTypes, listNodes, listPositions, listUnplacedUsers, headTitleOf, postLabel } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
 import { ChartSelection, allUnitsOf, ancestorsOf, companyHeadcount, companyPostsOf, depthsOf, findMember, findPosition, headPostOf, isNested, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
@@ -971,7 +971,7 @@ export const OrgChartBoard: React.FC<{
           {!company.manager && headPostOf(company) ? (
             <NodeCard
               node={`position:${headPostOf(company)!.unitPositionId}`}
-              label={`رئیس کل: ${postLabel(headPostOf(company)!)}`}
+              label={`${headTitleOf(company)}: ${postLabel(headPostOf(company)!)}`}
               selected={isSelected({ kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: headPostOf(company)!.unitPositionId })}
               onSelect={() => choose({ kind: 'position', companyId: company.companyId, unitId: '', unitPositionId: headPostOf(company)!.unitPositionId })}
               className="w-64 border-dashed"
@@ -979,7 +979,7 @@ export const OrgChartBoard: React.FC<{
               <div className="flex items-center gap-2.5 p-3">
                 <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300 flex items-center justify-center shrink-0"><Crown className="w-[18px] h-[18px]" /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">رئیس کل · {postLabel(headPostOf(company)!)}</span>
+                  <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">{headTitleOf(company)} · {postLabel(headPostOf(company)!)}</span>
                   <span className="block text-xs text-slate-400">خالی</span>
                 </span>
               </div>
@@ -987,7 +987,7 @@ export const OrgChartBoard: React.FC<{
           ) : company.manager ? (
             <NodeCard
               node={`member:${company.manager.userId}`}
-              label={`رئیس کل: ${company.manager.displayName}`}
+              label={`${headTitleOf(company)}: ${company.manager.displayName}`}
               selected={selectedUserId === company.manager.userId}
               onSelect={() => choose({ kind: 'member', userId: company.manager!.userId })}
               className="w-64"
@@ -995,7 +995,7 @@ export const OrgChartBoard: React.FC<{
               <div className="flex items-center gap-2.5 p-3">
                 <span className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300 flex items-center justify-center shrink-0"><Crown className="w-[18px] h-[18px]" /></span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">رئیس کل{headPostOf(company)?.code ? ` · کد ${toPersianDigits(headPostOf(company)!.code!)}` : ''}</span>
+                  <span className="block text-[11px] font-bold text-amber-700 dark:text-amber-300 truncate">{headTitleOf(company)}{headPostOf(company)?.code ? ` · کد ${toPersianDigits(headPostOf(company)!.code!)}` : ''}</span>
                   <PersonLine person={company.manager} empty="" />
                 </span>
               </div>
@@ -1004,7 +1004,7 @@ export const OrgChartBoard: React.FC<{
             <div className="w-64 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 bg-white/70 dark:bg-slate-900/70 p-3 flex items-center gap-2.5">
               <span className="w-9 h-9 rounded-xl bg-slate-100 text-slate-400 dark:bg-slate-800 flex items-center justify-center shrink-0"><Crown className="w-[18px] h-[18px]" /></span>
               <span className="min-w-0">
-                <span className="block text-[11px] font-bold text-slate-500">رئیس کل</span>
+                <span className="block text-[11px] font-bold text-slate-500">{headTitleOf(company)}</span>
                 <span className="block text-xs text-slate-400">تعیین نشده</span>
               </span>
             </div>
@@ -1169,7 +1169,10 @@ export const OrgChartBoard: React.FC<{
         types={addableTypes(data.data?.nodeTypes || [], rules, addRequest.parentId ? unitById.get(addRequest.parentId) ?? null : null)}
         onCreated={async (node) => {
           await data.reload();
-          choose({ kind: 'unit', companyId: company.companyId, unitId: node.id }, { force: true });
+          // Stay on the node the new one was added to, so more can be added there.
+          choose(addRequest.parentId
+            ? { kind: 'unit', companyId: company.companyId, unitId: addRequest.parentId }
+            : { kind: 'company', companyId: company.companyId }, { force: true });
           // An automatic link rule with several possible targets: the user picks.
           if (node.autoLinkChoices?.length) setLinkChoices(node.autoLinkChoices);
         }}

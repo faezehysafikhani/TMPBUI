@@ -8,11 +8,11 @@ import { userErrorMessage } from '../../../utils/errorMessages';
 import { NexusApiError } from '../../../services/nexusApi';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
-  ChartCompany, ChartMember, ChartPosition, ChartUnit, LinkType, NodeType, OrgUiLevel, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
+  type Company, ChartCompany, ChartMember, ChartPosition, ChartUnit, LinkType, NodeType, OrgUiLevel, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
   ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, setCompanyUiLevel, setNodeDetails, deactivateNode, isConflict, reorderNode, setNodeManager, updateNode,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
   orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, unlinkUnit, updateCompany, updateOrgUnit,
-  addCompanyPosition, postLabel, setPostParent, updateUnitPositionCode,
+  addCompanyPosition, headTitleOf, postLabel, setPostParent, updateUnitPositionCode,
 } from '../../../services/orgStructureApi';
 import { UserPicker } from './orgShared';
 import { ChartSelection, allUnitsOf, ancestorsOf, isNested as isNestedCompany, companyHeadcount, companyPostsOf, findMember, findPosition, findUnit, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
@@ -24,6 +24,7 @@ import { SaveTemplateDialog } from './nodes/SaveTemplateDialog';
 import { NodePostTools } from './nodes/NodePostTools';
 import { AppointDialog, EndAppointmentDialog, PostHistory, UserPositionHistory } from './nodes/AppointmentDialogs';
 import { MergeNodeDialog, NodeHistoryDialog, NodeValidityDialog } from './nodes/HistoryDialogs';
+import { CompanyFormDialog } from './nodes/CompanyFormDialog';
 import { PersonAvatar } from './PersonAvatar';
 import { appConfirm, appPrompt } from '../../../utils/appDialog';
 
@@ -196,6 +197,7 @@ export const OrgChartDetails: React.FC<{
   /** Dialogs that bring their own footer and steps: saving a template, adding or removing a link. */
   const [extra, setExtra] = useState<
     | { kind: 'saveTemplate'; company: ChartCompany }
+    | { kind: 'editCompany'; company: Company; companies: Company[] }
     | { kind: 'addLink'; company: ChartCompany; unit: ChartUnit }
     | { kind: 'merge'; company: ChartCompany; unit: ChartUnit }
     | { kind: 'appoint'; post: ChartPosition; placeName: string }
@@ -258,9 +260,9 @@ export const OrgChartDetails: React.FC<{
         <>
           <Header icon={Building2} tone="bg-indigo-600 text-white" title={company.name} subtitle={`شرکت · کد ${company.code}`} badge={<ActiveBadge active={company.isActive} />} />
           <div>
-            <InfoRow label="رئیس کل"><PersonValue person={company.manager} empty="تعیین نشده" /></InfoRow>
+            <InfoRow label={headTitleOf(company)}><PersonValue person={company.manager} empty="تعیین نشده" /></InfoRow>
             {!company.manager && (
-              <p className="text-[11px] leading-5 text-slate-500 py-2">رئیس کل کسی است که سمتِ بدون مافوقِ این شرکت را مستقیم در شرکت (بدون معاونت) داشته باشد.</p>
+              <p className="text-[11px] leading-5 text-slate-500 py-2">{headTitleOf(company)} کسی است که سمتِ بدون مافوقِ این شرکت را مستقیم در شرکت (بدون معاونت) داشته باشد.</p>
             )}
             <InfoRow label={isNestedCompany(company) ? 'گره‌ها' : 'معاونت‌ها'}>{toPersianDigits(nodeCount(company))}</InfoRow>
             <InfoRow label="سمت‌ها">{toPersianDigits(positionCount)}{vacant > 0 ? ` (${toPersianDigits(vacant)} خالی)` : ''}</InfoRow>
@@ -303,7 +305,16 @@ export const OrgChartDetails: React.FC<{
             </div>
           )}
           <QuickActions>
-            {can(P.manageCompanies) && <ActionTile icon={Pencil} label="ویرایش شرکت" onClick={() => setDialog({ kind: 'editCompany', company })} />}
+            {can(P.manageCompanies) && <ActionTile icon={Pencil} label="ویرایش شرکت" disabled={busy} onClick={async () => {
+              // The form needs the company's details, which the chart does not carry.
+              try {
+                const companies = await listCompanies();
+                const full = companies.find((c) => c.id === company.companyId);
+                if (full) setExtra({ kind: 'editCompany', company: full, companies });
+              } catch (err) {
+                setMessage({ type: 'error', text: userErrorMessage(err, 'دریافت اطلاعات شرکت ممکن نشد.') });
+              }
+            }} />}
             {nodes.length === 0 && can(P.manageCompanies) && can(U.create) && <ActionTile icon={Plus} label="افزودن معاونت" onClick={() => setDialog({ kind: 'addUnit', company })} />}
             {atLeast(levelOf(company), 'advanced') && canNode(can, 'manageTemplates') && (
               <ActionTile icon={LayoutTemplate} label="ذخیره به‌عنوان قالب" onClick={() => setExtra({ kind: 'saveTemplate', company })} />
@@ -356,7 +367,7 @@ export const OrgChartDetails: React.FC<{
               const rows: [string, string | null | undefined][] = [['کد', info.code], ['نام لاتین', info.latinName], ['عنوان مکاتباتی', info.correspondenceTitle], ['تلفن', info.phone], ['نشانی', info.address]];
               return rows.filter(([, v]) => v).map(([label, v]) => <InfoRow key={label} label={label}><span className={label === 'نام لاتین' || label === 'تلفن' || label === 'کد' ? 'dir-ltr' : ''}>{v}</span></InfoRow>);
             })()}
-            {unit.nodeType && <InfoRow label="نوع"><NodeTypeBadge name={unit.nodeType.name} color={unit.nodeType.color} icon={unit.nodeType.icon} /></InfoRow>}
+            {unit.nodeType && <InfoRow label="جزء چارت"><NodeTypeBadge name={unit.nodeType.name} color={unit.nodeType.color} icon={unit.nodeType.icon} /></InfoRow>}
             {ancestorsOf(company, unit.unitId).length > 0 && (
               <InfoRow label="مسیر">
                 <span className="flex flex-wrap items-center justify-end gap-x-1 gap-y-0.5 text-xs">
@@ -504,19 +515,6 @@ export const OrgChartDetails: React.FC<{
             )}
             {canArrange && <ActionTile icon={Briefcase} label="افزودن سمت" onClick={() => setDialog({ kind: 'addUnitPosition', unit })} />}
             {can(P.manageAssignments) && <ActionTile icon={UserPlus} label="افزودن فرد" onClick={() => setDialog({ kind: 'addUnitMember', company, unit })} />}
-            {can(P.manageCompanies) && !unit.parentNodeId && (
-              <ActionTile
-                icon={Unlink}
-                tone="rose"
-                label="جدا کردن از شرکت"
-                disabled={busy || unitHeadcount(unit) > 0}
-                onClick={async () => await appConfirm(`معاونت «${unit.name}» از شرکت «${company.name}» جدا شود؟`)
-                  && run(async () => {
-                    await unlinkUnit(unit.unitId);
-                    onSelect({ kind: 'company', companyId: company.companyId });
-                  }, 'معاونت از شرکت جدا شد.', 'جدا کردن معاونت انجام نشد.')}
-              />
-            )}
           </QuickActions>
           {can(P.manageCompanies) && !unit.parentNodeId && unitHeadcount(unit) > 0 && <p className="text-[11px] text-slate-400">برای جدا کردن معاونت از شرکت، ابتدا افراد آن را جابه‌جا کنید.</p>}
         </>
@@ -555,7 +553,7 @@ export const OrgChartDetails: React.FC<{
       };
       body = (
         <>
-          <Header icon={Briefcase} tone="bg-sky-600 text-white" title={postLabel(position)} subtitle={`${position.isHead ? 'پست رئیس کل' : 'پست'} · ${placeName}`} badge={position.holders.length === 0 ? <StatusBadge tone="amber">خالی</StatusBadge> : undefined} />
+          <Header icon={Briefcase} tone="bg-sky-600 text-white" title={postLabel(position)} subtitle={`${position.isHead ? `پست ${headTitleOf(company)}` : 'پست'} · ${placeName}`} badge={position.holders.length === 0 ? <StatusBadge tone="amber">خالی</StatusBadge> : undefined} />
           <div>
             <InfoRow label={unit ? 'معاونت' : 'شرکت'}>
               <button type="button" className="text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer" onClick={() => onSelect(unit ? { kind: 'unit', companyId: company.companyId, unitId: unit.unitId } : { kind: 'company', companyId: company.companyId })}>
@@ -689,6 +687,14 @@ export const OrgChartDetails: React.FC<{
           <AppointDialog post={extra.post} placeName={extra.placeName} onDone={async (text) => { await onChanged(); setMessage({ type: 'success', text }); }} onClose={() => setExtra(null)} />
         ) : extra.kind === 'endAppointment' ? (
           <EndAppointmentDialog post={extra.post} onDone={async (text) => { await onChanged(); setMessage({ type: 'success', text }); }} onClose={() => setExtra(null)} />
+        ) : extra.kind === 'editCompany' ? (
+          <CompanyFormDialog
+            company={extra.company}
+            parentChoices={atLeast(levelOf(chart.find((c) => c.companyId === extra.company.id)), 'advanced') ? extra.companies : undefined}
+            canLinkUnits={can(U.view)}
+            onSaved={async () => { await onChanged(); setMessage({ type: 'success', text: 'شرکت ویرایش شد.' }); }}
+            onClose={() => setExtra(null)}
+          />
         ) : extra.kind === 'saveTemplate' ? (
           <SaveTemplateDialog company={extra.company} onSaved={(name) => setMessage({ type: 'success', text: `قالب «${name}» ذخیره شد.` })} onClose={() => setExtra(null)} />
         ) : extra.kind === 'merge' ? (
@@ -778,7 +784,7 @@ const MemberDetails: React.FC<{
       <div className="flex flex-col items-center gap-2 py-2">
         <PersonAvatar name={member.displayName} url={member.avatarUrl} size="lg" />
         <span className="text-base font-extrabold text-slate-900 dark:text-white text-center">{member.displayName}</span>
-        <span className="text-xs text-slate-500 text-center">{[isHead ? 'رئیس کل' : null, member.positionTitle].filter(Boolean).join(' · ') || 'بدون سمت'}</span>
+        <span className="text-xs text-slate-500 text-center">{[isHead ? headTitleOf(chart.find((c) => c.manager?.userId === member.userId)) : null, member.positionTitle].filter(Boolean).join(' · ') || 'بدون سمت'}</span>
         {!member.isActive && <StatusBadge tone="red">حساب غیرفعال</StatusBadge>}
       </div>
       <div>
@@ -990,9 +996,9 @@ const ChartDialog: React.FC<{
             <>
               <Field label="نام" required><input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={200} /></Field>
               {useNodeApi && nodeTypes.length > 0 && (
-                <Field label="نوع گره" hint="با تغییر نوع، جای گره در ساختار عوض نمی‌شود؛ اگر با قاعده‌ی «چه زیر چه» نخواند، در صفحه‌ی قواعد در فهرست ناسازگارها می‌آید.">
+                <Field label="جزء چارت" hint="با تغییر جزء، جای گره در ساختار عوض نمی‌شود؛ اگر با قاعده‌ی «چه زیر چه» نخواند، در صفحه‌ی قواعد در فهرست ناسازگارها می‌آید.">
                   <select className={inputClass} value={typeId} onChange={(e) => setTypeId(e.target.value)}>
-                    <option value="">— بدون نوع (واحد ساده) —</option>
+                    <option value="">— بدون جزء (واحد ساده) —</option>
                     {nodeTypes.filter((t) => t.isActive || t.id === typeId).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </Field>

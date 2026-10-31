@@ -83,7 +83,7 @@ function rootOf(top: ChartUnit): TidyRoot {
     const key = child.nodeType?.nodeTypeId ?? 'none';
     let column = byType.get(key);
     if (!column) {
-      column = { key: `${top.unitId}:${key}`, title: child.nodeType?.name ?? 'بدون نوع', color: child.nodeType?.color ?? null, nodes: [], people: 0 };
+      column = { key: `${top.unitId}:${key}`, title: child.nodeType?.name ?? 'بدون جزء', color: child.nodeType?.color ?? null, nodes: [], people: 0 };
       byType.set(key, column);
     }
     column.nodes.push(child);
