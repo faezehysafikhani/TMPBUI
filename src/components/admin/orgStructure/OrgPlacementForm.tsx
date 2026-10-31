@@ -6,7 +6,7 @@ import { userErrorMessage } from '../../../utils/errorMessages';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
   type HeldPosition, type UnitPosition,
-  addUnitPosition, appointToPost, createNode, createPosition, getAssignment, positionsForCompany, setAssignment,
+  addUnitPosition, appointToPost, createNode, createPosition, endPostAppointment, getAssignment, positionsForCompany, setAssignment,
 } from '../../../services/orgStructureApi';
 import { type PostChoice, type PostOption, PostChoiceDialog, endPosts } from './nodes/PostChoices';
 import { UserPicker } from './orgShared';
@@ -200,7 +200,7 @@ export const OrgPlacementForm: React.FC<{
           vacant: askTarget
             ? board.posts.filter((p) => p.unitId === draft.unitId && p.holders.length === 0).map((p) => ({ postId: p.id, label: postLabelOf(p) }))
             : [],
-          allowReplace: later || context.inCompany,
+          allowReplace: true,
           previous,
           andNext,
           context,
@@ -229,8 +229,9 @@ export const OrgPlacementForm: React.FC<{
       await appointToPost(postId, userId, draft.startDate);
       await endPosts(choice.endPostIds, draft.startDate);
     } else {
-      // Someone else's post: they end now and this person takes it.
-      if (choice.target?.kind === 'replace') await appointToPost(postId, userId, null);
+      // Someone else's post: their appointment ends now (kept as history) and this person takes it -
+      // also when this person has no place yet.
+      if (choice.target?.kind === 'replace') await endPostAppointment(postId, null);
       const kept = previous.filter((h) => !choice.endPostIds.includes(h.unitPositionId)).map((h) => h.unitPositionId);
       await setAssignment(userId, {
         companyId: draft.companyId,
