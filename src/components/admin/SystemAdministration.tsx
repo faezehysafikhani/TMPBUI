@@ -13,6 +13,7 @@ import { refreshUploadPolicy } from '../../utils/uploadPolicy';
 import { isOrgStructureAvailable, orgStructureLookupKey, ORG_STRUCTURE_PERMISSIONS, ORG_UNIT_PERMISSIONS, TITLE_PERMISSIONS } from '../../services/orgStructureApi';
 import { useLookup } from '../../utils/lookupCache';
 import { OrgStructureSection } from './orgStructure/OrgStructureSection';
+import { MyPlacementPanel } from './orgStructure/OrgViews';
 import { TitlesPanel } from './orgStructure/TitlesPanel';
 import { canSeeWorkTeams } from '../../utils/permissions';
 import { DEFAULT_SYSTEM_NAME, saveBranding, useBranding } from '../../utils/branding';
@@ -404,7 +405,7 @@ export const SystemAdministration: React.FC<{
         ) : tabs.length > 1 && <SegmentedTabs tabs={tabs} active={current} onChange={setActive} />}
       </AdminCard>
 
-      {current === 'profile' && profile}
+      {current === 'profile' && <>{profile}{orgStructureAvailable && <MyPlacementPanel />}</>}
       {current === 'team' && canSeeWorkTeams(permissions) && team}
       {current === 'appearance' && (
         <div className="space-y-5">

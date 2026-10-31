@@ -14,13 +14,46 @@ export interface Company {
   manager: PersonRef | null;
   isActive: boolean;
   linkedUnitIds: string[];
+  parentCompanyId?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  nationalId?: string | null;
+  economicCode?: string | null;
+  address?: string | null;
+  /** What the chart calls the company's head; empty: «رئیس کل». */
+  headTitle?: string | null;
+  /** The logo's address (behind sign-in: read it with companyLogoUrl). */
+  logoUrl?: string | null;
+}
+
+/** A company's optional details; saving replaces all of them (empty means none). */
+export interface CompanyDetails {
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  nationalId?: string | null;
+  economicCode?: string | null;
+  address?: string | null;
+  headTitle?: string | null;
 }
 
 /** The head is not chosen here: it is whoever holds the company's position with no superior. */
 export interface CompanyInput { name: string; code: string; description?: string | null }
 
-/** A new company, optionally made from a structure template (a copy of its types, rules, positions and nodes). */
-export interface CompanyCreateInput extends CompanyInput { templateId?: string | null; parentCompanyId?: string | null }
+/**
+ * A new company, optionally made from a structure template (a copy of its types, rules, positions and nodes).
+ * code: empty makes one. unitIds: top deputies with no company yet, linked to the new one.
+ */
+export interface CompanyCreateInput {
+  name: string;
+  code?: string | null;
+  description?: string | null;
+  templateId?: string | null;
+  parentCompanyId?: string | null;
+  details?: CompanyDetails | null;
+  unitIds?: string[];
+}
 
 export interface CompanyUnitLink { unitId: string; unitName: string; companyId: string; companyName: string }
 
@@ -210,7 +243,13 @@ export interface ChartCompany {
   positions?: ChartPosition[];
   /** How much of the structure screens show for this company; absent: as today. */
   uiLevel?: OrgUiLevel;
+  /** What the chart calls the company's head; empty: «رئیس کل». */
+  headTitle?: string | null;
+  logoUrl?: string | null;
 }
+
+/** What the company's head is called (its own title, or «رئیس کل»). */
+export const headTitleOf = (company: { headTitle?: string | null } | null | undefined): string => company?.headTitle?.trim() || 'رئیس کل';
 
 /** An organization unit (a deputy, a department...) from Nexus.Organization. */
 export interface OrgUnit { id: string; name: string; managerUserId: string | null; isActive: boolean }
@@ -302,6 +341,32 @@ export const createCompany = (input: CompanyCreateInput) => apiRequest<Company>(
 export const updateCompany = (id: string, input: CompanyInput & { isActive: boolean }) =>
   apiRequest<Company>('PUT', `${BASE}/companies/${id}`, { body: input });
 export const deleteCompany = (id: string) => apiRequest<void>('DELETE', `${BASE}/companies/${id}`);
+export const setCompanyDetails = (id: string, details: CompanyDetails) =>
+  apiRequest<Company>('PUT', `${BASE}/companies/${id}/details`, { body: details });
+/** PNG, JPEG or WebP, at most 512 KB. */
+export const setCompanyLogo = (id: string, file: File) => {
+  const form = new FormData();
+  form.append('logo', file);
+  return apiRequest<Company>('PUT', `${BASE}/companies/${id}/logo`, { form });
+};
+export const removeCompanyLogo = (id: string) => apiRequest<Company>('DELETE', `${BASE}/companies/${id}/logo`);
+
+// The logo is behind sign-in, so an <img> cannot load its address: it is read once and shown from memory.
+const logoUrls = new Map<string, Promise<string>>();
+/** A displayable address for the company's logo (its logoUrl), or '' when it cannot be read. */
+export function companyLogoUrl(logoUrl: string): Promise<string> {
+  let url = logoUrls.get(logoUrl);
+  if (!url) {
+    url = apiRequest<Blob>('GET', logoUrl, { responseType: 'blob' })
+      .then((blob) => URL.createObjectURL(blob))
+      .catch(() => {
+        logoUrls.delete(logoUrl);
+        return '';
+      });
+    logoUrls.set(logoUrl, url);
+  }
+  return url;
+}
 
 export const listCompanyUnits = () => apiRequest<CompanyUnitLink[]>('GET', `${BASE}/company-units`);
 export const linkUnitToCompany = (unitId: string, companyId: string) =>
@@ -669,30 +734,6 @@ export interface ApplyPostTemplatesResult { created: UnitPosition[]; skipped: Sk
 export const applyPostTemplates = (target: { nodeId?: string; nodeTypeId?: string }) => apiRequest<ApplyPostTemplatesResult>('POST', `${BASE}/post-templates/apply`, { body: target });
 export const setManagerPost = (unitPositionId: string, isManagerPost: boolean) =>
   apiRequest<UnitPosition>('PUT', `${BASE}/unit-positions/${unitPositionId}/manager-post`, { body: { isManagerPost } });
-
-// ---- import from a sheet
-
-/** A fault of the sheet; row: its row in the sheet (null: the file as a whole). */
-export interface ImportError { row: number | null; code: string | null; message: string }
-export interface ImportNodePreview { row: number; code: string; name: string; parentCode: string | null; typeName: string; managerPosition: string | null; depth: number }
-/** What the sheet would make. Nothing is made while errors is not empty (all or nothing). */
-export interface ImportPreview { rowCount: number; nodes: ImportNodePreview[]; errors: ImportError[] }
-export interface ImportResult { nodes: OrgNode[]; links: number; posts: number; autoLinkChoices: AutoLinkChoice[]; skippedPosts: SkippedPost[] }
-
-/** The sheet (.xlsx first sheet, or UTF-8 .csv; at most 5 MB and 5000 rows) goes to the top of a company or under a node. */
-function importForm(file: File, target: { companyId?: string | null; parentNodeId?: string | null }): FormData {
-  const form = new FormData();
-  form.append('file', file, file.name);
-  if (target.companyId) form.append('companyId', target.companyId);
-  if (target.parentNodeId) form.append('parentNodeId', target.parentNodeId);
-  return form;
-}
-export const previewImport = (file: File, target: { companyId?: string | null; parentNodeId?: string | null }) =>
-  apiRequest<ImportPreview>('POST', `${BASE}/import/preview`, { form: importForm(file, target) });
-export const commitImport = (file: File, target: { companyId?: string | null; parentNodeId?: string | null }) =>
-  apiRequest<ImportResult>('POST', `${BASE}/import/commit`, { form: importForm(file, target) });
-export const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
-export const IMPORT_COLUMNS = ['کد', 'نام', 'کد والد', 'نوع', 'سمت مدیر'] as const;
 
 // ---------------------------------------------------------------- appointments over time (phase 9)
 

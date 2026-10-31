@@ -37,7 +37,7 @@ export const NodeTypeRulesMatrix: React.FC<{
   ];
 
   if (types.length === 0) {
-    return <div className="py-6 text-center text-sm text-slate-500">هنوز نوعی تعریف نشده؛ شرکت بدون نوع، ساختار مسطح دارد.</div>;
+    return <div className="py-6 text-center text-sm text-slate-500">هنوز جزئی برای چارت تعریف نشده؛ شرکت بدون اجزای چارت، ساختار مسطح دارد.</div>;
   }
 
   return (

@@ -16,7 +16,9 @@ export const jalaliDay = (iso: string): string => {
   return toPersianDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`);
 };
 import { appConfirm } from '../../../../utils/appDialog';
-import { type ChartCompany, type ChartUnit, type NodeChange, isConflict, listNodeChanges, mergeNode, setNodeValidity, undoNodeChange } from '../../../../services/orgStructureApi';
+import { type ChartCompany, type ChartUnit, type NodeChange, isConflict, listCompanies, listNodeChanges, listNodeTypes, listNodes, mergeNode, setNodeValidity, undoNodeChange } from '../../../../services/orgStructureApi';
+import { fetchUsers } from '../../../../services/nexusApi';
+import { type ChangeNames, describeChange } from './changeDetails';
 import { useLoad } from '../orgShared';
 import { ImpactPreviewDialog } from './ImpactPreviewDialog';
 import { MergeNodesForm, type MergeNodesInput } from './MergeNodesForm';
@@ -58,8 +60,8 @@ export const MergeNodeDialog: React.FC<{
 };
 
 const ACTION_TITLES: Record<string, string> = {
-  create: 'ساخته شد', update: 'ویرایش نام یا نوع', manager: 'تغییر مدیر', move: 'جابه‌جایی', reorder: 'تغییر ترتیب', deactivate: 'غیرفعال شد', activate: 'فعال شد',
-  details: 'ویرایش اطلاعات', validity: 'تغییر تاریخ وجود', merge: 'ادغام', undo: 'بازگردانی', link: 'افزودن رابطه', unlink: 'برداشتن رابطه',
+  create: 'ساخته شد', update: 'ویرایش نام یا جزء چارت', manager: 'تغییر مدیر', move: 'جابه‌جایی', reorder: 'تغییر ترتیب', deactivate: 'غیرفعال شد', activate: 'فعال شد',
+  details: 'ویرایش اطلاعات', validity: 'تغییر تاریخ وجود', merge: 'ادغام', unmerge: 'برگشت ادغام', undo: 'بازگردانی', link: 'افزودن رابطه', unlink: 'برداشتن رابطه',
 };
 const actionTitle = (action: string) => ACTION_TITLES[action] || ACTION_TITLES[action.split('.').pop() || ''] || action;
 
@@ -72,6 +74,15 @@ export const NodeHistoryDialog: React.FC<{
   onClose: () => void;
 }> = ({ unit, rowVersion, canUndo, onUndone, onClose }) => {
   const log = useLoad(() => listNodeChanges(unit.unitId, 50), 'دریافت تاریخچه ممکن نشد.');
+  // Names for the ids in the log; each list is optional (a missing permission only leaves «(حذف‌شده)»).
+  const names = useLoad(async (): Promise<ChangeNames> => {
+    const [nodes, types, companies, users] = await Promise.all([
+      listNodes().catch(() => []), listNodeTypes().catch(() => []), listCompanies().catch(() => []), fetchUsers().catch(() => []),
+    ]);
+    const map = (items: { id: string; name?: string; username?: string }[]) => new Map(items.map((i) => [i.id, i.name || i.username || '']));
+    const [n, ty, c, u] = [map(nodes), map(types), map(companies), map(users)];
+    return { node: (id) => n.get(id), type: (id) => ty.get(id), company: (id) => c.get(id), user: (id) => u.get(id) };
+  }, '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string; conflict?: boolean } | null>(null);
   const changes: NodeChange[] = log.data || [];
@@ -108,7 +119,14 @@ export const NodeHistoryDialog: React.FC<{
                   <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{actionTitle(c.action)}</span>
                   <span className="text-[11px] text-slate-500 tabular-nums">{formatToJalali(c.atUtc)}</span>
                 </div>
-                {c.details && <details className="mt-1"><summary className="text-[11px] text-slate-500 cursor-pointer">جزئیات</summary><pre dir="ltr" className="mt-1 whitespace-pre-wrap break-words text-[11px] text-slate-600 dark:text-slate-300">{c.details}</pre></details>}
+                {(() => {
+                  const lines = describeChange(c.action, c.details, names.data || {});
+                  return lines.length > 0 && (
+                    <details className="mt-1"><summary className="text-[11px] text-slate-500 cursor-pointer">جزئیات</summary>
+                      <ul className="mt-1 space-y-0.5 text-[12px] text-slate-600 dark:text-slate-300">{lines.map((line) => <li key={line}>{line}</li>)}</ul>
+                    </details>
+                  );
+                })()}
                 {i === 0 && !c.canUndo && <p className="mt-1 text-[11px] text-slate-400">این نوع تغییر برگردانده نمی‌شود.</p>}
               </li>
             ))}
