@@ -92,7 +92,7 @@ export function MeetingFormModal({ initialDate, meeting, currentUser, people, ta
     const item = resolutionAgenda !== '' ? form.agenda[Number(resolutionAgenda)] : undefined;
     const tags = ['جلسه: ' + clip(form.title.trim())];
     if (item?.title.trim()) tags.push('دستور جلسه: ' + clip(item.title.trim()));
-    onConvertToTask(item?.title.trim() || form.title.trim(), form.date, tags);
+    onConvertToTask('', form.date, tags);
   };
   const nameOf = (id: string | null) => !id ? '' : people.find(p => p.id === id)?.name || peopleOptions?.people.find(p => p.id === id)?.name || 'فرد ثبت‌شده در جلسه';
   const downloadReport = async () => {
@@ -178,18 +178,15 @@ export function MeetingFormModal({ initialDate, meeting, currentUser, people, ta
             <Remove label={`حذف بند ${i+1}`} onClick={() => set('agenda', form.agenda.filter((_,n) => n !== i))} />
           </div>)}
         </div>}
-        {active === 'minutes' && meeting && <div className="space-y-3">
-          <Field label="مصوبات صورت‌جلسه"><textarea className={inputClass} rows={10} maxLength={12000} placeholder="خلاصه مذاکرات، مصوبات و تصمیم‌های جلسه…" value={form.minutes||''} onChange={e=>set('minutes',e.target.value)}/></Field>
-        </div>}
         {active === 'tasks' && <MeetingTaskPicker selectedIds={form.taskIds} onChange={ids=>set('taskIds',ids)} initialTasks={tasks}/>}
       </fieldset>
     </form>
-    {active === 'minutes' && meeting && onConvertToTask && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/60 dark:bg-indigo-950/30 p-3">
+    {active === 'minutes' && meeting && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/60 dark:bg-indigo-950/30 p-3">
       {form.agenda.some(a=>a.title.trim()) && <select aria-label="بند دستور جلسه" className={inputClass+' max-w-xs'} value={resolutionAgenda} onChange={e=>setResolutionAgenda(e.target.value)}>
         <option value="">— بدون بند مشخص از دستور جلسه —</option>
         {form.agenda.map((a,i)=>a.title.trim()?<option key={i} value={String(i)}>{toPersianDigits(i+1)}. {a.title}</option>:null)}
       </select>}
-      <SecondaryButton type="button" onClick={createResolutionTask}><ListPlus className="w-4 h-4" />ایجاد وظیفه</SecondaryButton>
+      <SecondaryButton type="button" disabled={!onConvertToTask} title={onConvertToTask?undefined:'اجازه‌ی ایجاد فعالیت را ندارید'} onClick={createResolutionTask}><ListPlus className="w-4 h-4" />ایجاد وظیفه</SecondaryButton>
       <span className="text-[11px] text-slate-500">فرم ثبت فعالیت باز می‌شود و برچسب جلسه{form.agenda.some(a=>a.title.trim())?' و بند دستور جلسه':''} خودکار روی آن می‌نشیند.</span>
     </div>}
     {active === 'report' && meeting && <div className="space-y-3 rounded-xl border border-slate-200 dark:border-slate-700 p-4">

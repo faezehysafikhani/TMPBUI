@@ -81,8 +81,6 @@ function buildBlocks(data: MeetingReportData): HTMLElement[] {
       const p = el('div', `font-size:13px;line-height:1.9;color:${C.ink};margin-bottom:6px;white-space:pre-wrap`, part);
       blocks.push(i === 0 ? section('مصوبات صورت‌جلسه', p) : p);
     });
-  } else {
-    blocks.push(section('مصوبات صورت‌جلسه', el('div', `font-size:13px;color:${C.muted}`, 'متنی ثبت نشده است.')));
   }
 
   blocks.push(section(`وظایف مرتبط (${data.tasks.length})`, data.tasks.length
