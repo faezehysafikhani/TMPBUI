@@ -45,7 +45,7 @@ interface JalaliCalendarViewProps {
   currentUser?: User | null;
   onOpenCreateForDate?: (isoDateString: string) => void;
   /** Opens the new-task form for a meeting: its title as the default, its day when still open for new work. */
-  onConvertMeetingToTask?: (title: string, isoDate?: string) => void;
+  onConvertMeetingToTask?: (title: string, isoDate?: string, tags?: string[], onCreated?: (taskId: string) => void) => void;
   onEditTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
@@ -851,7 +851,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
   })()}
 
       {createMenu && <CalendarCreateMenu anchor={createMenu.anchor} canCreateMeeting={!!meetingPeople?.canCreate} canCreateTask={!!onOpenCreateForDate} meetingReason={meetingPeopleError || meetingPeople?.message || (!meetingPeople?'در حال بررسی دسترسی…':!meetingPeople.canCreate?'دسترسی ایجاد جلسه ندارید.':undefined)} onClose={()=>setCreateMenu(null)} onTask={()=>{const day=createMenu.day;setCreateMenu(null);openCreateForDay(day);}} onMeeting={()=>{if(!meetingPeople?.canCreate)return;setEditingMeeting(undefined);setMeetingDate(dayDate(createMenu.day));setCreateMenu(null);}} />}
-      {meetingDate && currentUser && <MeetingFormModal initialDate={meetingDate} meeting={editingMeeting} currentUser={currentUser} people={registeredUsers} tasks={tasks} onClose={()=>{setMeetingDate(null);setEditingMeeting(undefined);}} onSaved={savedMeeting} onConvertToTask={onConvertMeetingToTask && ((title,isoDate)=>onConvertMeetingToTask(title,isoDate))} />}
+      {meetingDate && currentUser && <MeetingFormModal initialDate={meetingDate} meeting={editingMeeting} currentUser={currentUser} people={registeredUsers} tasks={tasks} onClose={()=>{setMeetingDate(null);setEditingMeeting(undefined);}} onSaved={savedMeeting} onConvertToTask={onConvertMeetingToTask && ((title,isoDate,tags,onCreated)=>onConvertMeetingToTask(title,isoDate,tags,onCreated))} onLinked={m=>setMeetings(rows=>rows.map(old=>old.id===m.id?m:old))} />}
       {/* Delete Confirmation Modal */}
       {deletingTaskId && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">

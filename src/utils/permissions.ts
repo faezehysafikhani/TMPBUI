@@ -16,6 +16,7 @@ export const PERMISSIONS = {
   meetingsView: 'Meetings.View',
   meetingsCreate: 'Meetings.Create',
   meetingsEdit: 'Meetings.Edit',
+  meetingsDelete: 'Meetings.Delete',
   meetingsInviteHigher: 'Meetings.InviteHigher',
   meetingsAccessAllPeople: 'Meetings.AccessAllPeople',
   notesManage: 'Notes.Manage',
@@ -182,6 +183,7 @@ const PERMISSION_PREREQUISITES: Readonly<Record<string, readonly string[]>> = {
   // Meetings
   'Meetings.Create': ['Meetings.View'],
   'Meetings.Edit': ['Meetings.View'],
+  'Meetings.Delete': ['Meetings.View'],
   'Meetings.InviteHigher': ['Meetings.View'],
   'Meetings.AccessAllPeople': ['Meetings.View'],
   // Actions

@@ -59,6 +59,8 @@ interface TaskFormModalProps {
   initialStatus?: TaskStatus;
   initialDueDate?: string;
   initialTitle?: string;
+  /** Labels a new task starts with (a task made from a meeting resolution). */
+  initialTags?: string[];
   initialDescription?: string;
   /** The description given in `initialDescription` cannot be edited (a task made from a message or comment). */
   lockInitialDescription?: boolean;
@@ -78,6 +80,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   initialStatus = 'todo',
   initialDueDate,
   initialTitle = '',
+  initialTags,
   initialDescription = '',
   lockInitialDescription = false,
   parentTask = null,
@@ -382,7 +385,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setStatus(initialStatus);
       setAttachments([]);
       setResponsibleIds([]);
-      setTags([]);
+      setTags(initialTags ? [...initialTags] : []);
       setTagInput('');
       setIsProject(false);
       setProjectCharterManager(currentUser ? currentUser.name || currentUser.username : '');
