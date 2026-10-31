@@ -221,7 +221,11 @@ export const OrgPlacementForm: React.FC<{
     // The post the person takes: the one chosen, else the one they hold here, else a vacant one, else a new one.
     let postId: string | null = choice.target && choice.target.kind !== 'new' ? choice.target.postId : null;
     if (!postId && choice.target?.kind !== 'new') postId = context.sameHeld?.id ?? context.vacant[0]?.id ?? null;
-    if (!postId) postId = (await addUnitPosition(draft.unitId, draft.positionId)).id;
+    if (!postId) {
+      // A new post goes under the same post as the others of its position in this unit.
+      const sibling = board.posts.find((p) => p.unitId === draft.unitId && p.positionId === draft.positionId && p.parentPostId);
+      postId = (await addUnitPosition(draft.unitId, draft.positionId, undefined, sibling?.parentPostId ?? null)).id;
+    }
     const positionId = board.posts.find((p) => p.id === postId)?.positionId ?? draft.positionId;
 
     if (later) {
