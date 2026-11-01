@@ -674,11 +674,11 @@ export const OrgChartBoard: React.FC<{
     if (canNode(can, 'create') && !asOf && (!unit || unit.isActive !== false)) {
       items.push({ icon: Network, label: unit ? 'زیرواحد' : 'واحد', run: () => setAddRequest({ parentId: unit?.unitId ?? null }) });
     }
-    if (can(PERM.managePositions) && !asOf && (!unit || unit.isActive !== false) && allUnitsOf(company).length > 0) {
+    if (unit && can(PERM.managePositions) && !asOf && (!unit || unit.isActive !== false) && allUnitsOf(company).length > 0) {
       items.push({ icon: Briefcase, label: 'پست', run: () => setPostsRequest({ unitId: unit?.unitId ?? null }) });
     }
     const vacant = unit ? positionsOf(unit).find((p) => p.holders.length === 0 && p.isActive) : undefined;
-    if (can(PERM.manageAssignments) && !asOf && (unit ? positionsOf(unit).length > 0 : allUnitsOf(company).some((u) => positionsOf(u).length > 0))) {
+    if (unit && can(PERM.manageAssignments) && !asOf && positionsOf(unit).length > 0) {
       items.push({ icon: UserRound, label: 'گذاشتن فرد', run: () => requestPlace({ unitId: unit?.unitId, positionId: vacant?.positionId }) });
     }
     return items;

@@ -52,21 +52,21 @@ export async function createAllowedType(name: string, parentTypeId: string | nul
 const IconPicker: React.FC<{ value: string; color: string; onChange: (icon: string) => void }> = ({ value, color, onChange }) => {
   const [open, setOpen] = useState(false);
   return (
-    <span className="relative inline-block">
+    <>
       <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label="آیکون" data-testid="icon-picker" onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 cursor-pointer">
         <span className="w-6 h-6 rounded-md flex items-center justify-center" style={{ backgroundColor: `${color}1a`, color }}><NodeTypeIcon icon={value} className="w-4 h-4" /></span>
         <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
       </button>
       {open && (
-        <span role="listbox" aria-label="آیکون" className="absolute z-20 mt-1 start-0 grid grid-cols-7 gap-1 p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg w-max max-w-[16rem]">
+        <div role="listbox" aria-label="آیکون" className="basis-full w-full grid grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))] gap-1 p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
           {Object.keys(NODE_TYPE_ICONS).map((key) => (
             <button key={key} type="button" role="option" aria-selected={value === key} data-icon={key} onClick={() => { onChange(key); setOpen(false); }} className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer ${value === key ? 'ring-2 ring-indigo-400' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`} style={{ color }}>
               <NodeTypeIcon icon={key} className="w-4 h-4" />
             </button>
           ))}
-        </span>
+        </div>
       )}
-    </span>
+    </>
   );
 };
 
