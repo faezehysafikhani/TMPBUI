@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Crown, Briefcase, Users } from 'lucide-react';
+import { AlertTriangle, Building2, ChevronDown, ChevronLeft, Crown, Briefcase, Plus, Users } from 'lucide-react';
 import type { ChartCompany, ChartMember, ChartPosition, ChartUnit } from '../../../services/orgStructureApi';
 import { headTitleOf, postLabel } from '../../../services/orgStructureApi';
 import { toPersianDigits } from '../../../utils/helpers';
@@ -35,6 +35,9 @@ interface Ctx {
   nameOf: Map<string, string>;
   shown: Map<string, number>;
   more: (key: string) => void;
+  /** The «+» buttons (none: the user may not add, or the chart is a past day). parentId null: at the top of the company. */
+  onAddUnit?: (parentId: string | null) => void;
+  onAddPosts?: (unitId: string) => void;
 }
 
 const rowBase = 'w-full flex items-center gap-2 rounded-lg px-2 py-1 text-start transition-colors';
@@ -122,6 +125,16 @@ const NodeRow: React.FC<{ ctx: Ctx; unit: ChartUnit; depth: number }> = ({ ctx, 
           <span className="flex-1" />
           <Headcount n={people} />
         </button>
+        {!ctx.printing && !inactive && (ctx.onAddUnit || ctx.onAddPosts) && (
+          <span className="flex items-center gap-1 pe-1 shrink-0">
+            {ctx.onAddPosts && (
+              <button type="button" data-testid="tidy-add-post" onClick={() => ctx.onAddPosts!(unit.unitId)} title={`افزودن پست به ${unit.name}`} aria-label={`افزودن پست به ${unit.name}`} className="flex items-center gap-0.5 h-6 px-1.5 rounded-full border border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/40 text-[10px] font-bold cursor-pointer"><Plus className="w-3 h-3" /><Briefcase className="w-3 h-3" /></button>
+            )}
+            {ctx.onAddUnit && (
+              <button type="button" data-testid="tidy-add-child" onClick={() => ctx.onAddUnit!(unit.unitId)} title={`افزودن زیرواحد به ${unit.name}`} aria-label={`افزودن زیرواحد به ${unit.name}`} className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer"><Plus className="w-3.5 h-3.5" /></button>
+            )}
+          </span>
+        )}
       </div>
       {isOpen && hasInside && (
         <div className="ms-3 ps-3 border-s border-slate-200 dark:border-slate-700 space-y-1" data-depth={depth}>
@@ -223,11 +236,13 @@ export const TidyOrgChart: React.FC<{
   showEmpty: boolean;
   printing?: boolean;
   rootRef?: React.Ref<HTMLDivElement>;
-}> = ({ company, selection, onSelect, open, onToggle, showEmpty, printing = false, rootRef }) => {
+  onAddUnit?: (parentId: string | null) => void;
+  onAddPosts?: (unitId: string) => void;
+}> = ({ company, selection, onSelect, open, onToggle, showEmpty, printing = false, rootRef, onAddUnit, onAddPosts }) => {
   const nameOf = React.useMemo(() => new Map(allUnitsOf(company).map((u) => [u.unitId, u.name] as const)), [company]);
   const [shown, setShown] = React.useState<Map<string, number>>(new Map());
   const more = (key: string) => setShown((prev: Map<string, number>) => new Map<string, number>(prev).set(key, (prev.get(key) ?? PAGE_SIZE) + PAGE_SIZE));
-  const ctx: Ctx = { company, selection, onSelect, open, toggle: onToggle, showEmpty, printing, nameOf, shown, more };
+  const ctx: Ctx = { company, selection, onSelect, open, toggle: onToggle, showEmpty, printing, nameOf, shown, more, onAddUnit, onAddPosts };
 
   // A node chosen elsewhere (search, side panel) is on a page of a long list: show up to it.
   React.useEffect(() => {
@@ -288,6 +303,9 @@ export const TidyOrgChart: React.FC<{
                 <span className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{company.name}</span>
                 <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-300 shrink-0">شرکت</span>
               </button>
+              {!printing && onAddUnit && (
+                <button type="button" data-testid="tidy-add-top" onClick={() => onAddUnit(null)} className="ms-9 mt-1 inline-flex items-center gap-1 rounded-full border border-dashed border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 px-2.5 py-0.5 text-[11px] font-bold cursor-pointer"><Plus className="w-3 h-3" /> افزودن واحد</button>
+              )}
             </li>
             {headSelect && (
               <li>

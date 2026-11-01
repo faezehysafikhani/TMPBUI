@@ -1022,6 +1022,8 @@ export const OrgChartBoard: React.FC<{
               showEmpty={showEmpty}
               printing={printingTidy}
               rootRef={tidyRoot}
+              onAddUnit={canNode(can, 'create') && !asOf ? (parentId) => setAddRequest({ parentId }) : undefined}
+              onAddPosts={can(PERM.managePositions) && !asOf ? (unitId) => setPostsRequest({ unitId }) : undefined}
             />
           </TidyBoundary>
           {asOf && (
