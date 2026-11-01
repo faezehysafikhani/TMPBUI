@@ -32,6 +32,7 @@ export const AddPostsDialog: React.FC<{
   const [headPost, setHeadPost] = useState(true);
   const [parentId, setParentId] = useState('');
   const [manager, setManager] = useState(true);
+  const [editParent, setEditParent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +42,10 @@ export const AddPostsDialog: React.FC<{
   const isNewTitle = !!typed && !existing;
   const linksExisting = !!existing && !known;
   const unitPosts = unit ? positionsOf(unit) : [];
-  const defaultParent = unitPosts[0]?.positionId || head?.id || '';
+  // A title that sounds like a manager's goes under the company's head; any other goes under the highest title the unit already has.
+  const depthOf = (id: string) => { let n = 0; for (let p = ofCompany.find((x) => x.id === id); p?.parentPositionId && n < 20; p = ofCompany.find((x) => x.id === p!.parentPositionId)) n++; return n; };
+  const highestHere = [...unitPosts].sort((x, y) => depthOf(x.positionId) - depthOf(y.positionId))[0]?.positionId;
+  const defaultParent = /مدیر|رئیس|معاون|سرپرست/.test(typed) ? head?.id || '' : highestHere || head?.id || '';
   const parent = parentId || defaultParent;
   const needsHead = !head;
   const firstPosts = unit != null && unitPosts.length === 0;
@@ -134,11 +138,20 @@ export const AddPostsDialog: React.FC<{
       </Field>
       {linksExisting && <Notice type="info">عنوان «{typed}» در سامانه هست؛ برای این شرکت هم فعال می‌شود (برای شرکت‌های دیگر تغییری نمی‌کند).</Notice>}
       {isNewTitle && !needsHead && ofCompany.length > 1 && (
-        <Field label="زیر کدام سمت؟" hint="سمت مافوق سمت تازه؛ دارنده‌ی آن مدیر دارنده‌ی این پست می‌شود.">
-          <select className={inputClass} value={parent} onChange={(e) => setParentId(e.target.value)} aria-label="سمت مافوق">
-            {ofCompany.map((p) => <option key={p.id} value={p.id}>{p.title}{p.parentPositionId ? '' : ' (رئیس کل)'}</option>)}
-          </select>
-        </Field>
+        <div className="text-[11px] text-slate-500" data-testid="parent-hint">
+          {editParent ? (
+            <Field label="سمت مافوق این عنوان" hint="دارنده‌ی سمت مافوق، مدیر دارنده‌ی این پست می‌شود. به‌طور معمول نیازی به تغییر نیست.">
+              <select className={inputClass} value={parent} onChange={(e) => setParentId(e.target.value)} aria-label="سمت مافوق">
+                {ofCompany.map((p) => <option key={p.id} value={p.id}>{p.title}{p.parentPositionId ? '' : ' (رئیس کل)'}</option>)}
+              </select>
+            </Field>
+          ) : (
+            <>
+              عنوان تازه زیر «{ofCompany.find((p) => p.id === parent)?.title ?? '—'}» قرار می‌گیرد.{' '}
+              <button type="button" onClick={() => setEditParent(true)} className="font-bold text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer">تغییر</button>
+            </>
+          )}
+        </div>
       )}
       <Field label="چند پست؟" hint="هر پست یک نفر دارد؛ برای سه کارشناس عدد ۳ را بگذارید.">
         <input className={`${inputClass} w-28`} type="number" min={1} max={50} value={count} onChange={(e) => setCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} aria-label="تعداد پست" />
