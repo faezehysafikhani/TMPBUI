@@ -971,104 +971,105 @@ export const OrgChartBoard: React.FC<{
     </div>
   );
 
+  const controls = (
+    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        {showLinks && (
+          <div className="flex items-center gap-1.5" data-testid="as-of">
+            <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">نمایش به تاریخ</span>
+            <JalaliDatePicker
+              value={asOf}
+              // Today is the live chart (editable), not a view «as of today».
+              onChange={(day) => setAsOf(day && day !== localToday() ? day : undefined)}
+              ariaLabel="نمایش چارت به تاریخ"
+              placeholder="امروز"
+            />
+          </div>
+        )}
+        <ViewSwitch view={view} onChange={chooseView} />
+        {view === 'tree' && !asOf && (
+          <span className="flex items-center gap-1.5">
+            <button type="button" data-testid="free-layout" aria-pressed={free} onClick={toggleFree} title="کارت‌ها را هرجا خواستید بچینید؛ فقط ظاهر چارت عوض می‌شود و ساختار همان می‌ماند" className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold cursor-pointer whitespace-nowrap ${free ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600'}`}><Move className="w-3.5 h-3.5" />چیدمان آزاد</button>
+            {free && Object.keys(offsets).length > 0 && (
+              <button type="button" data-testid="free-reset" onClick={resetLayout} title="برگرداندن کارت‌ها به چیدمان خودکار" aria-label="برگرداندن به چیدمان خودکار" className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer"><RotateCcw className="w-4 h-4" /></button>
+            )}
+          </span>
+        )}
+        {view === 'tidy' && (
+          <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer whitespace-nowrap">
+            <input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} className="accent-indigo-600" /> نمایش پست‌های خالی
+          </label>
+        )}
+        <ChartSearch hits={searchHits} />
+        <button type="button" onClick={allOpen ? collapseAll : expandAll} className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer" title={allOpen ? 'بستن همه' : 'باز کردن همه'} aria-label={allOpen ? 'بستن همه' : 'باز کردن همه'}>
+          {allOpen ? <ChevronsDownUp className="w-4 h-4" /> : <ChevronsUpDown className="w-4 h-4" />}
+        </button>
+        <button
+          type="button"
+          disabled={exporting}
+          onClick={async () => {
+            if (view === 'tree' && !content.current) return;
+            setExporting(true);
+            try {
+              // The tidy chart is printed with everything open and without its buttons; the tree chart as it was.
+              if (view === 'tidy') {
+                setPrintingTidy(true);
+                await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+              }
+              const { downloadOrgChartPdf } = await import('../../../utils/orgChartPdf');
+              const { jalaliStamp } = await import('../../../utils/reportExport');
+              // The company's code and today's Jalali date (or the chart's day); ASCII on purpose, as every export here.
+              const code = (company.code || '').replace(/[^A-Za-z0-9_-]+/g, '') || 'company';
+              const day = asOf ? jalaliDay(asOf).replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/\//g, '-') : jalaliStamp();
+              await downloadOrgChartPdf((view === 'tidy' ? tidyRoot.current : content.current)!, `چارت سازمانی ${company.name}`, `org-chart-${code}-${day}.pdf`);
+            } catch (err) {
+              console.error('Org chart PDF failed:', err);
+              void appAlert('دریافت فایل PDF چارت انجام نشد.');
+            } finally {
+              setPrintingTidy(false);
+              setExporting(false);
+            }
+          }}
+          className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-wait"
+          title="دریافت PDF چارت"
+          aria-label="دریافت PDF چارت"
+        >
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+        </button>
+        <button type="button" onClick={() => setFullscreen(!fullscreen)} className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer" title={fullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'} aria-label={fullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}>
+          {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+        </button>
+    </div>
+  );
+
   const board = (
     <AdminCard className={`relative ${fullscreen ? 'overflow-hidden flex flex-col h-full' : 'overflow-hidden'}`}>
-      {/* In the tree chart the toolbar and the steps lie over the top of the canvas (more room for the chart) and fade while the chart is moved, zoomed or scrolled. */}
-      <div ref={overlay} data-testid="chart-overlay" className={view === 'tree' ? `absolute inset-x-2 top-2 z-20 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm transition-opacity duration-300 ${chartBusy ? 'opacity-25 pointer-events-none' : 'opacity-100'}` : ''}>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
         <div>
           <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white" title="روی هر بخش بزنید تا جزئیاتش را ببینید و همان‌جا تغییرش دهید."><GitFork className="w-5 h-5 text-indigo-600" /> چارت سازمانی</h3>
         </div>
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {showLinks && (
-            <div className="flex items-center gap-1.5" data-testid="as-of">
-              <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">نمایش به تاریخ</span>
-              <JalaliDatePicker
-                value={asOf}
-                // Today is the live chart (editable), not a view «as of today».
-                onChange={(day) => setAsOf(day && day !== localToday() ? day : undefined)}
-                ariaLabel="نمایش چارت به تاریخ"
-                placeholder="امروز"
-              />
-            </div>
-          )}
-          <ViewSwitch view={view} onChange={chooseView} />
-          {view === 'tree' && !asOf && (
-            <span className="flex items-center gap-1.5">
-              <button type="button" data-testid="free-layout" aria-pressed={free} onClick={toggleFree} title="کارت‌ها را هرجا خواستید بچینید؛ فقط ظاهر چارت عوض می‌شود و ساختار همان می‌ماند" className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold cursor-pointer whitespace-nowrap ${free ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600'}`}><Move className="w-3.5 h-3.5" />چیدمان آزاد</button>
-              {free && Object.keys(offsets).length > 0 && (
-                <button type="button" data-testid="free-reset" onClick={resetLayout} title="برگرداندن کارت‌ها به چیدمان خودکار" aria-label="برگرداندن به چیدمان خودکار" className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer"><RotateCcw className="w-4 h-4" /></button>
-              )}
-            </span>
-          )}
-          {view === 'tidy' && (
-            <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer whitespace-nowrap">
-              <input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} className="accent-indigo-600" /> نمایش پست‌های خالی
-            </label>
-          )}
-          <ChartSearch hits={searchHits} />
-          {chart.length > 1 && (
-            <select
-              className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold"
-              value={company.companyId}
-              onChange={(e) => {
-                setCompanyId(e.target.value);
-                setSelection({ kind: 'company', companyId: e.target.value });
-                // Whatever changed meanwhile (another tab, another person, the API) shows on arrival.
-                void data.reload();
-              }}
-              aria-label="شرکت"
-            >
-              {chart.map((c) => <option key={c.companyId} value={c.companyId}>{c.name}</option>)}
-            </select>
-          )}
-          <button type="button" onClick={allOpen ? collapseAll : expandAll} className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer" title={allOpen ? 'بستن همه' : 'باز کردن همه'} aria-label={allOpen ? 'بستن همه' : 'باز کردن همه'}>
-            {allOpen ? <ChevronsDownUp className="w-4 h-4" /> : <ChevronsUpDown className="w-4 h-4" />}
-          </button>
-          <button
-            type="button"
-            disabled={exporting}
-            onClick={async () => {
-              if (view === 'tree' && !content.current) return;
-              setExporting(true);
-              try {
-                // The tidy chart is printed with everything open and without its buttons; the tree chart as it was.
-                if (view === 'tidy') {
-                  setPrintingTidy(true);
-                  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-                }
-                const { downloadOrgChartPdf } = await import('../../../utils/orgChartPdf');
-                const { jalaliStamp } = await import('../../../utils/reportExport');
-                // The company's code and today's Jalali date (or the chart's day); ASCII on purpose, as every export here.
-                const code = (company.code || '').replace(/[^A-Za-z0-9_-]+/g, '') || 'company';
-                const day = asOf ? jalaliDay(asOf).replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/\//g, '-') : jalaliStamp();
-                await downloadOrgChartPdf((view === 'tidy' ? tidyRoot.current : content.current)!, `چارت سازمانی ${company.name}`, `org-chart-${code}-${day}.pdf`);
-              } catch (err) {
-                console.error('Org chart PDF failed:', err);
-                void appAlert('دریافت فایل PDF چارت انجام نشد.');
-              } finally {
-                setPrintingTidy(false);
-                setExporting(false);
-              }
+        {view !== 'tree' && controls}
+        {chart.length > 1 && (
+          <select
+            className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold"
+            value={company.companyId}
+            onChange={(e) => {
+              setCompanyId(e.target.value);
+              setSelection({ kind: 'company', companyId: e.target.value });
+              // Whatever changed meanwhile (another tab, another person, the API) shows on arrival.
+              void data.reload();
             }}
-            className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer disabled:opacity-50 disabled:cursor-wait"
-            title="دریافت PDF چارت"
-            aria-label="دریافت PDF چارت"
+            aria-label="شرکت"
           >
-            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-          </button>
-          <button type="button" onClick={() => setFullscreen(!fullscreen)} className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer" title={fullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'} aria-label={fullscreen ? 'خروج از تمام‌صفحه' : 'تمام‌صفحه'}>
-            {fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-        </div>
+            {chart.map((c) => <option key={c.companyId} value={c.companyId}>{c.name}</option>)}
+          </select>
+        )}
       </div>
 
       {!asOf && (
-        <div className="px-3 py-2">
+        <div className="px-3 pb-2">
           <BuildSteps company={company} />
         </div>
       )}
-      </div>
 
       {view === 'tidy' ? (
         <div className={`relative overflow-auto ${fullscreen ? 'flex-1 min-h-0' : 'max-h-[75vh] xl:max-h-[calc(100vh-170px)]'}`}>
@@ -1092,6 +1093,9 @@ export const OrgChartBoard: React.FC<{
           )}
         </div>
       ) : (
+      <div className={`relative ${fullscreen ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
+      {/* The buttons lie over the top of the canvas and fade while the chart is moved, zoomed or scrolled. */}
+      <div ref={overlay} data-testid="chart-overlay" className={`absolute inset-x-2 top-2 z-20 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm px-3 py-2 flex justify-end transition-opacity duration-300 ${chartBusy ? 'opacity-25 pointer-events-none' : 'opacity-100'}`}>{controls}</div>
       <div
         ref={viewport}
         tabIndex={0}
@@ -1250,7 +1254,7 @@ export const OrgChartBoard: React.FC<{
           <span className="hidden pointer-coarse:inline">دو انگشت: بزرگ‌نمایی · کشیدن: جابه‌جایی</span>
         </p>}
         {asOf && (
-          <p role="status" className="pointer-events-none absolute top-3 end-3 z-10 max-w-sm rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200 px-3 py-1.5 text-xs font-bold shadow-md">
+          <p role="status" className="pointer-events-none absolute bottom-3 end-3 z-10 max-w-sm rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200 px-3 py-1.5 text-xs font-bold shadow-md">
             چارت در تاریخ {jalaliDay(asOf)} (فقط نمایش؛ کدام واحدها وجود داشتند، نه جای آن‌ها آن روز)
           </p>
         )}
@@ -1261,6 +1265,7 @@ export const OrgChartBoard: React.FC<{
           </p>
         )}
         <ZoomControls subscribe={subscribe} zoomBy={zoomBy} fit={fit} />
+      </div>
       </div>
       )}
 
