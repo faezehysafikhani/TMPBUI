@@ -57,7 +57,7 @@ export const AddMenu: React.FC<{
         aria-expanded={!!at}
         aria-label={`افزودن به ${forName}`}
         title={`افزودن به ${forName}`}
-        className={`inline-flex items-center gap-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold cursor-pointer shadow-xs w-6 h-6 justify-center`}
+        className="inline-flex shrink-0 items-center justify-center w-6 h-6 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold cursor-pointer shadow-xs"
       >
         <Plus className="w-3.5 h-3.5" />
       </button>
