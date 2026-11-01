@@ -1075,7 +1075,7 @@ export const OrgChartBoard: React.FC<{
       >
         <div ref={content} className="absolute top-0 left-0 origin-top-left w-max px-10 py-10 flex flex-col items-center">
           {/* secondary links (dotted / dashed lines between nodes), behind the cards; none: nothing */}
-          {showLinks && <OrgLinkLayer company={company} content={content} highlightNodeId={selection?.kind === 'unit' ? selection.unitId : null} />}
+          {showLinks && <OrgLinkLayer company={company} content={content} highlightNodeId={selection?.kind === 'unit' ? selection.unitId : null} offsets={free && !asOf ? offsets : undefined} />}
           {free && !asOf && <FreeLinkLayer content={content} pairs={freePairs} offsets={offsets} />}
           {/* the company */}
           <FreeDrag {...freeProps('company')}>
