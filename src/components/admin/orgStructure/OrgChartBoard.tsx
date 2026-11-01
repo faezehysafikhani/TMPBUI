@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
+import { Plus, Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown, UserPlus } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
 import { ChartCompany, ChartMember, ChartPosition, ChartUnit, AutoLinkChoice, LinkType, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listLinkTypes, listNodeTypes, listNodes, listPositions, listTemplates, listUnplacedUsers, headTitleOf, postLabel, ORG_STRUCTURE_PERMISSIONS as PERM, type StructureTemplate } from '../../../services/orgStructureApi';
@@ -134,7 +134,9 @@ const BranchCard: React.FC<{
   muted?: boolean;
   /** A position nobody holds yet: drawn with a dashed border. */
   vacant?: boolean;
-}> = ({ node, icon: Icon, tone, title, subtitle, count, members, open, onToggle, selected, onSelect, selectedUserId, onSelectMember, muted, vacant }) => (
+  /** A vacant post: puts a person in it (opens the placement window). */
+  onAssign?: () => void;
+}> = ({ node, icon: Icon, tone, title, subtitle, count, members, open, onToggle, selected, onSelect, selectedUserId, onSelectMember, muted, vacant, onAssign }) => (
   <div className="relative">
     <span className="absolute -start-4 top-7 w-4 h-0.5 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
     <NodeCard node={node} label={title} selected={selected} onSelect={onSelect} className={`w-60 ${muted ? 'opacity-70' : ''} ${vacant && !selected ? 'border-dashed' : ''}`}>
@@ -148,6 +150,9 @@ const BranchCard: React.FC<{
           </span>
         </span>
         {count > 0 && <Toggle open={open} onClick={onToggle} label={title} />}
+        {vacant && onAssign && (
+          <button type="button" data-testid="assign-post" title="گذاشتن فرد در این پست" aria-label={`گذاشتن فرد در ${title}`} onClick={(e) => { e.stopPropagation(); onAssign(); }} className="w-7 h-7 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center shrink-0 cursor-pointer shadow-xs"><UserPlus className="w-3.5 h-3.5" /></button>
+        )}
       </div>
       {open && members.length > 0 && (
         <div data-scrollable className="relative border-t border-slate-100 dark:border-slate-800 p-1.5 space-y-0.5 max-h-60 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -667,14 +672,14 @@ export const OrgChartBoard: React.FC<{
   const menuItemsFor = (unit: ChartUnit | null): AddMenuItem[] => {
     const items: AddMenuItem[] = [];
     if (canNode(can, 'create') && !asOf && (!unit || unit.isActive !== false)) {
-      items.push({ icon: Network, label: unit ? 'زیرواحد' : 'واحد', hint: unit ? `زیر «${unit.name}»` : 'در بالاترین سطح شرکت', run: () => setAddRequest({ parentId: unit?.unitId ?? null }) });
+      items.push({ icon: Network, label: unit ? 'زیرواحد' : 'واحد', run: () => setAddRequest({ parentId: unit?.unitId ?? null }) });
     }
     if (can(PERM.managePositions) && !asOf && (!unit || unit.isActive !== false) && allUnitsOf(company).length > 0) {
-      items.push({ icon: Briefcase, label: 'پست', hint: unit ? `به «${unit.name}»` : 'با انتخاب واحد', run: () => setPostsRequest({ unitId: unit?.unitId ?? null }) });
+      items.push({ icon: Briefcase, label: 'پست', run: () => setPostsRequest({ unitId: unit?.unitId ?? null }) });
     }
     const vacant = unit ? positionsOf(unit).find((p) => p.holders.length === 0 && p.isActive) : undefined;
     if (can(PERM.manageAssignments) && !asOf && (unit ? positionsOf(unit).length > 0 : allUnitsOf(company).some((u) => positionsOf(u).length > 0))) {
-      items.push({ icon: UserRound, label: 'نفر به پست', hint: unit ? `در «${unit.name}»` : undefined, run: () => requestPlace({ unitId: unit?.unitId, positionId: vacant?.positionId }) });
+      items.push({ icon: UserRound, label: 'گذاشتن فرد', run: () => requestPlace({ unitId: unit?.unitId, positionId: vacant?.positionId }) });
     }
     return items;
   };
@@ -827,6 +832,7 @@ export const OrgChartBoard: React.FC<{
                   count={position.holders.length}
                   members={position.holders}
                   vacant={position.holders.length === 0}
+                  onAssign={!asOf && can(PERM.manageAssignments) && position.isActive ? () => requestPlace({ unitId: unit.unitId, positionId: position.positionId }) : undefined}
                   muted={!position.isActive}
                   open={openGroups.has(`pos:${position.unitPositionId}`)}
                   onToggle={() => toggleIn(setOpenGroups, `pos:${position.unitPositionId}`)}

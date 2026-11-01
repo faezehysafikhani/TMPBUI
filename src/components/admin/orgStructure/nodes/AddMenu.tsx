@@ -43,7 +43,7 @@ export const AddMenu: React.FC<{
     e.stopPropagation();
     if (at) { setAt(null); return; }
     const r = button.current?.getBoundingClientRect();
-    if (r) setAt({ top: r.bottom + 6, left: Math.min(Math.max(8, r.left), window.innerWidth - 232) });
+    if (r) setAt({ top: r.bottom + 6, left: Math.min(Math.max(8, r.left), window.innerWidth - 200) });
   };
 
   return (
@@ -57,14 +57,14 @@ export const AddMenu: React.FC<{
         aria-expanded={!!at}
         aria-label={`افزودن به ${forName}`}
         title={`افزودن به ${forName}`}
-        className={`inline-flex items-center gap-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold cursor-pointer shadow-xs ${compact ? 'w-6 h-6 justify-center' : 'h-6 ps-1.5 pe-2.5 text-[11px]'}`}
+        className={`inline-flex items-center gap-1 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold cursor-pointer shadow-xs w-6 h-6 justify-center`}
       >
-        <Plus className="w-3.5 h-3.5" />{!compact && 'افزودن'}
+        <Plus className="w-3.5 h-3.5" />
       </button>
       {at && createPortal(
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setAt(null)} aria-hidden="true" />
-          <div role="menu" dir="rtl" style={{ top: at.top, left: at.left }} className="fixed z-[61] w-56 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-1.5">
+          <div role="menu" dir="rtl" style={{ top: at.top, left: at.left }} className="fixed z-[61] w-48 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl p-1.5">
             {list.map((item) => (
               <button
                 key={item.label}
@@ -76,7 +76,6 @@ export const AddMenu: React.FC<{
                 <span className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0"><item.icon className="w-4 h-4" /></span>
                 <span className="min-w-0">
                   <span className="block text-xs font-extrabold text-slate-800 dark:text-slate-100">{item.label}</span>
-                  {item.hint && <span className="block text-[10px] text-slate-500 truncate">{item.hint}</span>}
                 </span>
               </button>
             ))}
