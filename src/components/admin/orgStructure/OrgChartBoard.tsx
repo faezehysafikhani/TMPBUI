@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown, UserPlus } from 'lucide-react';
+import { Plus, Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown, UserPlus, Move, RotateCcw } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
 import { ChartCompany, ChartMember, ChartPosition, ChartUnit, AutoLinkChoice, LinkType, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listLinkTypes, listNodeTypes, listNodes, listPositions, listTemplates, listUnplacedUsers, headTitleOf, postLabel, ORG_STRUCTURE_PERMISSIONS as PERM, type StructureTemplate } from '../../../services/orgStructureApi';
@@ -22,6 +22,8 @@ import { type ChartView, allOpenSet, defaultView, pathTo, readSavedCompany, read
 import { OrgChartDetails } from './OrgChartDetails';
 import { PanZoomView, usePanZoom } from './usePanZoom';
 import { OrgLinkLayer } from './OrgLinkLayer';
+import { FreeDrag, type FreeOffset } from './FreeDrag';
+import { FreeLinkLayer } from './FreeLinkLayer';
 import { appAlert } from '../../../utils/appDialog';
 import { JalaliDatePicker } from '../../JalaliDatePicker';
 import { jalaliDay } from './nodes/HistoryDialogs';
@@ -412,6 +414,15 @@ export const OrgChartBoard: React.FC<{
   /** «ثبت شرکت» from the empty state: the form with the templates to start from. */
   const [companyForm, setCompanyForm] = useState<{ templates: StructureTemplate[] } | null>(null);
   const openCompanyForm = async () => setCompanyForm({ templates: await listTemplates().catch(() => []) });
+  /** «چیدمان آزاد» (this browser only): cards are dragged anywhere; the structure does not change. */
+  const [free, setFree] = useState<boolean>(() => { try { return localStorage.getItem('org-free-layout-on') === '1'; } catch { return false; } });
+  const [offsets, setOffsets] = useState<Record<string, FreeOffset>>({});
+  const offsetsRef = useRef(offsets);
+  offsetsRef.current = offsets;
+  const zoomScale = useRef(1);
+  const saveOffsets = () => { try { localStorage.setItem(layoutKey, JSON.stringify(offsetsRef.current)); } catch { /* not saved: still shown */ } };
+  const toggleFree = () => setFree((on) => { try { localStorage.setItem('org-free-layout-on', on ? '0' : '1'); } catch { /* ignore */ } return !on; });
+  const resetLayout = () => { setOffsets({}); offsetsRef.current = {}; try { localStorage.removeItem(layoutKey); } catch { /* ignore */ } };
   /** Dragging a card: which one, and the card it is over (with whether it may go there). */
   const [dragId, setDragId] = useState<string | null>(null);
   /** The card being dragged over, whether the node may go there, and (if not) why - shown while hovering. */
@@ -472,6 +483,7 @@ export const OrgChartBoard: React.FC<{
   /** Printing the tidy chart: everything open, no buttons, for the moment of the capture. */
   const [printingTidy, setPrintingTidy] = useState(false);
   const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company && view === 'tree');
+  useEffect(() => subscribe((v) => { zoomScale.current = v.s; }), [subscribe]);
   const level = levelOf(company);
   // The display level only hides: simple has no node tools, advanced adds the secondary links.
   const nodeApi = (data.data?.nodes.length ?? 0) > 0 && atLeast(level, 'normal') && !asOf;
@@ -508,6 +520,11 @@ export const OrgChartBoard: React.FC<{
   }, [initialCompanyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const units = company?.units || [];
+  const layoutKey = `org-free-layout:${company?.companyId ?? ''}`;
+  useEffect(() => {
+    try { const raw = localStorage.getItem(layoutKey); setOffsets(raw ? JSON.parse(raw) : {}); } catch { setOffsets({}); }
+  }, [layoutKey]);
+
   useEffect(() => { if (data.data) onLevelChange?.(highestLevel(data.data.chart)); }, [data.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const firstToken = useRef(reloadToken);
@@ -728,10 +745,12 @@ export const OrgChartBoard: React.FC<{
     );
   }
 
-  const line = 'bg-slate-300 dark:bg-slate-600';
+  const line = free ? 'bg-transparent' : 'bg-slate-300 dark:bg-slate-600';
+  const freeProps = (id: string) => ({ id, enabled: free && !asOf, offset: offsets[id], scale: () => zoomScale.current, onMove: (key: string, o: FreeOffset) => setOffsets((prev) => ({ ...prev, [key]: o })), onEnd: saveOffsets });
 
   /** Moving a node by dragging its card onto another (a node) or onto the company (the top); the preview comes before it is saved. */
   const dndOf = (unit: ChartUnit | null) => {
+    if (free) return undefined;
     const targetId = unit?.unitId ?? null;
     return {
       draggable: !!unit && canMoveNodes,
@@ -778,6 +797,7 @@ export const OrgChartBoard: React.FC<{
     const color = safeColor(type?.color);
     return (
       <div className="flex flex-col items-center">
+        <FreeDrag {...freeProps(`unit:${unit.unitId}`)} className="flex flex-col items-center">
         <NodeCard
           node={`unit:${unit.unitId}`}
           label={unit.name}
@@ -873,6 +893,7 @@ export const OrgChartBoard: React.FC<{
           </div>
         )}
 
+        </FreeDrag>
         {branchOpen && (
           <>
             <span className={`w-0.5 h-8 ${line}`} aria-hidden="true" />
@@ -901,6 +922,10 @@ export const OrgChartBoard: React.FC<{
   };
 
   const rows = rowsOf(units, perRow);
+  /** Parent → child pairs for the free layout's lines: company → head → deputies → their sub-units. */
+  const freePairs: [string, string][] = [['company', 'head']];
+  const addPairs = (parent: string, list: ChartUnit[]) => list.forEach((u) => { freePairs.push([parent, `unit:${u.unitId}`]); addPairs(`unit:${u.unitId}`, u.children || []); });
+  addPairs('head', units);
 
   /** One row of deputies hanging from a bar; with several rows the bar runs from the line down their start side. */
   const unitRow = (row: ChartUnit[], joinedAtStart: boolean) => (
@@ -942,6 +967,14 @@ export const OrgChartBoard: React.FC<{
             </div>
           )}
           <ViewSwitch view={view} onChange={chooseView} />
+          {view === 'tree' && !asOf && (
+            <span className="flex items-center gap-1.5">
+              <button type="button" data-testid="free-layout" aria-pressed={free} onClick={toggleFree} title="کارت‌ها را هرجا خواستید بچینید؛ فقط ظاهر چارت عوض می‌شود و ساختار همان می‌ماند" className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold cursor-pointer whitespace-nowrap ${free ? 'border-indigo-400 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-indigo-600'}`}><Move className="w-3.5 h-3.5" />چیدمان آزاد</button>
+              {free && Object.keys(offsets).length > 0 && (
+                <button type="button" data-testid="free-reset" onClick={resetLayout} title="برگرداندن کارت‌ها به چیدمان خودکار" aria-label="برگرداندن به چیدمان خودکار" className="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-indigo-600 flex items-center justify-center cursor-pointer"><RotateCcw className="w-4 h-4" /></button>
+              )}
+            </span>
+          )}
           {view === 'tidy' && (
             <label className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 cursor-pointer whitespace-nowrap">
               <input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} className="accent-indigo-600" /> نمایش پست‌های خالی
@@ -1043,7 +1076,9 @@ export const OrgChartBoard: React.FC<{
         <div ref={content} className="absolute top-0 left-0 origin-top-left w-max px-10 py-10 flex flex-col items-center">
           {/* secondary links (dotted / dashed lines between nodes), behind the cards; none: nothing */}
           {showLinks && <OrgLinkLayer company={company} content={content} highlightNodeId={selection?.kind === 'unit' ? selection.unitId : null} />}
+          {free && !asOf && <FreeLinkLayer content={content} pairs={freePairs} offsets={offsets} />}
           {/* the company */}
+          <FreeDrag {...freeProps('company')}>
           <NodeCard
             node={`company:${company.companyId}`}
             label={company.name}
@@ -1066,9 +1101,11 @@ export const OrgChartBoard: React.FC<{
               <AddMenu items={menuItemsFor(null)} forName={company.name} testId="add-company" compact />
             </div>
           </NodeCard>
+          </FreeDrag>
 
           {/* the head of the company, between it and its deputies */}
           <span className={`w-0.5 h-6 ${line}`} aria-hidden="true" />
+          <FreeDrag {...freeProps('head')}>
           {!company.manager && headPostOf(company) ? (
             <NodeCard
               node={`position:${headPostOf(company)!.unitPositionId}`}
@@ -1110,6 +1147,8 @@ export const OrgChartBoard: React.FC<{
               </span>
             </div>
           )}
+
+          </FreeDrag>
 
           {/* the company's other posts (board members, advisers...), right under its head */}
           {companyPostsOf(company).some((p) => !p.isHead) && (

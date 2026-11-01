@@ -187,6 +187,8 @@ export function usePanZoom(viewport: RefObject<HTMLDivElement | null>, content: 
     const onPointerDown = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if ((e.target as Element).closest('input, select, textarea')) return;
+      // A card of the free layout is dragged by itself, not the whole chart.
+      if ((e.target as Element).closest('[data-free-drag]') && !(e.target as Element).closest('button')) { dragged.current = false; return; }
       pointers.set(e.pointerId, local(e));
       if (pointers.size === 1) {
         start = local(e);
