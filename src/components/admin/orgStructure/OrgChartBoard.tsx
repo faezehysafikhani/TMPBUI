@@ -783,7 +783,7 @@ export const OrgChartBoard: React.FC<{
           label={unit.name}
           selected={isSelected({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
           onSelect={() => choose({ kind: 'unit', companyId: company.companyId, unitId: unit.unitId })}
-          className={`w-64 ${unit.isActive === false ? 'opacity-60 border-dashed' : ''} ${dragId === unit.unitId ? 'opacity-40' : ''}`}
+          className={`w-72 ${unit.isActive === false ? 'opacity-60 border-dashed' : ''} ${dragId === unit.unitId ? 'opacity-40' : ''}`}
           dnd={dndOf(unit)}
           onShortcut={nodeApi ? (key) => {
             if (key === 'm' && canMoveNodes) setMoveRequest({ unitId: unit.unitId });
@@ -791,7 +791,7 @@ export const OrgChartBoard: React.FC<{
           } : undefined}
         >
           {type && <span className="absolute inset-x-3 top-0 h-1 rounded-b-full" style={{ backgroundColor: color }} aria-hidden="true" />}
-          <div className="flex items-center gap-2.5 p-3.5">
+          <div className="flex items-center gap-3 p-3.5">
             {type ? (
               <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1a`, color }}>
                 <NodeTypeIcon icon={type.icon} className="w-5 h-5" />
@@ -799,19 +799,17 @@ export const OrgChartBoard: React.FC<{
             ) : (
               <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 flex items-center justify-center shrink-0"><Network className="w-5 h-5" /></span>
             )}
-            <span className="min-w-0 flex-1 space-y-1">
+            <span className="min-w-0 flex-1 flex flex-col gap-1 items-start">
               {type && type.name !== unit.name && <span className="block text-[10px] font-bold truncate" style={{ color }}>{type.name}</span>}
               <span className={`block text-sm font-extrabold truncate ${unit.isActive === false ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>{unit.name}</span>
               {unit.manager && <PersonLine person={unit.manager} empty="" />}
             </span>
-            <span className="flex flex-col items-center gap-1.5 shrink-0 self-start">
-              <AddMenu items={menuItemsFor(unit)} forName={unit.name} testId="add-child" compact />
-              {(positions.length > 0 || unit.members.length > 0) && (
-                <Toggle open={open} onClick={() => toggleIn(setCollapsedUnits, unit.unitId)} label={`پست‌های ${unit.name}`} />
-              )}
-            </span>
+            {(positions.length > 0 || unit.members.length > 0) && (
+              <Toggle open={open} onClick={() => toggleIn(setCollapsedUnits, unit.unitId)} label={`پست‌های ${unit.name}`} />
+            )}
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30 rounded-b-2xl px-3.5 py-2">
+          <div className="flex items-center justify-between gap-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30 rounded-b-2xl px-3.5 py-2">
+            <div className="flex flex-wrap items-center gap-1.5 min-w-0">
             <Stat icon={Briefcase}>{toPersianDigits(positions.length)} پست</Stat>
             {vacant > 0 && <Stat icon={UserX} tone="warn">{toPersianDigits(vacant)} خالی</Stat>}
             <Stat icon={Users}>{toPersianDigits(unitHeadcount(unit))} نفر</Stat>
@@ -821,11 +819,13 @@ export const OrgChartBoard: React.FC<{
                 onClick={(e) => { e.stopPropagation(); toggleIn(setCollapsedBranches, unit.unitId); }}
                 aria-expanded={branchOpen}
                 aria-label={`${branchOpen ? 'بستن' : 'باز کردن'} زیرمجموعه‌ی ${unit.name}`}
-                className="ms-auto inline-flex items-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-slate-900 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 cursor-pointer"
+                className="inline-flex items-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-slate-900 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 cursor-pointer"
               >
                 <GitBranch className="w-3 h-3" />{toPersianDigits(children.length)} زیرمجموعه {branchOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
             )}
+            </div>
+            <AddMenu items={menuItemsFor(unit)} forName={unit.name} testId="add-child" compact />
           </div>
         </NodeCard>
         {open && (positions.length > 0 || unit.members.length > 0) && (
@@ -1057,11 +1057,13 @@ export const OrgChartBoard: React.FC<{
               <span className="min-w-0 flex-1">
                 <span className="block text-base font-extrabold text-slate-900 dark:text-white truncate">{company.name}</span>
               </span>
-              <AddMenu items={menuItemsFor(null)} forName={company.name} testId="add-company" compact />
             </div>
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-indigo-100/70 dark:border-slate-800 bg-white/60 dark:bg-slate-800/30 rounded-b-2xl px-4 py-2">
-              <Stat icon={Network}>{toPersianDigits(nodeCount(company))} واحد</Stat>
-              <Stat icon={Users}>{toPersianDigits(companyHeadcount(company))} نفر</Stat>
+            <div className="flex items-center justify-between gap-5 border-t border-indigo-100/70 dark:border-slate-800 bg-white/60 dark:bg-slate-800/30 rounded-b-2xl px-4 py-2">
+              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                <Stat icon={Network}>{toPersianDigits(nodeCount(company))} واحد</Stat>
+                <Stat icon={Users}>{toPersianDigits(companyHeadcount(company))} نفر</Stat>
+              </div>
+              <AddMenu items={menuItemsFor(null)} forName={company.name} testId="add-company" compact />
             </div>
           </NodeCard>
 
