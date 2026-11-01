@@ -1041,12 +1041,8 @@ export const OrgChartBoard: React.FC<{
 
   const board = (
     <AdminCard className={`relative ${fullscreen ? 'overflow-hidden flex flex-col h-full' : 'overflow-hidden'}`}>
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
-        <div>
-          <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white" title="روی هر بخش بزنید تا جزئیاتش را ببینید و همان‌جا تغییرش دهید."><GitFork className="w-5 h-5 text-indigo-600" /> چارت سازمانی</h3>
-        </div>
-        {view !== 'tree' && controls}
-        {chart.length > 1 && (
+      {chart.length > 1 && (
+      <div className="flex justify-end px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
           <select
             className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-bold"
             value={company.companyId}
@@ -1060,14 +1056,16 @@ export const OrgChartBoard: React.FC<{
           >
             {chart.map((c) => <option key={c.companyId} value={c.companyId}>{c.name}</option>)}
           </select>
-        )}
       </div>
+      )}
 
       {!asOf && (
-        <div className="px-3 pb-2">
+        <div className="px-3 py-2">
           <BuildSteps company={company} />
         </div>
       )}
+      {/* The tidy chart keeps its buttons in a row of its own under the steps (the tree chart has them over the canvas). */}
+      {view !== 'tree' && <div className="px-3 pb-2.5">{controls}</div>}
 
       {view === 'tidy' ? (
         <div className={`relative overflow-auto ${fullscreen ? 'flex-1 min-h-0' : 'max-h-[75vh] xl:max-h-[calc(100vh-170px)]'}`}>
