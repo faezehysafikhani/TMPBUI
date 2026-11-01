@@ -150,7 +150,7 @@ const BranchCard: React.FC<{
       <div className="flex items-center gap-2.5 p-3">
         <span className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${tone}`}><Icon className="w-[18px] h-[18px]" /></span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-extrabold text-slate-800 dark:text-slate-100 truncate">{title}</span>
+          <span className="block text-sm font-extrabold text-slate-800 dark:text-slate-100 break-words leading-snug">{title}</span>
           <span className="flex items-center gap-1 text-[11px] text-slate-500 min-w-0">
             <Users className="w-3 h-3 shrink-0" />
             <span className="truncate">{vacant ? 'خالی' : `${toPersianDigits(count)} نفر`}{subtitle ? ` · ${subtitle}` : ''}</span>
@@ -799,9 +799,9 @@ export const OrgChartBoard: React.FC<{
             ) : (
               <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300 flex items-center justify-center shrink-0"><Network className="w-5 h-5" /></span>
             )}
-            <span className="min-w-0 flex-1 flex flex-col gap-1 items-start">
+            <span className="min-w-0 flex-1 flex flex-col gap-1 items-start text-start">
               {type && type.name !== unit.name && <span className="block text-[10px] font-bold truncate" style={{ color }}>{type.name}</span>}
-              <span className={`block text-sm font-extrabold truncate ${unit.isActive === false ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>{unit.name}</span>
+              <span className={`block text-sm font-extrabold break-words leading-snug ${unit.isActive === false ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>{unit.name}</span>
               {unit.manager && <PersonLine person={unit.manager} empty="" />}
             </span>
             {(positions.length > 0 || unit.members.length > 0) && (
