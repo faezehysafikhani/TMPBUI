@@ -136,13 +136,24 @@ export const AddPostsDialog: React.FC<{
         </datalist>
       </Field>
       {linksExisting && <Notice type="info">عنوان «{typed}» در سامانه هست؛ برای این شرکت هم فعال می‌شود (برای شرکت‌های دیگر تغییری نمی‌کند).</Notice>}
-      {/* A unit that has posts already: the superior box is shown from the start (chosen for the user). The first post of a unit has nothing above it to ask about. */}
-      {isNewTitle && !needsHead && unitPosts.length > 0 && (
-        <Field label="سمت مافوق" hint="دارنده‌ی سمت مافوق، مدیر دارنده‌ی این پست می‌شود. از پست‌های همین واحد (یا رئیس کل شرکت) انتخاب کنید؛ پیش‌فرض مناسب انتخاب شده است.">
-          <select className={inputClass} value={parent} onChange={(e) => setParentId(e.target.value)} aria-label="سمت مافوق" data-testid="parent-select">
-            {head && <option value={head.id}>{head.title} (رئیس کل شرکت)</option>}
-            {[...new Map(unitPosts.map((p) => [p.positionId, p.title])).entries()].filter(([id]) => id !== head?.id).map(([id, t]) => <option key={id} value={id}>{t} (همین واحد)</option>)}
-          </select>
+      {/* A unit that has posts already: the superior box is there from the start, before anything is typed. The first post of a unit has nothing above it to ask about. */}
+      {!needsHead && unitPosts.length > 0 && (
+        <Field
+          label="سمت مافوق"
+          hint={existing
+            ? 'این عنوان از قبل مافوق دارد و همان می‌ماند.'
+            : 'دارنده‌ی سمت مافوق، مدیر دارنده‌ی این پست می‌شود. از پست‌های همین واحد (یا رئیس کل شرکت) انتخاب کنید؛ پیش‌فرض مناسب انتخاب شده است.'}
+        >
+          {existing ? (
+            <select className={inputClass} disabled aria-label="سمت مافوق" data-testid="parent-select" value="">
+              <option value="">{positions.find((p) => p.id === existing.parentPositionId)?.title ?? 'رئیس کل شرکت'}</option>
+            </select>
+          ) : (
+            <select className={inputClass} value={parent} onChange={(e) => setParentId(e.target.value)} aria-label="سمت مافوق" data-testid="parent-select">
+              {head && <option value={head.id}>{head.title} (رئیس کل شرکت)</option>}
+              {[...new Map(unitPosts.map((p) => [p.positionId, p.title])).entries()].filter(([id]) => id !== head?.id).map(([id, t]) => <option key={id} value={id}>{t} (همین واحد)</option>)}
+            </select>
+          )}
         </Field>
       )}
       <Field label="چند پست؟" hint="هر پست یک نفر دارد؛ برای سه کارشناس عدد ۳ را بگذارید.">
