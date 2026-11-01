@@ -1,5 +1,5 @@
 // «قدم بعدی»: the four things a structure is made of, in order, with what is done and one button for
-// the next one - so nobody has to know where to start. Shown while something is still missing.
+// the next one - so nobody has to know where to start. It stays: more units and posts are added with it later too.
 import React from 'react';
 import { Check, Plus } from 'lucide-react';
 import { toPersianDigits } from '../../../../utils/helpers';
@@ -34,7 +34,6 @@ export const BuildSteps: React.FC<{
         : scope.kind === 'unit' ? { label: `افزودن پست به «${scope.name}»`, run: () => onAddPosts(scope.unitId) } : { label: 'افزودن پست', run: () => onAddPosts(null) } },
     { id: 'people', title: 'افراد', done: filled > 0, detail: `${toPersianDigits(filled)} پست پر`, action: posts.length > 0 ? { label: scope.kind === 'post' ? `افزودن نفر به «${scope.name}»` : scope.kind === 'unit' ? `افزودن نفر به «${scope.name}»` : 'افزودن نفر به پست', run: onPlacePeople } : null },
   ];
-  if (steps.every((s) => s.done) && posts.length > 0 && filled >= posts.length) return null;
   const next = steps.find((s) => !s.done);
   return (
     <ol className="flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50/50 dark:bg-indigo-950/20 px-3 py-2.5" data-testid="build-steps" aria-label="مراحل ساخت ساختار">

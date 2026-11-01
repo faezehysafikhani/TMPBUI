@@ -29,13 +29,16 @@ export const AddPostsDialog: React.FC<{
   const [title, setTitle] = useState('');
   const [count, setCount] = useState(1);
   const [headTitle, setHeadTitle] = useState('مدیرعامل');
-  const [headPost, setHeadPost] = useState(true);
+  const [headPostChoice, setHeadPostChoice] = useState<boolean | null>(null);
   const [parentId, setParentId] = useState('');
   const [manager, setManager] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const typed = title.trim();
+  /** The first title asked for is the head's own («مدیرعامل» in the CEO's unit): it is the unit's post, so a separate post directly in the company is off unless asked for. */
+  const sameAsHeadTyped = !!typed && typed === headTitle.trim();
+  const headPost = headPostChoice ?? !sameAsHeadTyped;
   const existing = positions.find((p) => p.title === typed);
   const known = ofCompany.find((p) => p.title === typed);
   const isNewTitle = !!typed && !existing;
@@ -58,21 +61,14 @@ export const AddPostsDialog: React.FC<{
       // The head's title first, when the company has none (the first title has no superior).
       let headId = head?.id ?? null;
       if (needsHead) {
-        const sameAsHead = typed === headTitle.trim();
         const found = positions.find((p) => p.title === headTitle.trim());
         const made = found
           ? await updatePosition(found.id, found.title, found.parentPositionId, true, [...new Set([...(found.companyIds ?? []), company.companyId])])
           : await createPosition(headTitle.trim(), null, [company.companyId]);
         headId = made.id;
         if (headPost) await addCompanyPosition(company.companyId, made.id);
-        if (sameAsHead) {
-          // The title asked for is the head's itself: it belongs to the company, not to a unit.
-          await onDone(`سمت «${headTitle.trim()}» ساخته شد و پست رئیس کل شرکت گذاشته شد. پست‌های واحدها را با عنوان دیگری بسازید.`);
-          onClose();
-          return;
-        }
       }
-      let positionId = (known ?? existing)?.id;
+      let positionId = needsHead && typed === headTitle.trim() ? headId ?? undefined : (known ?? existing)?.id;
       if (existing && !known) {
         // A title that exists for other companies: it is turned on for this one too.
         await updatePosition(existing.id, existing.title, existing.parentPositionId, existing.isActive, [...new Set([...(existing.companyIds ?? []), company.companyId])]);
@@ -117,7 +113,7 @@ export const AddPostsDialog: React.FC<{
           <Field label="عنوان رئیس کل شرکت" required hint="اولین سمت هر شرکت بالاترین سمت آن است و همه‌ی سمت‌های دیگر زیر آن قرار می‌گیرند.">
             <input className={inputClass} value={headTitle} onChange={(e) => setHeadTitle(e.target.value)} maxLength={120} aria-label="عنوان رئیس کل شرکت" />
           </Field>
-          <Toggle checked={headPost} onChange={setHeadPost} label="یک پست رئیس کل هم برای شرکت ساخته شود" />
+          <Toggle checked={headPost} onChange={setHeadPostChoice} label="یک پست رئیس کل هم مستقیماً زیر شرکت ساخته شود" />
         </div>
       )}
       <Field label="عنوان پست" required hint={ofCompany.length > 0 ? 'از فهرست انتخاب کنید یا عنوان تازه بنویسید؛ عنوان تازه همین‌جا ساخته می‌شود.' : 'مثلاً: مدیر کل، رئیس اداره، کارشناس.'}>
