@@ -32,7 +32,6 @@ export const AddPostsDialog: React.FC<{
   const [headPost, setHeadPost] = useState(true);
   const [parentId, setParentId] = useState('');
   const [manager, setManager] = useState(true);
-  const [editParent, setEditParent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -137,22 +136,14 @@ export const AddPostsDialog: React.FC<{
         </datalist>
       </Field>
       {linksExisting && <Notice type="info">عنوان «{typed}» در سامانه هست؛ برای این شرکت هم فعال می‌شود (برای شرکت‌های دیگر تغییری نمی‌کند).</Notice>}
-      {/* Only when it goes under a title this unit already has: a unit's first post has nothing above it to talk about. */}
-      {isNewTitle && !needsHead && unitPosts.some((p) => p.positionId === parent) && (
-        <div className="text-[11px] text-slate-500" data-testid="parent-hint">
-          {editParent ? (
-            <Field label="سمت مافوق این عنوان" hint="دارنده‌ی سمت مافوق، مدیر دارنده‌ی این پست می‌شود. به‌طور معمول نیازی به تغییر نیست.">
-              <select className={inputClass} value={parent} onChange={(e) => setParentId(e.target.value)} aria-label="سمت مافوق">
-                {ofCompany.map((p) => <option key={p.id} value={p.id}>{p.title}{p.parentPositionId ? '' : ' (رئیس کل)'}</option>)}
-              </select>
-            </Field>
-          ) : (
-            <>
-              این عنوان زیر «{ofCompany.find((p) => p.id === parent)?.title ?? '—'}» (از پست‌های همین واحد) قرار می‌گیرد.{' '}
-              <button type="button" onClick={() => setEditParent(true)} className="font-bold text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer">تغییر</button>
-            </>
-          )}
-        </div>
+      {/* A unit that has posts already: the superior box is shown from the start (chosen for the user). The first post of a unit has nothing above it to ask about. */}
+      {isNewTitle && !needsHead && unitPosts.length > 0 && (
+        <Field label="سمت مافوق" hint="دارنده‌ی سمت مافوق، مدیر دارنده‌ی این پست می‌شود. از پست‌های همین واحد (یا رئیس کل شرکت) انتخاب کنید؛ پیش‌فرض مناسب انتخاب شده است.">
+          <select className={inputClass} value={parent} onChange={(e) => setParentId(e.target.value)} aria-label="سمت مافوق" data-testid="parent-select">
+            {head && <option value={head.id}>{head.title} (رئیس کل شرکت)</option>}
+            {[...new Map(unitPosts.map((p) => [p.positionId, p.title])).entries()].filter(([id]) => id !== head?.id).map(([id, t]) => <option key={id} value={id}>{t} (همین واحد)</option>)}
+          </select>
+        </Field>
       )}
       <Field label="چند پست؟" hint="هر پست یک نفر دارد؛ برای سه کارشناس عدد ۳ را بگذارید.">
         <input className={`${inputClass} w-28`} type="number" min={1} max={50} value={count} onChange={(e) => setCount(Math.max(1, Math.min(50, Number(e.target.value) || 1)))} aria-label="تعداد پست" />
