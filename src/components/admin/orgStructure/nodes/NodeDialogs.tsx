@@ -1,7 +1,7 @@
 // The two ways a node enters the structure's shape: «افزودن» (only the types the rules allow there)
 // and «جابه‌جایی» (only the places the rules allow; ends in the impact preview before it is saved).
 import React, { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2, Plus } from 'lucide-react';
 import { AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, inputClass } from '../../AdminUi';
 import { userErrorMessage } from '../../../../utils/errorMessages';
 import { NexusApiError } from '../../../../services/nexusApi';
@@ -48,6 +48,28 @@ export async function createAllowedType(name: string, parentTypeId: string | nul
   return type;
 }
 
+/** Icon-only dropdown: a button showing the chosen icon that opens a grid of icons (no names). */
+const IconPicker: React.FC<{ value: string; color: string; onChange: (icon: string) => void }> = ({ value, color, onChange }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-block">
+      <button type="button" aria-haspopup="listbox" aria-expanded={open} aria-label="آیکون" data-testid="icon-picker" onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-2 py-1 cursor-pointer">
+        <span className="w-6 h-6 rounded-md flex items-center justify-center" style={{ backgroundColor: `${color}1a`, color }}><NodeTypeIcon icon={value} className="w-4 h-4" /></span>
+        <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+      </button>
+      {open && (
+        <span role="listbox" aria-label="آیکون" className="absolute z-20 mt-1 start-0 grid grid-cols-7 gap-1 p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg w-max max-w-[16rem]">
+          {Object.keys(NODE_TYPE_ICONS).map((key) => (
+            <button key={key} type="button" role="option" aria-selected={value === key} data-icon={key} onClick={() => { onChange(key); setOpen(false); }} className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer ${value === key ? 'ring-2 ring-indigo-400' : 'hover:bg-slate-100 dark:hover:bg-slate-800'}`} style={{ color }}>
+              <NodeTypeIcon icon={key} className="w-4 h-4" />
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+};
+
 /**
  * «افزودن واحد»: one or several names (a line each) and the type they get, at this place (the top
  * of the company, or under `parent`). Only the types the rules allow are listed; a type that is
@@ -74,6 +96,7 @@ export const AddNodeDialog: React.FC<{
   const [typeId, setTypeId] = useState(initialTypes.length === 1 ? initialTypes[0].id : '');
   const [newType, setNewType] = useState<string | null>(initialTypes.length === 0 && canCreateTypes && !(allTypes ?? []).some((t) => t.isActive) ? (parent ? '' : 'معاونت') : null);
   const [look, setLook] = useState<{ color: string; icon: string } | null>(null);
+  const [typeFilter, setTypeFilter] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const list = names.split('\n').map((n) => n.trim()).filter(Boolean);
@@ -143,39 +166,36 @@ export const AddNodeDialog: React.FC<{
       {error && <Notice type="error" onClose={() => setError(null)}>{error}</Notice>}
       <fieldset className="space-y-1.5">
         <legend className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">نوع واحد <span className="text-rose-500">*</span></legend>
-        {types.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="نوع واحد">
-            {types.map((type) => {
-              const color = safeColor(type.color);
-              const chosen = typeId === type.id;
-              return (
-                <label key={type.id} className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 cursor-pointer ${chosen ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-600' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-200'}`}>
-                  <input type="radio" name="node-type" className="sr-only" checked={chosen} onChange={() => setTypeId(type.id)} />
-                  <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1a`, color }}><NodeTypeIcon icon={type.icon} className="w-4 h-4" /></span>
-                  <span className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{type.name}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
-        {others.length > 0 && (
-          <div className="space-y-1.5" data-testid="other-types">
-            <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300">نوع‌های دیگر (با انتخاب، همین‌جا هم مجاز می‌شوند):</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="نوع‌های دیگر">
-              {others.map((type) => {
-                const color = safeColor(type.color);
-                const chosen = typeId === type.id;
-                return (
-                  <label key={type.id} className={`flex items-center gap-2.5 rounded-xl border border-dashed px-3 py-2 cursor-pointer ${chosen ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-600' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-200'}`}>
-                    <input type="radio" name="node-type" className="sr-only" checked={chosen} onChange={() => setTypeId(type.id)} />
-                    <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1a`, color }}><NodeTypeIcon icon={type.icon} className="w-4 h-4" /></span>
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{type.name}</span>
-                  </label>
-                );
-              })}
+        {(types.length > 0 || others.length > 0) && (() => {
+          const q = typeFilter.trim();
+          const match = (t: NodeType) => !q || t.name.includes(q);
+          const chip = (type: NodeType, dashed: boolean) => {
+            const color = safeColor(type.color);
+            const chosen = typeId === type.id;
+            return (
+              <label key={type.id} className={`inline-flex items-center gap-2 rounded-xl border ${dashed ? 'border-dashed' : ''} px-2.5 py-1.5 cursor-pointer max-w-full ${chosen ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-600' : 'border-slate-200 dark:border-slate-700 hover:border-indigo-200'}`}>
+                <input type="radio" name="node-type" className="sr-only" checked={chosen} onChange={() => setTypeId(type.id)} />
+                <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1a`, color }}><NodeTypeIcon icon={type.icon} className="w-3.5 h-3.5" /></span>
+                <span className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{type.name}</span>
+              </label>
+            );
+          };
+          const shown = types.filter(match);
+          const shownOthers = others.filter(match);
+          return (
+            <div className="space-y-1.5">
+              {types.length + others.length > 8 && (
+                <input className={`${inputClass} w-full`} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} placeholder="جستجوی نوع واحد…" aria-label="جستجوی نوع واحد" />
+              )}
+              <div className="max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 p-2 flex flex-wrap gap-2" role="radiogroup" aria-label="نوع واحد" data-testid="type-list">
+                {shown.map((t) => chip(t, false))}
+                {shownOthers.map((t) => chip(t, true))}
+                {shown.length + shownOthers.length === 0 && <span className="text-xs text-slate-500 px-1">نوعی با این نام نیست.</span>}
+              </div>
+              {others.length > 0 && <p className="text-[11px] text-slate-500" data-testid="other-types">نوع‌های خط‌چین هنوز اینجا مجاز نیستند؛ با انتخابشان مجاز می‌شوند.</p>}
             </div>
-          </div>
-        )}
+          );
+        })()}
         {types.length === 0 && others.length === 0 && newType === null && (
           <Notice type="info">{canCreateTypes ? 'هنوز نوعی برای این جایگاه تعریف نشده است.' : 'نوعی برای این جایگاه مجاز نیست و شما اجازه‌ی ساخت نوع تازه را ندارید.'}</Notice>
         )}
@@ -200,24 +220,21 @@ export const AddNodeDialog: React.FC<{
             const cur = look ?? auto;
             return (
               <div className="flex flex-wrap items-center gap-3" data-testid="type-look">
-                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">رنگ و نماد:</span>
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">رنگ:</span>
                 <span className="flex gap-1" role="radiogroup" aria-label="رنگ">
                   {TYPE_COLORS.map((c) => (
                     <button key={c} type="button" role="radio" aria-checked={cur.color === c} aria-label={c} onClick={() => setLook({ ...cur, color: c })} className={`w-5 h-5 rounded-full cursor-pointer ${cur.color === c ? 'ring-2 ring-offset-1 ring-slate-500' : ''}`} style={{ backgroundColor: c }} />
                   ))}
                 </span>
-                <select value={cur.icon} onChange={(e) => setLook({ ...cur, icon: e.target.value })} aria-label="نماد" className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs px-2 py-1">
-                  {Object.entries(NODE_TYPE_ICONS).map(([key, v]) => <option key={key} value={key}>{v.label}</option>)}
-                </select>
-                <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${cur.color}1a`, color: cur.color }}><NodeTypeIcon icon={cur.icon} className="w-4 h-4" /></span>
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">آیکون:</span>
+                <IconPicker value={cur.icon} color={cur.color} onChange={(icon) => setLook({ ...cur, icon })} />
               </div>
             );
           })()}
           </div>
         ) : canCreateTypes && (
-          <button type="button" onClick={() => setNewType('')} className="text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer">+ نوع واحد تازه (همین‌جا مجاز می‌شود)</button>
+          <button type="button" onClick={() => setNewType('')} data-testid="new-type-open" className="w-full flex items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-indigo-300 dark:border-indigo-700 bg-indigo-50/60 dark:bg-indigo-950/30 px-3 py-2 text-sm font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 cursor-pointer"><Plus className="w-4 h-4" />نوع واحد تازه</button>
         )}
-        <p className="text-[11px] text-slate-500">«نوع واحد» مثلاً معاونت، اداره کل یا شعبه است. نوع‌های بالا همین‌جا مجازند؛ نوع‌های دیگر یا نوع تازه را هم می‌توانید انتخاب کنید و همین‌جا مجاز می‌شوند.</p>
       </fieldset>
       <Field label="نام واحد" required hint="برای ساخت چند واحد با یک نوع، هر نام را در یک خط بنویسید.">
         <textarea
