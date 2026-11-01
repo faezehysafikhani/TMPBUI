@@ -89,8 +89,8 @@ function buildBlocks(data: MeetingReportData): HTMLElement[] {
   return blocks;
 }
 
-/** Builds the report pages, turns them into a PDF and downloads it. */
-export async function downloadMeetingReport(data: MeetingReportData, fileName: string): Promise<void> {
+/** Lays the blocks out on A4 pages (a block that does not fit goes to the next page) and makes the PDF. */
+async function blocksToPdf(blocks: HTMLElement[], generatedText: string, onProgress?: (done: number, total: number) => void): Promise<Blob> {
   const root = el('div', 'position:fixed;top:0;left:-20000px;z-index:-1');
   root.className = 'report-print-root';
   document.body.appendChild(root);
@@ -101,14 +101,14 @@ export async function downloadMeetingReport(data: MeetingReportData, fileName: s
       page.className = 'report-page';
       const body = el('div', `height:${PAGE_H - PAD * 2 - 22}px;overflow:hidden`);
       const footer = el('div', `position:absolute;right:${PAD}px;left:${PAD}px;bottom:24px;font-size:11px;color:${C.muted};display:flex;justify-content:space-between`);
-      footer.append(el('span', '', data.generatedText), el('span', ''));
+      footer.append(el('span', '', generatedText), el('span', ''));
       page.append(body, footer);
       root.append(page);
       pages.push(page);
       return body;
     };
     let body = newPage();
-    for (const block of buildBlocks(data)) {
+    for (const block of blocks) {
       body.append(block);
       if (body.scrollHeight > body.clientHeight && body.children.length > 1) {
         body.removeChild(block);
@@ -117,9 +117,50 @@ export async function downloadMeetingReport(data: MeetingReportData, fileName: s
       }
     }
     pages.forEach((page, i) => { (page.lastElementChild!.lastElementChild as HTMLElement).textContent = `صفحه ${i + 1} از ${pages.length}`.replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]); });
-    const blob = await pagesToPdf(pages);
-    saveBlob(blob, fileName);
+    return await pagesToPdf(pages, onProgress);
   } finally {
     root.remove();
   }
+}
+
+/** The report of one meeting as a PDF. */
+export function meetingReportBlob(data: MeetingReportData): Promise<Blob> {
+  return blocksToPdf(buildBlocks(data), data.generatedText);
+}
+
+/** Builds the report pages, turns them into a PDF and downloads it. */
+export async function downloadMeetingReport(data: MeetingReportData, fileName: string): Promise<void> {
+  saveBlob(await meetingReportBlob(data), fileName);
+}
+
+export interface TableReportData {
+  title: string;
+  /** Lines under the title: scope, filters, totals. */
+  infoLines: string[];
+  head: string[];
+  /** Column widths, as percentages that add up to 100. */
+  widths: string[];
+  rows: string[][];
+  generatedText: string;
+  emptyText: string;
+}
+
+/**
+ * Any report as a list: the title and lines in words (scope, filters, totals), then the rows in a
+ * table. Rows go on the pages in small groups, each with its heading row, so a page break never
+ * splits a row. Used by the meetings and the users reports.
+ */
+export function tableReportBlob(data: TableReportData, onProgress?: (done: number, total: number) => void): Promise<Blob> {
+  const blocks: HTMLElement[] = [];
+  const header = el('div', `border-bottom:3px solid ${C.head};padding-bottom:10px;margin-bottom:14px`);
+  header.append(el('div', `font-size:22px;font-weight:800;color:${C.ink}`, data.title));
+  data.infoLines.forEach((line, i) => header.append(el('div', `font-size:12px;color:${i === data.infoLines.length - 1 ? C.ink : C.muted};margin-top:4px${i === data.infoLines.length - 1 ? ';font-weight:700' : ''}`, line)));
+  blocks.push(header);
+  const CHUNK = 6;
+  for (let i = 0; i < data.rows.length; i += CHUNK) {
+    blocks.push(table(data.head, data.widths, data.rows.slice(i, i + CHUNK)));
+  }
+
+  if (data.rows.length === 0) blocks.push(el('div', `font-size:13px;color:${C.muted}`, data.emptyText));
+  return blocksToPdf(blocks, data.generatedText, onProgress);
 }
