@@ -137,7 +137,8 @@ export const AddPostsDialog: React.FC<{
         </datalist>
       </Field>
       {linksExisting && <Notice type="info">عنوان «{typed}» در سامانه هست؛ برای این شرکت هم فعال می‌شود (برای شرکت‌های دیگر تغییری نمی‌کند).</Notice>}
-      {isNewTitle && !needsHead && ofCompany.length > 1 && (
+      {/* Only when it goes under a title this unit already has: a unit's first post has nothing above it to talk about. */}
+      {isNewTitle && !needsHead && unitPosts.some((p) => p.positionId === parent) && (
         <div className="text-[11px] text-slate-500" data-testid="parent-hint">
           {editParent ? (
             <Field label="سمت مافوق این عنوان" hint="دارنده‌ی سمت مافوق، مدیر دارنده‌ی این پست می‌شود. به‌طور معمول نیازی به تغییر نیست.">
@@ -147,7 +148,7 @@ export const AddPostsDialog: React.FC<{
             </Field>
           ) : (
             <>
-              عنوان تازه زیر «{ofCompany.find((p) => p.id === parent)?.title ?? '—'}» قرار می‌گیرد.{' '}
+              این عنوان زیر «{ofCompany.find((p) => p.id === parent)?.title ?? '—'}» (از پست‌های همین واحد) قرار می‌گیرد.{' '}
               <button type="button" onClick={() => setEditParent(true)} className="font-bold text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer">تغییر</button>
             </>
           )}
