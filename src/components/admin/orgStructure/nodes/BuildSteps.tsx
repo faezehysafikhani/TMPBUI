@@ -35,8 +35,8 @@ export const BuildSteps: React.FC<{
           </span>
           <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{s.title}</span>
           <span className="text-[11px] text-slate-500">{s.detail}</span>
-          {next?.id === s.id && s.action && (
-            <button type="button" onClick={s.action.run} data-testid={`step-${s.id}`} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 text-[11px] font-extrabold cursor-pointer">
+          {s.action && (
+            <button type="button" onClick={s.action.run} data-testid={`step-${s.id}`} className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-extrabold cursor-pointer ${next?.id === s.id ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40'}`}>
               <Plus className="w-3 h-3" /> {s.action.label}
             </button>
           )}
