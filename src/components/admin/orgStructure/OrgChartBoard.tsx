@@ -488,29 +488,23 @@ export const OrgChartBoard: React.FC<{
   const topInset = useCallback(() => (overlay.current && overlay.current.parentElement && view === 'tree' ? overlay.current.offsetHeight + 8 : 0), [view]);
   const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company && view === 'tree', topInset);
   useEffect(() => subscribe((v) => { zoomScale.current = v.s; }), [subscribe]);
+  /** The buttons over the canvas fade while the chart is being used (moved, zoomed, scrolled) and come back a moment after. */
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const fadeNow = (holdMs?: number) => {
+    setChartBusy(true);
+    if (fadeTimer.current) clearTimeout(fadeTimer.current);
+    if (holdMs) fadeTimer.current = setTimeout(() => setChartBusy(false), holdMs);
+  };
   useEffect(() => {
-    const vp = viewport.current;
-    if (view !== 'tree' || !vp) { setChartBusy(false); return undefined; }
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const down = () => setChartBusy(true);
-    const move = (e: PointerEvent) => { if (e.buttons) setChartBusy(true); };
-    const up = () => setChartBusy(false);
-    const wheel = () => { setChartBusy(true); if (timer) clearTimeout(timer); timer = setTimeout(() => setChartBusy(false), 700); };
-    vp.addEventListener('pointerdown', down, true);
-    vp.addEventListener('pointermove', move, true);
-    vp.addEventListener('wheel', wheel, { passive: true });
+    const up = () => { if (fadeTimer.current) clearTimeout(fadeTimer.current); fadeTimer.current = setTimeout(() => setChartBusy(false), 350); };
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
     return () => {
-      if (timer) clearTimeout(timer);
-      vp.removeEventListener('pointerdown', down, true);
-      vp.removeEventListener('pointermove', move, true);
-      vp.removeEventListener('wheel', wheel);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      setChartBusy(false);
+      if (fadeTimer.current) clearTimeout(fadeTimer.current);
     };
-  }, [view, company?.companyId]);
+  }, []);
   const level = levelOf(company);
   // The display level only hides: simple has no node tools, advanced adds the secondary links.
   const nodeApi = (data.data?.nodes.length ?? 0) > 0 && atLeast(level, 'normal') && !asOf;
@@ -1097,7 +1091,12 @@ export const OrgChartBoard: React.FC<{
           )}
         </div>
       ) : (
-      <div className={`relative ${fullscreen ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
+      <div
+        className={`relative ${fullscreen ? 'flex-1 min-h-0 flex flex-col' : ''}`}
+        onPointerDownCapture={(e) => { if (!overlay.current?.contains(e.target as Node)) fadeNow(); }}
+        onPointerMoveCapture={(e) => { if (e.buttons && !overlay.current?.contains(e.target as Node)) fadeNow(); }}
+        onWheel={(e) => { if (!overlay.current?.contains(e.target as Node)) fadeNow(700); }}
+      >
       {/* The buttons lie over the top of the canvas and fade while the chart is moved, zoomed or scrolled. */}
       <div ref={overlay} data-testid="chart-overlay" className={`absolute inset-x-2 top-2 z-20 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm px-3 py-2 flex justify-end overflow-x-auto transition-opacity duration-300 ${chartBusy ? 'opacity-25 pointer-events-none' : 'opacity-100'}`}>{controlsRow(true)}</div>
       <div
