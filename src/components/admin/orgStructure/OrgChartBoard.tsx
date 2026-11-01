@@ -9,7 +9,7 @@ import { ChartSelection, allUnitsOf, ancestorsOf, companyHeadcount, companyPosts
 import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
 import { AddNodeDialog, MoveNodeDialog } from './nodes/NodeDialogs';
 import { CompanyFormDialog } from './nodes/CompanyFormDialog';
-import { BuildSteps } from './nodes/BuildSteps';
+import { BuildSteps, type BuildScope } from './nodes/BuildSteps';
 import { AddPostsDialog } from './nodes/AddPostsDialog';
 import { AutoLinkChoiceDialog } from './nodes/LinkDialogs';
 import { addableTypes, checkMove } from './orgNodeRules';
@@ -660,6 +660,27 @@ export const OrgChartBoard: React.FC<{
     return hits;
   }, [company]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** What the build buttons act on: the selected company, unit or post. */
+  const selectedUnit = selection?.kind === 'unit' ? unitById.get(selection.unitId) ?? null : null;
+  const selectedPost = selection?.kind === 'position' ? findPosition(chart, selection.unitPositionId) : null;
+  const buildScope: BuildScope = selectedUnit
+    ? { kind: 'unit', unitId: selectedUnit.unitId, name: selectedUnit.name }
+    : selectedPost ? { kind: 'post', name: postLabel(selectedPost.position) }
+      : selection?.kind === 'company' ? { kind: 'company' } : { kind: 'other' };
+  /** «افزودن نفر به پست»: the form above is filled from the selected post, or a vacant post of the selected unit (else of the company). */
+  const placeFromSelection = () => {
+    const vacantIn = (u: ChartUnit) => positionsOf(u).find((p) => p.holders.length === 0 && p.isActive);
+    let pick: { unitId?: string; positionId?: string } | undefined;
+    if (selectedPost) pick = { unitId: selectedPost.unit?.unitId, positionId: selectedPost.position.positionId };
+    else if (selectedUnit) pick = { unitId: selectedUnit.unitId, positionId: vacantIn(selectedUnit)?.positionId };
+    else {
+      const u = allUnitsOf(company).find((x) => !!vacantIn(x));
+      pick = u ? { unitId: u.unitId, positionId: vacantIn(u)!.positionId } : undefined;
+    }
+    onPlacementPick?.({ companyId: company.companyId, ...pick });
+    document.querySelector('[data-testid="placement-path"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
   const selectedUserId = selection && (selection.kind === 'member' || selection.kind === 'unplaced') ? selection.userId : null;
   const isSelected = (s: ChartSelection) => JSON.stringify(s) === JSON.stringify(selection);
   const selectMember = (userId: string) => choose({ kind: 'member', userId });
@@ -979,16 +1000,12 @@ export const OrgChartBoard: React.FC<{
         <div className="px-3 pb-2">
           <BuildSteps
             company={company}
+            scope={buildScope}
             canAddUnits={canNode(can, 'create')}
             canAddPosts={can(PERM.managePositions)}
-            onAddUnit={() => setAddRequest({ parentId: null })}
-            onAddPosts={() => setPostsRequest({ unitId: null })}
-            onPlacePeople={() => {
-              // The form is filled with a vacant post (its unit and title), so only the person is left to choose.
-              const vacantPost = allUnitsOf(company).flatMap((u) => positionsOf(u).filter((p) => p.holders.length === 0 && p.isActive).map((p) => ({ unitId: u.unitId, positionId: p.positionId })))[0];
-              onPlacementPick?.({ companyId: company.companyId, unitId: vacantPost?.unitId, positionId: vacantPost?.positionId });
-              document.querySelector('[data-testid="placement-path"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }}
+            onAddUnit={(parentId) => setAddRequest({ parentId })}
+            onAddPosts={(unitId) => setPostsRequest({ unitId })}
+            onPlacePeople={placeFromSelection}
           />
         </div>
       )}
