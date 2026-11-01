@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown, UserPlus, Move, RotateCcw } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
@@ -482,8 +482,32 @@ export const OrgChartBoard: React.FC<{
   const tidyRoot = useRef<HTMLDivElement>(null);
   /** Printing the tidy chart: everything open, no buttons, for the moment of the capture. */
   const [printingTidy, setPrintingTidy] = useState(false);
-  const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company && view === 'tree');
+  /** The toolbar over the canvas: the chart starts below it, and it fades while the chart is being used. */
+  const overlay = useRef<HTMLDivElement>(null);
+  const [chartBusy, setChartBusy] = useState(false);
+  const topInset = useCallback(() => (overlay.current && overlay.current.parentElement && view === 'tree' ? overlay.current.offsetHeight + 8 : 0), [view]);
+  const { fit, home, zoomBy, focus, subscribe } = usePanZoom(viewport, content, !!company && view === 'tree', topInset);
   useEffect(() => subscribe((v) => { zoomScale.current = v.s; }), [subscribe]);
+  useEffect(() => {
+    const vp = viewport.current;
+    if (view !== 'tree' || !vp) { setChartBusy(false); return undefined; }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const down = () => setChartBusy(true);
+    const up = () => setChartBusy(false);
+    const wheel = () => { setChartBusy(true); if (timer) clearTimeout(timer); timer = setTimeout(() => setChartBusy(false), 700); };
+    vp.addEventListener('pointerdown', down);
+    vp.addEventListener('wheel', wheel, { passive: true });
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => {
+      if (timer) clearTimeout(timer);
+      vp.removeEventListener('pointerdown', down);
+      vp.removeEventListener('wheel', wheel);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      setChartBusy(false);
+    };
+  }, [view, company?.companyId]);
   const level = levelOf(company);
   // The display level only hides: simple has no node tools, advanced adds the secondary links.
   const nodeApi = (data.data?.nodes.length ?? 0) > 0 && atLeast(level, 'normal') && !asOf;
@@ -948,7 +972,9 @@ export const OrgChartBoard: React.FC<{
   );
 
   const board = (
-    <AdminCard className={fullscreen ? 'overflow-hidden flex flex-col h-full' : 'overflow-hidden'}>
+    <AdminCard className={`relative ${fullscreen ? 'overflow-hidden flex flex-col h-full' : 'overflow-hidden'}`}>
+      {/* In the tree chart the toolbar and the steps lie over the top of the canvas (more room for the chart) and fade while the chart is moved, zoomed or scrolled. */}
+      <div ref={overlay} data-testid="chart-overlay" className={view === 'tree' ? `absolute inset-x-2 top-2 z-20 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm transition-opacity duration-300 ${chartBusy ? 'opacity-25 pointer-events-none' : 'opacity-100'}` : ''}>
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-slate-100 dark:border-slate-800">
         <div>
           <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white" title="روی هر بخش بزنید تا جزئیاتش را ببینید و همان‌جا تغییرش دهید."><GitFork className="w-5 h-5 text-indigo-600" /> چارت سازمانی</h3>
@@ -1038,10 +1064,11 @@ export const OrgChartBoard: React.FC<{
       </div>
 
       {!asOf && (
-        <div className="px-3 pb-2">
+        <div className="px-3 py-2">
           <BuildSteps company={company} />
         </div>
       )}
+      </div>
 
       {view === 'tidy' ? (
         <div className={`relative overflow-auto ${fullscreen ? 'flex-1 min-h-0' : 'max-h-[75vh] xl:max-h-[calc(100vh-170px)]'}`}>
@@ -1218,7 +1245,7 @@ export const OrgChartBoard: React.FC<{
           )}
         </div>
 
-        {hint && <p className="pointer-events-none absolute top-3 left-3 z-10 hidden sm:block rounded-lg bg-white/80 dark:bg-slate-900/80 px-2.5 py-1 text-[11px] text-slate-500 shadow-xs">
+        {hint && <p className="pointer-events-none absolute bottom-3 left-3 z-10 hidden sm:block rounded-lg bg-white/80 dark:bg-slate-900/80 px-2.5 py-1 text-[11px] text-slate-500 shadow-xs">
           <span className="pointer-coarse:hidden">چرخ ماوس: بزرگ‌نمایی · کشیدن: جابه‌جایی · دوبار کلیک: نزدیک‌تر</span>
           <span className="hidden pointer-coarse:inline">دو انگشت: بزرگ‌نمایی · کشیدن: جابه‌جایی</span>
         </p>}
@@ -1228,7 +1255,7 @@ export const OrgChartBoard: React.FC<{
           </p>
         )}
         {(dragId || dragNote) && (
-          <p role="status" className={`pointer-events-none absolute top-3 start-3 z-10 max-w-md rounded-lg px-3 py-1.5 text-xs font-bold shadow-md ${dragNote || (dragId && dropOver?.reason) ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200' : 'bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-300'}`}>
+          <p role="status" className={`pointer-events-none absolute bottom-3 start-3 z-10 max-w-md rounded-lg px-3 py-1.5 text-xs font-bold shadow-md ${dragNote || (dragId && dropOver?.reason) ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200' : 'bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-300'}`}>
             {/* While hovering a place the node may not go: why, at once (not only after letting go). */}
             {dragNote || (dragId && dropOver?.reason) || 'کارت را روی واحد بالاتر جدید (یا روی شرکت، برای بالاترین سطح) رها کنید؛ پیش‌نمایش اثر قبل از ذخیره نشان داده می‌شود.'}
           </p>
