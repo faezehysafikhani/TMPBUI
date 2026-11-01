@@ -272,7 +272,7 @@ const ChartSearch: React.FC<{ hits: SearchHit[] }> = ({ hits }) => {
     person: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
   };
   return (
-    <div className="relative w-full sm:w-64">
+    <div className="org-search relative w-full sm:w-64 min-w-[8rem]">
       <Search className="w-4 h-4 text-slate-400 absolute top-1/2 -translate-y-1/2 start-3 pointer-events-none" />
       <input
         value={text}
@@ -493,15 +493,18 @@ export const OrgChartBoard: React.FC<{
     if (view !== 'tree' || !vp) { setChartBusy(false); return undefined; }
     let timer: ReturnType<typeof setTimeout> | undefined;
     const down = () => setChartBusy(true);
+    const move = (e: PointerEvent) => { if (e.buttons) setChartBusy(true); };
     const up = () => setChartBusy(false);
     const wheel = () => { setChartBusy(true); if (timer) clearTimeout(timer); timer = setTimeout(() => setChartBusy(false), 700); };
-    vp.addEventListener('pointerdown', down);
+    vp.addEventListener('pointerdown', down, true);
+    vp.addEventListener('pointermove', move, true);
     vp.addEventListener('wheel', wheel, { passive: true });
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
     return () => {
       if (timer) clearTimeout(timer);
-      vp.removeEventListener('pointerdown', down);
+      vp.removeEventListener('pointerdown', down, true);
+      vp.removeEventListener('pointermove', move, true);
       vp.removeEventListener('wheel', wheel);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
@@ -971,8 +974,8 @@ export const OrgChartBoard: React.FC<{
     </div>
   );
 
-  const controls = (
-    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+  const controlsRow = (inChart: boolean) => (
+    <div className={inChart ? 'flex flex-nowrap items-center gap-2 w-full min-w-0 [&>*:not(.org-search)]:shrink-0' : 'flex flex-wrap items-center gap-2 w-full sm:w-auto'}>
         {showLinks && (
           <div className="flex items-center gap-1.5" data-testid="as-of">
             <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">نمایش به تاریخ</span>
@@ -1040,6 +1043,7 @@ export const OrgChartBoard: React.FC<{
         </button>
     </div>
   );
+  const controls = controlsRow(false);
 
   const board = (
     <AdminCard className={`relative ${fullscreen ? 'overflow-hidden flex flex-col h-full' : 'overflow-hidden'}`}>
@@ -1095,7 +1099,7 @@ export const OrgChartBoard: React.FC<{
       ) : (
       <div className={`relative ${fullscreen ? 'flex-1 min-h-0 flex flex-col' : ''}`}>
       {/* The buttons lie over the top of the canvas and fade while the chart is moved, zoomed or scrolled. */}
-      <div ref={overlay} data-testid="chart-overlay" className={`absolute inset-x-2 top-2 z-20 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm px-3 py-2 flex justify-end transition-opacity duration-300 ${chartBusy ? 'opacity-25 pointer-events-none' : 'opacity-100'}`}>{controls}</div>
+      <div ref={overlay} data-testid="chart-overlay" className={`absolute inset-x-2 top-2 z-20 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm px-3 py-2 flex justify-end overflow-x-auto transition-opacity duration-300 ${chartBusy ? 'opacity-25 pointer-events-none' : 'opacity-100'}`}>{controlsRow(true)}</div>
       <div
         ref={viewport}
         tabIndex={0}
