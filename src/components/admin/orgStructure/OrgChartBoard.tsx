@@ -42,9 +42,9 @@ const Toggle: React.FC<{ open: boolean; onClick: () => void; label: string }> = 
     onClick={(e) => { e.stopPropagation(); onClick(); }}
     aria-expanded={open}
     aria-label={`${open ? 'بستن' : 'باز کردن'} ${label}`}
-    className="w-8 h-8 shrink-0 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center cursor-pointer"
+    className="w-6 h-6 shrink-0 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-500 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center cursor-pointer"
   >
-    {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+    {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
   </button>
 );
 
@@ -114,6 +114,13 @@ const MemberRow: React.FC<{ member: ChartMember; selected: boolean; onSelect: ()
       {member.positionTitle && <span className="block text-[10px] text-slate-500 truncate">{member.positionTitle}</span>}
     </span>
   </button>
+);
+
+/** A small count chip for a card's footer: icon, number and word. */
+const Stat: React.FC<{ icon: React.ComponentType<{ className?: string }>; children: React.ReactNode; tone?: 'plain' | 'warn' }> = ({ icon: Icon, children, tone = 'plain' }) => (
+  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${tone === 'warn' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+    <Icon className="w-3 h-3 shrink-0" aria-hidden="true" />{children}
+  </span>
 );
 
 /** A position of a deputy (or the deputy's people with no position) under it, with a branch line to it. */
@@ -797,25 +804,28 @@ export const OrgChartBoard: React.FC<{
               <span className={`block text-sm font-extrabold truncate ${unit.isActive === false ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>{unit.name}</span>
               {unit.manager && <PersonLine person={unit.manager} empty="" />}
             </span>
-            {(positions.length > 0 || unit.members.length > 0) && (
-              <Toggle open={open} onClick={() => toggleIn(setCollapsedUnits, unit.unitId)} label={`پست‌های ${unit.name}`} />
-            )}
+            <span className="flex flex-col items-center gap-1.5 shrink-0 self-start">
+              <AddMenu items={menuItemsFor(unit)} forName={unit.name} testId="add-child" compact />
+              {(positions.length > 0 || unit.members.length > 0) && (
+                <Toggle open={open} onClick={() => toggleIn(setCollapsedUnits, unit.unitId)} label={`پست‌های ${unit.name}`} />
+              )}
+            </span>
           </div>
-          <div className="flex items-center justify-between gap-2 border-t border-slate-100 dark:border-slate-800 px-3.5 py-1.5 text-[11px] text-slate-500">
-            <span>{toPersianDigits(positions.length)} پست{vacant > 0 ? ` · ${toPersianDigits(vacant)} خالی` : ''}</span>
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/30 rounded-b-2xl px-3.5 py-2">
+            <Stat icon={Briefcase}>{toPersianDigits(positions.length)} پست</Stat>
+            {vacant > 0 && <Stat icon={UserX} tone="warn">{toPersianDigits(vacant)} خالی</Stat>}
+            <Stat icon={Users}>{toPersianDigits(unitHeadcount(unit))} نفر</Stat>
             {children.length > 0 && (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); toggleIn(setCollapsedBranches, unit.unitId); }}
                 aria-expanded={branchOpen}
                 aria-label={`${branchOpen ? 'بستن' : 'باز کردن'} زیرمجموعه‌ی ${unit.name}`}
-                className="flex items-center gap-1 rounded-full border border-slate-200 dark:border-slate-700 px-2 py-0.5 font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 hover:border-indigo-300 cursor-pointer"
+                className="ms-auto inline-flex items-center gap-1 rounded-full border border-indigo-200 dark:border-indigo-900 bg-white dark:bg-slate-900 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 cursor-pointer"
               >
                 <GitBranch className="w-3 h-3" />{toPersianDigits(children.length)} زیرمجموعه {branchOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
             )}
-            <span>{toPersianDigits(unitHeadcount(unit))} نفر</span>
-            <AddMenu items={menuItemsFor(unit)} forName={unit.name} testId="add-child" />
           </div>
         </NodeCard>
         {open && (positions.length > 0 || unit.members.length > 0) && (
@@ -1047,11 +1057,11 @@ export const OrgChartBoard: React.FC<{
               <span className="min-w-0 flex-1">
                 <span className="block text-base font-extrabold text-slate-900 dark:text-white truncate">{company.name}</span>
               </span>
+              <AddMenu items={menuItemsFor(null)} forName={company.name} testId="add-company" compact />
             </div>
-            <div className="flex items-center justify-between border-t border-indigo-100/70 dark:border-slate-800 px-4 py-1.5 text-[11px] text-slate-500">
-              <span>{toPersianDigits(nodeCount(company))} واحد</span>
-              <AddMenu items={menuItemsFor(null)} forName={company.name} testId="add-company" />
-              <span>{toPersianDigits(companyHeadcount(company))} نفر</span>
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-indigo-100/70 dark:border-slate-800 bg-white/60 dark:bg-slate-800/30 rounded-b-2xl px-4 py-2">
+              <Stat icon={Network}>{toPersianDigits(nodeCount(company))} واحد</Stat>
+              <Stat icon={Users}>{toPersianDigits(companyHeadcount(company))} نفر</Stat>
             </div>
           </NodeCard>
 
