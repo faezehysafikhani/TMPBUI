@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Briefcase, Building2, Layers, Link2, LayoutTemplate, ListChecks, Network } from 'lucide-react';
+import { Briefcase, Building2, GitFork, Layers, Link2, LayoutTemplate, ListChecks, Network } from 'lucide-react';
 import { AdminCard, AdminDialog, Notice, SecondaryButton } from '../AdminUi';
 import { ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, type OrgUiLevel, canNode, getChart } from '../../../services/orgStructureApi';
 import { OrgChartBoard } from './OrgChartBoard';
@@ -82,7 +82,7 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
       {board.error && <Notice type="error">{board.error}</Notice>}
       <AdminCard className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-base font-extrabold text-slate-900 dark:text-white">چارت سازمانی</h3>
+          <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900 dark:text-white"><GitFork className="w-5 h-5 text-indigo-600" aria-hidden="true" /> چارت سازمانی</h3>
           <div className="flex flex-wrap gap-1.5">
             {tools.filter((id) => !ADVANCED_TOOLS.includes(id)).map((id) => toolButton(id))}
             {tools.some((id) => ADVANCED_TOOLS.includes(id)) && (
