@@ -111,6 +111,7 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
           onLevelChange={setLevel}
           initialCompanyId={chartCompanyId}
           onPlacementPick={(next) => setPick({ ...next, at: Date.now() })}
+          onStructureChanged={() => void board.reload()}
         />
       </AdminCard>
       {tool && (

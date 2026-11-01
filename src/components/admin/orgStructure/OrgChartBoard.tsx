@@ -358,7 +358,9 @@ export const OrgChartBoard: React.FC<{
   /** Changes when the data was changed elsewhere (the placement form): the chart is read again. */
   reloadToken?: number;
   onPlacementPick?: (pick: { companyId: string; unitId?: string; positionId?: string; userId?: string | null; userName?: string | null }) => void;
-}> = ({ can: realCan, onLevelChange, initialCompanyId, onPlacementPick, reloadToken }) => {
+  /** Told after the structure was changed here (units, posts...): the form beside the chart reads its lists again. */
+  onStructureChanged?: () => void;
+}> = ({ can: realCan, onLevelChange, initialCompanyId, onPlacementPick, reloadToken, onStructureChanged }) => {
   /** «نمایش به تاریخ»: the chart as of a day (only which nodes existed); nothing can be changed then. */
   const [asOf, setAsOf] = useState<string | undefined>(undefined);
   const asOfRef = useRef(asOf);
@@ -981,7 +983,12 @@ export const OrgChartBoard: React.FC<{
             canAddPosts={can(PERM.managePositions)}
             onAddUnit={() => setAddRequest({ parentId: null })}
             onAddPosts={() => setPostsRequest({ unitId: null })}
-            onPlacePeople={() => document.querySelector('[data-testid="placement-path"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+            onPlacePeople={() => {
+              // The form is filled with a vacant post (its unit and title), so only the person is left to choose.
+              const vacantPost = allUnitsOf(company).flatMap((u) => positionsOf(u).filter((p) => p.holders.length === 0 && p.isActive).map((p) => ({ unitId: u.unitId, positionId: p.positionId })))[0];
+              onPlacementPick?.({ companyId: company.companyId, unitId: vacantPost?.unitId, positionId: vacantPost?.positionId });
+              document.querySelector('[data-testid="placement-path"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }}
           />
         </div>
       )}
@@ -1222,7 +1229,7 @@ export const OrgChartBoard: React.FC<{
         onRequestPosts={(unitId) => setPostsRequest({ unitId })}
         selection={selection}
         onSelect={(next) => choose(next)}
-        onChanged={data.reload}
+        onChanged={async () => { await data.reload(); onStructureChanged?.(); }}
       />
       </DetailsBoundary>
       </div>
@@ -1250,7 +1257,7 @@ export const OrgChartBoard: React.FC<{
         company={company}
         unit={postsRequest.unitId ? unitById.get(postsRequest.unitId) ?? null : null}
         positions={data.data?.positions || []}
-        onDone={async (text) => { await data.reload(); showToast(text, 'ok'); }}
+        onDone={async (text) => { await data.reload(); onStructureChanged?.(); showToast(text, 'ok'); }}
         onClose={() => setPostsRequest(null)}
       />,
       document.body,
@@ -1264,6 +1271,7 @@ export const OrgChartBoard: React.FC<{
         canCreateTypes={canNode(can, 'manageRules')}
         onCreated={async (nodes) => {
           const node = nodes.find((n) => n.autoLinkChoices?.length) ?? nodes[0];
+          onStructureChanged?.();
           showToast(nodes.length > 1 ? `${toPersianDigits(nodes.length)} واحد اضافه شد.` : `واحد «${nodes[0]?.name}» اضافه شد.`, 'ok');
           await data.reload();
           // Stay on the node the new one was added to, so more can be added there.

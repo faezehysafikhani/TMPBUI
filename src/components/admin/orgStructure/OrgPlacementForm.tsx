@@ -185,6 +185,12 @@ export const OrgPlacementForm: React.FC<{
   );
   /** The types a unit made here may have: those the rules allow at the top of a company. */
   const topTypes = useMemo(() => addableTypes(board.nodeTypes, board.rules, null), [board.nodeTypes, board.rules]);
+  // A unit whose vacant posts all have one title: that title is chosen (the person only has to be picked).
+  useEffect(() => {
+    if (!draft.unitId || draft.positionId) return;
+    const titles = new Set(board.posts.filter((p) => p.unitId === draft.unitId && p.holders.length === 0 && p.isPositionActive).map((p) => p.positionId));
+    if (titles.size === 1) setDraft((d) => (d.unitId === draft.unitId && !d.positionId ? { ...d, positionId: [...titles][0] } : d));
+  }, [draft.unitId, draft.positionId, board.posts]);
   const set = (patch: Partial<Draft>) => { setDraft((d) => ({ ...d, ...patch })); setMessage(null); };
   const companyName = board.companies.find((c) => c.id === draft.companyId)?.name;
   const unitName = units.find((u) => u.id === draft.unitId)?.label;
