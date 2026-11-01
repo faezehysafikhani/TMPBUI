@@ -5,26 +5,46 @@ import { Loader2 } from 'lucide-react';
 import { AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, inputClass } from '../../AdminUi';
 import { userErrorMessage } from '../../../../utils/errorMessages';
 import { NexusApiError } from '../../../../services/nexusApi';
-import { type ChartCompany, type ChartUnit, type NodeType, type NodeTypeRule, type OrgNode, createNode, createNodeType, getNodeTypeRules, moveNode, setNodeTypeRules } from '../../../../services/orgStructureApi';
+import { type ChartCompany, type ChartUnit, type NodeType, type NodeTypeRule, type OrgNode, createNode, createNodeType, getNodeTypeRules, listNodeTypes, moveNode, setNodeTypeRules, updateNodeType } from '../../../../services/orgStructureApi';
 import { toPersianDigits } from '../../../../utils/helpers';
 import { allUnitsOf } from '../orgChartModel';
 import { moveTargets } from '../orgNodeRules';
 import { ImpactPreviewDialog } from './ImpactPreviewDialog';
-import { NodeTypeIcon, safeColor } from './nodeTypeStyle';
+import { NODE_TYPE_ICONS, NodeTypeIcon, TYPE_COLORS, safeColor, suggestTypeLook } from './nodeTypeStyle';
+
+const sameName = (a: string, b: string) => a.replace(/[\s\u200c]+/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک') === b.replace(/[\s\u200c]+/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک');
 
 /**
- * A new node type that may stand at `parentTypeId` (null: at the top of the company), made on the
- * spot: the type, then the rule that allows it there. With no rules yet (the flat structure) the
- * existing types are first allowed at the top, so nothing that is there now stops being allowed.
+ * Lets `typeId` stand at `parentTypeId` (null: at the top of the company): the rule is added to the
+ * ones there are. With no rules yet (the flat structure) the existing types are first allowed at the
+ * top, so nothing that is there now stops being allowed.
  */
-export async function createAllowedType(name: string, parentTypeId: string | null, existing: NodeType[]): Promise<NodeType> {
-  const type = await createNodeType({ name: name.trim() });
+export async function allowTypeHere(typeId: string, parentTypeId: string | null, existing: NodeType[]): Promise<void> {
   const { rules } = await getNodeTypeRules();
+  if (rules.some((r) => r.childNodeTypeId === typeId && (r.parentNodeTypeId ?? null) === parentTypeId)) return;
   const all: NodeTypeRule[] = rules.length > 0
     ? [...rules]
     : existing.filter((t) => t.isActive).map((t) => ({ parentNodeTypeId: null, childNodeTypeId: t.id }));
-  all.push({ parentNodeTypeId: parentTypeId, childNodeTypeId: type.id });
+  all.push({ parentNodeTypeId: parentTypeId, childNodeTypeId: typeId });
   await setNodeTypeRules(all);
+}
+
+/**
+ * A type named `name` that may stand at `parentTypeId`: the one that already has this name (types are
+ * shared by the whole organization, so it is used, and turned on if it was off), else a new one -
+ * then allowed there.
+ */
+export async function createAllowedType(name: string, parentTypeId: string | null, existing: NodeType[], look?: { color: string; icon: string }): Promise<NodeType> {
+  const fresh = await listNodeTypes().catch(() => existing);
+  const same = fresh.find((t) => sameName(t.name, name));
+  let type: NodeType;
+  if (same) {
+    type = same.isActive ? same : await updateNodeType(same.id, { name: same.name, color: same.color, icon: same.icon, isDomainBoundary: same.isDomainBoundary, sortOrder: same.sortOrder, isActive: true });
+  } else {
+    const chosen = look ?? suggestTypeLook(name, fresh.map((t) => t.color));
+    type = await createNodeType({ name: name.trim(), color: chosen.color, icon: chosen.icon });
+  }
+  await allowTypeHere(type.id, parentTypeId, fresh);
   return type;
 }
 
@@ -46,10 +66,14 @@ export const AddNodeDialog: React.FC<{
   onClose: () => void;
 }> = ({ company, parent, types: initialTypes, allTypes, canCreateTypes = false, onCreated, onClose }) => {
   const [types, setTypes] = useState(initialTypes);
+  const parentTypeId0 = parent?.nodeType?.nodeTypeId ?? null;
+  /** Other types that exist: choosing one allows it here. Not offered under a node with no type (no rule can say so). */
+  const [others, setOthers] = useState<NodeType[]>(() => (!parent || parentTypeId0 ? (allTypes ?? []).filter((t) => t.isActive && !initialTypes.some((x) => x.id === t.id)) : []));
   const [names, setNames] = useState('');
   const [code, setCode] = useState('');
   const [typeId, setTypeId] = useState(initialTypes.length === 1 ? initialTypes[0].id : '');
-  const [newType, setNewType] = useState<string | null>(initialTypes.length === 0 && canCreateTypes ? (parent ? '' : 'معاونت') : null);
+  const [newType, setNewType] = useState<string | null>(initialTypes.length === 0 && canCreateTypes && !(allTypes ?? []).some((t) => t.isActive) ? (parent ? '' : 'معاونت') : null);
+  const [look, setLook] = useState<{ color: string; icon: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const list = names.split('\n').map((n) => n.trim()).filter(Boolean);
@@ -60,8 +84,9 @@ export const AddNodeDialog: React.FC<{
     setBusy(true);
     setError(null);
     try {
-      const type = await createAllowedType(newType, parentTypeId, allTypes ?? types);
-      setTypes((t) => [...t, type]);
+      const type = await createAllowedType(newType, parentTypeId, allTypes ?? types, look ?? undefined);
+      setTypes((t) => (t.some((x) => x.id === type.id) ? t : [...t, type]));
+      setOthers((o) => o.filter((x) => x.id !== type.id));
       setTypeId(type.id);
       setNewType(null);
     } catch (err) {
@@ -76,6 +101,13 @@ export const AddNodeDialog: React.FC<{
     setError(null);
     const made: OrgNode[] = [];
     try {
+      // A type that is not allowed here yet (chosen from the others): it is allowed first.
+      if (others.some((t) => t.id === typeId)) {
+        await allowTypeHere(typeId, parentTypeId, allTypes ?? types);
+        const chosen = others.find((t) => t.id === typeId)!;
+        setTypes((t) => [...t, chosen]);
+        setOthers((o) => o.filter((x) => x.id !== typeId));
+      }
       for (const name of list) {
         made.push(await createNode({
           name,
@@ -126,10 +158,29 @@ export const AddNodeDialog: React.FC<{
             })}
           </div>
         )}
-        {types.length === 0 && newType === null && (
+        {others.length > 0 && (
+          <div className="space-y-1.5" data-testid="other-types">
+            <p className="text-[11px] font-bold text-slate-600 dark:text-slate-300">نوع‌های دیگر (با انتخاب، همین‌جا هم مجاز می‌شوند):</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="نوع‌های دیگر">
+              {others.map((type) => {
+                const color = safeColor(type.color);
+                const chosen = typeId === type.id;
+                return (
+                  <label key={type.id} className={`flex items-center gap-2.5 rounded-xl border border-dashed px-3 py-2 cursor-pointer ${chosen ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-600' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-200'}`}>
+                    <input type="radio" name="node-type" className="sr-only" checked={chosen} onChange={() => setTypeId(type.id)} />
+                    <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}1a`, color }}><NodeTypeIcon icon={type.icon} className="w-4 h-4" /></span>
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{type.name}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {types.length === 0 && others.length === 0 && newType === null && (
           <Notice type="info">{canCreateTypes ? 'هنوز نوعی برای این جایگاه تعریف نشده است.' : 'نوعی برای این جایگاه مجاز نیست و شما اجازه‌ی ساخت نوع تازه را ندارید.'}</Notice>
         )}
         {newType !== null ? (
+          <div className="space-y-2 rounded-xl border border-slate-200 dark:border-slate-700 p-2.5">
           <div className="flex gap-2 items-center">
             <input
               className={`${inputClass} flex-1 min-w-0`}
@@ -142,12 +193,31 @@ export const AddNodeDialog: React.FC<{
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void makeType(); } }}
             />
             <SecondaryButton type="button" disabled={busy || !newType.trim()} onClick={() => void makeType()}>ساخت این نوع</SecondaryButton>
-            {types.length > 0 && <SecondaryButton type="button" disabled={busy} onClick={() => setNewType(null)}>بستن</SecondaryButton>}
+            {(types.length > 0 || others.length > 0) && <SecondaryButton type="button" disabled={busy} onClick={() => setNewType(null)}>بستن</SecondaryButton>}
+          </div>
+          {(() => {
+            const auto = suggestTypeLook(newType, (allTypes ?? types).map((t) => t.color));
+            const cur = look ?? auto;
+            return (
+              <div className="flex flex-wrap items-center gap-3" data-testid="type-look">
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">رنگ و نماد:</span>
+                <span className="flex gap-1" role="radiogroup" aria-label="رنگ">
+                  {TYPE_COLORS.map((c) => (
+                    <button key={c} type="button" role="radio" aria-checked={cur.color === c} aria-label={c} onClick={() => setLook({ ...cur, color: c })} className={`w-5 h-5 rounded-full cursor-pointer ${cur.color === c ? 'ring-2 ring-offset-1 ring-slate-500' : ''}`} style={{ backgroundColor: c }} />
+                  ))}
+                </span>
+                <select value={cur.icon} onChange={(e) => setLook({ ...cur, icon: e.target.value })} aria-label="نماد" className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs px-2 py-1">
+                  {Object.entries(NODE_TYPE_ICONS).map(([key, v]) => <option key={key} value={key}>{v.label}</option>)}
+                </select>
+                <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${cur.color}1a`, color: cur.color }}><NodeTypeIcon icon={cur.icon} className="w-4 h-4" /></span>
+              </div>
+            );
+          })()}
           </div>
         ) : canCreateTypes && (
           <button type="button" onClick={() => setNewType('')} className="text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:underline cursor-pointer">+ نوع واحد تازه (همین‌جا مجاز می‌شود)</button>
         )}
-        <p className="text-[11px] text-slate-500">«نوع واحد» مثلاً معاونت، اداره کل یا شعبه است. فقط نوع‌هایی که قاعده‌ی «سلسله‌مراتب مجاز» اینجا اجازه می‌دهد نشان داده می‌شود.</p>
+        <p className="text-[11px] text-slate-500">«نوع واحد» مثلاً معاونت، اداره کل یا شعبه است. نوع‌های بالا همین‌جا مجازند؛ نوع‌های دیگر یا نوع تازه را هم می‌توانید انتخاب کنید و همین‌جا مجاز می‌شوند.</p>
       </fieldset>
       <Field label="نام واحد" required hint="برای ساخت چند واحد با یک نوع، هر نام را در یک خط بنویسید.">
         <textarea
