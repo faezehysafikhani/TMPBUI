@@ -290,12 +290,14 @@ export const TidyOrgChart: React.FC<{
         <LinkArrows company={company} deps={[open, shown, showEmpty, printing]}>
           <ul className="space-y-1">
             <li>
-              <button type="button" onClick={() => onSelect({ kind: 'company', companyId: company.companyId })} aria-current={companyOn ? 'true' : undefined} data-tidy-selected={companyOn ? 'true' : undefined} className={`${rowBase} ${pick(companyOn)}`}>
+              <div className="flex items-center gap-1">
+              <button type="button" onClick={() => onSelect({ kind: 'company', companyId: company.companyId })} aria-current={companyOn ? 'true' : undefined} data-tidy-selected={companyOn ? 'true' : undefined} className={`${rowBase} min-w-0 flex-1 ${pick(companyOn)}`}>
                 <CompanyLogo logoUrl={company.logoUrl} name={company.name} className="w-7 h-7" fallback={<Building2 className="w-[18px] h-[18px] text-indigo-600 shrink-0" aria-hidden="true" />} />
                 <span className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{company.name}</span>
                 <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-300 shrink-0">شرکت</span>
               </button>
-              {!printing && menuFor && <span className="ms-9 mt-1 inline-block"><AddMenu items={menuFor(null)} forName={company.name} testId="tidy-add-top" /></span>}
+              {!printing && menuFor && <span className="pe-1 shrink-0"><AddMenu items={menuFor(null)} forName={company.name} compact testId="tidy-add-top" /></span>}
+              </div>
             </li>
             {headSelect && (
               <li>
