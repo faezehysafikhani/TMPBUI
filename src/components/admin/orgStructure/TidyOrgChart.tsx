@@ -299,7 +299,7 @@ export const TidyOrgChart: React.FC<{
               </li>
             )}
             {company.units.length === 0
-              ? <li className="p-4 text-sm text-slate-500">این شرکت هنوز گره‌ای ندارد.</li>
+              ? <li className="p-4 text-sm text-slate-500">این شرکت هنوز واحدی ندارد.</li>
               : (printing ? company.units : company.units.slice(0, limit)).map((u) => <NodeRow key={u.unitId} ctx={ctx} unit={u} depth={0} />)}
             {!printing && company.units.length > limit && (
               <li><button type="button" onClick={() => more('top')} className="ms-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 cursor-pointer">نمایش {toPersianDigits(Math.min(PAGE_SIZE, company.units.length - limit))} مورد بعدی</button></li>

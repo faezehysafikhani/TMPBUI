@@ -1,13 +1,16 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
+import { Plus, Building2, Network, Users, UserRound, ChevronDown, ChevronUp, GitBranch, GitFork, Maximize2, Minimize2, ChevronsDownUp, ChevronsUpDown, UserX, ZoomIn, ZoomOut, Scan, Search, X, FileDown, Loader2, Briefcase, Crown } from 'lucide-react';
 import { AdminCard, Notice } from '../AdminUi';
 import { toPersianDigits } from '../../../utils/helpers';
-import { ChartCompany, ChartMember, ChartPosition, ChartUnit, AutoLinkChoice, LinkType, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listLinkTypes, listNodeTypes, listNodes, listPositions, listUnplacedUsers, headTitleOf, postLabel } from '../../../services/orgStructureApi';
+import { ChartCompany, ChartMember, ChartPosition, ChartUnit, AutoLinkChoice, LinkType, NodeType, NodeTypeRule, OrgNode, PersonRef, canNode, getChart, getNodeTypeRules, listLinkTypes, listNodeTypes, listNodes, listPositions, listTemplates, listUnplacedUsers, headTitleOf, postLabel, ORG_STRUCTURE_PERMISSIONS as PERM, type StructureTemplate } from '../../../services/orgStructureApi';
 import { EmptyRow, LoadingRow, useLoad } from './orgShared';
 import { ChartSelection, allUnitsOf, ancestorsOf, companyHeadcount, companyPostsOf, depthsOf, findMember, findPosition, headPostOf, isNested, nodeCount, positionsOf, postTree, unitHeadcount, vacantCount } from './orgChartModel';
 import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
 import { AddNodeDialog, MoveNodeDialog } from './nodes/NodeDialogs';
+import { CompanyFormDialog } from './nodes/CompanyFormDialog';
+import { BuildSteps } from './nodes/BuildSteps';
+import { AddPostsDialog } from './nodes/AddPostsDialog';
 import { AutoLinkChoiceDialog } from './nodes/LinkDialogs';
 import { addableTypes, checkMove } from './orgNodeRules';
 import { atLeast, highestLevel, levelOf } from './orgUiLevel';
@@ -21,6 +24,7 @@ import { OrgLinkLayer } from './OrgLinkLayer';
 import { appAlert } from '../../../utils/appDialog';
 import { JalaliDatePicker } from '../../JalaliDatePicker';
 import { jalaliDay } from './nodes/HistoryDialogs';
+import { showToast } from '../../../utils/toast';
 
 const PersonLine: React.FC<{ person: PersonRef | null; empty: string }> = ({ person, empty }) => (
   person ? (
@@ -386,6 +390,11 @@ export const OrgChartBoard: React.FC<{
   /** A node being moved (dragged to a place, or from its «جابه‌جایی»), or being added under a node. */
   const [moveRequest, setMoveRequest] = useState<{ unitId: string; parentId?: string | null } | null>(null);
   const [addRequest, setAddRequest] = useState<{ parentId: string | null } | null>(null);
+  /** «افزودن پست»: to this unit (null: the user chooses it). */
+  const [postsRequest, setPostsRequest] = useState<{ unitId: string | null } | null>(null);
+  /** «ثبت شرکت» from the empty state: the form with the templates to start from. */
+  const [companyForm, setCompanyForm] = useState<{ templates: StructureTemplate[] } | null>(null);
+  const openCompanyForm = async () => setCompanyForm({ templates: await listTemplates().catch(() => []) });
   /** Dragging a card: which one, and the card it is over (with whether it may go there). */
   const [dragId, setDragId] = useState<string | null>(null);
   /** The card being dragged over, whether the node may go there, and (if not) why - shown while hovering. */
@@ -655,7 +664,33 @@ export const OrgChartBoard: React.FC<{
 
   if (data.loading && !data.data) return <AdminCard><LoadingRow /></AdminCard>;
   if (data.error) return <Notice type="error">{data.error}</Notice>;
-  if (!company) return <AdminCard><EmptyRow>هنوز شرکتی تعریف نشده است. ابتدا در بخش «شرکت‌ها» یک شرکت بسازید.</EmptyRow></AdminCard>;
+  if (!company) {
+    return (
+      <>
+        <AdminCard>
+          <div className="flex flex-col items-center gap-3 px-6 py-14 text-center" data-testid="no-company">
+            <span className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300 flex items-center justify-center"><Building2 className="w-7 h-7" /></span>
+            <h4 className="text-base font-extrabold text-slate-900 dark:text-white">هنوز شرکتی ثبت نشده است</h4>
+            <p className="max-w-md text-sm text-slate-500 leading-7">با ثبت شرکت شروع کنید؛ بعد همین‌جا روی چارت با دکمه‌ی «+» واحدها، پست‌ها و افراد را یکی‌یکی اضافه می‌کنید. می‌توانید با یک قالب آماده هم شروع کنید.</p>
+            {can(PERM.manageCompanies) ? (
+              <button type="button" data-testid="register-company" onClick={() => void openCompanyForm()} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 text-sm font-extrabold cursor-pointer">
+                <Plus className="w-4 h-4" /> ثبت شرکت
+              </button>
+            ) : <p className="text-xs text-amber-600">برای ثبت شرکت، دسترسی «مدیریت شرکت‌ها» لازم است.</p>}
+          </div>
+        </AdminCard>
+        {companyForm && createPortal(
+          <CompanyFormDialog
+            templates={companyForm.templates}
+            parentChoices={undefined}
+            onSaved={async () => { await data.reload(); }}
+            onClose={() => setCompanyForm(null)}
+          />,
+          document.body,
+        )}
+      </>
+    );
+  }
 
   const line = 'bg-slate-300 dark:bg-slate-600';
 
@@ -751,6 +786,16 @@ export const OrgChartBoard: React.FC<{
               </button>
             )}
             <span>{toPersianDigits(unitHeadcount(unit))} نفر</span>
+            {canNode(can, 'create') && unit.isActive !== false && !asOf && (
+              <button
+                type="button"
+                data-testid="add-child"
+                onClick={(e) => { e.stopPropagation(); setAddRequest({ parentId: unit.unitId }); }}
+                title={`افزودن زیرمجموعه به ${unit.name}`}
+                aria-label={`افزودن زیرمجموعه به ${unit.name}`}
+                className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer shrink-0"
+              ><Plus className="w-3.5 h-3.5" /></button>
+            )}
           </div>
         </NodeCard>
         {open && (positions.length > 0 || unit.members.length > 0) && (
@@ -928,6 +973,19 @@ export const OrgChartBoard: React.FC<{
         </div>
       </div>
 
+      {!asOf && (canNode(can, 'create') || can(PERM.managePositions)) && (
+        <div className="px-3 pb-2">
+          <BuildSteps
+            company={company}
+            canAddUnits={canNode(can, 'create')}
+            canAddPosts={can(PERM.managePositions)}
+            onAddUnit={() => setAddRequest({ parentId: null })}
+            onAddPosts={() => setPostsRequest({ unitId: null })}
+            onPlacePeople={() => document.querySelector('[data-testid="placement-path"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+          />
+        </div>
+      )}
+
       {view === 'tidy' ? (
         <div className={`relative overflow-auto ${fullscreen ? 'flex-1 min-h-0' : 'max-h-[75vh] xl:max-h-[calc(100vh-170px)]'}`}>
           <TidyBoundary onFail={() => setUserView('tree')}>
@@ -976,7 +1034,7 @@ export const OrgChartBoard: React.FC<{
               </span>
             </div>
             <div className="flex items-center justify-between border-t border-indigo-100/70 dark:border-slate-800 px-4 py-1.5 text-[11px] text-slate-500">
-              <span>{toPersianDigits(nodeCount(company))} گره</span>
+              <span>{toPersianDigits(nodeCount(company))} واحد</span>
               <span>{toPersianDigits(companyHeadcount(company))} نفر</span>
             </div>
           </NodeCard>
@@ -1065,7 +1123,14 @@ export const OrgChartBoard: React.FC<{
           )}
 
           {units.length === 0 ? (
-            <p className="mt-6 text-sm text-slate-500">این شرکت هنوز گره‌ای ندارد. از پنل کنار، «افزودن معاونت» را بزنید.</p>
+            <div className="mt-6 flex flex-col items-center gap-2" data-testid="no-units">
+              <p className="text-sm text-slate-500">این شرکت هنوز واحدی ندارد.</p>
+              {canNode(can, 'create') && !asOf && (
+                <button type="button" data-testid="add-first-unit" onClick={() => setAddRequest({ parentId: null })} className="inline-flex items-center gap-2 rounded-xl border-2 border-dashed border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 px-5 py-3 text-sm font-extrabold hover:bg-indigo-50 dark:hover:bg-indigo-950/40 cursor-pointer">
+                  <Plus className="w-4 h-4" /> افزودن اولین واحد
+                </button>
+              )}
+            </div>
           ) : (
             <>
               <span className={`w-0.5 h-8 ${line}`} aria-hidden="true" />
@@ -1092,13 +1157,13 @@ export const OrgChartBoard: React.FC<{
         </p>}
         {asOf && (
           <p role="status" className="pointer-events-none absolute top-3 end-3 z-10 max-w-sm rounded-lg bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200 px-3 py-1.5 text-xs font-bold shadow-md">
-            چارت در تاریخ {jalaliDay(asOf)} (فقط نمایش؛ کدام گره‌ها وجود داشتند، نه جای آن‌ها آن روز)
+            چارت در تاریخ {jalaliDay(asOf)} (فقط نمایش؛ کدام واحدها وجود داشتند، نه جای آن‌ها آن روز)
           </p>
         )}
         {(dragId || dragNote) && (
           <p role="status" className={`pointer-events-none absolute top-3 start-3 z-10 max-w-md rounded-lg px-3 py-1.5 text-xs font-bold shadow-md ${dragNote || (dragId && dropOver?.reason) ? 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-200' : 'bg-white/90 dark:bg-slate-900/90 text-slate-600 dark:text-slate-300'}`}>
             {/* While hovering a place the node may not go: why, at once (not only after letting go). */}
-            {dragNote || (dragId && dropOver?.reason) || 'کارت را روی گره‌ی بالاتر جدید (یا روی شرکت، برای بالاترین سطح) رها کنید؛ پیش‌نمایش اثر قبل از ذخیره نشان داده می‌شود.'}
+            {dragNote || (dragId && dropOver?.reason) || 'کارت را روی واحد بالاتر جدید (یا روی شرکت، برای بالاترین سطح) رها کنید؛ پیش‌نمایش اثر قبل از ذخیره نشان داده می‌شود.'}
           </p>
         )}
         <ZoomControls subscribe={subscribe} zoomBy={zoomBy} fit={fit} />
@@ -1154,6 +1219,7 @@ export const OrgChartBoard: React.FC<{
         rules={rules}
         onRequestMove={(unitId) => setMoveRequest({ unitId })}
         onRequestAdd={(parentId) => setAddRequest({ parentId })}
+        onRequestPosts={(unitId) => setPostsRequest({ unitId })}
         selection={selection}
         onSelect={(next) => choose(next)}
         onChanged={data.reload}
@@ -1179,19 +1245,33 @@ export const OrgChartBoard: React.FC<{
       <AutoLinkChoiceDialog choices={linkChoices} onDone={data.reload} onClose={() => setLinkChoices(null)} />,
       document.body,
     )}
+    {postsRequest && createPortal(
+      <AddPostsDialog
+        company={company}
+        unit={postsRequest.unitId ? unitById.get(postsRequest.unitId) ?? null : null}
+        positions={data.data?.positions || []}
+        onDone={async (text) => { await data.reload(); showToast(text, 'ok'); }}
+        onClose={() => setPostsRequest(null)}
+      />,
+      document.body,
+    )}
     {addRequest && createPortal(
       <AddNodeDialog
         company={company}
         parent={addRequest.parentId ? unitById.get(addRequest.parentId) ?? null : null}
         types={addableTypes(data.data?.nodeTypes || [], rules, addRequest.parentId ? unitById.get(addRequest.parentId) ?? null : null)}
-        onCreated={async (node) => {
+        allTypes={data.data?.nodeTypes || []}
+        canCreateTypes={canNode(can, 'manageRules')}
+        onCreated={async (nodes) => {
+          const node = nodes.find((n) => n.autoLinkChoices?.length) ?? nodes[0];
+          showToast(nodes.length > 1 ? `${toPersianDigits(nodes.length)} واحد اضافه شد.` : `واحد «${nodes[0]?.name}» اضافه شد.`, 'ok');
           await data.reload();
           // Stay on the node the new one was added to, so more can be added there.
           choose(addRequest.parentId
             ? { kind: 'unit', companyId: company.companyId, unitId: addRequest.parentId }
             : { kind: 'company', companyId: company.companyId }, { force: true });
           // An automatic link rule with several possible targets: the user picks.
-          if (node.autoLinkChoices?.length) setLinkChoices(node.autoLinkChoices);
+          if (node?.autoLinkChoices?.length) setLinkChoices(node.autoLinkChoices);
         }}
         onClose={() => setAddRequest(null)}
       />,
