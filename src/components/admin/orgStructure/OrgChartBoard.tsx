@@ -9,7 +9,8 @@ import { ChartSelection, allUnitsOf, ancestorsOf, companyHeadcount, companyPosts
 import { NodeTypeIcon, safeColor } from './nodes/nodeTypeStyle';
 import { AddNodeDialog, MoveNodeDialog } from './nodes/NodeDialogs';
 import { CompanyFormDialog } from './nodes/CompanyFormDialog';
-import { BuildSteps, type BuildScope } from './nodes/BuildSteps';
+import { BuildSteps } from './nodes/BuildSteps';
+import { AddMenu, type AddMenuItem } from './nodes/AddMenu';
 import { AddPostsDialog } from './nodes/AddPostsDialog';
 import { AutoLinkChoiceDialog } from './nodes/LinkDialogs';
 import { addableTypes, checkMove } from './orgNodeRules';
@@ -360,7 +361,9 @@ export const OrgChartBoard: React.FC<{
   onPlacementPick?: (pick: { companyId: string; unitId?: string; positionId?: string; userId?: string | null; userName?: string | null }) => void;
   /** Told after the structure was changed here (units, posts...): the form beside the chart reads its lists again. */
   onStructureChanged?: () => void;
-}> = ({ can: realCan, onLevelChange, initialCompanyId, onPlacementPick, reloadToken, onStructureChanged }) => {
+  /** «افزودن نفر به پست»: opens the window for it, filled from where it was asked. */
+  onRequestPlace?: (pick: { companyId: string; unitId?: string; positionId?: string; userId?: string | null; userName?: string | null }) => void;
+}> = ({ can: realCan, onLevelChange, initialCompanyId, onPlacementPick, reloadToken, onStructureChanged, onRequestPlace }) => {
   /** «نمایش به تاریخ»: the chart as of a day (only which nodes existed); nothing can be changed then. */
   const [asOf, setAsOf] = useState<string | undefined>(undefined);
   const asOfRef = useRef(asOf);
@@ -660,26 +663,24 @@ export const OrgChartBoard: React.FC<{
     return hits;
   }, [company]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** What the build buttons act on: the selected company, unit or post. */
-  const selectedUnit = selection?.kind === 'unit' ? unitById.get(selection.unitId) ?? null : null;
-  const selectedPost = selection?.kind === 'position' ? findPosition(chart, selection.unitPositionId) : null;
-  const buildScope: BuildScope = selectedUnit
-    ? { kind: 'unit', unitId: selectedUnit.unitId, name: selectedUnit.name }
-    : selectedPost ? { kind: 'post', name: postLabel(selectedPost.position) }
-      : selection?.kind === 'company' ? { kind: 'company' } : { kind: 'other' };
-  /** «افزودن نفر به پست»: the form above is filled from the selected post, or a vacant post of the selected unit (else of the company). */
-  const placeFromSelection = () => {
-    const vacantIn = (u: ChartUnit) => positionsOf(u).find((p) => p.holders.length === 0 && p.isActive);
-    let pick: { unitId?: string; positionId?: string } | undefined;
-    if (selectedPost) pick = { unitId: selectedPost.unit?.unitId, positionId: selectedPost.position.positionId };
-    else if (selectedUnit) pick = { unitId: selectedUnit.unitId, positionId: vacantIn(selectedUnit)?.positionId };
-    else {
-      const u = allUnitsOf(company).find((x) => !!vacantIn(x));
-      pick = u ? { unitId: u.unitId, positionId: vacantIn(u)!.positionId } : undefined;
+  /** «+ افزودن» on a card: what can be added there (a unit, a post, a person); unit null: the company. */
+  const menuItemsFor = (unit: ChartUnit | null): AddMenuItem[] => {
+    const items: AddMenuItem[] = [];
+    if (canNode(can, 'create') && !asOf && (!unit || unit.isActive !== false)) {
+      items.push({ icon: Network, label: unit ? 'زیرواحد' : 'واحد', hint: unit ? `زیر «${unit.name}»` : 'در بالاترین سطح شرکت', run: () => setAddRequest({ parentId: unit?.unitId ?? null }) });
     }
-    onPlacementPick?.({ companyId: company.companyId, ...pick });
-    document.querySelector('[data-testid="placement-path"]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (can(PERM.managePositions) && !asOf && (!unit || unit.isActive !== false) && allUnitsOf(company).length > 0) {
+      items.push({ icon: Briefcase, label: 'پست', hint: unit ? `به «${unit.name}»` : 'با انتخاب واحد', run: () => setPostsRequest({ unitId: unit?.unitId ?? null }) });
+    }
+    const vacant = unit ? positionsOf(unit).find((p) => p.holders.length === 0 && p.isActive) : undefined;
+    if (can(PERM.manageAssignments) && !asOf && (unit ? positionsOf(unit).length > 0 : allUnitsOf(company).some((u) => positionsOf(u).length > 0))) {
+      items.push({ icon: UserRound, label: 'نفر به پست', hint: unit ? `در «${unit.name}»` : undefined, run: () => requestPlace({ unitId: unit?.unitId, positionId: vacant?.positionId }) });
+    }
+    return items;
   };
+  /** Opens the «افزودن نفر به پست» window, filled from where it was asked. */
+  const requestPlace = (where: { unitId?: string; positionId?: string; userId?: string | null; userName?: string | null }) =>
+    onRequestPlace?.({ companyId: company.companyId, ...where });
 
   const selectedUserId = selection && (selection.kind === 'member' || selection.kind === 'unplaced') ? selection.userId : null;
   const isSelected = (s: ChartSelection) => JSON.stringify(s) === JSON.stringify(selection);
@@ -809,16 +810,7 @@ export const OrgChartBoard: React.FC<{
               </button>
             )}
             <span>{toPersianDigits(unitHeadcount(unit))} نفر</span>
-            {canNode(can, 'create') && unit.isActive !== false && !asOf && (
-              <button
-                type="button"
-                data-testid="add-child"
-                onClick={(e) => { e.stopPropagation(); setAddRequest({ parentId: unit.unitId }); }}
-                title={`افزودن زیرمجموعه به ${unit.name}`}
-                aria-label={`افزودن زیرمجموعه به ${unit.name}`}
-                className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer shrink-0"
-              ><Plus className="w-3.5 h-3.5" /></button>
-            )}
+            <AddMenu items={menuItemsFor(unit)} forName={unit.name} testId="add-child" />
           </div>
         </NodeCard>
         {open && (positions.length > 0 || unit.members.length > 0) && (
@@ -996,17 +988,9 @@ export const OrgChartBoard: React.FC<{
         </div>
       </div>
 
-      {!asOf && (canNode(can, 'create') || can(PERM.managePositions)) && (
+      {!asOf && (
         <div className="px-3 pb-2">
-          <BuildSteps
-            company={company}
-            scope={buildScope}
-            canAddUnits={canNode(can, 'create')}
-            canAddPosts={can(PERM.managePositions)}
-            onAddUnit={(parentId) => setAddRequest({ parentId })}
-            onAddPosts={(unitId) => setPostsRequest({ unitId })}
-            onPlacePeople={placeFromSelection}
-          />
+          <BuildSteps company={company} />
         </div>
       )}
 
@@ -1022,8 +1006,7 @@ export const OrgChartBoard: React.FC<{
               showEmpty={showEmpty}
               printing={printingTidy}
               rootRef={tidyRoot}
-              onAddUnit={canNode(can, 'create') && !asOf ? (parentId) => setAddRequest({ parentId }) : undefined}
-              onAddPosts={can(PERM.managePositions) && !asOf ? (unitId) => setPostsRequest({ unitId }) : undefined}
+              menuFor={asOf ? undefined : (unitId) => menuItemsFor(unitId ? unitById.get(unitId) ?? null : null)}
             />
           </TidyBoundary>
           {asOf && (
@@ -1061,6 +1044,7 @@ export const OrgChartBoard: React.FC<{
             </div>
             <div className="flex items-center justify-between border-t border-indigo-100/70 dark:border-slate-800 px-4 py-1.5 text-[11px] text-slate-500">
               <span>{toPersianDigits(nodeCount(company))} واحد</span>
+              <AddMenu items={menuItemsFor(null)} forName={company.name} testId="add-company" />
               <span>{toPersianDigits(companyHeadcount(company))} نفر</span>
             </div>
           </NodeCard>
@@ -1246,6 +1230,7 @@ export const OrgChartBoard: React.FC<{
         onRequestMove={(unitId) => setMoveRequest({ unitId })}
         onRequestAdd={(parentId) => setAddRequest({ parentId })}
         onRequestPosts={(unitId) => setPostsRequest({ unitId })}
+        onRequestPlace={(where) => requestPlace(where)}
         selection={selection}
         onSelect={(next) => choose(next)}
         onChanged={async () => { await data.reload(); onStructureChanged?.(); }}

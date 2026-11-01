@@ -59,6 +59,8 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
   const [chartCompanyId, setChartCompanyId] = useState<string | undefined>(undefined);
   /** Bumped to draw the chart again after the form saved. */
   const [chartKey, setChartKey] = useState(0);
+  /** The «افزودن نفر به پست» window (the form, with everything: person, post, start day, direct manager). */
+  const [placeOpen, setPlaceOpen] = useState(false);
 
   const tools: ToolId[] = [
     ...(reader ? ['companies' as const] : []),
@@ -78,15 +80,6 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
   return (
     <div className="space-y-4">
       {board.error && <Notice type="error">{board.error}</Notice>}
-      <OrgPlacementForm
-        board={board.data}
-        pick={pick}
-        canAssign={can(P.manageAssignments)}
-        canCreateUnits={canNode(can, 'create') || can(U.create)}
-        canCreatePositions={can(P.managePositions)}
-        onSaved={async () => { setChartKey((k) => k + 1); await board.reload(); }}
-        onTool={(id) => setTool(id)}
-      />
       <AdminCard className="p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-base font-extrabold text-slate-900 dark:text-white">چارت سازمانی</h3>
@@ -112,8 +105,23 @@ export const OrgStructureSection: React.FC<{ can: (permission: string) => boolea
           initialCompanyId={chartCompanyId}
           onPlacementPick={(next) => setPick({ ...next, at: Date.now() })}
           onStructureChanged={() => void board.reload()}
+          onRequestPlace={(next) => { setPick({ ...next, at: Date.now() }); setPlaceOpen(true); }}
         />
       </AdminCard>
+      {placeOpen && (
+        <AdminDialog wide title="افزودن نفر به پست" onClose={() => setPlaceOpen(false)} footer={<SecondaryButton onClick={() => setPlaceOpen(false)}>بستن</SecondaryButton>}>
+          <OrgPlacementForm
+            embedded
+            board={board.data}
+            pick={pick}
+            canAssign={can(P.manageAssignments)}
+            canCreateUnits={canNode(can, 'create') || can(U.create)}
+            canCreatePositions={can(P.managePositions)}
+            onSaved={async () => { setChartKey((k) => k + 1); await board.reload(); }}
+            onDone={() => setPlaceOpen(false)}
+          />
+        </AdminDialog>
+      )}
       {tool && (
         <AdminDialog wide title={TOOL_TITLES[tool]} onClose={close} footer={<SecondaryButton onClick={close}>بستن</SecondaryButton>}>
           {tool === 'companies' && <CompaniesPanel canManage={can(P.manageCompanies)} canSeeUnits={can(U.view)} advanced={advanced} />}

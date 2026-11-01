@@ -193,10 +193,12 @@ export const OrgChartDetails: React.FC<{
   onRequestAdd?: (parentId: string | null) => void;
   /** «افزودن پست» to this unit (null: the user chooses it). */
   onRequestPosts?: (unitId: string | null) => void;
+  /** Opens the «افزودن نفر به پست» window, filled (a post, or a person with no place). */
+  onRequestPlace?: (pick: { unitId?: string; positionId?: string; userId?: string | null; userName?: string | null }) => void;
   selection: ChartSelection | null;
   onSelect: (selection: ChartSelection) => void;
   onChanged: () => Promise<void> | void;
-}> = ({ can, chart, positions, unplaced, nodes = [], nodeTypes = [], linkTypes = [], rules = [], onRequestMove, onRequestAdd, onRequestPosts, selection, onSelect, onChanged }) => {
+}> = ({ can, chart, positions, unplaced, nodes = [], nodeTypes = [], linkTypes = [], rules = [], onRequestMove, onRequestAdd, onRequestPosts, onRequestPlace, selection, onSelect, onChanged }) => {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   /** Dialogs that bring their own footer and steps: saving a template, adding or removing a link. */
   const [extra, setExtra] = useState<
@@ -627,7 +629,7 @@ export const OrgChartDetails: React.FC<{
             />
           </div>
           <QuickActions>
-            {can(P.manageAssignments) && position.isActive && position.holders.length === 0 && <ActionTile icon={UserPlus} label="گذاشتن فرد در این پست" onClick={() => setDialog({ kind: 'addHolder', company, unit, position })} />}
+            {can(P.manageAssignments) && position.isActive && position.holders.length === 0 && <ActionTile icon={UserPlus} label="گذاشتن فرد در این پست" onClick={() => (unit && onRequestPlace ? onRequestPlace({ unitId: unit.unitId, positionId: position.positionId }) : setDialog({ kind: 'addHolder', company, unit, position }))} />}
             {can(P.manageAssignments) && position.isActive && (
               <ActionTile icon={UserCog} label={position.holders.length ? 'تعویض مسئول' : 'انتصاب با تاریخ'} title="انتصاب از امروز یا از روزی بعد؛ مسئول فعلی همان روز پایان می‌یابد" disabled={busy} onClick={() => setExtra({ kind: 'appoint', post: position, placeName })} />
             )}
@@ -680,7 +682,7 @@ export const OrgChartDetails: React.FC<{
           </div>
           <p className="text-xs text-slate-500">این فرد هنوز در هیچ شرکت یا معاونتی قرار نگرفته است.</p>
           <QuickActions>
-            {can(P.manageAssignments) && <ActionTile icon={UserPlus} label="قرار دادن در ساختار" onClick={() => setDialog({ kind: 'placeUser', userId: person.userId, name: person.displayName })} />}
+            {can(P.manageAssignments) && <ActionTile icon={UserPlus} label="قرار دادن در ساختار" onClick={() => (onRequestPlace ? onRequestPlace({ userId: person.userId, userName: person.displayName }) : setDialog({ kind: 'placeUser', userId: person.userId, name: person.displayName }))} />}
           </QuickActions>
         </>
       );

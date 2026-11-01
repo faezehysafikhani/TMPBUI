@@ -3,6 +3,7 @@ import { ChevronDown, ChevronLeft, Plus, Check, X } from 'lucide-react';
 import { AdminCard, Notice, PrimaryButton, SecondaryButton, inputClass } from '../AdminUi';
 import { JalaliDatePicker } from '../../JalaliDatePicker';
 import { userErrorMessage } from '../../../utils/errorMessages';
+import { showToast } from '../../../utils/toast';
 import { toPersianDigits } from '../../../utils/helpers';
 import {
   type HeldPosition, type UnitPosition,
@@ -136,6 +137,9 @@ const SelectWithAdd: React.FC<{
  * calls the chart and the user dialog always used (setAssignment; a start date in the future
  * appoints to the post from that day).
  */
+/** The form's frame: a card on its own, or nothing inside a window. */
+const Wrap: React.FC<{ embedded: boolean; children: React.ReactNode }> = ({ embedded, children }) => (embedded ? <div className="space-y-4">{children}</div> : <AdminCard className="p-5 space-y-4">{children}</AdminCard>);
+
 export const OrgPlacementForm: React.FC<{
   board: OrgPlacementBoard;
   pick: PlacementPick | null;
@@ -144,7 +148,10 @@ export const OrgPlacementForm: React.FC<{
   canCreatePositions: boolean;
   onSaved: () => Promise<void>;
   onTool?: (tool: 'templates' | 'links') => void;
-}> = ({ board, pick, canAssign, canCreateUnits, canCreatePositions, onSaved, onTool }) => {
+  /** Inside the «افزودن نفر به پست» window: no card or title of its own, and it is closed after a save (not after «ثبت و افزودن بعدی»). */
+  embedded?: boolean;
+  onDone?: () => void;
+}> = ({ board, pick, canAssign, canCreateUnits, canCreatePositions, onSaved, onTool, embedded = false, onDone }) => {
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>(null);
@@ -277,7 +284,13 @@ export const OrgPlacementForm: React.FC<{
       });
     }
     await onSaved();
-    setMessage({ type: 'success', text: later ? `جایگاه «${draft.userName}» از تاریخ انتخاب‌شده ثبت شد.` : `جایگاه «${draft.userName}» ثبت شد.` });
+    const text = later ? `جایگاه «${draft.userName}» از تاریخ انتخاب‌شده ثبت شد.` : `«${draft.userName}» به پست اضافه شد.`;
+    if (embedded && !andNext && onDone) {
+      showToast(text, 'ok');
+      onDone();
+      return;
+    }
+    setMessage({ type: 'success', text });
     setDraft(andNext ? { ...EMPTY, companyId: draft.companyId, unitId: draft.unitId, positionId: '' } : draft);
   };
 
@@ -296,8 +309,8 @@ export const OrgPlacementForm: React.FC<{
   };
 
   return (
-    <AdminCard className="p-5 space-y-4">
-      <h3 className="text-base font-extrabold text-slate-900 dark:text-white">افزودن نفر به پست</h3>
+    <Wrap embedded={embedded}>
+      {!embedded && <h3 className="text-base font-extrabold text-slate-900 dark:text-white">افزودن نفر به پست</h3>}
 
       <div className="flex flex-wrap items-center gap-1.5 text-xs" aria-label="مسیر زنده" data-testid="placement-path">
         {crumbs.map((c, i) => (
@@ -431,6 +444,6 @@ export const OrgPlacementForm: React.FC<{
           onCancel={() => setAsking(null)}
         />
       )}
-    </AdminCard>
+    </Wrap>
   );
 };
