@@ -71,7 +71,8 @@ import {
   toAppNotification,
 } from './utils/serverNotifications';
 import { Database, PanelRightOpen } from 'lucide-react';
-import { SESSION_ENDED_EVENT, TASK_CREATED_ACTION, withoutEditDuplicates } from './services/nexusApi';
+import { NexusApiError, SESSION_ENDED_EVENT, SESSION_END_MESSAGES, TASK_CREATED_ACTION, sessionEndReasonOf, withoutEditDuplicates } from './services/nexusApi';
+import { SessionGuard } from './components/SessionGuard';
 import { describeTaskChanges, summarizeTaskChanges, userNameLookup } from './utils/taskChangeSummary';
 import { getReportScope, ReportScope } from './services/taskReportApi';
 import { reportTabsFor } from './utils/reportTabs';
@@ -242,6 +243,8 @@ export default function App() {
   const [initialDueDateForNewTask, setInitialDueDateForNewTask] = useState<string | undefined>(undefined);
   const [initialTitleForNewTask, setInitialTitleForNewTask] = useState<string>('');
   const [initialTagsForNewTask, setInitialTagsForNewTask] = useState<string[]>([]);
+  // The labels above cannot be removed from the form (a task made from a meeting's resolution).
+  const [lockInitialTags, setLockInitialTags] = useState(false);
   // Runs once with the id of the task the open «new task» form creates (a meeting resolution links itself to its meeting).
   const onTaskCreatedRef = useRef<((taskId: string) => void) | null>(null);
   const [lockInitialDescription, setLockInitialDescription] = useState<boolean>(false);
@@ -295,7 +298,8 @@ export default function App() {
       setTotalUnreadChatCount(sum);
     };
     checkUnread();
-    const interval = setInterval(checkUnread, 4000);
+    // A hidden tab does not poll: nobody is looking, and the requests only cost the server.
+    const interval = setInterval(() => { if (!document.hidden) void checkUnread(); }, 4000);
     return () => clearInterval(interval);
   }, [currentUser]);
 
@@ -369,9 +373,12 @@ export default function App() {
 
   // The server ended the session (account disabled, tokens revoked): back to sign-in.
   useEffect(() => {
-    const onSessionEnded = () => {
+    const onSessionEnded = (event: Event) => {
       setCurrentUser(null);
       setIsAuthModalOpen(true);
+      // Why: signed out for inactivity, closed from another device, by an administrator...
+      const message = SESSION_END_MESSAGES[sessionEndReasonOf(event) ?? ''];
+      if (message) void appAlert(message);
     };
     window.addEventListener(SESSION_ENDED_EVENT, onSessionEnded);
     return () => window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
@@ -463,6 +470,11 @@ export default function App() {
     taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>,
     taskId?: string
   ) => {
+    // What to do once a NEW task exists (a task from a meeting's resolution is linked to the meeting).
+    // Taken now, before the form calls onClose, which clears the reference: reading it after the
+    // save would find it empty and the task would never be linked.
+    const afterCreate = taskId ? null : onTaskCreatedRef.current;
+    if (!taskId) onTaskCreatedRef.current = null;
     setIsSyncing(true);
     try {
       if (taskId) {
@@ -545,8 +557,6 @@ export default function App() {
           );
         }
         showToast(`فعالیت «${created.title}» ساخته شد.`, 'ok');
-        const afterCreate = onTaskCreatedRef.current;
-        onTaskCreatedRef.current = null;
         afterCreate?.(created.id);
       }
       setPbError(null);
@@ -756,10 +766,12 @@ export default function App() {
     initialDescription: string = '',
     parent?: { id: string; title: string },
     initialTags: string[] = [],
-    onCreated?: (taskId: string) => void
+    onCreated?: (taskId: string) => void,
+    lockTags = false,
   ) => {
     if (!can(currentUser, PERMISSIONS.tasksCreate)) return;
     setInitialTagsForNewTask(initialTags);
+    setLockInitialTags(lockTags);
     onTaskCreatedRef.current = onCreated || null;
     setTaskToEdit(null);
     setInitialStatusForNewTask(status);
@@ -786,6 +798,7 @@ export default function App() {
     setInitialDueDateForNewTask(undefined);
     setInitialTitleForNewTask('');
     setInitialTagsForNewTask([]);
+    setLockInitialTags(false);
     onTaskCreatedRef.current = null;
     setInitialDescriptionForNewTask('');
     setParentForNewTask(null);
@@ -1255,6 +1268,11 @@ export default function App() {
     <TaskTitleContext.Provider value={taskTitleById}>
     <div className={`min-h-dvh bg-pattern-${appColorTheme || 'default'} palette-${appColorPalette || 'indigo'} text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200`}>
       
+      {/* Session limits: warns before an idle sign-out, asks for the password at the absolute limit. */}
+      {currentUser && !isAuthModalOpen && (
+        <SessionGuard identifier={currentUser.username || ''} onSignOut={handleLogout} />
+      )}
+
       {/* Startup Summary Welcome Modal (Priority 1 Overlay) */}
       {isWelcomeModalOpen && (
         <UserWelcomeModal
@@ -1296,6 +1314,7 @@ export default function App() {
         onOpenWelcomeModal={() => setIsWelcomeModalOpen(true)}
         onOpenUserGuide={currentUser ? () => setIsUserGuideOpen(true) : undefined}
         onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
+        onLogout={currentUser ? handleLogout : undefined}
       />
 
       {!isDesktopSidebarOpen && (
@@ -1414,7 +1433,7 @@ export default function App() {
                   tasks={visibleTasks}
                   currentUser={currentUser}
                   onOpenCreateForDate={canCreateTask ? (isoDate) => handleOpenCreateModal('todo', isoDate) : undefined}
-                  onConvertMeetingToTask={canCreateTask ? (title, meetingDate, tags, onCreated) => handleOpenCreateModal('todo', meetingDate && !schedulingBlockReason(meetingDate) ? iranDateTimeToISO(meetingDate, '23:59') : undefined, title, '', undefined, tags, onCreated) : undefined}
+                  onConvertMeetingToTask={canCreateTask ? (title, meetingDate, tags, onCreated) => handleOpenCreateModal('todo', meetingDate && !schedulingBlockReason(meetingDate) ? iranDateTimeToISO(meetingDate, '23:59') : undefined, title, '', undefined, tags, onCreated, true) : undefined}
                   onEditTask={handleOpenEditModal}
                   onDeleteTask={handleDeleteTask}
                   onStatusChange={handleStatusChange}
@@ -1535,6 +1554,7 @@ export default function App() {
             initialDueDate={initialDueDateForNewTask}
             initialTitle={initialTitleForNewTask}
             initialTags={initialTagsForNewTask}
+            lockInitialTags={lockInitialTags}
             initialDescription={initialDescriptionForNewTask}
             lockInitialDescription={lockInitialDescription}
             parentTask={parentForNewTask}

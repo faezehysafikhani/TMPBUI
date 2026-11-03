@@ -415,7 +415,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     };
 
     loadUnread();
-    const interval = setInterval(loadUnread, 4000);
+    const interval = setInterval(() => { if (!document.hidden) void loadUnread(); }, 4000);
     return () => clearInterval(interval);
   }, [currentUser?.id]);
 
@@ -436,7 +436,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
         .then((p) => isMounted && setPresence((prev) => ({ ...prev, ...p })))
         .catch(() => undefined);
     load();
-    const interval = setInterval(load, 15000);
+    const interval = setInterval(() => { if (!document.hidden) load(); }, 15000);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -515,6 +515,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
     // Polling for live updates; the list only changes when something new arrived.
     const chatInterval = setInterval(async () => {
+      if (document.hidden) return;
       try {
         const data = await fetchMessages();
         if (!isMounted) return;
@@ -934,7 +935,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                               }`}
                             >
                               <FileText className="w-4 h-4 shrink-0" />
-                              <a href={msg.attachmentUrl} target="_blank" rel="noreferrer" className="underline text-xs truncate max-w-[180px] hover:opacity-80">
+                              <a href={msg.attachmentUrl} target="_blank" rel="noopener noreferrer" className="underline text-xs truncate max-w-[180px] hover:opacity-80">
                                 {msg.attachmentName || 'فایل پیوست'}
                               </a>
                             </div>

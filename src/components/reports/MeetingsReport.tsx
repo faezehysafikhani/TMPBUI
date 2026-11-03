@@ -7,14 +7,20 @@ import { toPersianDigits } from '../../utils/helpers';
 import { getIranTodayISO, parseISOToJalali, PERSIAN_MONTH_NAMES } from '../../utils/jalali';
 import { userErrorMessage } from '../../utils/errorMessages';
 import { buildXlsx, jalaliStamp, saveBlob } from '../../utils/reportExport';
-import { MeetingReportData, downloadMeetingReport, tableReportBlob } from '../../utils/meetingReportPdf';
-import { Meeting, listMeetings } from '../../services/meetingApi';
-import { FieldGroup, SummaryCard, iranDay, jalaliDate } from './reportShared';
+import { MeetingReportData, PrintInfo, downloadMeetingReport, tableReportBlob } from '../../utils/meetingReportPdf';
+import { useBranding } from '../../utils/branding';
+import { Meeting, MeetingInput, listMeetings } from '../../services/meetingApi';
+import { FieldGroup, SummaryCard, jalaliDate, printedAtText } from './reportShared';
 import { ReportActions, ProgressToast, useClampedPage, useListExport } from './ReportParts';
 
 const PAGE_SIZE = 25;
 const TYPE_LABELS = { meeting: 'جلسه حضوری', online: 'جلسه آنلاین', committee: 'کمیته' } as const;
 const ACTION_STATUS = { todo: 'شروع نشده', in_progress: 'درحال اجرا', completed: 'خاتمه یافته' } as const;
+/**
+ * A meeting has «صورت‌جلسه» when it has minutes text, action items, or tasks made from its
+ * resolutions (those become tasks, not text, so the text alone is not a reliable sign).
+ */
+const hasMinutes = (d: MeetingInput) => !!d.minutes.trim() || (d.actions?.length ?? 0) > 0 || (d.taskIds?.length ?? 0) > 0;
 const UNKNOWN_PERSON = 'فرد ثبت‌شده در جلسه';
 
 type MinutesFilter = 'all' | 'with' | 'without';
@@ -58,6 +64,9 @@ export const MeetingsReport: React.FC<{ people: User[]; tasks: Task[]; generated
   const [error, setError] = useState<string | null>(null);
   const [opened, setOpened] = useState<Meeting | null>(null);
   const [pdfBusy, setPdfBusy] = useState<string | null>(null);
+  const brand = useBranding();
+  /** Logo, organization, the moment of the printout and the person: on every PDF and printout. */
+  const printInfo = (): PrintInfo => ({ logo: brand.logo, orgName: brand.name, printedAtText: printedAtText(), printedBy: generatedBy || '' });
 
   // Only the date range goes to the server; everything else is a filter on what came back.
   useEffect(() => {
@@ -87,8 +96,8 @@ export const MeetingsReport: React.FC<{ people: User[]; tasks: Task[]; generated
     if (filters.type && d.type !== filters.type) return false;
     if (filters.organizerId && d.organizerUserId !== filters.organizerId) return false;
     if (filters.participantId && !d.participantIds.includes(filters.participantId)) return false;
-    if (filters.minutes === 'with' && !d.minutes.trim()) return false;
-    if (filters.minutes === 'without' && d.minutes.trim()) return false;
+    if (filters.minutes === 'with' && !hasMinutes(d)) return false;
+    if (filters.minutes === 'without' && hasMinutes(d)) return false;
     const text = filters.text.trim();
     if (text && ![d.title, d.location, d.description, d.minutes, ...d.agenda.map((a) => a.title)].some((v) => (v || '').includes(text))) return false;
     return true;
@@ -102,11 +111,13 @@ export const MeetingsReport: React.FC<{ people: User[]; tasks: Task[]; generated
     meeting: all.filter((m) => m.details.type === 'meeting').length,
     online: all.filter((m) => m.details.type === 'online').length,
     committee: all.filter((m) => m.details.type === 'committee').length,
-    withMinutes: all.filter((m) => m.details.minutes.trim()).length,
-    withoutMinutes: all.filter((m) => !m.details.minutes.trim()).length,
+    withMinutes: all.filter((m) => hasMinutes(m.details)).length,
+    withoutMinutes: all.filter((m) => !hasMinutes(m.details)).length,
   };
 
   const timeOf = (m: Meeting) => (m.details.startTime && m.details.endTime ? `${toPersianDigits(m.details.startTime)} تا ${toPersianDigits(m.details.endTime)}` : '');
+  /** «۰۹:۰۰–۱۰:۰۰» for the narrow column of the PDF. */
+  const shortTime = (m: Meeting) => (m.details.startTime && m.details.endTime ? `${toPersianDigits(m.details.startTime)}–${toPersianDigits(m.details.endTime)}` : '—');
   const participantsText = (m: Meeting) => m.details.participantIds.map(nameOf).join('، ');
 
   const filtersText = (() => {
@@ -129,7 +140,7 @@ export const MeetingsReport: React.FC<{ people: User[]; tasks: Task[]; generated
       agenda: d.agenda.map((a) => ({ title: a.title, durationText: a.durationMinutes ? `${toPersianDigits(a.durationMinutes)} دقیقه` : '', presenter: nameOf(a.presenterUserId) })),
       minutes: d.minutes || '',
       tasks: d.taskIds.map(taskOf).filter((t): t is Task => !!t).map((t) => ({ title: t.title, statusText: STATUSES[t.status]?.title || t.status, dueText: dayText(t.dueDate || '') })),
-      generatedText: `تهیه‌شده در ${dayText(new Date().toISOString().slice(0, 10))}`,
+      print: printInfo(),
     };
   };
 
@@ -158,21 +169,35 @@ export const MeetingsReport: React.FC<{ people: User[]; tasks: Task[]; generated
         d.description || '',
       ];
     });
-    saveBlob(buildXlsx('گزارش جلسات', header, data, [6, 34, 13, 13, 10, 10, 20, 20, 10, 40, 50, 60, 45, 45, 40]), `meetings-report-${jalaliStamp()}.xlsx`);
+    const info = printInfo();
+    saveBlob(buildXlsx('گزارش جلسات', header, data, [6, 34, 13, 13, 10, 10, 20, 20, 10, 40, 50, 60, 45, 45, 40], [
+      `گزارش جلسات — ${info.orgName}`,
+      `تاریخ چاپ: ${info.printedAtText}${info.printedBy ? ` | چاپ‌کننده: ${info.printedBy}` : ''}`,
+      `فیلترها: ${filtersText}`,
+      `${toPersianDigits(rows.length)} جلسه`,
+    ]), `meetings-report-${jalaliStamp()}.xlsx`);
   };
 
-  const generatedText = `تاریخ تهیه: ${jalaliDate(iranDay(new Date().toISOString()))}${generatedBy ? ` | تهیه‌کننده: ${generatedBy}` : ''}`;
   const exporter = useListExport(
     (onProgress) => tableReportBlob({
       title: 'گزارش جلسات',
-      infoLines: [`فیلترها: ${filtersText}`, `${toPersianDigits(rows.length)} جلسه`],
-      head: ['ردیف', 'عنوان', 'نوع', 'تاریخ', 'ساعت', 'مکان', 'برگزارکننده', 'شرکت‌کنندگان', 'صورت‌جلسه', 'وظایف'],
-      widths: ['5%', '19%', '9%', '10%', '10%', '10%', '11%', '14%', '6%', '6%'],
+      subtitle: `${toPersianDigits(rows.length)} جلسه از ${toPersianDigits(all.length)} جلسه‌ی بازه`,
+      filtersText,
+      // The cards of the screen, as they are now.
+      summary: [
+        { label: 'کل جلسات', value: toPersianDigits(counts.total) }, { label: 'حضوری', value: toPersianDigits(counts.meeting) },
+        { label: 'آنلاین', value: toPersianDigits(counts.online) }, { label: 'کمیته', value: toPersianDigits(counts.committee) },
+        { label: 'دارای صورت‌جلسه', value: toPersianDigits(counts.withMinutes) }, { label: 'بدون صورت‌جلسه', value: toPersianDigits(counts.withoutMinutes) },
+      ],
+      listTitle: 'فهرست جلسات',
+      head: ['ردیف', 'عنوان', 'نوع', 'تاریخ', 'ساعت', 'مکان', 'برگزارکننده', 'شرکت‌کنندگان', 'دستور جلسه', 'صورت جلسه', 'وظایف'],
+      widths: ['5%', '15%', '7%', '11%', '11%', '9%', '10%', '11%', '7%', '8%', '6%'],
       rows: rows.map((m, i) => [
-        toPersianDigits(i + 1), m.details.title, TYPE_LABELS[m.details.type], jalaliDate(m.details.date), timeOf(m), m.details.location || '—',
-        nameOf(m.details.organizerUserId) || '—', participantsText(m) || '—', m.details.minutes.trim() ? 'دارد' : '—', toPersianDigits(m.details.taskIds.length),
+        toPersianDigits(i + 1), m.details.title, TYPE_LABELS[m.details.type], jalaliDate(m.details.date), shortTime(m), m.details.location || '—',
+        nameOf(m.details.organizerUserId) || '—', participantsText(m) || '—', `${toPersianDigits(m.details.agenda.length)} بند`,
+        hasMinutes(m.details) ? 'دارد' : '—', toPersianDigits(m.details.taskIds.length),
       ]),
-      generatedText,
+      print: printInfo(),
       emptyText: 'جلسه‌ای با این فیلترها پیدا نشد.',
     }, onProgress),
     `meetings-report-${jalaliStamp()}.pdf`,
@@ -277,7 +302,7 @@ export const MeetingsReport: React.FC<{ people: User[]; tasks: Task[]; generated
                       <td className={`${td} whitespace-nowrap`}>{nameOf(m.details.organizerUserId) || '—'}</td>
                       <td className={td} title={participantsText(m)}>{toPersianDigits(m.details.participantIds.length)} نفر</td>
                       <td className={td}>{toPersianDigits(m.details.agenda.length)} بند</td>
-                      <td className={td}>{m.details.minutes.trim() ? <StatusBadge tone="green">دارد</StatusBadge> : <span className="text-slate-400">—</span>}</td>
+                      <td className={td}>{hasMinutes(m.details) ? <StatusBadge tone="green">دارد</StatusBadge> : <span className="text-slate-400">—</span>}</td>
                       <td className={td}>{toPersianDigits(m.details.taskIds.length)}</td>
                       <td className={td}>
                         <div className="flex items-center gap-0.5">
@@ -332,11 +357,11 @@ const MeetingReportBody: React.FC<{ meeting: Meeting; nameOf: (id: string | null
           <div><span className="text-slate-500">مکان: </span><b>{d.location || '—'}</b></div>
           <div><span className="text-slate-500">برگزارکننده: </span><b>{nameOf(d.organizerUserId) || '—'}</b></div>
         </div>
-        {d.description.trim() && <p className="mt-2 whitespace-pre-line text-slate-700 dark:text-slate-300">{d.description}</p>}
+        {d.description.trim() && <p className="mt-2 whitespace-pre-line text-justify text-slate-700 dark:text-slate-300">{d.description}</p>}
       </section>
       <section>
         <h4 className={heading}>افراد مرتبط ({toPersianDigits(d.participantIds.length)})</h4>
-        <p className="leading-7">{d.participantIds.map(nameOf).join('، ') || 'فردی ثبت نشده است.'}</p>
+        <p className="leading-7 text-justify">{d.participantIds.map(nameOf).join('، ') || 'فردی ثبت نشده است.'}</p>
       </section>
       <section>
         <h4 className={heading}>دستور جلسه ({toPersianDigits(d.agenda.length)})</h4>
@@ -353,7 +378,9 @@ const MeetingReportBody: React.FC<{ meeting: Meeting; nameOf: (id: string | null
       </section>
       <section>
         <h4 className={heading}>مصوبات صورت‌جلسه</h4>
-        {d.minutes.trim() ? <p className="whitespace-pre-line leading-7">{d.minutes}</p> : <p className="text-slate-500">صورت‌جلسه‌ای ثبت نشده است.</p>}
+        {d.minutes.trim()
+          ? <p className="whitespace-pre-line leading-7 text-justify">{d.minutes}</p>
+          : <p className="text-slate-500">{hasMinutes(d) ? 'متن صورت‌جلسه ثبت نشده؛ مصوبات به‌صورت وظیفه یا اقدام ثبت شده‌اند (پایین).' : 'صورت‌جلسه‌ای ثبت نشده است.'}</p>}
         {d.actions.length > 0 && (
           <ul className="mt-2 space-y-1">
             {d.actions.map((a, i) => (

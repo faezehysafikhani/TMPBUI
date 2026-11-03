@@ -1,8 +1,10 @@
 import React, { useEffect, useId, useState } from 'react';
-import { MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2, BadgeCheck, ShieldCheck, Image as ImageIcon, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
-import { getKnownPermissions, getMyPermissions, changeMyPassword, fetchUploadPolicy, updateMaxUploadSizeKb } from '../../services/nexusApi';
+import { Smartphone, MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2, BadgeCheck, ShieldCheck, Image as ImageIcon, RotateCcw, ChevronDown, ChevronUp, MonitorSmartphone, LogOut } from 'lucide-react';
+import { getKnownPermissions, getMyPermissions, changeMyPassword, requestPhoneChange, confirmPhoneChange, fetchUploadPolicy, updateMaxUploadSizeKb } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
+import { SessionsPanel } from './SessionsPanel';
+import { OPEN_PROFILE_EVENT } from '../../utils/profileEvents';
 import { RolesPanel } from './RolesPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
 import { LdapPanel } from './LdapPanel';
@@ -80,6 +82,8 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
             changeStatus: can('users.change_status'),
             assignRoles: can('users.assign_roles'),
             assignPermissions: can('users.assign_permissions'),
+            viewSessions: can('sessions.view'),
+            revokeSessions: can('sessions.revoke'),
           }}
           orgStructureAvailable={orgStructureAvailable}
           canManageOrgAssignments={can(ORG_STRUCTURE_PERMISSIONS.manageAssignments)}
@@ -98,8 +102,17 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
 };
 
 /** The signed-in user's own password change (the system administrator included). */
+/** Mirrors the server's rule (PasswordRules): 10+ characters of at least three kinds. The server decides; this only saves a trip. */
+const PASSWORD_RULE = 'رمز عبور باید حداقل ۱۰ کاراکتر باشد و دست‌کم از سه نوع کاراکتر (حرف کوچک، حرف بزرگ، رقم، نماد) تشکیل شود.';
+
+function isStrongPassword(value: string): boolean {
+  if (value.length < 10 || value.length > 128) return false;
+  const kinds = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((pattern) => pattern.test(value)).length;
+  return kinds >= 3;
+}
+
 export const ChangePasswordCard: React.FC = () => {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const panelId = useId();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -110,7 +123,7 @@ export const ChangePasswordCard: React.FC = () => {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
-    if (next.length < 8) { setMessage({ type: 'error', text: 'رمز عبور جدید باید حداقل ۸ کاراکتر باشد.' }); return; }
+    if (!isStrongPassword(next)) { setMessage({ type: 'error', text: PASSWORD_RULE }); return; }
     if (next !== repeat) { setMessage({ type: 'error', text: 'تکرار رمز عبور جدید با آن یکسان نیست.' }); return; }
     setBusy(true);
     try {
@@ -146,7 +159,7 @@ export const ChangePasswordCard: React.FC = () => {
           <Field label="رمز عبور فعلی" required>
             <input type="password" className={`${inputClass} dir-ltr text-right`} value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" required />
           </Field>
-          <Field label="رمز عبور جدید" required hint="حداقل ۸ کاراکتر">
+          <Field label="رمز عبور جدید" required hint="حداقل ۱۰ کاراکتر، ترکیبی از حروف، ارقام و نماد">
             <input type="password" className={`${inputClass} dir-ltr text-right`} value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" required />
           </Field>
           <Field label="تکرار رمز عبور جدید" required>
@@ -161,6 +174,90 @@ export const ChangePasswordCard: React.FC = () => {
         </div>
       </form>
       </div>
+    </AdminCard>
+  );
+};
+
+/**
+ * Changing the mobile number (the number a forgotten password is recovered through): the current
+ * password and the new number first, then the code that arrives on the NEW number. The number
+ * changes only after both, and the person's other sign-ins end.
+ */
+export const ChangePhoneCard: React.FC<{ currentPhone?: string; onChanged?: () => void | Promise<void> }> = ({ currentPhone, onChanged }) => {
+  const [newPhone, setNewPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const sendCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    setBusy(true);
+    try {
+      const answer = await requestPhoneChange(newPhone, password);
+      setSent(true);
+      setMessage({ type: 'success', text: `${answer.message} کد تا ${Math.ceil(answer.expiresInSeconds / 60)} دقیقه معتبر است.` });
+    } catch (err: any) {
+      setMessage({ type: 'error', text: userErrorMessage(err, 'ارسال کد تأیید انجام نشد.') });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMessage(null);
+    setBusy(true);
+    try {
+      await confirmPhoneChange(newPhone, code, password);
+      setNewPhone(''); setPassword(''); setCode(''); setSent(false);
+      setMessage({ type: 'success', text: 'شماره موبایل شما تغییر کرد. نشست‌های دیگر شما بسته شد.' });
+      await onChanged?.();
+    } catch (err: any) {
+      setMessage({ type: 'error', text: userErrorMessage(err, 'تغییر شماره موبایل انجام نشد.') });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <AdminCard className="p-5 sm:p-6">
+      <form onSubmit={sent ? confirm : sendCode} className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Smartphone className="w-5 h-5 text-indigo-700 dark:text-indigo-400" />
+          <h3 className="text-base font-extrabold text-slate-900 dark:text-white">تغییر شماره موبایل</h3>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          شماره فعلی: <span className="font-mono dir-ltr">{currentPhone || '—'}</span>. شماره موبایل برای بازیابی رمز عبور استفاده می‌شود، بنابراین تغییر آن به رمز عبور فعلی و کدی نیاز دارد که به شماره‌ی جدید پیامک می‌شود.
+        </p>
+        {message && <Notice type={message.type} onClose={() => setMessage(null)}>{message.text}</Notice>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="شماره موبایل جدید" required>
+            <input type="tel" className={`${inputClass} dir-ltr text-right`} value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="09121234567" disabled={sent} required />
+          </Field>
+          <Field label="رمز عبور فعلی" required>
+            <input type="password" className={`${inputClass} dir-ltr text-right`} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+          </Field>
+          {sent && (
+            <Field label="کد تأیید پیامک‌شده" required>
+              <input type="text" inputMode="numeric" className={`${inputClass} dir-ltr text-right`} value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" required />
+            </Field>
+          )}
+        </div>
+        <div className="flex justify-end gap-2">
+          {sent && (
+            <button type="button" onClick={() => { setSent(false); setCode(''); setMessage(null); }} className="px-4 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+              شماره‌ی دیگر
+            </button>
+          )}
+          <PrimaryButton type="submit" disabled={busy}>
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>{sent ? 'تأیید و تغییر شماره' : 'ارسال کد تأیید'}</span>
+          </PrimaryButton>
+        </div>
+      </form>
     </AdminCard>
   );
 };
@@ -373,13 +470,85 @@ const UploadSizeSettingsCard: React.FC = () => {
   );
 };
 
+/** What the profile page holds; the page itself (tabs, sessions) is ProfileHub below. */
+export interface ProfileSections {
+  avatar: React.ReactNode;
+  password: React.ReactNode;
+  phone: React.ReactNode;
+  account: React.ReactNode;
+}
+
+type ProfileTab = 'avatar' | 'password' | 'phone' | 'sessions' | 'account';
+
+/**
+ * «پروفایل»: one page for everything about the signed-in person - profile and avatar, password,
+ * mobile number, sessions, account and sign-out - as a row of tabs with an underline.
+ */
+const ProfileHub: React.FC<{ sections: ProfileSections; can: (permission: string) => boolean; placement?: React.ReactNode }> = ({ sections, can, placement }) => {
+  const [active, setActive] = useState<ProfileTab>('avatar');
+  const tabs: { id: ProfileTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'avatar', label: 'پروفایل و آواتار', icon: UserIcon },
+    { id: 'password', label: 'تغییر رمز عبور', icon: KeyRound },
+    { id: 'phone', label: 'تغییر شماره موبایل', icon: Smartphone },
+    { id: 'sessions', label: 'نشست‌ها', icon: MonitorSmartphone },
+    { id: 'account', label: 'حساب کاربری و خروج', icon: LogOut },
+  ];
+
+  useEffect(() => {
+    const open = (event: Event) => {
+      const tab = (event as CustomEvent).detail?.tab as ProfileTab | undefined;
+      setActive(tab && tabs.some((item) => item.id === tab) ? tab : 'avatar');
+    };
+    window.addEventListener(OPEN_PROFILE_EVENT, open);
+    return () => window.removeEventListener(OPEN_PROFILE_EVENT, open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800" role="tablist" aria-label="پروفایل">
+        {tabs.map(({ id, label, icon: Icon }) => {
+          const selected = id === active;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => setActive(id)}
+              className={`flex items-center gap-2 px-4 py-3 -mb-px text-sm font-bold whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
+                selected
+                  ? 'border-indigo-700 text-indigo-800 dark:border-indigo-400 dark:text-indigo-300'
+                  : id === 'account'
+                    ? 'border-transparent text-rose-600 dark:text-rose-400 hover:border-rose-300'
+                    : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div role="tabpanel">
+        {active === 'avatar' && <>{sections.avatar}{placement}</>}
+        {active === 'password' && sections.password}
+        {active === 'phone' && sections.phone}
+        {active === 'sessions' && <SessionsPanel can={can} />}
+        {active === 'account' && sections.account}
+      </div>
+    </div>
+  );
+};
+
 /**
  * «تنظیمات سامانه»: the header card with the main tabs. Profile / Team / Appearance / Help are
  * always-present personal-settings tabs; SMS panel and user management appear by permission.
  */
 export const SystemAdministration: React.FC<{
   currentUserId?: string;
-  profile: React.ReactNode;
+  profile: ProfileSections;
   team: React.ReactNode;
   appearance: React.ReactNode;
   help: React.ReactNode;
@@ -418,7 +587,7 @@ export const SystemAdministration: React.FC<{
         ) : tabs.length > 1 && <SegmentedTabs tabs={tabs} active={current} onChange={setActive} />}
       </AdminCard>
 
-      {current === 'profile' && <>{profile}{orgStructureAvailable && <MyPlacementPanel />}</>}
+      {current === 'profile' && <ProfileHub sections={profile} can={can} placement={orgStructureAvailable ? <MyPlacementPanel /> : null} />}
       {current === 'team' && canSeeWorkTeams(permissions) && team}
       {current === 'appearance' && (
         <div className="space-y-5">

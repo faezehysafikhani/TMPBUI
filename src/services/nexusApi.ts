@@ -2,7 +2,7 @@
  * REST connection to the NexusCore backend (ASP.NET Core 8, TaskManagement module).
  *
  * This is the app's only backend. In production, the origin is read at runtime from
- * /config/runtime-config.js; without it the app calls the origin it is served from
+ * /config/runtime-config.json; without it the app calls the origin it is served from
  * (a reverse proxy in front of both).
  *
  * The functions in dataService.ts delegate here; the components keep calling the same
@@ -14,6 +14,8 @@
  *   Nexus.TaskManagement/Application/Dtos/TaskManagementDtos.cs
  * Enums travel as strings (JsonStringEnumConverter) and property names are camelCase.
  */
+import { takeActivityFlag } from '../utils/sessionActivity';
+import { toSafeBlob } from '../utils/safeBlob';
 import {
   Task,
   TaskStatus,
@@ -36,7 +38,7 @@ import { iranDateTimeToISO, isoToIranDateTimeParts } from '../utils/jalali';
 import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
 import { NETWORK_ERROR, TIMEOUT_ERROR, persianApiMessage } from '../utils/errorMessages';
 import { normalizeAvatar } from '../utils/avatars';
-import { clearLookups } from '../utils/lookupCache';
+import { clearPrivateData } from '../utils/privateStorage';
 import type { ServerNotificationDto } from '../utils/serverNotifications';
 
 // ---------------------------------------------------------------------------
@@ -124,7 +126,91 @@ interface AuthResponse {
   refreshToken: string;
   accessTokenExpiresAtUtc: string;
   user: UserDto;
+  /** Instead of tokens, when the user is at the concurrent-session limit. */
+  sessionLimit?: SessionLimitChallenge | null;
+  session?: SessionStatus | null;
 }
+
+// --- Sessions ---------------------------------------------------------------------------
+
+/** One sign-in of a user on one device, as the server lists it. */
+export interface SessionInfo {
+  id: string;
+  userId: string;
+  deviceLabel: string | null;
+  userAgent: string | null;
+  createdIp: string | null;
+  lastIp: string | null;
+  createdAtUtc: string;
+  lastActivityAtUtc: string;
+  lastSeenAtUtc: string;
+  idleExpiresAtUtc: string;
+  absoluteExpiresAtUtc: string;
+  policyProfile: string;
+  isCurrent: boolean;
+  isActive: boolean;
+  endedAtUtc: string | null;
+  /** A reason code such as session.idle_expired (see SESSION_END_MESSAGES). */
+  endReason: string | null;
+  endedByName: string | null;
+}
+
+export interface SessionList {
+  active: SessionInfo[];
+  recent: SessionInfo[];
+  policy: { profile: string; idleSeconds: number; absoluteSeconds: number; maxConcurrentAllowed: number; maxConcurrentChosen: number } | null;
+  smsOnEveryNewSignIn: boolean;
+}
+
+/** Seconds left in the caller's session, from the server (never computed from the browser clock alone). */
+export interface SessionStatus {
+  sessionId: string;
+  idleTimeoutSeconds: number;
+  idleRemainingSeconds: number;
+  absoluteRemainingSeconds: number;
+  serverTimeUtc: string;
+  /** How long before the idle timeout the warning shows (the server's choice). */
+  idleWarningSeconds?: number;
+}
+
+/** The sign-in stopped at the concurrent-session limit: the user picks which session to close. */
+export interface SessionLimitChallenge {
+  ticket: string;
+  expiresAtUtc: string;
+  maxConcurrent: number;
+  mustClose: number;
+  sessions: SessionInfo[];
+}
+
+export interface SessionPolicySettings {
+  idleMinutes: number; absoluteHours: number; maxConcurrent: number;
+  sensitiveIdleMinutes: number; sensitiveAbsoluteHours: number; sensitiveMaxConcurrent: number;
+  systemIdleMinutes: number; systemAbsoluteHours: number; systemMaxConcurrent: number;
+  internalNetworks: string[]; externalIdleMinutes: number; externalAbsoluteHours: number;
+  range: { minIdleMinutes: number; maxIdleMinutes: number; minAbsoluteHours: number; maxAbsoluteHours: number; minConcurrent: number; maxConcurrent: number };
+}
+
+/** Thrown by login() when the sign-in must first close a session; the sign-in screen handles it. */
+export class SessionLimitError extends Error {
+  constructor(public readonly challenge: SessionLimitChallenge) {
+    super('session limit reached');
+    this.name = 'SessionLimitError';
+  }
+}
+
+/** Why a session ended, in the words the user sees. */
+export const SESSION_END_MESSAGES: Record<string, string> = {
+  'session.idle_expired': 'به دلیل عدم فعالیت از سامانه خارج شدید. لطفاً دوباره وارد شوید.',
+  'session.absolute_expired': 'زمان مجاز نشست شما به پایان رسید. لطفاً دوباره وارد شوید.',
+  'session.revoked': 'این نشست از دستگاه دیگری بسته شد. لطفاً دوباره وارد شوید.',
+  'session.concurrent_limit': 'از دستگاه دیگری وارد شدید و این نشست بسته شد. لطفاً دوباره وارد شوید.',
+  'session.administrator': 'به دستور مدیر سامانه از نشست خود خارج شدید.',
+  'session.credentials_changed': 'رمز عبور یا شماره موبایل حساب تغییر کرد؛ لطفاً دوباره وارد شوید.',
+  'session.account_disabled': 'حساب کاربری شما غیرفعال شده است.',
+  'session.reuse_detected': 'به‌دلایل امنیتی نشست شما بسته شد. لطفاً دوباره وارد شوید و در صورت لزوم رمز عبور را تغییر دهید.',
+  'session.missing': 'نشست شما معتبر نیست. لطفاً دوباره وارد شوید.',
+  'session.logged_out': '',
+};
 
 interface CurrentUserResponse {
   user: UserDto;
@@ -279,24 +365,32 @@ export interface NoteDto {
 }
 
 // ---------------------------------------------------------------------------
-// Session (access + refresh token)
+// Session (access token in memory, refresh token in an HttpOnly cookie)
 // ---------------------------------------------------------------------------
 
+/**
+ * What is kept in the browser's storage: who is signed in, and what they may see. Nothing in it
+ * can be used to call the API - the tokens are not here. The access token lives only in this
+ * page's memory (below), and the refresh token only in a cookie the server sets with HttpOnly,
+ * which no script - ours or an injected one - can read.
+ */
 interface StoredSession {
-  accessToken: string;
-  /**
-   * The refresh token, when the server returns it in the body (Identity:Session:
-   * ReturnRefreshTokenInBody). Empty when it keeps it in an HttpOnly cookie instead, which
-   * this page can never read: the browser sends it to /api/identity/auth by itself.
-   */
-  refreshToken: string;
-  accessTokenExpiresAtUtc: string;
   user: UserDto;
   /** The user's permissions from the last /me answer. */
   permissions?: string[];
 }
 
-const SESSION_KEY = 'nexuscore_auth_session_v1';
+const SESSION_KEY = 'nexuscore_auth_profile_v2';
+/** Before the cookie, the tokens themselves were stored here. Never read again; removed. */
+const LEGACY_SESSION_KEY = 'nexuscore_auth_session_v1';
+
+/** The short-lived access token. A reload starts without one and gets one from the cookie. */
+let tokens: {
+  accessToken: string;
+  accessTokenExpiresAtUtc: string;
+  /** Only when the server returned the refresh token in the body instead of the cookie (older servers): kept in memory only. */
+  refreshToken?: string;
+} | null = null;
 
 /**
  * Fired on window when the server no longer accepts the session (account disabled, tokens
@@ -304,11 +398,27 @@ const SESSION_KEY = 'nexuscore_auth_session_v1';
  */
 export const SESSION_ENDED_EVENT = 'nexuscore:session-ended';
 
-function endSession(): void {
+let absoluteReauth: (() => Promise<boolean>) | null = null;
+let absoluteReauthInFlight: Promise<boolean> | null = null;
+
+/** Registers the dialog that asks for the password again when the session reaches its absolute limit. */
+export function setAbsoluteReauthHandler(handler: (() => Promise<boolean>) | null): void {
+  absoluteReauth = handler
+    ? () => (absoluteReauthInFlight ??= handler().finally(() => { absoluteReauthInFlight = null; }))
+    : null;
+}
+
+/** The reason code (session.*) carried by SESSION_ENDED_EVENT, when the server gave one. */
+export function sessionEndReasonOf(event: Event): string | null {
+  return ((event as CustomEvent).detail?.reason as string | undefined) ?? null;
+}
+
+function endSession(reason?: string | null): void {
+  tokens = null;
   writeSession(null);
-  clearLookups();
+  clearPrivateData();
   try {
-    window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
+    window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: { reason: reason ?? null } }));
   } catch {
     // No window (tests, SSR): nothing to notify.
   }
@@ -331,48 +441,87 @@ function writeSession(session: StoredSession | null): void {
       localStorage.removeItem(SESSION_KEY);
     }
   } catch {
-    // Storage unavailable (private mode); the session simply will not survive a reload.
+    // Storage unavailable (private mode); the page simply will not remember who is signed in.
   }
+}
+
+// Sessions from before the cookie held live tokens in storage: they are removed, and the user
+// signs in once more.
+try {
+  localStorage.removeItem(LEGACY_SESSION_KEY);
+} catch {
+  // Storage unavailable.
+}
+
+// Signing out (or being signed out) in another tab ends this tab's session as well.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === SESSION_KEY && event.newValue === null && tokens) {
+      tokens = null;
+      try {
+        window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
+      } catch {
+        // Nothing to notify.
+      }
+    }
+  });
 }
 
 function saveAuthResponse(auth: AuthResponse): void {
   const previous = readSession();
-  writeSession({
+  tokens = {
     accessToken: auth.accessToken,
-    refreshToken: auth.refreshToken || '',
     accessTokenExpiresAtUtc: auth.accessTokenExpiresAtUtc,
+    refreshToken: auth.refreshToken || undefined,
+  };
+  writeSession({
     user: auth.user,
     // A renewed token keeps the known permissions; a new sign-in reads them from /me.
     permissions: previous?.user?.id === auth.user.id ? previous.permissions : undefined,
   });
 }
 
-// Refresh tokens rotate on every use (IdentityService.RefreshTokenAsync revokes the old one),
-// so concurrent 401s must share a single refresh call rather than racing each other.
+/** An access token that is good for at least a little longer, renewed from the cookie when it is not. */
+async function ensureAccessToken(): Promise<string | null> {
+  if (!readSession()) return null;
+  if (tokens && new Date(tokens.accessTokenExpiresAtUtc).getTime() - Date.now() > 20_000) {
+    return tokens.accessToken;
+  }
+  return (await refreshSession()) && tokens ? tokens.accessToken : null;
+}
+
+// Refresh tokens rotate on every use, so concurrent 401s must share a single refresh call rather
+// than racing each other - and so must several tabs, which share the one cookie: the browser's
+// lock makes them take turns, and the second tab sends the cookie the first one just received.
 let refreshInFlight: Promise<boolean> | null = null;
+
+async function withRefreshLock<T>(work: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? (navigator as any).locks : undefined;
+  return locks?.request ? (locks.request('nexus-refresh', work) as Promise<T>) : work();
+}
 
 async function refreshSession(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
 
-  refreshInFlight = (async () => {
-    const session = readSession();
-    // Without a stored token the session lives in the HttpOnly cookie, sent with the request.
-    if (!session?.user) return false;
+  refreshInFlight = withRefreshLock(async () => {
+    if (!readSession()) return false;
     try {
       const auth = await request<AuthResponse>('POST', '/api/identity/auth/refresh', {
-        body: session.refreshToken ? { refreshToken: session.refreshToken } : {},
+        // The cookie carries the token; a body is only sent when the server handed the token over in one.
+        body: tokens?.refreshToken ? { refreshToken: tokens.refreshToken } : undefined,
         auth: false,
         retryOnUnauthorized: false,
+        cookieSession: true,
       });
       saveAuthResponse(auth);
       return true;
     } catch (err) {
       if (err instanceof NexusApiError && (err.httpStatus === 401 || err.httpStatus === 400)) {
-        endSession();
+        endSession(err.code?.startsWith('session.') ? err.code : null);
       }
       return false;
     }
-  })();
+  });
 
   try {
     return await refreshInFlight;
@@ -407,16 +556,16 @@ interface RequestOptions {
   unauthorizedMessage?: string;
   /** Fetch cache mode; reports use 'no-store' so a repeat request never returns an old copy. */
   cache?: RequestCache;
+  /**
+   * The call that sets, uses or ends the refresh-token cookie (sign-in, refresh, sign-out, a
+   * password or mobile change): asks the server to keep the token in the cookie, marks the
+   * request as ours (a cross-site form cannot send this header) and sends the cookie along even
+   * when the API is on another origin.
+   */
+  cookieSession?: boolean;
+  /** Lets the request finish after the page is closed (sign-out on closing a tab). */
+  keepalive?: boolean;
 }
-
-/**
- * Sign-in, refresh and sign-out: the browser sends and keeps the HttpOnly session cookie
- * (credentials), and X-Requested-With - which a cross-site form cannot send - lets the server
- * accept the cookie. Whether the refresh token travels in the cookie or in the body is the
- * server's choice (Identity:Session); this page works with either.
- */
-const SESSION_PATH = '/api/identity/auth/';
-const isSessionRequest = (path: string) => path.startsWith(SESSION_PATH) && !path.startsWith(`${SESSION_PATH}me`);
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
   const url = `${NEXUS_API_BASE_URL}${path}`;
@@ -455,11 +604,16 @@ async function request<T>(method: string, path: string, options: RequestOptions 
 
   const headers: Record<string, string> = { Accept: responseType === 'json' ? 'application/json' : '*/*' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  const sessionRequest = isSessionRequest(path);
-  if (sessionRequest) headers['X-Requested-With'] = 'XMLHttpRequest';
   if (auth) {
-    const session = readSession();
-    if (session?.accessToken) headers.Authorization = `Bearer ${session.accessToken}`;
+    const accessToken = await ensureAccessToken();
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    // Only a request that follows a real interaction (click, key, scroll, touch, mouse move) tells
+    // the server the user is there. Polling and background calls never do.
+    if (takeActivityFlag()) headers['X-Nexus-Activity'] = '1';
+  }
+  if (options.cookieSession) {
+    headers['X-Nexus-Session'] = 'cookie';
+    headers['X-Requested-With'] = 'XMLHttpRequest';
   }
 
   const controller = new AbortController();
@@ -473,7 +627,8 @@ async function request<T>(method: string, path: string, options: RequestOptions 
       // FormData sets its own multipart boundary header.
       body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
       cache: options.cache,
-      credentials: sessionRequest ? 'include' : 'same-origin',
+      credentials: options.cookieSession ? 'include' : undefined,
+      keepalive: options.keepalive,
       signal: controller.signal,
     });
   } catch (err: any) {
@@ -483,6 +638,18 @@ async function request<T>(method: string, path: string, options: RequestOptions 
     throw new NexusApiError(NETWORK_ERROR, 0);
   } finally {
     clearTimeout(timer);
+  }
+
+  // The session itself is over (idle, revoked, ...): the server says why. Refreshing cannot help.
+  const endedReason = response.status === 401 && auth ? response.headers.get('X-Nexus-Session-Reason') : null;
+  // The longest the sign-in may last has come: the user types the password again in place and the
+  // page (and anything half-filled in it) stays where it is. Any other reason ends the session.
+  if (endedReason === 'session.absolute_expired' && absoluteReauth && retryOnUnauthorized) {
+    if (await absoluteReauth()) return request<T>(method, path, { ...options, retryOnUnauthorized: false });
+  }
+  if (endedReason) {
+    endSession(endedReason);
+    throw new NexusApiError(SESSION_END_MESSAGES[endedReason] || 'نشست شما به پایان رسیده است. لطفاً دوباره وارد شوید.', 401, endedReason);
   }
 
   if (response.status === 401 && auth && retryOnUnauthorized) {
@@ -742,7 +909,7 @@ function mapSubTask(s: SubTaskDto): ProjectSubTask {
 
 async function downloadFileAsDataUrl(fileId: string): Promise<string> {
   const blob = await request<Blob>('GET', `/api/task-management/files/${fileId}/content`, { responseType: 'blob' });
-  return blobToDataUrl(blob);
+  return blobToDataUrl(toSafeBlob(blob));
 }
 
 /**
@@ -980,6 +1147,7 @@ export async function login(
       },
       auth: false,
       retryOnUnauthorized: false,
+      cookieSession: true,
       unauthorizedMessage: 'نام کاربری، شماره تلفن یا رمز عبور صحیح نیست.',
     });
   } catch (err) {
@@ -995,6 +1163,21 @@ export async function login(
     }
     throw err;
   }
+  // At the concurrent-session limit no token is issued: the user chooses a session to close first.
+  if (auth.sessionLimit) throw new SessionLimitError(auth.sessionLimit);
+  if (!auth.accessToken) throw new NexusApiError('ورود کامل نشد. لطفاً دوباره تلاش کنید.', 200);
+  saveAuthResponse(auth);
+  return mapUserDto(auth.user);
+}
+
+/** Step 2 of a sign-in that stopped at the session limit: closes the chosen sessions and signs in. */
+export async function completeLogin(ticket: string, closeSessionIds: string[], closeOldest: boolean): Promise<User> {
+  const auth = await request<AuthResponse>('POST', '/api/identity/auth/login/complete', {
+    body: { ticket, closeSessionIds, closeOldest },
+    auth: false,
+    retryOnUnauthorized: false,
+    cookieSession: true,
+  });
   saveAuthResponse(auth);
   return mapUserDto(auth.user);
 }
@@ -1002,7 +1185,7 @@ export async function login(
 /** Signed-in user from the stored session, without a network call (used on first render). */
 export function getSessionUser(): User | null {
   const session = readSession();
-  return session?.accessToken && session.user ? { ...mapUserDto(session.user), permissions: session.permissions } : null;
+  return session?.user ? { ...mapUserDto(session.user), permissions: session.permissions } : null;
 }
 
 export function getSessionTenantId(): string | null {
@@ -1041,17 +1224,19 @@ export async function refreshCurrentUser(): Promise<User | null> {
  * tokens are discarded at once. The server call is best effort - sign-out never waits for it.
  */
 export function logout(): void {
-  const session = readSession();
+  const refreshToken = tokens?.refreshToken;
+  tokens = null;
   writeSession(null);
-  clearLookups();
-  if (session) {
-    // The token from storage, or else the session cookie (which the server then also deletes).
-    request<void>('POST', '/api/identity/auth/logout', {
-      body: session.refreshToken ? { refreshToken: session.refreshToken } : {},
-      auth: false,
-      retryOnUnauthorized: false,
-    }).catch(() => undefined);
-  }
+  // What the page kept of this person (chat history, notes, caches) goes with the session.
+  clearPrivateData();
+  request<void>('POST', '/api/identity/auth/logout', {
+    // The cookie names the session; a body only when the server had handed the token over in one.
+    body: refreshToken ? { refreshToken } : undefined,
+    auth: false,
+    retryOnUnauthorized: false,
+    cookieSession: true,
+    keepalive: true,
+  }).catch(() => undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -2290,7 +2475,28 @@ export async function testLdapConnection(settings: LdapSettings): Promise<LdapTe
 
 /** Changes the signed-in user's own password; the current one is required. */
 export async function changeMyPassword(currentPassword: string, newPassword: string): Promise<void> {
-  await request('PUT', '/api/identity/auth/me/password', { body: { currentPassword, newPassword } });
+  // cookieSession: the server keeps this sign-in and ends the others.
+  await request('PUT', '/api/identity/auth/me/password', { body: { currentPassword, newPassword }, cookieSession: true });
+}
+
+/**
+ * Step 1 of changing the mobile number (the number a forgotten password is recovered through):
+ * with the current password, the server sends a code by SMS to the NEW number.
+ */
+export async function requestPhoneChange(newPhoneNumber: string, currentPassword: string): Promise<{ message: string; expiresInSeconds: number }> {
+  return request<{ message: string; expiresInSeconds: number }>('POST', '/api/identity/auth/me/phone/request', {
+    body: { newPhoneNumber: newPhoneNumber.trim(), currentPassword },
+  });
+}
+
+/** Step 2: the code from the SMS and the password again; the number changes and other sessions end. */
+export async function confirmPhoneChange(newPhoneNumber: string, code: string, currentPassword: string): Promise<User> {
+  const saved = await request<UserDto>('POST', '/api/identity/auth/me/phone/confirm', {
+    body: { newPhoneNumber: newPhoneNumber.trim(), code: code.trim(), currentPassword },
+    cookieSession: true,
+  });
+  updateSessionUser(saved);
+  return mapUserDto(saved);
 }
 
 // ---------------------------------------------------------------------------
@@ -2320,6 +2526,7 @@ function attachmentUrlFor(messageId: string): Promise<string> {
   let url = attachmentUrls.get(messageId);
   if (!url) {
     url = request<Blob>('GET', `${CHAT}/messages/${messageId}/attachment`, { responseType: 'blob' })
+      .then(toSafeBlob)
       .then((blob) => (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function' && typeof window !== 'undefined'
         ? URL.createObjectURL(blob)
         : blobToDataUrl(blob)))
@@ -2497,13 +2704,8 @@ let taskHubRetryDelay = 15_000;
 let changeTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function hubAccessToken(): Promise<string> {
-  const session = readSession();
-  if (!session) return '';
-  // A token that is about to expire would get the connection rejected; renew it first.
-  if (new Date(session.accessTokenExpiresAtUtc).getTime() - Date.now() < 30_000) {
-    await refreshSession();
-  }
-  return readSession()?.accessToken || '';
+  // A token that is about to expire would get the connection rejected; it is renewed first.
+  return (await ensureAccessToken()) || '';
 }
 
 function notifyTaskChange(): void {
@@ -2598,3 +2800,36 @@ function stopTaskHub(): void {
   }
   hub?.stop().catch(() => undefined);
 }
+
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+const AUTH = '/api/identity/auth';
+
+export const getMySessions = () => request<SessionList>('GET', `${AUTH}/sessions`);
+export const getSessionStatus = () => request<SessionStatus>('GET', `${AUTH}/sessions/current`);
+/** "Stay signed in": real activity; the server restarts the idle clock and answers with the new times. */
+export const keepSessionAlive = () => request<SessionStatus>('POST', `${AUTH}/sessions/current/activity`, { body: {} });
+export const revokeMySession = (sessionId: string) => request<void>('DELETE', `${AUTH}/sessions/${sessionId}`);
+export const revokeMyOtherSessions = () => request<number>('POST', `${AUTH}/sessions/revoke-others`, { body: {} });
+export const logoutEverywhere = async (): Promise<void> => {
+  await request<number>('POST', `${AUTH}/logout-all`, { body: {}, cookieSession: true });
+  tokens = null;
+  writeSession(null);
+  clearPrivateData();
+};
+export const updateSessionPreferences = (maxConcurrentSessions: number | null, smsOnEveryNewSignIn: boolean) =>
+  request<void>('PUT', `${AUTH}/me/session-preferences`, { body: { maxConcurrentSessions, smsOnEveryNewSignIn } });
+
+export const getUserSessions = (userId: string) => request<SessionList>('GET', `/api/identity/users/${userId}/sessions`);
+export const revokeUserSession = (userId: string, sessionId: string) =>
+  request<void>('DELETE', `/api/identity/users/${userId}/sessions/${sessionId}`);
+export const revokeAllSessionsOfUser = (userId: string) => request<number>('DELETE', `/api/identity/users/${userId}/sessions`);
+/** The emergency button: every session of the organization except the caller's. Needs the password and a reason. */
+export const revokeAllOrganizationSessions = (password: string, reason: string) =>
+  request<number>('POST', '/api/identity/sessions/revoke-all', { body: { password, reason } });
+export const getSessionPolicy = () => request<SessionPolicySettings>('GET', '/api/identity/sessions/policy');
+export const updateSessionPolicy = (settings: SessionPolicySettings) =>
+  request<SessionPolicySettings>('PUT', '/api/identity/sessions/policy', { body: settings });
