@@ -4,6 +4,7 @@ import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppCo
 import { getUploadPolicy, refreshUploadPolicy } from './utils/uploadPolicy';
 import { iranDateTimeToISO, schedulingBlockReason } from './utils/jalali';
 import { isOverdue, toPersianDigits, formatToJalali, getTaskLastModifiedTime, computeAutoTaskStatus } from './utils/helpers';
+import { requestSettingsTab } from './utils/profileEvents';
 import { Navbar } from './components/Navbar';
 import { FilterBar } from './components/FilterBar';
 import { BoardViewBar } from './components/BoardViewBar';
@@ -378,8 +379,13 @@ export default function App() {
       setIsAuthModalOpen(true);
       // Why: signed out for inactivity, closed from another device, by an administrator...
       const message = SESSION_END_MESSAGES[sessionEndReasonOf(event) ?? ''];
-      if (message) void appAlert(message);
+      // Several requests failing together report the end several times: one notice, one click.
+      if (message && !endedNoticeOpen) {
+        endedNoticeOpen = true;
+        void appAlert(message).finally(() => { endedNoticeOpen = false; });
+      }
     };
+    let endedNoticeOpen = false;
     window.addEventListener(SESSION_ENDED_EVENT, onSessionEnded);
     return () => window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
   }, []);
@@ -1313,6 +1319,7 @@ export default function App() {
         onOpenNotificationModal={() => setIsNotificationModalOpen(true)}
         onOpenWelcomeModal={() => setIsWelcomeModalOpen(true)}
         onOpenUserGuide={currentUser ? () => setIsUserGuideOpen(true) : undefined}
+        onOpenTutorials={currentUser ? () => { requestSettingsTab('help'); handleNavigateTab('settings'); } : undefined}
         onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
         onLogout={currentUser ? handleLogout : undefined}
       />
