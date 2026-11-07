@@ -32,7 +32,6 @@ interface NavbarProps {
   /** «خروج» in the avatar menu. */
   onLogout?: () => void;
   /** The right sidebar is hidden (collapsed): the post switch then shows here as a small chip (on small screens it always does). */
-  showPostFallback?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -53,7 +52,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenTutorials,
   onOpenSettings,
   onLogout,
-  showPostFallback = false,
   hidden
 }) => {
   const brand = useBranding();
@@ -149,10 +147,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         hidden={hidden}
       />
 
-      <ActivePostSwitcher
-        variant="chip"
-        className={showPostFallback ? '' : 'lg:hidden'}
-      />
     </div>
   )}
 

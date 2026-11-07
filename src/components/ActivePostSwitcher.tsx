@@ -6,7 +6,7 @@ import { toPersianDigits } from '../utils/helpers';
 
 const MENU_WIDTH = 270;
 const EDGE = 8;
-const HIDDEN_NOTE = 'فقط فعالیت‌ها و گزارش‌های این پست دیده می‌شود. دسترسی شما تغییر نکرده است.';
+const HIDDEN_NOTE = 'فقط فعالیت‌ها و گزارش‌های این پست دیده می‌شود و دسترسی‌ها همان دسترسی‌های شخصی شما به‌علاوهٔ دسترسی‌های این پست (و سمتش) است.';
 
 interface Pos { top: number; left: number }
 
@@ -140,8 +140,8 @@ const Menu: React.FC<{
 
 /**
  * «حالت نمایش پست»: only for a person who holds more than one post. variant «card» sits at the top of the
- * sidebar; «chip» is the small neutral stand-in in the header while the sidebar is not shown. Both open the
- * same menu and use the same state. It narrows what the screens show; it does not change what the person may see.
+ * header; «chip» is the small one. Both open the same menu and use the same state. It narrows what the screens
+ * show, and the server then counts only the chosen post's permissions (besides the person's own).
  */
 export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: HiddenInfo; className?: string }> = ({ variant = 'card', className = '' }) => {
   const view = useActivePost();
