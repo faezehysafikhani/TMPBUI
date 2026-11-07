@@ -1,44 +1,24 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Briefcase, Check, ChevronDown, X } from 'lucide-react';
-import { ALL_POSTS, ActivePostOption, HiddenInfo, hiddenTotal, selectActivePost, useActivePost } from '../utils/activePost';
+import { ALL_POSTS, ActivePostOption, HiddenInfo, selectActivePost, useActivePost } from '../utils/activePost';
 import { toPersianDigits } from '../utils/helpers';
 
 const MENU_WIDTH = 270;
-const GAP = 12;
 const EDGE = 8;
-
 const HIDDEN_NOTE = 'فقط فعالیت‌ها و گزارش‌های این پست دیده می‌شود. دسترسی شما تغییر نکرده است.';
 
-/** «بدون پست ۱، جانشینی ۲، پست دیگر ۱» */
-const reasons = (h: HiddenInfo) => [
-  h.noPost ? `بدون پست ${toPersianDigits(h.noPost)}` : '',
-  h.standIn ? `جانشینی ${toPersianDigits(h.standIn)}` : '',
-  h.other ? `پست دیگر ${toPersianDigits(h.other)}` : '',
-].filter(Boolean).join('، ');
+interface Pos { top: number; left: number }
 
-interface Pos { top: number; left: number; from: 'left' | 'right' | 'top' }
-
-/** Where the menu goes: beside the card (towards the page, 12px away) and flipped when there is no room; under a chip. */
-function place(anchor: DOMRect, placement: 'side' | 'below', menuHeight: number): Pos {
+/** Dropdown opens below its trigger and stays within the viewport horizontally. */
+function place(anchor: DOMRect): Pos {
   const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const clampTop = (top: number) => Math.max(EDGE, Math.min(top, vh - menuHeight - EDGE));
-  if (placement === 'below') {
-    // RTL: the menu's end edge lines up with the chip's.
-    const left = Math.max(EDGE, Math.min(anchor.right - MENU_WIDTH, vw - MENU_WIDTH - EDGE));
-    return { top: clampTop(anchor.bottom + 8), left, from: 'top' };
-  }
-  const toTheLeft = anchor.left - GAP - MENU_WIDTH;
-  if (toTheLeft >= EDGE) return { top: clampTop(anchor.top), left: toTheLeft, from: 'right' };
-  const toTheRight = anchor.right + GAP;
-  if (toTheRight + MENU_WIDTH <= vw - EDGE) return { top: clampTop(anchor.top), left: toTheRight, from: 'left' };
-  return { top: clampTop(anchor.bottom + 8), left: Math.max(EDGE, Math.min(anchor.left, vw - MENU_WIDTH - EDGE)), from: 'top' };
+  const left = Math.max(EDGE, Math.min(anchor.right - MENU_WIDTH, vw - MENU_WIDTH - EDGE));
+  return { top: anchor.bottom + 8, left };
 }
 
 const Menu: React.FC<{
   anchorRef: React.RefObject<HTMLElement | null>;
-  placement: 'side' | 'below';
   options: ActivePostOption[];
   selectedKey: string;
   listId: string;
@@ -46,7 +26,7 @@ const Menu: React.FC<{
   setActiveIndex: (i: number) => void;
   onPick: (key: string) => void;
   onClose: () => void;
-}> = ({ anchorRef, placement, options, selectedKey, listId, activeIndex, setActiveIndex, onPick, onClose }) => {
+}> = ({ anchorRef, options, selectedKey, listId, activeIndex, setActiveIndex, onPick, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos | null>(null);
   const [entered, setEntered] = useState(false);
@@ -55,8 +35,8 @@ const Menu: React.FC<{
     const anchor = anchorRef.current;
     const menu = menuRef.current;
     if (!anchor || !menu) return;
-    setPos(place(anchor.getBoundingClientRect(), placement, menu.offsetHeight));
-  }, [anchorRef, placement]);
+    setPos(place(anchor.getBoundingClientRect()));
+  }, [anchorRef]);
 
   useLayoutEffect(() => { reposition(); }, [reposition, options.length]);
   useEffect(() => {
@@ -102,7 +82,7 @@ const Menu: React.FC<{
     return () => document.removeEventListener('keydown', onKey, true);
   }, []);
 
-  const offset = pos?.from === 'right' ? 'translateX(8px)' : pos?.from === 'left' ? 'translateX(-8px)' : 'translateY(-6px)';
+  const offset = 'translateY(-6px)';
   return createPortal(
     <div
       ref={menuRef}
@@ -114,7 +94,9 @@ const Menu: React.FC<{
       dir="rtl"
       className="fixed z-[70] rounded-2xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 p-1.5 outline-none"
       style={{
-        width: MENU_WIDTH,
+        width: `min(${MENU_WIDTH}px, calc(100vw - 16px))`,
+        maxHeight: pos ? `calc(100vh - ${pos.top + EDGE}px)` : undefined,
+        overflowY: 'auto',
         top: pos?.top ?? 0,
         left: pos?.left ?? 0,
         visibility: pos ? 'visible' : 'hidden',
@@ -161,7 +143,7 @@ const Menu: React.FC<{
  * sidebar; «chip» is the small neutral stand-in in the header while the sidebar is not shown. Both open the
  * same menu and use the same state. It narrows what the screens show; it does not change what the person may see.
  */
-export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: HiddenInfo; className?: string }> = ({ variant = 'card', hidden, className = '' }) => {
+export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: HiddenInfo; className?: string }> = ({ variant = 'card', className = '' }) => {
   const view = useActivePost();
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -185,7 +167,6 @@ export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: 
   const menu = open && (
     <Menu
       anchorRef={anchorRef}
-      placement={variant === 'card' ? 'side' : 'below'}
       options={view.options}
       selectedKey={view.selected.key}
       listId={listId}
@@ -207,12 +188,12 @@ export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: 
           {...aria}
           title={view.narrowed ? `${title}. ${HIDDEN_NOTE}` : title}
           className={`inline-flex items-center gap-1.5 max-w-[11rem] px-2.5 py-1.5 rounded-full border text-[11px] font-bold cursor-pointer transition-colors ${
-            view.narrowed ? 'bg-indigo-500/20 border-indigo-300/40 text-indigo-100' : 'bg-white/10 border-white/20 text-slate-200 hover:bg-white/15'
+            view.narrowed ? 'bg-indigo-500/35 border-indigo-300/70 text-white' : 'bg-indigo-500/25 border-indigo-300/60 text-white hover:bg-indigo-500/40'
           }`}
         >
           <Briefcase className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span className="truncate">{view.narrowed ? view.selected.title : 'همهٔ پست‌ها'}</span>
-          <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
+          <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
         </button>
         {menu}
       </div>
@@ -222,7 +203,7 @@ export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: 
   return (
     <div className={`space-y-1 ${className}`} data-testid="active-post-switcher">
       <div className="flex items-center justify-between gap-2 px-0.5">
-        <span className="flex items-center gap-1.5 text-[11px] font-extrabold opacity-75 text-slate-700 dark:text-slate-200">
+        <span className="flex items-center gap-1.5 text-[11px] font-extrabold text-indigo-100">
           <span className="w-[3px] h-3 rounded-full bg-gradient-to-b from-indigo-500 to-violet-500 shrink-0" aria-hidden="true" />
           حالت نمایش پست
         </span>
@@ -244,24 +225,12 @@ export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: 
         onKeyDown={onTriggerKey}
         {...aria}
         title={title}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-right cursor-pointer border border-indigo-500/[0.28] hover:border-indigo-500/50 bg-gradient-to-br from-indigo-500/10 to-violet-500/[0.08] text-indigo-700 dark:text-indigo-200 hover:shadow-md hover:shadow-indigo-500/10 transition-all"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-right cursor-pointer border border-indigo-300/70 bg-gradient-to-l from-indigo-600/80 to-violet-600/65 text-white shadow-md shadow-indigo-950/20 hover:from-indigo-500 hover:to-violet-500 hover:border-indigo-200 transition-all"
       >
         <Briefcase className="w-4 h-4 shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1 text-xs font-bold leading-5 break-words line-clamp-2">{view.narrowed ? view.selected.label : 'همهٔ پست‌ها'}</span>
-        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? '-rotate-90' : 'rotate-90'}`} aria-hidden="true" />
+        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
-      {view.narrowed && hidden && hiddenTotal(hidden) > 0 && (
-        <button
-          type="button"
-          onClick={() => selectActivePost(ALL_POSTS)}
-          className="w-full text-right inline-flex items-start gap-1.5 px-2 py-1 rounded-lg text-[10px] leading-4 font-semibold bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-500/30 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-500/20"
-          title={`${HIDDEN_NOTE}\n${hidden.titles.map((t) => `• ${t}`).join('\n')}\nبرای دیدن همه کلیک کنید.`}
-          data-testid="active-post-hidden-chip"
-        >
-          <span className="w-1.5 h-1.5 mt-1 rounded-full bg-amber-500 shrink-0" aria-hidden="true" />
-          <span>{toPersianDigits(hiddenTotal(hidden))} فعالیت پنهان ({reasons(hidden)})</span>
-        </button>
-      )}
       {menu}
     </div>
   );

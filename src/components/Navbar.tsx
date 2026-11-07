@@ -54,6 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSettings,
   onLogout,
   showPostFallback = false,
+  hidden
 }) => {
   const brand = useBranding();
   // The avatar opens a small menu (profile, sign out); it closes on a click elsewhere or Escape.
@@ -95,45 +96,67 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           
           {/* Logo & Title */}
-          <div className="flex items-center gap-3.5">
-            <img 
-              src={brand.logo}
-              style={{ visibility: brand.ready ? 'visible' : 'hidden' }}
-              alt={`لوگوی ${brand.name}`}
-              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl shadow-md shrink-0 object-cover border border-white/20 cursor-pointer hover:opacity-90 transition-opacity" 
-              onClick={onOpenWelcomeModal}
-            />
-            <div>
-              <h1 className="text-base sm:text-lg lg:text-xl font-bold text-white tracking-tight flex items-center gap-2 whitespace-nowrap">
-                {brand.name}
-              </h1>
-              {currentUser ? (
-                <button 
-                  type="button" 
-                  onClick={onOpenWelcomeModal}
-                  className="flex items-center gap-1.5 mt-0.5 hover:text-indigo-300 transition-colors cursor-pointer text-right"
-                  title="نمایش خلاصه وضعیت کاربری"
-                >
-                  {currentUser.avatar ? (
-                    <img
-                      src={currentUser.avatar}
-                      alt={currentUser.name || 'آواتار کاربر'}
-                      className="w-4.5 h-4.5 rounded-full object-cover border border-white/30 shrink-0"
-                    />
-                  ) : null}
-                  <p className="text-xs text-indigo-200/90 font-medium truncate">
-                    کاربر: {currentUser.name}
-                  </p>
-                </button>
-              ) : (
-                <p className="text-xs text-slate-300/80 hidden sm:block mt-0.5">
-                  سامانه مدیریت فعالیت‌ها و کانبان بورد
-                </p>
-              )}
-            </div>
-          </div>
+          {/* Right Section: Logo + Post Switcher */}
+<div className="flex items-center gap-3 shrink-0">
 
-          {currentUser && <ActivePostSwitcher variant="chip" className={showPostFallback ? '' : 'lg:hidden'} />}
+  {/* Logo & Title */}
+  <div className="flex items-center gap-3.5 shrink-0">
+    <img
+      src={brand.logo}
+      style={{ visibility: brand.ready ? 'visible' : 'hidden' }}
+      alt={`لوگوی ${brand.name}`}
+      className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl shadow-md shrink-0 object-cover border border-white/20 cursor-pointer hover:opacity-90 transition-opacity"
+      onClick={onOpenWelcomeModal}
+    />
+
+    <div>
+      <h1 className="text-base sm:text-lg lg:text-xl font-bold text-white tracking-tight flex items-center gap-2 whitespace-nowrap">
+        {brand.name}
+      </h1>
+
+      {currentUser ? (
+        <button
+          type="button"
+          onClick={onOpenWelcomeModal}
+          className="flex items-center gap-1.5 mt-0.5 hover:text-indigo-300 transition-colors cursor-pointer text-right"
+          title="نمایش خلاصه وضعیت کاربری"
+        >
+          {currentUser.avatar && (
+            <img
+              src={currentUser.avatar}
+              alt={currentUser.name || 'آواتار کاربر'}
+              className="w-4.5 h-4.5 rounded-full object-cover border border-white/30 shrink-0"
+            />
+          )}
+
+          <p className="text-xs text-indigo-200/90 font-medium truncate">
+            کاربر: {currentUser.name}
+          </p>
+        </button>
+      ) : (
+        <p className="text-xs text-slate-300/80 hidden sm:block mt-0.5">
+          سامانه مدیریت فعالیت‌ها و کانبان بورد
+        </p>
+      )}
+    </div>
+  </div>
+
+  {/* Post Switcher */}
+  {currentUser && (
+    <div className="flex items-center shrink-0">
+      <ActivePostSwitcher
+        variant="card"
+        hidden={hidden}
+      />
+
+      <ActivePostSwitcher
+        variant="chip"
+        className={showPostFallback ? '' : 'lg:hidden'}
+      />
+    </div>
+  )}
+
+</div>
 
           <div className="navbar-clock order-3 w-full sm:order-none sm:w-auto flex items-center justify-center gap-3.5 px-5 py-1.5" title="تاریخ و ساعت دستگاه شما؛ بدون نیاز به اینترنت">
             <span className="relative z-10 flex items-center gap-2 text-xs sm:text-sm font-bold text-indigo-100"><CalendarDays className="w-4 h-4 text-indigo-300 drop-shadow-[0_0_8px_rgba(165,180,252,0.8)]" />{systemDate}</span>
