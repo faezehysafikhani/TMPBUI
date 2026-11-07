@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Briefcase, Check, ChevronDown, X } from 'lucide-react';
+import { Briefcase, Check, ChevronDown, Loader2, X } from 'lucide-react';
 import { ALL_POSTS, ActivePostOption, HiddenInfo, selectActivePost, useActivePost } from '../utils/activePost';
 import { toPersianDigits } from '../utils/helpers';
 
@@ -152,6 +152,7 @@ export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: 
 
   const close = useCallback(() => setOpen(false), []);
   const toggle = () => {
+    if (view.switching) return;
     if (!open) setActiveIndex(Math.max(0, view.options.findIndex((o) => o.key === view.selected.key)));
     setOpen((v) => !v);
   };
@@ -184,16 +185,20 @@ export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: 
           ref={anchorRef}
           type="button"
           onClick={toggle}
+          disabled={view.switching}
+          aria-busy={view.switching}
           onKeyDown={onTriggerKey}
           {...aria}
           title={view.narrowed ? `${title}. ${HIDDEN_NOTE}` : title}
-          className={`inline-flex items-center gap-1.5 max-w-[11rem] px-2.5 py-1.5 rounded-full border text-[11px] font-bold cursor-pointer transition-colors ${
+          className={`disabled:opacity-70 disabled:cursor-wait inline-flex items-center gap-1.5 max-w-[11rem] px-2.5 py-1.5 rounded-full border text-[11px] font-bold cursor-pointer transition-colors ${
             view.narrowed ? 'bg-indigo-500/35 border-indigo-300/70 text-white' : 'bg-indigo-500/25 border-indigo-300/60 text-white hover:bg-indigo-500/40'
           }`}
         >
           <Briefcase className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
           <span className="truncate">{view.narrowed ? view.selected.title : 'همهٔ پست‌ها'}</span>
-          <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+          {view.switching
+            ? <Loader2 className="w-3 h-3 shrink-0 animate-spin" aria-label="در حال تغییر پست" />
+            : <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />}
         </button>
         {menu}
       </div>
@@ -222,14 +227,18 @@ export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: 
         ref={anchorRef}
         type="button"
         onClick={toggle}
+        disabled={view.switching}
+        aria-busy={view.switching}
         onKeyDown={onTriggerKey}
         {...aria}
         title={title}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-right cursor-pointer border border-indigo-300/70 bg-gradient-to-l from-indigo-600/80 to-violet-600/65 text-white shadow-md shadow-indigo-950/20 hover:from-indigo-500 hover:to-violet-500 hover:border-indigo-200 transition-all"
+        className="disabled:opacity-70 disabled:cursor-wait w-full flex items-center gap-2 px-3 py-2 rounded-xl text-right cursor-pointer border border-indigo-300/70 bg-gradient-to-l from-indigo-600/80 to-violet-600/65 text-white shadow-md shadow-indigo-950/20 hover:from-indigo-500 hover:to-violet-500 hover:border-indigo-200 transition-all"
       >
         <Briefcase className="w-4 h-4 shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1 text-xs font-bold leading-5 break-words line-clamp-2">{view.narrowed ? view.selected.label : 'همهٔ پست‌ها'}</span>
-        <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+        {view.switching
+          ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" aria-label="در حال تغییر پست" />
+          : <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />}
       </button>
       {menu}
     </div>
