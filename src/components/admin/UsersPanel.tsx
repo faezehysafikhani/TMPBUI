@@ -29,12 +29,19 @@ export interface UserAdminRights {
   changeStatus: boolean;
   assignRoles: boolean;
   assignPermissions: boolean;
+  /** users.assign_roles: the «مدیر سیستم» box on the user form (one person gets every administrator permission). */
+  assignAdmin?: boolean;
   viewSessions?: boolean;
   revokeSessions?: boolean;
 }
 
 const ROLE_TITLES: Record<string, string> = { Administrator: 'مدیر سیستم', Member: 'کاربر' };
 export const roleTitle = (name: string) => ROLE_TITLES[name] || name;
+
+/** The built-in administrator role (seeded id, or its name on older databases). */
+const ADMIN_ROLE_ID = '22222222-2222-2222-2222-222222222222';
+const findAdminRole = (roles: AdminRole[]) =>
+  roles.find((r) => r.id === ADMIN_ROLE_ID) ?? roles.find((r) => r.name === 'Administrator') ?? roles.find((r) => r.name === 'مدیر سیستم') ?? null;
 
 function errorText(err: unknown, fallback: string): string {
   return userErrorMessage(err, fallback);
@@ -188,6 +195,8 @@ export const UsersPanel: React.FC<{
         <UserFormDialog
           user={editing === 'new' ? null : editing}
           canAssignRoles={rights.assignRoles}
+          canAssignAdmin={!!rights.assignAdmin}
+          currentUserId={currentUserId}
           showPlacementTab={orgStructureAvailable && canManageOrgAssignments}
           canSeeOrgUnits={canSeeOrgUnits}
           showTitle={orgStructureAvailable && (rights.create || rights.update)}
@@ -221,13 +230,15 @@ export const UsersPanel: React.FC<{
 const UserFormDialog: React.FC<{
   user: AdminUser | null;
   canAssignRoles: boolean;
+  canAssignAdmin: boolean;
+  currentUserId: string;
   showPlacementTab: boolean;
   canSeeOrgUnits: boolean;
   /** The organization-structure module's titles («آقای»، «خانم»...) before the name. */
   showTitle: boolean;
   onClose: () => void;
   onSaved: (message: string) => void;
-}> = ({ user, canAssignRoles, showPlacementTab, canSeeOrgUnits, showTitle: titlesAvailable, onClose, onSaved }) => {
+}> = ({ user, canAssignRoles, canAssignAdmin, currentUserId, showPlacementTab, canSeeOrgUnits, showTitle: titlesAvailable, onClose, onSaved }) => {
   const isNew = user === null;
   const photoInput = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<AdminUserInput>({
@@ -241,6 +252,11 @@ const UserFormDialog: React.FC<{
   });
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [roleIds, setRoleIds] = useState<string[]>([]);
+  // «مدیر سیستم»: the administrator role given to this one person, apart from positions and posts.
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [originalIsAdmin, setOriginalIsAdmin] = useState(false);
+  const isSelf = !!user && user.id === currentUserId;
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -279,14 +295,19 @@ const UserFormDialog: React.FC<{
   const chosenTitle = titles.find((t) => t.id === titleId)?.title;
 
   useEffect(() => {
-    if (!isNew || !canAssignRoles) return;
+    if (!(isNew && canAssignRoles) && !canAssignAdmin) return;
     listRoles().then((list) => {
       setRoles(list);
       // «کاربر عادی» is every new user's role (the server gives it too); older setups: Member.
       const member = list.find((r) => r.name === 'کاربر عادی') ?? list.find((r) => r.name === 'Member');
-      if (member) setRoleIds([member.id]);
+      if (member && isNew && canAssignRoles) setRoleIds([member.id]);
+      const admin = canAssignAdmin ? findAdminRole(list) : null;
+      setAdminRole(admin);
+      const held = !!admin && !!user && user.roles.includes(admin.name);
+      setIsAdmin(held);
+      setOriginalIsAdmin(held);
     }).catch(() => setRoles([]));
-  }, [isNew, canAssignRoles]);
+  }, [isNew, canAssignRoles, canAssignAdmin, user]);
 
   // The user's current placement, to prefill the «جایگاه سازمانی» tab when editing.
   useEffect(() => {
@@ -336,7 +357,8 @@ const UserFormDialog: React.FC<{
       same(form.firstName, first) && same(form.lastName, stored.lastName) && same(form.username, stored.username) &&
       same(form.phoneNumber, stored.phoneNumber) && same(form.email, stored.email) && same(form.address, stored.address) &&
       same(form.fatherName, stored.fatherName) && same(form.birthDate, stored.birthDate) && same(form.avatarUrl, stored.avatarUrl) &&
-      !form.password && !passwordConfirm && !placementDirty && (!showTitle || titleId === originalTitleId)
+      !form.password && !passwordConfirm && !placementDirty && (!showTitle || titleId === originalTitleId) &&
+      isAdmin === originalIsAdmin
     );
   };
 
@@ -358,18 +380,40 @@ const UserFormDialog: React.FC<{
     setError(null);
     try {
       let savedUserId: string;
+      let stored: AdminUser | null = persistedUser;
       if (isNew && !savedId) {
         const created = await adminCreateUser(form, []);
         savedUserId = created.id;
+        stored = created;
         setSavedId(savedUserId);
         setPersistedUser(created);
       } else {
         savedUserId = savedId || user!.id;
-        if (persistedUser) setPersistedUser(await adminUpdateUser(persistedUser, form));
+        if (persistedUser) {
+          stored = await adminUpdateUser(persistedUser, form);
+          setPersistedUser(stored);
+        }
       }
 
-      // Even with none ticked: the default role the server gave is then taken away.
-      if (isNew && canAssignRoles && roles.length) await setUserRoles(savedUserId, roleIds);
+      const adminChanged = !!adminRole && isAdmin !== originalIsAdmin;
+      const withAdmin = (ids: string[]) => adminRole
+        ? (isAdmin ? [...new Set([...ids, adminRole.id])] : ids.filter((id) => id !== adminRole.id))
+        : ids;
+      if (isNew && canAssignRoles && roles.length) {
+        // Even with none ticked: the default role the server gave is then taken away.
+        await setUserRoles(savedUserId, withAdmin(roleIds));
+        setOriginalIsAdmin(isAdmin);
+      } else if (adminChanged) {
+        // Only the administrator role changes; the user's other roles stay as they are.
+        const heldNames = stored?.roles ?? user?.roles ?? [];
+        let heldIds = roles.filter((r) => heldNames.includes(r.name)).map((r) => r.id);
+        if (isNew && heldIds.length === 0) {
+          const member = roles.find((r) => r.name === 'کاربر عادی') ?? roles.find((r) => r.name === 'Member');
+          if (member) heldIds = [member.id];
+        }
+        await setUserRoles(savedUserId, withAdmin(heldIds));
+        setOriginalIsAdmin(isAdmin);
+      }
 
       // Saving the name rebuilds it from first and last name, so a title is put back each time.
       if (showTitle && (titleId || originalTitleId)) {
@@ -458,6 +502,17 @@ const UserFormDialog: React.FC<{
               </Field>
               <Field label="آدرس" className="sm:col-span-3"><textarea className={inputClass} rows={2} value={form.address || ''} maxLength={1000} onChange={e => setForm(f => ({...f, address: e.target.value}))} /></Field>
             </div>
+            {canAssignAdmin && adminRole && (
+              <label className={`flex items-start gap-2.5 rounded-2xl border p-3 ${isSelf ? 'opacity-60' : 'cursor-pointer'} ${isAdmin ? 'border-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-700' : 'border-slate-200 dark:border-slate-700'}`}>
+                <input type="checkbox" className="mt-0.5" checked={isAdmin} disabled={isSelf || saving} onChange={(e) => setIsAdmin(e.target.checked)} />
+                <span>
+                  <span className="block text-sm font-bold text-slate-800 dark:text-slate-100">مدیر سیستم</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {isSelf ? 'نقش مدیر سیستم خودتان را از اینجا نمی‌توانید تغییر دهید.' : 'همهٔ دسترسی‌های مدیر سیستم را جدا از سمت و پست به همین شخص می‌دهد.'}
+                  </span>
+                </span>
+              </label>
+            )}
             {isNew && canAssignRoles && roles.length > 0 && (
               <div className="rounded-2xl border border-violet-100 dark:border-violet-900 bg-violet-50/40 dark:bg-violet-950/20 p-3">
                 <span className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">نقش‌ها</span>

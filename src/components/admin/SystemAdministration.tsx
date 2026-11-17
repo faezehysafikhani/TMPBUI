@@ -86,6 +86,7 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
             changeStatus: can('users.change_status'),
             assignRoles: PERSON_ACCESS_UI_ENABLED && can('users.assign_roles'),
             assignPermissions: PERSON_ACCESS_UI_ENABLED && can('users.assign_permissions'),
+            assignAdmin: can('users.assign_roles'),
             viewSessions: can('sessions.view'),
             revokeSessions: can('sessions.revoke'),
           }}
