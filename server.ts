@@ -10,6 +10,15 @@ dotenv.config();
 export const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Development only: the page and the API look like one origin (as in production behind one
+// address), so /api and /hubs (SignalR, with its websocket) go on to the backend. The slot sits
+// before express.json so request bodies reach the backend untouched; startServer fills it.
+// API_PROXY_TARGET names the backend (default: the API host's https address); its self-signed
+// development certificate is accepted.
+const API_PROXY_TARGET = process.env.API_PROXY_TARGET || "https://localhost:7271";
+let devProxy: (express.RequestHandler & { upgrade?: (...args: any[]) => void }) | null = null;
+app.use((req, res, next) => (devProxy ? devProxy(req, res, next) : next()));
+
 app.use(express.json({ limit: "100kb" }));
 
 app.disable("x-powered-by");
@@ -77,6 +86,16 @@ app.get(["/icon.svg", "/favicon.svg"], (req, res) => {
 async function startServer() {
   if (process.env.VERCEL !== "1") {
     if (process.env.NODE_ENV !== "production") {
+      const { createProxyMiddleware } = await import("http-proxy-middleware");
+      devProxy = createProxyMiddleware({
+        target: API_PROXY_TARGET,
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        pathFilter: (pathname) =>
+          (pathname.startsWith("/api/") && pathname !== "/api/health") || pathname.startsWith("/hubs/"),
+      });
+      console.log(`Dev proxy: /api and /hubs -> ${API_PROXY_TARGET}`);
       const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
@@ -120,9 +139,11 @@ async function startServer() {
       });
     }
 
-    app.listen(Number(PORT), "0.0.0.0", () => {
+    const server = app.listen(Number(PORT), "0.0.0.0", () => {
       console.log(`Server listening on http://0.0.0.0:${PORT}`);
     });
+    // SignalR's websocket: the upgrade request never passes through the Express middleware.
+    if (devProxy?.upgrade) server.on("upgrade", devProxy.upgrade);
   }
 }
 
