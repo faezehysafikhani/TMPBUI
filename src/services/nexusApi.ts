@@ -1,9 +1,9 @@
 /**
  * REST connection to the NexusCore backend (ASP.NET Core 8, TaskManagement module).
  *
- * This is the app's only backend. In production, the origin is read at runtime from
- * /config/runtime-config.json; without it the app calls the origin it is served from
- * (a reverse proxy in front of both).
+ * This is the app's only backend. Its address comes from .env (VITE_API_BASE_URL); an installed
+ * server may override it in /config/runtime-config.json. With neither, the app calls the origin
+ * it is served from (a reverse proxy in front of both, or the dev server's proxy).
  *
  * The functions in dataService.ts delegate here; the components keep calling the same
  * functions and receive the same shapes.
@@ -70,25 +70,37 @@ function cleanBaseUrl(value: unknown): string {
   return typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
 }
 
-const isDevelopment = env.DEV === true || env.MODE === 'development';
+/**
+ * Settings come from the .env file (VITE_* variables, see .env.example), in development and in
+ * the build alike. /config/runtime-config.json can still override one on an installed server
+ * without a rebuild: only a value it actually sets counts, so the shipped file (all empty)
+ * leaves the .env values in force.
+ */
+const envText = (...names: string[]): string => {
+  for (const name of names) {
+    const value = env[name];
+    if (typeof value === 'string' && value.trim() !== '') return value.trim();
+  }
+  return '';
+};
 
-/** Backend origin. Empty means same-origin: /api/... */
+/** Backend origin. Empty means same-origin: /api/... (in development the dev server passes it on, API_PROXY_TARGET). */
 export const NEXUS_API_BASE_URL = cleanBaseUrl(
-  runtimeConfig.apiBaseUrl || (isDevelopment ? env.VITE_DEV_API_BASE_URL : '')
+  runtimeConfig.apiBaseUrl || envText('VITE_API_BASE_URL', 'VITE_DEV_API_BASE_URL')
 );
 
-/** SignalR origin. Empty means same-origin: /hubs/... */
+/** SignalR origin. Empty means the API's origin (or same-origin): /hubs/... */
 export const NEXUS_SIGNALR_BASE_URL = cleanBaseUrl(
   runtimeConfig.signalRBaseUrl
-  || runtimeConfig.apiBaseUrl
-  || (isDevelopment ? env.VITE_DEV_SIGNALR_BASE_URL || env.VITE_DEV_API_BASE_URL : '')
+  || envText('VITE_SIGNALR_BASE_URL', 'VITE_DEV_SIGNALR_BASE_URL')
+  || NEXUS_API_BASE_URL
 );
 
 /** Optional tenant slug sent with login. Leave empty for a single-tenant install. */
-const NEXUS_TENANT_SLUG = String(runtimeConfig.tenantSlug || env.VITE_NEXUS_TENANT_SLUG || '').trim();
+const NEXUS_TENANT_SLUG = String(runtimeConfig.tenantSlug || envText('VITE_NEXUS_TENANT_SLUG')).trim();
 
 const timeoutFromRuntime = Number(runtimeConfig.requestTimeoutMs);
-const timeoutFromEnv = Number(env.VITE_API_TIMEOUT_MS);
+const timeoutFromEnv = Number(envText('VITE_API_TIMEOUT_MS'));
 const REQUEST_TIMEOUT_MS = timeoutFromRuntime > 0 ? timeoutFromRuntime : (timeoutFromEnv > 0 ? timeoutFromEnv : 30000);
 
 

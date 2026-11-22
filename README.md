@@ -18,8 +18,7 @@
 ## پیش‌نیازها
 
 - Node.js نسخه ۲۰ یا بالاتر
-- یک نمونه در حال اجرا از API سامانه NexusCore. در Production آدرس API از
-  `config/runtime-config.json` داخل خروجی build خوانده می‌شود و بدون rebuild قابل تغییر است.
+- یک نمونه در حال اجرا از API سامانه NexusCore.
 
 ## راه‌اندازی
 
@@ -29,8 +28,21 @@
 npm install
 ```
 
-۲. برای توسعه محلی، در صورت نیاز فایل `.env.development` را بر اساس
-`.env.development.example` بسازید.
+۲. فایل `.env.example` را به `.env` کپی کنید و تنظیمات را آنجا بنویسید. همهٔ تنظیمات فرانت از
+همین فایل خوانده می‌شود:
+
+| متغیر | کاربرد |
+|---|---|
+| `VITE_API_BASE_URL` | آدرس بک‌اند (مثلاً `https://localhost:7271`). خالی: همان origin صفحه |
+| `VITE_SIGNALR_BASE_URL` | آدرس SignalR. خالی: همان `VITE_API_BASE_URL` |
+| `VITE_NEXUS_TENANT_SLUG` | tenant (اختیاری) |
+| `VITE_API_TIMEOUT_MS` | مهلت درخواست (میلی‌ثانیه) |
+| `PORT` | پورت سرور Node |
+| `API_PROXY_TARGET` | فقط در توسعه، وقتی `VITE_API_BASE_URL` خالی است: `/api` و `/hubs` به این آدرس فرستاده می‌شوند |
+
+متغیرهای `VITE_*` در `npm run dev` مستقیم خوانده می‌شوند و در `npm run build` داخل خروجی قرار
+می‌گیرند (بعد از تغییرشان دوباره build بگیرید). اگر بک‌اند روی origin دیگری است، `Cors:AllowedOrigins`
+بک‌اند باید آدرس فرانت را داشته باشد.
 
 ۳. اجرای برنامه در حالت توسعه:
 
@@ -47,8 +59,9 @@ npm run build
 npm start
 ```
 
-بعد از build، برای استقرار same-origin پشت IIS مقدارهای زیر را در
-`dist/config/runtime-config.json` خالی بگذارید (این فایل فقط داده است، نه اسکریپت، و هنگام
+روی سرور نصب‌شده می‌توان بدون rebuild یکی از تنظیمات بک‌اند را در
+`dist/config/runtime-config.json` بازنویسی کرد؛ فقط مقدارهای پرشده حساب می‌شوند و فایل پیش‌فرض
+(همه خالی) تنظیمات `.env` را دست نمی‌زند (این فایل فقط داده است، نه اسکریپت، و هنگام
 شروع برنامه اعتبارسنجی می‌شود):
 
 ```json

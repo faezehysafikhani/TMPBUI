@@ -8,6 +8,22 @@ import securityHeadersConfig from "./security-headers.json";
 dotenv.config();
 
 export const app = express();
+
+/** The backend origins named in .env (VITE_API_BASE_URL, VITE_SIGNALR_BASE_URL), with their websocket form, for connect-src. */
+function apiOriginsFromEnv(): string[] {
+  const origins = new Set<string>();
+  for (const value of [process.env.VITE_API_BASE_URL, process.env.VITE_SIGNALR_BASE_URL]) {
+    try {
+      const url = new URL(String(value || "").trim());
+      if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+      origins.add(url.origin);
+      origins.add(url.origin.replace(/^http/, "ws"));
+    } catch {
+      // empty or not an address: same-origin
+    }
+  }
+  return [...origins];
+}
 const PORT = process.env.PORT || 3000;
 
 // Development only: the page and the API look like one origin (as in production behind one
@@ -32,7 +48,9 @@ const securityHeaders = process.env.NODE_ENV === "production" ? buildHeaders({
   // report endpoint and for connect-src, e.g. CSP_REPORT_URI=http://localhost:5271/api/platform/csp-report
   // CSP_CONNECT_SRC="http://localhost:5271 ws://localhost:5271".
   cspReportUri: process.env.CSP_REPORT_URI || securityHeadersConfig.cspReportUri,
-  connectSrcExtra: process.env.CSP_CONNECT_SRC ? process.env.CSP_CONNECT_SRC.split(/\s+/) : securityHeadersConfig.connectSrcExtra,
+  connectSrcExtra: process.env.CSP_CONNECT_SRC
+    ? process.env.CSP_CONNECT_SRC.split(/\s+/).filter(Boolean)
+    : [...securityHeadersConfig.connectSrcExtra, ...apiOriginsFromEnv()],
 }) : {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
