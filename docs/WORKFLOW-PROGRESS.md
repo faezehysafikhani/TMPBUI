@@ -85,3 +85,9 @@ message: `components/AttachmentMedia.tsx`, cached). Older Core without the endpo
 whole load is 7 task-management requests; opening a preview downloads that one file. Read-only POSTs
 (`board-details`, `in-review`) no longer trigger "TasksChanged" (they would have made every client reload in a
 loop); checked: one change → one reload. ✅ pushed.
+
+# Small fixes — done
+
+- Ctrl+K «تقویم کاری» / «مسیرهای تأیید» open those sections directly (`requestSettingsSection`).
+- New/edit task form: the responsible-people list works from the keyboard (↑ ↓, Enter adds/removes without
+  submitting the form, Esc closes only the list). Checked: a task created with the keyboard only. ✅ pushed.

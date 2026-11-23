@@ -143,6 +143,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [allowedIds, setAllowedIds] = useState<Set<string> | null>(null);
   const [userSearchQuery, setUserSearchQuery] = useState<string>('');
   const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState<boolean>(false);
+  // Keyboard choice in the responsible-people list: ↑ ↓ move, Enter adds or removes, Esc closes.
+  const [assigneeActive, setAssigneeActive] = useState(0);
   const assigneeDropdownRef = useRef<HTMLDivElement>(null);
   // People from outside the chosen team who may also see the task (not responsible for it).
   const [accessSearchQuery, setAccessSearchQuery] = useState<string>('');
@@ -1742,6 +1744,27 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                             onChange={(e) => {
                               setUserSearchQuery(e.target.value);
                               setIsAssigneeDropdownOpen(true);
+                              setAssigneeActive(0);
+                            }}
+                            role="combobox"
+                            aria-expanded={isAssigneeDropdownOpen}
+                            aria-activedescendant={isAssigneeDropdownOpen && filtered[assigneeActive] ? `responsible-option-${filtered[assigneeActive].id}` : undefined}
+                            onKeyDown={(e) => {
+                              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                if (!isAssigneeDropdownOpen) { setIsAssigneeDropdownOpen(true); return; }
+                                const last = Math.max(0, filtered.length - 1);
+                                setAssigneeActive((i) => (e.key === 'ArrowDown' ? Math.min(last, i + 1) : Math.max(0, i - 1)));
+                              } else if (e.key === 'Enter') {
+                                // Never submits the form from here.
+                                e.preventDefault();
+                                const person = isAssigneeDropdownOpen ? filtered[Math.min(assigneeActive, filtered.length - 1)] : undefined;
+                                if (person) toggle(person.id);
+                              } else if (e.key === 'Escape' && isAssigneeDropdownOpen) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsAssigneeDropdownOpen(false);
+                              }
                             }}
                             className="w-full pl-9 pr-9 py-2 bg-white dark:bg-slate-900 text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
                           />
@@ -1764,8 +1787,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                             {filtered.length === 0 ? (
                               <div className="py-4 text-center text-xs text-slate-400">کاربری با این مشخصات یافت نشد.</div>
                             ) : (
-                              filtered.map((user) => {
+                              filtered.map((user, index) => {
                                 const isSelected = responsibleIds.includes(user.id);
+                                const isActive = index === Math.min(assigneeActive, filtered.length - 1);
                                 return (
                                   <button
                                     key={user.id}
@@ -1773,12 +1797,15 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                                     role="option"
                                     aria-selected={isSelected}
                                     data-option={user.id}
+                                    id={`responsible-option-${user.id}`}
+                                    ref={isActive ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
+                                    onMouseMove={() => setAssigneeActive(index)}
                                     onClick={() => toggle(user.id)}
                                     className={`w-full flex items-center justify-between p-2 rounded-lg text-xs text-right transition-colors cursor-pointer ${
                                       isSelected
                                         ? 'bg-indigo-50 dark:bg-indigo-950/70 text-indigo-900 dark:text-indigo-100 border border-indigo-200 dark:border-indigo-800'
                                         : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200'
-                                    }`}
+                                    } ${isActive ? 'ring-2 ring-indigo-400 dark:ring-indigo-500' : ''}`}
                                   >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                       {user.avatar ? (
