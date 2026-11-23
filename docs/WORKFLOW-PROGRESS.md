@@ -71,3 +71,11 @@ switch, the production build was served with the policy enforced and walked in t
 settings tabs, task detail, new task, Ctrl+K palette, image/PDF attachment preview and open-in-new-window (blob),
 report Excel export, tutorial video, SignalR — no violation, no page error. Stop-gap without a rebuild:
 `CSP_MODE=report-only` for `npm start` (checked), or the header name in `web.config` on IIS. ✅ pushed.
+
+# Backup and restore (CAT-244) — done
+
+Core `TMPB-API/BACKUP.md`, `tools/backup.ps1`, `tools/restore.ps1`: database, uploaded files
+(`FileStorage:RootPath`), data-protection keys, settings; manifest with hashes; schedule and off-server copies.
+Round trip checked on SQL Server 2022 (damage → restore → identical). ✅ pushed (Core `e741a36`).
+
+# Next: board load (one request for the board instead of 3 per task)
