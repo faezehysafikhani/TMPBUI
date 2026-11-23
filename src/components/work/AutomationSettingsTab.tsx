@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ClipboardCheck, FolderInput, History, Pencil, Plus, Trash2, Workflow, X } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, FolderInput, History, Pencil, Plus, Trash2, Workflow, X } from 'lucide-react';
 import { ApprovalChainsSection } from '../approvals/ApprovalChainsSection';
 import { APPROVAL_PERMISSIONS } from '../../services/approvalsApi';
+import { WorkCalendarSection } from '../calendar/WorkCalendarSection';
+import { WORK_CALENDAR_PERMISSIONS } from '../../services/workCalendarApi';
 import type { User, WorkTeam } from '../../types';
 import {
   AdminCard,
@@ -54,10 +56,10 @@ import type {
  * two exports (docs/UI-WORKSTREAMS.md). Each user's own report digests are on the reports page.
  */
 export function canSeeAutomationSettings(can: (permission: string) => boolean): boolean {
-  return can(WORK_PERMISSIONS.manageAutomation) || can(WORK_PERMISSIONS.manageRequests) || can(APPROVAL_PERMISSIONS.configure);
+  return can(WORK_PERMISSIONS.manageAutomation) || can(WORK_PERMISSIONS.manageRequests) || can(APPROVAL_PERMISSIONS.configure) || can(WORK_CALENDAR_PERMISSIONS.view);
 }
 
-type Section = 'rules' | 'log' | 'categories' | 'approvals';
+type Section = 'rules' | 'log' | 'categories' | 'approvals' | 'work-calendar';
 
 export const AutomationSettingsTab: React.FC<{ can: (permission: string) => boolean }> = ({ can }) => {
   const automation = can(WORK_PERMISSIONS.manageAutomation);
@@ -66,6 +68,7 @@ export const AutomationSettingsTab: React.FC<{ can: (permission: string) => bool
     ...(automation ? ([{ id: 'rules', label: 'قواعد خودکار', icon: Workflow }, { id: 'log', label: 'گزارش اجرا', icon: History }] as TabItem<Section>[]) : []),
     ...(requests ? ([{ id: 'categories', label: 'دسته‌های درخواست', icon: FolderInput }] as TabItem<Section>[]) : []),
     ...(can(APPROVAL_PERMISSIONS.configure) ? ([{ id: 'approvals', label: 'مسیرهای تأیید', icon: ClipboardCheck }] as TabItem<Section>[]) : []),
+    ...(can(WORK_CALENDAR_PERMISSIONS.view) ? ([{ id: 'work-calendar', label: 'تقویم کاری', icon: CalendarDays }] as TabItem<Section>[]) : []),
   ];
   const [active, setActive] = useState<Section>(tabs[0]?.id ?? 'categories');
   const current = tabs.some((t) => t.id === active) ? active : tabs[0]?.id;
@@ -76,6 +79,7 @@ export const AutomationSettingsTab: React.FC<{ can: (permission: string) => bool
       {current === 'log' && <LogSection />}
       {current === 'categories' && <CategoriesSection />}
       {current === 'approvals' && <ApprovalChainsSection />}
+      {current === 'work-calendar' && <WorkCalendarSection can={can} />}
     </div>
   );
 };
