@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Archive, BarChart3, Calendar, ClipboardCheck, CornerDownLeft, FileText, Inbox, Kanban, Keyboard, ListChecks, LockKeyhole,
+  Archive, BarChart3, Calendar, CalendarDays, ClipboardCheck, CornerDownLeft, FileText, Inbox, Kanban, Keyboard, ListChecks, LockKeyhole,
   MessageSquare, Plus, Search, Settings, Timer, User as UserIcon, Workflow, AlertCircle,
 } from 'lucide-react';
 import type { Task } from '../../types';
 import type { ActiveTab } from '../SandwichBar';
-import { requestSettingsTab } from '../../utils/profileEvents';
+import { requestSettingsSection, requestSettingsTab } from '../../utils/profileEvents';
 import { toPersianDigits } from '../../utils/helpers';
 
 interface Command {
@@ -83,6 +83,10 @@ export const CommandPalette: React.FC<{
       id: `settings:${tab}`, label, keywords, group: 'تنظیمات', icon,
       run: () => { requestSettingsTab(tab); goTo('settings'); },
     });
+    const section = (tab: string, id: string, label: string, keywords: string, icon: Command['icon']): Command => ({
+      id: `settings:${tab}:${id}`, label, keywords, group: 'تنظیمات', icon,
+      run: () => { requestSettingsSection(tab, id); goTo('settings'); },
+    });
     return [
       ...(onNewTask ? [{ id: 'new-task', label: 'فعالیت جدید', keywords: 'ایجاد افزودن ثبت new task create', group: 'کارها' as const, icon: Plus, run: onNewTask }] : []),
       ...page('kanban', 'بورد کانبان', 'board kanban فعالیت‌ها کارها', Kanban),
@@ -99,7 +103,9 @@ export const CommandPalette: React.FC<{
       ...page('unplaced', 'کارتابل افراد بدون پست', 'unplaced بدون پست', UserIcon),
       setting('profile', 'پروفایل و رمز عبور', 'profile password رمز پروفایل آواتار', UserIcon),
       setting('task-settings', 'تنظیمات فعالیت', 'statuses templates وضعیت قالب فیلد wip', ListChecks),
-      setting('automation', 'اتوماسیون، مسیر تأیید و تقویم کاری', 'automation rules sla قاعده تقویم کاری مسیر تایید', Workflow),
+      setting('automation', 'اتوماسیون و قواعد خودکار', 'automation rules sla قاعده اتوماسیون', Workflow),
+      section('automation', 'work-calendar', 'تقویم کاری', 'work calendar holidays تعطیلات روز کاری ساعت کاری تقویم کاری', CalendarDays),
+      section('automation', 'approvals', 'مسیرهای تأیید', 'approval chain workflow مسیر تایید تأیید', ClipboardCheck),
       setting('security', 'امنیت و حساب‌ها', 'security service account plan پلن حساب سرویس رمز', LockKeyhole),
       setting('users', 'مدیریت کاربران', 'users کاربران نقش ldap', UserIcon),
       setting('appearance', 'ظاهر سامانه', 'theme appearance تم رنگ ظاهر', Settings),

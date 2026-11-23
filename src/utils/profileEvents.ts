@@ -14,3 +14,18 @@ export const takePendingSettingsTab = (): string | null => {
   pendingSettingsTab = null;
   return tab;
 };
+
+/** Fired to open one section inside a settings tab (e.g. «تقویم کاری» inside «اتوماسیون»). */
+export const OPEN_SETTINGS_SECTION_EVENT = 'nexuscore:open-settings-section';
+let pendingSettingsSection: string | null = null;
+/** Opens a settings tab on one of its sections; the section reads it when it mounts, or hears the event. */
+export const requestSettingsSection = (tab: string, section: string) => {
+  pendingSettingsSection = section;
+  requestSettingsTab(tab);
+  window.setTimeout(() => window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_SECTION_EVENT, { detail: { section } })), 0);
+};
+export const takePendingSettingsSection = (): string | null => {
+  const section = pendingSettingsSection;
+  pendingSettingsSection = null;
+  return section;
+};

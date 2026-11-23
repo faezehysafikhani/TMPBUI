@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { CalendarDays, ClipboardCheck, FolderInput, History, Pencil, Plus, Trash2, Workflow, X } from 'lucide-react';
 import { ApprovalChainsSection } from '../approvals/ApprovalChainsSection';
+import { OPEN_SETTINGS_SECTION_EVENT, takePendingSettingsSection } from '../../utils/profileEvents';
 import { APPROVAL_PERMISSIONS } from '../../services/approvalsApi';
 import { WorkCalendarSection } from '../calendar/WorkCalendarSection';
 import { WORK_CALENDAR_PERMISSIONS } from '../../services/workCalendarApi';
@@ -70,7 +71,19 @@ export const AutomationSettingsTab: React.FC<{ can: (permission: string) => bool
     ...(can(APPROVAL_PERMISSIONS.configure) ? ([{ id: 'approvals', label: 'مسیرهای تأیید', icon: ClipboardCheck }] as TabItem<Section>[]) : []),
     ...(can(WORK_CALENDAR_PERMISSIONS.view) ? ([{ id: 'work-calendar', label: 'تقویم کاری', icon: CalendarDays }] as TabItem<Section>[]) : []),
   ];
-  const [active, setActive] = useState<Section>(tabs[0]?.id ?? 'categories');
+  const [active, setActive] = useState<Section>(() => {
+    const asked = takePendingSettingsSection();
+    return (tabs.find((t) => t.id === asked)?.id) ?? tabs[0]?.id ?? 'categories';
+  });
+  // Already open when the palette asks for a section (Ctrl+K → «تقویم کاری»).
+  useEffect(() => {
+    const onSection = (e: Event) => {
+      const asked = (e as CustomEvent<{ section: string }>).detail?.section;
+      if (tabs.some((t) => t.id === asked)) { setActive(asked as Section); takePendingSettingsSection(); }
+    };
+    window.addEventListener(OPEN_SETTINGS_SECTION_EVENT, onSection);
+    return () => window.removeEventListener(OPEN_SETTINGS_SECTION_EVENT, onSection);
+  });
   const current = tabs.some((t) => t.id === active) ? active : tabs[0]?.id;
   return (
     <div className="space-y-4">
