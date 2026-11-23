@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { TaskTimePanel } from './work/TaskTimePanel';
 import { Task, TaskComment, TaskLog, TaskStatus, User, STATUSES, PRIORITIES, Attachment, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { formatToJalali, formatFileSize, toPersianDigits, computeAutoTaskStatus, isCompletionDelayed } from '../utils/helpers';
 import { readFileAsDataUrl } from '../utils/storage';
@@ -703,6 +704,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </button>
             </div>
           )}
+
+          {/* Time on this task: estimate, logged time, timer (Track 2 owns TaskTimePanel; docs/UI-WORKSTREAMS.md) */}
+          <TaskTimePanel task={task} />
 
           {/* Subtasks / Recurring Occurrences Section */}
           {task.projectSubTasks && task.projectSubTasks.length > 0 && (

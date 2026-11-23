@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useState } from 'react';
-import { Smartphone, MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2, BadgeCheck, ShieldCheck, Image as ImageIcon, RotateCcw, ChevronDown, ChevronUp, MonitorSmartphone, LogOut } from 'lucide-react';
+import { Smartphone, MessageSquare, Users, History, Network, KeyRound, Loader2, Save, User as UserIcon, Palette, FileText, UploadCloud, Building2, BadgeCheck, ShieldCheck, Image as ImageIcon, RotateCcw, ChevronDown, ChevronUp, MonitorSmartphone, LogOut, ListChecks, Workflow, LockKeyhole } from 'lucide-react';
 import { getKnownPermissions, getMyPermissions, changeMyPassword, requestPhoneChange, confirmPhoneChange, fetchUploadPolicy, updateMaxUploadSizeKb } from '../../services/nexusApi';
 import { AdminCard, SegmentedTabs, PillTabs, TabItem, Field, inputClass, Notice, PrimaryButton } from './AdminUi';
 import { UsersPanel } from './UsersPanel';
@@ -20,8 +20,12 @@ import { TitlesPanel } from './orgStructure/TitlesPanel';
 import { canSeeWorkTeams, PERSON_ACCESS_UI_ENABLED } from '../../utils/permissions';
 import { DEFAULT_SYSTEM_NAME, saveBranding, useBranding } from '../../utils/branding';
 import { useActivePost } from '../../utils/activePost';
+// Settings tabs of the new features (docs/UI-WORKSTREAMS.md): each track owns its file, including who sees the tab.
+import { TaskSettingsTab, canSeeTaskSettings } from '../tasks/TaskSettingsTab';
+import { AutomationSettingsTab, canSeeAutomationSettings } from '../work/AutomationSettingsTab';
+import { SecuritySettingsTab, canSeeSecuritySettings } from '../security/SecuritySettingsTab';
 
-type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users' | 'org';
+type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users' | 'org' | 'task-settings' | 'automation' | 'security';
 type UsersTab = 'list' | 'roles' | 'titles' | 'history' | 'ldap' | 'sso';
 
 /**
@@ -585,6 +589,10 @@ export const SystemAdministration: React.FC<{
       ? [{ id: 'users' as const, label: 'مدیریت کاربران', icon: Users }] : []),
     // The structure tab is for whoever was given a structure permission (by role, position or post), not for everyone.
     ...(orgStructureAvailable && Object.values(ORG_STRUCTURE_PERMISSIONS).some(can) ? [{ id: 'org' as const, label: 'ساختار سازمانی', icon: Building2 }] : []),
+    // The new features' tabs (docs/UI-WORKSTREAMS.md).
+    ...(canSeeTaskSettings(can) ? [{ id: 'task-settings' as const, label: 'تنظیمات فعالیت', icon: ListChecks }] : []),
+    ...(canSeeAutomationSettings(can) ? [{ id: 'automation' as const, label: 'اتوماسیون و گزارش', icon: Workflow }] : []),
+    ...(canSeeSecuritySettings(can) ? [{ id: 'security' as const, label: 'امنیت و حساب‌ها', icon: LockKeyhole }] : []),
   ];
   const current = tabs.some((t) => t.id === active) ? active : 'profile';
 
@@ -615,6 +623,9 @@ export const SystemAdministration: React.FC<{
       {current === 'sms' && <SmsPanel canUpdate={can('sms_settings.update')} canTest={can('sms_settings.test')} />}
       {current === 'users' && currentUserId && <UserManagementSection currentUserId={currentUserId} can={can} orgStructureAvailable={orgStructureAvailable} />}
       {current === 'org' && <OrgStructureSection can={can} />}
+      {current === 'task-settings' && <TaskSettingsTab can={can} />}
+      {current === 'automation' && <AutomationSettingsTab can={can} />}
+      {current === 'security' && <SecuritySettingsTab can={can} />}
     </div>
   );
 };

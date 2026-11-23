@@ -327,6 +327,20 @@ interface TaskDto {
   charterStartTime?: string | null;
   charterEndTime?: string | null;
   posts?: Array<{ postId: string; role: string; title: string; code: string; place: string; holderUserId: string | null; holderName: string | null }> | null;
+  // Newer fields, passed on as task.server (TaskServerFields).
+  rowVersion?: string | null;
+  archivedAtUtc?: string | null;
+  customStatusId?: string | null;
+  reviewStatus?: string | null;
+  reviewSubmittedAtUtc?: string | null;
+  reviewDecidedAtUtc?: string | null;
+  reviewComment?: string | null;
+  sourceType?: string | null;
+  sourceId?: string | null;
+  blockedReason?: string | null;
+  estimatedMinutes?: number | null;
+  slaDueAtUtc?: string | null;
+  slaBreachedAtUtc?: string | null;
 }
 
 interface TaskListItemDto { id: string; }
@@ -1062,6 +1076,21 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     logs: logs || [],
     createdAt: dto.createdAtUtc,
     updatedAt: dto.modifiedAtUtc || dto.createdAtUtc,
+    server: {
+      rowVersion: dto.rowVersion ?? null,
+      archivedAtUtc: dto.archivedAtUtc ?? null,
+      customStatusId: dto.customStatusId ?? null,
+      reviewStatus: dto.reviewStatus ?? null,
+      reviewSubmittedAtUtc: dto.reviewSubmittedAtUtc ?? null,
+      reviewDecidedAtUtc: dto.reviewDecidedAtUtc ?? null,
+      reviewComment: dto.reviewComment ?? null,
+      sourceType: dto.sourceType ?? null,
+      sourceId: dto.sourceId ?? null,
+      blockedReason: dto.blockedReason ?? null,
+      estimatedMinutes: dto.estimatedMinutes ?? null,
+      slaDueAtUtc: dto.slaDueAtUtc ?? null,
+      slaBreachedAtUtc: dto.slaBreachedAtUtc ?? null,
+    },
   };
 }
 

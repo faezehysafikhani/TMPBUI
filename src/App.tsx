@@ -29,6 +29,10 @@ const SubstitutionInboxView = lazy(() => import('./components/SubstitutionInboxV
 const TeamChatView = lazy(() => import('./components/TeamChatView').then(m => ({ default: m.TeamChatView })));
 const PersonalNotesView = lazy(() => import('./components/PersonalNotesView').then(m => ({ default: m.PersonalNotesView })));
 const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({ default: m.SettingsView })));
+// New pages (docs/UI-WORKSTREAMS.md): each track owns its page file, not these lines.
+const ArchivedTasksView = lazy(() => import('./components/tasks/ArchivedTasksView').then(m => ({ default: m.ArchivedTasksView })));
+const RequestsView = lazy(() => import('./components/work/RequestsView').then(m => ({ default: m.RequestsView })));
+const TimesheetsView = lazy(() => import('./components/work/TimesheetsView').then(m => ({ default: m.TimesheetsView })));
 
 const TaskFormModal = lazy(() => import('./components/TaskFormModal').then(m => ({ default: m.TaskFormModal })));
 const TaskDetailModal = lazy(() => import('./components/TaskDetailModal').then(m => ({ default: m.TaskDetailModal })));
@@ -1595,6 +1599,29 @@ export default function App() {
                   can={(permission) => can(currentUser, permission)}
                   onChanged={() => currentUserId && refreshLookup(`${currentUserId}:substitution`, getSubstitutionInbox).catch(() => {})}
                 />
+              </Suspense>
+            )}
+
+            {/* New pages (docs/UI-WORKSTREAMS.md): archive - Track 1; requests, timesheets - Track 2 */}
+            {activeTab === 'archive' && canOpenSection('archive') && (
+              <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
+                <ErrorBoundary title="خطا در نمایش بایگانی">
+                  <ArchivedTasksView />
+                </ErrorBoundary>
+              </Suspense>
+            )}
+            {activeTab === 'requests' && canOpenSection('requests') && (
+              <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
+                <ErrorBoundary title="خطا در نمایش درخواست‌ها">
+                  <RequestsView />
+                </ErrorBoundary>
+              </Suspense>
+            )}
+            {activeTab === 'timesheets' && canOpenSection('timesheets') && (
+              <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
+                <ErrorBoundary title="خطا در نمایش ساعت کار">
+                  <TimesheetsView />
+                </ErrorBoundary>
               </Suspense>
             )}
 

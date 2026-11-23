@@ -31,6 +31,7 @@ import {
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
 import { appAlert } from '../utils/appDialog';
+import { TaskSlaBadge } from './work/TaskSlaBadge';
 
 interface TaskCardProps {
   task: Task;
@@ -532,6 +533,9 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             </span>
           )}
         </div>
+
+        {/* SLA badge (Track 2 owns TaskSlaBadge; docs/UI-WORKSTREAMS.md) */}
+        <TaskSlaBadge task={task} />
 
         {/* Actual Completion Date for completed tasks */}
         {task.status === 'completed' && (task.actualCompletionDate || task.updatedAt) && (() => {

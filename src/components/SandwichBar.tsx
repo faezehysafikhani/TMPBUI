@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Kanban, Calendar, Plus, AlertCircle, Settings, MessageSquare, FileText, Layers, X, BarChart3, UserCog, UserX } from 'lucide-react';
+import { Kanban, Calendar, Plus, AlertCircle, Settings, MessageSquare, FileText, Layers, X, BarChart3, UserCog, UserX, Archive, Inbox, Timer } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 
-export type ActiveTab = 'kanban' | 'calendar' | 'overdue' | 'chat' | 'notes' | 'reports' | 'substitution' | 'unplaced' | 'settings';
+export type ActiveTab = 'kanban' | 'calendar' | 'overdue' | 'chat' | 'notes' | 'reports' | 'substitution' | 'unplaced' | 'settings'
+  // New pages (docs/UI-WORKSTREAMS.md): archive - Track 1; requests, timesheets - Track 2.
+  | 'archive' | 'requests' | 'timesheets';
 
 interface SandwichBarProps {
   activeTab: ActiveTab;
@@ -122,6 +124,70 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                     <BarChart3 className="w-5.5 h-5.5" />
                   
                     <span className="absolute right-full mr-2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg pointer-events-none">گزارشات</span>
+                  </button>
+                  )}
+
+                  {/* New pages (docs/UI-WORKSTREAMS.md): requests, timesheets - Track 2; archive - Track 1 */}
+                  {canOpenTab('requests') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsToolsMenuOpen(false);
+                      setActiveTab('requests');
+                    }}
+                    className={`relative w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-100 ${
+                      activeTab === 'requests'
+                        ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
+                        : 'bg-slate-800 hover:bg-slate-700 text-emerald-400'
+                    }`}
+                    title="درخواست‌ها"
+                    aria-label="درخواست‌ها"
+                  >
+                    <Inbox className="w-5.5 h-5.5" />
+
+                    <span className="absolute right-full mr-2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg pointer-events-none">درخواست‌ها</span>
+                  </button>
+                  )}
+
+                  {canOpenTab('timesheets') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsToolsMenuOpen(false);
+                      setActiveTab('timesheets');
+                    }}
+                    className={`relative w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-100 ${
+                      activeTab === 'timesheets'
+                        ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
+                        : 'bg-slate-800 hover:bg-slate-700 text-emerald-400'
+                    }`}
+                    title="ساعت کار"
+                    aria-label="ساعت کار"
+                  >
+                    <Timer className="w-5.5 h-5.5" />
+
+                    <span className="absolute right-full mr-2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg pointer-events-none">ساعت کار</span>
+                  </button>
+                  )}
+
+                  {canOpenTab('archive') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsToolsMenuOpen(false);
+                      setActiveTab('archive');
+                    }}
+                    className={`relative w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-100 ${
+                      activeTab === 'archive'
+                        ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
+                        : 'bg-slate-800 hover:bg-slate-700 text-sky-400'
+                    }`}
+                    title="بایگانی"
+                    aria-label="بایگانی"
+                  >
+                    <Archive className="w-5.5 h-5.5" />
+
+                    <span className="absolute right-full mr-2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg pointer-events-none">بایگانی</span>
                   </button>
                   )}
 

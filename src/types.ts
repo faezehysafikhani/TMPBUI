@@ -203,6 +203,30 @@ export interface Task {
   logs?: TaskLog[];
   createdAt: string;
   updatedAt: string;
+  /** The task's newer server fields, as the server sends them (see TaskServerFields). */
+  server?: TaskServerFields;
+}
+
+/**
+ * Fields the server sends with a task that the screens above do not use yet: the new features
+ * read them from here (docs/UI-WORKSTREAMS.md). Dates are ISO strings in UTC; each may be absent.
+ */
+export interface TaskServerFields {
+  /** For a save that must not overwrite someone else's change (409 when it is stale). */
+  rowVersion?: string | null;
+  archivedAtUtc?: string | null;
+  customStatusId?: string | null;
+  reviewStatus?: string | null;
+  reviewSubmittedAtUtc?: string | null;
+  reviewDecidedAtUtc?: string | null;
+  reviewComment?: string | null;
+  /** Where the task came from (a request, a chat message, a meeting) and that item's id. */
+  sourceType?: string | null;
+  sourceId?: string | null;
+  blockedReason?: string | null;
+  estimatedMinutes?: number | null;
+  slaDueAtUtc?: string | null;
+  slaBreachedAtUtc?: string | null;
 }
 
 /** A post a task is given to: role owner / responsible / access; holderUserId null when vacant. */

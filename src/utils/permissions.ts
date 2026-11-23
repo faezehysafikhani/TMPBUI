@@ -30,6 +30,12 @@ export const PERMISSIONS = {
   notesManage: 'Notes.Manage',
   /** The users list: the «گزارشات کاربران» tab needs it. */
   usersView: 'users.view',
+  // The new pages (docs/UI-WORKSTREAMS.md).
+  timesheetsLog: 'Timesheets.Log',
+  timesheetsViewAll: 'Timesheets.ViewAll',
+  requestsSubmit: 'Requests.Submit',
+  requestsHandle: 'Requests.Handle',
+  requestsManage: 'Requests.Manage',
 } as const;
 
 /**
@@ -72,6 +78,7 @@ const TAB_PERMISSION: Partial<Record<ActiveTab, string>> = {
   overdue: PERMISSIONS.tasksView,
   notes: PERMISSIONS.notesManage,
   reports: PERMISSIONS.tasksView,
+  archive: PERMISSIONS.tasksView,
 };
 
 /** Whether a section (menu entry and page) is available to the user. Chat and settings always are. */
@@ -91,6 +98,16 @@ export function canOpenTab(
   // «گزارشات»: a page of up to three reports (activities, meetings, users), open to whoever may read any.
   if (tab === 'reports') {
     return can(user, PERMISSIONS.tasksView) || can(user, PERMISSIONS.meetingsView) || !!user?.permissions?.includes(PERMISSIONS.usersView);
+  }
+
+  // «درخواست‌ها»: whoever may send a request, handle them or set up their categories.
+  if (tab === 'requests') {
+    return can(user, PERMISSIONS.requestsSubmit) || can(user, PERMISSIONS.requestsHandle) || can(user, PERMISSIONS.requestsManage);
+  }
+
+  // «ساعت کار»: whoever logs their own time or sees everyone's.
+  if (tab === 'timesheets') {
+    return can(user, PERMISSIONS.timesheetsLog) || can(user, PERMISSIONS.timesheetsViewAll);
   }
 
   const permission = TAB_PERMISSION[tab];
