@@ -175,9 +175,9 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
   const commentCount = task.comments?.length || 0;
 
   const priorityBorderShadowMap: Record<Priority, string> = {
-    high: 'border-r-[5px] border-r-rose-500 shadow-[4px_0_12px_-2px_rgba(244,63,94,0.35)] dark:shadow-[4px_0_14px_-2px_rgba(244,63,94,0.45)]',
-    medium: 'border-r-[5px] border-r-amber-400 dark:border-r-amber-500 shadow-[4px_0_12px_-2px_rgba(251,191,36,0.35)] dark:shadow-[4px_0_14px_-2px_rgba(245,158,11,0.45)]',
-    low: 'border-r-[5px] border-r-emerald-500 shadow-[4px_0_12px_-2px_rgba(16,185,129,0.35)] dark:shadow-[4px_0_14px_-2px_rgba(16,185,129,0.45)]',
+    high: 'border-r-[3px] border-r-rose-500',
+    medium: 'border-r-[3px] border-r-amber-400 dark:border-r-amber-500',
+    low: 'border-r-[3px] border-r-emerald-500',
   };
 
   const priorityStyle = priorityBorderShadowMap[task.priority || 'medium'];
@@ -238,8 +238,8 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             ? 'opacity-30 scale-95 border-dashed border-indigo-500 shadow-2xl ring-2 ring-indigo-500/80 bg-indigo-50 dark:bg-indigo-950'
             : overdue && task.status !== 'completed'
             ? 'border-slate-200 dark:border-slate-700 bg-rose-50/40 dark:bg-rose-950/40'
-            : 'border-slate-200/90 dark:border-slate-700/80 hover:border-indigo-400 dark:hover:border-indigo-500/60 bg-white/85 dark:bg-slate-800/85 backdrop-blur-xs'
-        } ${priorityStyle} p-4 sm:p-4.5 flex flex-col justify-between overflow-hidden`}
+            : 'border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-500/60 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)]'
+        } ${priorityStyle} p-3.5 flex flex-col justify-between overflow-hidden`}
       >
       {/* Top Section: Title & Actions First, then Tags below */}
       <div>
@@ -257,7 +257,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
             <h3
               onClick={() => onViewDetails && onViewDetails(task)}
               title={canChangeStatus ? 'امکان کشیدن و رها کردن (Drag & Drop) یا کلیک جهت جزئیات' : 'مشاهده جزئیات'}
-              className={`text-[11px] sm:text-xs font-bold leading-snug cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-1 break-words ${
+              className={`text-[13px] font-bold leading-6 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-1 break-words ${
                 task.status === 'completed' || task.status === 'paused'
                   ? 'line-through text-slate-400 dark:text-slate-500'
                   : 'text-slate-900 dark:text-slate-100'

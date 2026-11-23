@@ -77,7 +77,7 @@ import {
   serverNotificationKey,
   toAppNotification,
 } from './utils/serverNotifications';
-import { Database, PanelRightOpen } from 'lucide-react';
+import { Database } from 'lucide-react';
 import { NexusApiError, getMyPermissions, SESSION_ENDED_EVENT, SESSION_END_MESSAGES, TASK_CREATED_ACTION, sessionEndReasonOf, withoutEditDuplicates } from './services/nexusApi';
 import { SessionGuard } from './components/SessionGuard';
 import { describeTaskChanges, summarizeTaskChanges, userNameLookup } from './utils/taskChangeSummary';
@@ -1430,10 +1430,6 @@ export default function App() {
       <Navbar
         totalTasks={visibleTasks.length}
         completedTasks={completedCount}
-        onToggleFilterBar={activeTab === 'kanban' ? () => setShowFilterBar((prev) => !prev) : undefined}
-        isFilterBarOpen={showFilterBar}
-        onToggleGroupingBar={activeTab === 'kanban' ? () => setShowGroupingBar((prev) => !prev) : undefined}
-        isGroupingBarOpen={showGroupingBar}
         currentUser={currentUser}
         currentTheme={appColorTheme}
         appColorPalette={appColorPalette}
@@ -1445,24 +1441,16 @@ export default function App() {
         onOpenTutorials={currentUser ? () => { requestSettingsTab('help'); handleNavigateTab('settings'); } : undefined}
         onOpenSettings={currentUser ? () => handleNavigateTab('settings') : undefined}
         onLogout={currentUser ? handleLogout : undefined}
+        themeMode={themeMode}
+        onToggleThemeMode={currentUser ? () => handleSelectThemeMode(themeMode === 'dark' ? 'light' : 'dark') : undefined}
+        sidebarOpen={isDesktopSidebarOpen}
+        onOpenSidebar={handleToggleDesktopSidebar}
         hidden={hiddenInfo}
       />
 
-      {!isDesktopSidebarOpen && (
-        <button
-          type="button"
-          onClick={handleToggleDesktopSidebar}
-          title="باز کردن منوی سمت راست"
-          aria-label="باز کردن منوی سمت راست"
-          className="hidden lg:flex fixed right-0 top-1/2 -translate-y-1/2 z-20 w-7 h-20 flex-col items-center justify-center gap-1 rounded-l-xl border border-r-0 border-sky-200 bg-sky-50 text-indigo-700 shadow-[0_4px_10px_-5px_rgba(30,64,175,0.4)] hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-indigo-600 transition-colors cursor-pointer"
-        >
-          <PanelRightOpen className="w-4 h-4" />
-          <span className="text-[10px] font-bold [writing-mode:vertical-rl]">منو</span>
-        </button>
-      )}
 
       {/* Main Container with Right Desktop Sidebar */}
-      <div className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-4 pb-4">
+      <div className="flex-1 w-full px-3 sm:px-5 lg:pr-0 lg:pl-6 pt-5 pb-4">
         <div className="flex flex-col lg:flex-row gap-6 items-start">
           
           {/* Desktop Sidebar (Renders on Right Side in RTL) */}
@@ -1508,30 +1496,6 @@ export default function App() {
           </div>
         )}
 
-        {/* FilterBar (Toggleable) */}
-        {showFilterBar && activeTab === 'kanban' && !isPageTransitioning && (
-          <FilterBar
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            priorityFilter={priorityFilter}
-            setPriorityFilter={setPriorityFilter}
-            assigneeFilter={assigneeFilter}
-            setAssigneeFilter={setAssigneeFilter}
-            tagFilter={tagFilter}
-            setTagFilter={setTagFilter}
-            teamMembers={currentUserTeamMembers}
-            availableTags={currentUserTags}
-            currentUser={currentUser}
-          />
-        )}
-
-        {/* Grouping & card view bar (Toggleable) */}
-        {showGroupingBar && activeTab === 'kanban' && !isPageTransitioning && (
-          <BoardViewBar settings={boardView} onChange={handleBoardViewChange} onClose={() => setShowGroupingBar(false)} />
-        )}
-
         {/* Page Switch Loading Spinner with Active Theme Color */}
         {isPageTransitioning ? (
           <PageViewLoader appColorPalette={appColorPalette} />
@@ -1541,6 +1505,31 @@ export default function App() {
             {activeTab === 'kanban' && canOpenTab(currentUser, 'kanban') && (
               <div className="space-y-6">
                 <KanbanBoard
+                  filtersOpen={showFilterBar}
+                  onToggleFilters={() => setShowFilterBar((prev) => !prev)}
+                  activeFilterCount={[statusFilter !== 'all', priorityFilter !== 'all', assigneeFilter !== 'all', tagFilter !== 'all', !!searchQuery.trim()].filter(Boolean).length}
+                  filterPanel={showFilterBar ? (
+                    <FilterBar
+                      searchQuery={searchQuery}
+                      setSearchQuery={setSearchQuery}
+                      statusFilter={statusFilter}
+                      setStatusFilter={setStatusFilter}
+                      priorityFilter={priorityFilter}
+                      setPriorityFilter={setPriorityFilter}
+                      assigneeFilter={assigneeFilter}
+                      setAssigneeFilter={setAssigneeFilter}
+                      tagFilter={tagFilter}
+                      setTagFilter={setTagFilter}
+                      teamMembers={currentUserTeamMembers}
+                      availableTags={currentUserTags}
+                      currentUser={currentUser}
+                    />
+                  ) : null}
+                  viewOpen={showGroupingBar}
+                  onToggleView={() => setShowGroupingBar((prev) => !prev)}
+                  viewPanel={showGroupingBar ? <BoardViewBar settings={boardView} onChange={handleBoardViewChange} onClose={() => setShowGroupingBar(false)} /> : null}
+                  onViewChange={handleBoardViewChange}
+                  onCreateTask={canCreateTask ? () => handleOpenCreateModal('todo') : undefined}
                   tasks={filteredTasks}
                   currentUser={currentUser}
                   onOpenCreateForStatus={handleOpenCreateModal}
@@ -1705,12 +1694,10 @@ export default function App() {
           pages the flex-1 main container above pushes it to the bottom of the screen. While the
           fixed desktop sidebar is open, it sits in the main column (sidebar 12rem + gap 1.5rem +
           page padding 0.75rem) so the sidebar never covers it. */}
-      <footer className={`w-full max-w-[1920px] mx-auto px-2 sm:px-3 lg:px-3 pt-6 pb-24 lg:pt-3 lg:pb-3 ${isDesktopSidebarOpen ? 'lg:pr-[14.25rem]' : ''}`}>
-        <div className="ui-bar bg-slate-900 text-white rounded-2xl p-4 lg:py-3 border border-slate-800 shadow-md flex flex-col sm:flex-row items-center justify-center gap-3 text-center text-xs select-none">
-          <span className="font-bold tracking-tight text-white/95">
-            تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
-          </span>
-        </div>
+      <footer className={`w-full px-3 sm:px-5 pt-4 pb-24 lg:pb-5 ${isDesktopSidebarOpen ? 'lg:pr-[17.5rem]' : ''}`}>
+        <p className="text-center text-xs text-slate-400 dark:text-slate-500 select-none">
+          تمام حقوق برای شرکت مدیریت پروژه پارس محفوظ است
+        </p>
       </footer>
 
       <ToastHost />

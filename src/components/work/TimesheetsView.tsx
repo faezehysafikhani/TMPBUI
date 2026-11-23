@@ -8,7 +8,6 @@ import {
   IconAction,
   inputClass,
   Notice,
-  PillTabs,
   PrimaryButton,
   SecondaryButton,
   StatusBadge,
@@ -36,6 +35,9 @@ import {
   updateTimeEntry,
   WORK_PERMISSIONS,
 } from '../../services/workApi';
+import { PageHeader, btnPrimary, btnSecondary, surface } from '../layout/PageHeader';
+import { schedulingOffDayInfo } from '../../utils/jalali';
+import { useSchedulingCalendarVersion } from '../../utils/useSchedulingCalendar';
 import { DAY_NAMES, formatHm, formatJalaliDay, formatMinutes, parseDuration, TaskSearchPicker, useRunningTimer } from './workShared';
 import type { ApprovalStatus, TimeEntry, TimesheetWeek, Workload } from './types';
 
@@ -47,6 +49,9 @@ const STATUS_BADGE: Record<ApprovalStatus, { tone: 'slate' | 'amber' | 'green' |
 };
 
 type Tab = 'week' | 'workload';
+
+/** Hours a working day counts for the weekly target (the work calendar's hours per day are not public yet). */
+const HOURS_PER_WORKING_DAY = 8;
 
 /**
  * «ساعت کار» (CAT-159, CAT-77): the week's time on tasks, logged by hand or with the timer, sent once
@@ -61,23 +66,41 @@ export const TimesheetsView: React.FC = () => {
     ...(canViewAll ? [{ id: 'workload' as const, label: 'بار کاری تیم', icon: Users }] : []),
   ];
   const [tab, setTab] = useState<Tab>('week');
+  const [newEntry, setNewEntry] = useState(0);
   return (
-    <div className="w-full space-y-4" dir="rtl">
-      <AdminCard className="p-5 sm:p-6 space-y-4">
-        <div>
-          <h2 className="flex items-center gap-2 text-xl font-extrabold text-slate-900 dark:text-white"><Timer className="w-6 h-6 text-indigo-600" /> ساعت کار</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">زمانی که روی هر فعالیت گذاشته‌اید را ثبت کنید؛ دستی یا با زمان‌سنج. آخر هفته، هفته را ثبت نهایی کنید.</p>
-        </div>
-        {tabs.length > 1 && <PillTabs tabs={tabs} active={tab} onChange={setTab} />}
-      </AdminCard>
-      {tab === 'week' && <WeekPanel me={me} canLog={canLog} canViewAll={canViewAll} />}
+    <div className="w-full" dir="rtl">
+      <PageHeader
+        title="ساعت کار"
+        subtitle="زمانی که روی هر فعالیت گذاشته‌اید را ثبت کنید؛ دستی یا با زمان‌سنج. آخر هفته، هفته را برای تأیید بفرستید."
+        actions={tab === 'week' && canLog && (
+          <button type="button" className={btnPrimary} onClick={() => setNewEntry((n) => n + 1)}><Plus className="w-4 h-4" /> ثبت زمان</button>
+        )}
+      >
+        {tabs.length > 1 && (
+          <div className="inline-flex self-start p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80" role="tablist">
+            {tabs.map((t) => {
+              const Icon = t.icon;
+              const active = tab === t.id;
+              return (
+                <button key={t.id} type="button" role="tab" aria-selected={active} onClick={() => setTab(t.id)}
+                  className={`inline-flex items-center gap-1.5 h-8 px-3.5 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${active ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}>
+                  {Icon && <Icon className="w-4 h-4" />} {t.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </PageHeader>
+      {tab === 'week' && <WeekPanel me={me} canLog={canLog} canViewAll={canViewAll} newEntryRequest={newEntry} />}
       {tab === 'workload' && canViewAll && <WorkloadPanel />}
     </div>
   );
 };
 
-const WeekPanel: React.FC<{ me: User | null; canLog: boolean; canViewAll: boolean }> = ({ me, canLog, canViewAll }) => {
+const WeekPanel: React.FC<{ me: User | null; canLog: boolean; canViewAll: boolean; newEntryRequest: number }> = ({ me, canLog, canViewAll, newEntryRequest }) => {
+  useSchedulingCalendarVersion();
   const [day, setDay] = useState(todayIso());
+  const [selected, setSelected] = useState<string | 'week'>(todayIso());
   const [userId, setUserId] = useState<string>('');
   const [people, setPeople] = useState<User[]>([]);
   const [week, setWeek] = useState<TimesheetWeek | null>(null);
@@ -93,10 +116,21 @@ const WeekPanel: React.FC<{ me: User | null; canLog: boolean; canViewAll: boolea
   }, [day, userId, viewingOther]);
   useEffect(load, [load]);
   useEffect(() => { if (canViewAll) fetchAllUsersPB().then(setPeople).catch(() => setPeople([])); }, [canViewAll]);
+  useEffect(() => { if (newEntryRequest > 0) setEditing('new'); }, [newEntryRequest]);
 
   const days = useMemo(() => (week ? Array.from({ length: 7 }, (_, i) => addDays(week.weekStart, i)) : []), [week]);
-  const editable = !viewingOther && canLog && week?.status !== 'PendingApproval';
+  // Keep the selected day inside the shown week (the whole week when today is not in it).
+  useEffect(() => {
+    if (days.length && selected !== 'week' && !days.includes(selected)) setSelected(days.includes(todayIso()) ? todayIso() : 'week');
+  }, [days, selected]);
+  const editable = !viewingOther && canLog && week?.status !== 'PendingApproval' && week?.status !== 'Approved';
   const today = todayIso();
+
+  // The week's target: working days in the organization's work calendar (Friday and holidays without one).
+  const workingDays = days.filter((d) => !schedulingOffDayInfo(d).off).length;
+  const targetMinutes = workingDays * HOURS_PER_WORKING_DAY * 60;
+  const total = week?.totalMinutes || 0;
+  const ratio = targetMinutes > 0 ? Math.min(1, total / targetMinutes) : 0;
 
   const stop = async () => {
     try {
@@ -133,97 +167,176 @@ const WeekPanel: React.FC<{ me: User | null; canLog: boolean; canViewAll: boolea
   };
 
   const badge = week ? STATUS_BADGE[week.status] : null;
+  const shown = week ? [...week.entries].filter((e) => selected === 'week' || e.date === selected).sort((a, b) => a.date.localeCompare(b.date)) : [];
+  const dayLabel = (d: string) => `${DAY_NAMES[new Date(`${d}T12:00:00Z`).getUTCDay()]} ${formatJalaliDay(d)}`;
 
   return (
     <div className="space-y-4">
+      {/* Running timer, or start one */}
       {canLog && !viewingOther && (
-        <AdminCard className={`p-4 flex flex-wrap items-center gap-3 ${timer ? 'border-emerald-300 dark:border-emerald-800' : ''}`}>
+        <div className={`${surface} p-3.5 flex flex-wrap items-center gap-3 ${timer ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20' : ''}`}>
           {timer ? (
             <>
-              <span className="relative flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" /><span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" /></span>
-              <span className="text-sm font-bold text-slate-800 dark:text-slate-100 flex-1 min-w-0 truncate">زمان‌سنج روی «{timer.taskTitle || 'فعالیت'}» — {formatMinutes(elapsed)}</span>
-              <PrimaryButton type="button" onClick={stop} className="bg-rose-700 hover:bg-rose-800"><Square className="w-4 h-4" /> توقف و ثبت</PrimaryButton>
+              <span className="relative flex h-3 w-3 mr-1"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" /><span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" /></span>
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-100 flex-1 min-w-0 truncate">زمان‌سنج روی «{timer.taskTitle || 'فعالیت'}»</span>
+              <span className="text-lg font-extrabold tabular-nums text-emerald-700 dark:text-emerald-400">{formatHm(elapsed)}</span>
+              <button type="button" onClick={stop} className={`${btnPrimary} !bg-rose-600 hover:!bg-rose-700 !shadow-none`}><Square className="w-4 h-4" /> توقف و ثبت</button>
             </>
           ) : (
             <TimerStarter onStarted={reloadTimer} />
           )}
-        </AdminCard>
+        </div>
       )}
 
-      <AdminCard className="p-5 space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <SecondaryButton type="button" onClick={() => setDay(addDays(week?.weekStart || day, -7))} aria-label="هفتهٔ قبل" className="px-3"><ChevronRight className="w-4 h-4" /></SecondaryButton>
-          <SecondaryButton type="button" onClick={() => setDay(todayIso())}>این هفته</SecondaryButton>
-          <SecondaryButton type="button" onClick={() => setDay(addDays(week?.weekStart || day, 7))} aria-label="هفتهٔ بعد" className="px-3"><ChevronLeft className="w-4 h-4" /></SecondaryButton>
-          {week && <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100 mx-2">{formatJalaliDay(week.weekStart)} تا {formatJalaliDay(addDays(week.weekStart, 6))}</span>}
+      {/* Week: navigation, status, person */}
+      <div className={`${surface} p-3.5`}>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <span className="text-sm font-extrabold text-slate-800 dark:text-slate-100">
+            {week ? `${formatJalaliDay(week.weekStart)} تا ${formatJalaliDay(addDays(week.weekStart, 6))}` : '…'}
+          </span>
           {badge && <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>}
           <span className="flex-1" />
           {canViewAll && people.length > 0 && (
-            <select id="timesheet-person" aria-label="کارمند" className={`${inputClass} !w-auto max-w-60`} value={userId} onChange={(e) => setUserId(e.target.value)}>
+            <select id="timesheet-person" aria-label="کارمند" className={`${inputClass} !w-auto max-w-60 !h-9 !py-0`} value={userId} onChange={(e) => setUserId(e.target.value)}>
               <option value="">هفتهٔ خودم</option>
               {people.filter((p) => p.id !== me?.id).map((p) => <option key={p.id} value={p.id}>{p.name || p.username}</option>)}
             </select>
           )}
-          {editable && <PrimaryButton type="button" onClick={() => setEditing('new')}><Plus className="w-4 h-4" /> ثبت زمان</PrimaryButton>}
-          {!viewingOther && week?.canSubmit && <SecondaryButton type="button" onClick={submit}><Send className="w-4 h-4" /> ثبت نهایی هفته</SecondaryButton>}
+          <button type="button" className={`${btnSecondary} !h-9`} onClick={() => { setDay(todayIso()); setSelected(todayIso()); }}>این هفته</button>
         </div>
-        {error && <Notice type="error">{error}</Notice>}
-        {week?.decisionComment && <Notice type="info">نظر تأییدکننده: {week.decisionComment}</Notice>}
-
-        {week && (
-          <div className="grid grid-cols-7 gap-1.5 text-center">
+        <div className="flex items-stretch gap-2">
+          <button type="button" onClick={() => setDay(addDays(week?.weekStart || day, -7))} aria-label="هفتهٔ قبل" className="shrink-0 w-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"><ChevronRight className="w-5 h-5" /></button>
+          <div className="flex-1 grid grid-cols-7 gap-2 min-w-0 overflow-x-auto">
             {days.map((d) => {
-              const minutes = week.minutesPerDay[d] || 0;
-              const dow = new Date(`${d}T12:00:00Z`).getUTCDay();
+              const minutes = week?.minutesPerDay[d] || 0;
+              const off = schedulingOffDayInfo(d);
+              const isSelected = selected === d;
+              const isToday = d === today;
               return (
-                <div key={d} className={`rounded-xl border p-2 ${d === today ? 'border-indigo-300 bg-indigo-50 dark:border-indigo-800 dark:bg-indigo-950/40' : 'border-slate-200 dark:border-slate-700'}`}>
-                  <div className={`text-[11px] font-bold ${dow === 5 ? 'text-rose-500' : 'text-slate-500 dark:text-slate-400'}`}>{DAY_NAMES[dow]}</div>
-                  <div className="text-[10px] text-slate-400">{formatJalaliDay(d).split('/').slice(1).join('/')}</div>
-                  <div className={`mt-1 text-sm font-extrabold tabular-nums ${minutes ? 'text-slate-800 dark:text-slate-100' : 'text-slate-300 dark:text-slate-600'}`}>{formatHm(minutes)}</div>
-                </div>
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setSelected(isSelected ? 'week' : d)}
+                  aria-pressed={isSelected}
+                  title={off.off ? off.title : undefined}
+                  className={`min-w-[72px] rounded-xl border px-2 py-2.5 text-center transition-colors cursor-pointer ${
+                    isSelected
+                      ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500/15 dark:bg-indigo-950/50 dark:border-indigo-500'
+                      : off.off
+                      ? 'border-rose-100 bg-rose-50/60 hover:bg-rose-50 dark:border-rose-900/50 dark:bg-rose-950/20'
+                      : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className={`text-[11px] font-semibold ${off.off ? 'text-rose-500' : 'text-slate-500 dark:text-slate-400'}`}>{DAY_NAMES[new Date(`${d}T12:00:00Z`).getUTCDay()]}</div>
+                  <div className={`text-lg font-extrabold leading-7 ${isSelected ? 'text-indigo-700 dark:text-indigo-300' : off.off ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-100'}`}>
+                    {formatJalaliDay(d).split('/')[2]}
+                    {isToday && <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 align-middle mr-1" aria-label="امروز" />}
+                  </div>
+                  <div className={`text-[11px] tabular-nums font-semibold ${minutes ? 'text-slate-700 dark:text-slate-200' : off.off ? 'text-rose-400' : 'text-slate-300 dark:text-slate-600'}`}>
+                    {minutes ? formatHm(minutes) : off.off ? 'تعطیل' : '—'}
+                  </div>
+                </button>
               );
             })}
           </div>
-        )}
-        {week && <p className="text-sm font-bold text-slate-700 dark:text-slate-200">جمع هفته: {formatMinutes(week.totalMinutes)}</p>}
+          <button type="button" onClick={() => setDay(addDays(week?.weekStart || day, 7))} aria-label="هفتهٔ بعد" className="shrink-0 w-9 rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"><ChevronLeft className="w-5 h-5" /></button>
+        </div>
+      </div>
 
-        {week && week.entries.length === 0 && (
-          <p className="p-6 text-center text-sm text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
-            {viewingOther ? 'این شخص در این هفته زمانی ثبت نکرده است.' : 'در این هفته زمانی ثبت نشده است. با «ثبت زمان» یا زمان‌سنج شروع کنید.'}
-          </p>
-        )}
-        {week && week.entries.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700">
-                <tr className="text-right text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                  <th className="px-3 py-2.5">روز</th><th className="px-3 py-2.5">فعالیت</th><th className="px-3 py-2.5">مدت</th><th className="px-3 py-2.5">توضیح</th><th className="px-3 py-2.5">نوع ثبت</th><th className="px-3 py-2.5 w-20" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {[...week.entries].sort((a, b) => a.date.localeCompare(b.date)).map((e) => (
-                  <tr key={e.id}>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-slate-600 dark:text-slate-300">{DAY_NAMES[new Date(`${e.date}T12:00:00Z`).getUTCDay()]} {formatJalaliDay(e.date)}</td>
-                    <td className="px-3 py-2.5 font-bold text-slate-800 dark:text-slate-100">{e.taskTitle || '—'}</td>
-                    <td className="px-3 py-2.5 tabular-nums font-bold">{formatHm(e.minutes)}</td>
-                    <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">{e.note || '—'}</td>
-                    <td className="px-3 py-2.5">{e.source === 'Timer' ? <StatusBadge tone="indigo">زمان‌سنج</StatusBadge> : <StatusBadge tone="slate">دستی</StatusBadge>}</td>
-                    <td className="px-3 py-2.5">
-                      {editable && (e.status === 'NotSubmitted' || e.status === 'Rejected') && (
-                        <span className="flex gap-1">
-                          <IconAction icon={Pencil} label="ویرایش" onClick={() => setEditing(e)} />
-                          <IconAction icon={Trash2} label="حذف" tone="rose" onClick={() => remove(e)} />
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {error && <Notice type="error">{error}</Notice>}
+      {week?.decisionComment && <Notice type="info">نظر تأییدکننده: {week.decisionComment}</Notice>}
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 items-start">
+        {/* Entries of the selected day (or the week) */}
+        <div className={`${surface} overflow-hidden`}>
+          <div className="flex items-center gap-2 px-4 h-14 border-b border-slate-100 dark:border-slate-800">
+            <div className="min-w-0">
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{selected === 'week' ? 'همهٔ هفته' : dayLabel(selected)}</h3>
+              <p className="text-[11px] text-slate-400">{toPersianDigits(shown.length)} ورودی · {formatMinutes(shown.reduce((sum, e) => sum + e.minutes, 0)) || '۰ دقیقه'}</p>
+            </div>
+            <span className="flex-1" />
+            {selected !== 'week' && <button type="button" onClick={() => setSelected('week')} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer">نمایش همهٔ هفته</button>}
           </div>
-        )}
-      </AdminCard>
-      {editing && <EntryDialog entry={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+          {shown.length === 0 ? (
+            <div className="p-10 text-center">
+              <Clock3 className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                {viewingOther ? 'زمانی ثبت نشده است.' : selected === 'week' ? 'در این هفته زمانی ثبت نشده است.' : 'برای این روز زمانی ثبت نشده است.'}
+              </p>
+              {editable && <button type="button" onClick={() => setEditing('new')} className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"><Plus className="w-4 h-4" /> ثبت زمان</button>}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[620px] text-sm">
+                <thead>
+                  <tr className="text-right text-xs font-semibold text-slate-400 bg-slate-50/70 dark:bg-slate-800/40">
+                    {selected === 'week' && <th className="px-4 py-2.5 font-semibold">روز</th>}
+                    <th className="px-4 py-2.5 font-semibold">فعالیت</th>
+                    <th className="px-4 py-2.5 font-semibold">توضیح</th>
+                    <th className="px-4 py-2.5 font-semibold">نوع ثبت</th>
+                    <th className="px-4 py-2.5 font-semibold text-left">مدت</th>
+                    <th className="px-2 py-2.5 w-20" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {shown.map((e) => (
+                    <tr key={e.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
+                      {selected === 'week' && <td className="px-4 py-3 whitespace-nowrap text-slate-500 dark:text-slate-400 text-xs">{dayLabel(e.date)}</td>}
+                      <td className="px-4 py-3 font-bold text-slate-800 dark:text-slate-100">{e.taskTitle || '—'}</td>
+                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">{e.note || '—'}</td>
+                      <td className="px-4 py-3">{e.source === 'Timer' ? <StatusBadge tone="indigo">زمان‌سنج</StatusBadge> : <StatusBadge tone="slate">دستی</StatusBadge>}</td>
+                      <td className="px-4 py-3 tabular-nums font-extrabold text-left text-slate-800 dark:text-slate-100">{formatHm(e.minutes)}</td>
+                      <td className="px-2 py-3">
+                        {editable && (e.status === 'NotSubmitted' || e.status === 'Rejected') && (
+                          <span className="flex gap-1 justify-end">
+                            <IconAction icon={Pencil} label="ویرایش" onClick={() => setEditing(e)} />
+                            <IconAction icon={Trash2} label="حذف" tone="rose" onClick={() => remove(e)} />
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Week summary and submit */}
+        <aside className={`${surface} p-5`} aria-label="خلاصهٔ هفته">
+          <WeekRing ratio={ratio} total={total} target={targetMinutes} />
+          <dl className="mt-5 divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+            <div className="flex items-center justify-between py-2.5"><dt className="text-slate-500 dark:text-slate-400">ثبت‌شده این هفته</dt><dd className="font-extrabold tabular-nums">{formatHm(total)}</dd></div>
+            <div className="flex items-center justify-between py-2.5"><dt className="text-slate-500 dark:text-slate-400">موظفی هفته</dt><dd className="font-bold tabular-nums">{formatHm(targetMinutes)} <span className="text-[11px] font-normal text-slate-400">({toPersianDigits(workingDays)} روز کاری)</span></dd></div>
+            <div className="flex items-center justify-between py-2.5"><dt className="text-slate-500 dark:text-slate-400">{total >= targetMinutes ? 'بیش از موظفی' : 'باقی‌مانده'}</dt><dd className={`font-bold tabular-nums ${total >= targetMinutes ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>{formatHm(Math.abs(targetMinutes - total))}</dd></div>
+          </dl>
+          {!viewingOther && week?.canSubmit && (
+            <button type="button" onClick={submit} className={`${btnPrimary} w-full mt-4`}><Send className="w-4 h-4" /> ثبت نهایی و ارسال هفته</button>
+          )}
+          {week?.status === 'PendingApproval' && <p className="mt-4 text-xs text-amber-700 dark:text-amber-400 text-center">هفته در انتظار تأیید است؛ تا تصمیم تأییدکننده زمان‌ها قابل تغییر نیستند.</p>}
+          {week?.status === 'Approved' && <p className="mt-4 text-xs text-emerald-700 dark:text-emerald-400 text-center">این هفته ثبت نهایی شده است.</p>}
+          {week?.status === 'Rejected' && <p className="mt-4 text-xs text-rose-600 dark:text-rose-400 text-center">ورودی‌های ردشده را اصلاح کنید و دوباره بفرستید.</p>}
+        </aside>
+      </div>
+      {editing && <EntryDialog entry={editing === 'new' ? null : editing} defaultDate={selected !== 'week' && selected <= today ? selected : undefined} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+    </div>
+  );
+};
+
+/** The week's logged time against its target, as a ring. */
+const WeekRing: React.FC<{ ratio: number; total: number; target: number }> = ({ ratio, total, target }) => {
+  const r = 52;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative w-40 h-40 mx-auto" role="img" aria-label={`${formatMinutes(total)} از ${formatMinutes(target)}`}>
+      <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="10" className="stroke-slate-100 dark:stroke-slate-800" />
+        <circle cx="60" cy="60" r={r} fill="none" strokeWidth="10" strokeLinecap="round" className={`${ratio >= 1 ? 'stroke-emerald-500' : 'stroke-indigo-600'} transition-all duration-500`} strokeDasharray={c} strokeDashoffset={c * (1 - ratio)} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-extrabold tabular-nums text-slate-900 dark:text-white">{formatHm(total)}</span>
+        <span className="text-[11px] text-slate-400">از {formatHm(target)} ساعت</span>
+      </div>
     </div>
   );
 };
@@ -250,9 +363,9 @@ const TimerStarter: React.FC<{ onStarted: () => void }> = ({ onStarted }) => {
   );
 };
 
-const EntryDialog: React.FC<{ entry: TimeEntry | null; onClose: () => void; onSaved: () => void }> = ({ entry, onClose, onSaved }) => {
+const EntryDialog: React.FC<{ entry: TimeEntry | null; defaultDate?: string; onClose: () => void; onSaved: () => void }> = ({ entry, defaultDate, onClose, onSaved }) => {
   const [task, setTask] = useState<{ id: string; title: string } | null>(entry ? { id: entry.taskId, title: entry.taskTitle || 'فعالیت' } : null);
-  const [date, setDate] = useState<string | undefined>(entry?.date || todayIso());
+  const [date, setDate] = useState<string | undefined>(entry?.date || defaultDate || todayIso());
   const [duration, setDuration] = useState(entry ? `${Math.floor(entry.minutes / 60)}:${String(entry.minutes % 60).padStart(2, '0')}` : '');
   const [note, setNote] = useState(entry?.note || '');
   const [error, setError] = useState('');

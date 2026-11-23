@@ -3,6 +3,8 @@ import { Task, TaskStatus, STATUSES, Attachment, User } from '../types';
 import { TaskCardList } from './TaskCardList';
 import { toPersianDigits } from '../utils/helpers';
 import { Plus, ChevronDown, Move } from 'lucide-react';
+
+const DOT: Record<TaskStatus, string> = { todo: 'bg-slate-400', in_progress: 'bg-blue-500', paused: 'bg-amber-500', completed: 'bg-emerald-500' };
 import { can, PERMISSIONS } from '../utils/permissions';
 
 interface KanbanColumnProps {
@@ -34,8 +36,9 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
   onToggleSubTask,
   showDetails = true,
 }) => {
-  // Columns start closed; the user opens the ones to look at.
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
+  // Columns start open (the board is the main screen); the header closes one.
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const canCreate = can(currentUser, PERMISSIONS.tasksCreate);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
 
   const cfg = STATUSES[status];
@@ -68,53 +71,40 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
           onStatusChange(taskId, status);
         }
       }}
-      className={`w-full max-w-full overflow-hidden flex flex-col rounded-3xl border transition-all duration-300 bg-gradient-to-b from-white to-slate-50/80 dark:from-slate-900 dark:to-slate-900/80 shadow-[0_10px_28px_-18px_rgba(15,23,42,0.55)] hover:shadow-[0_16px_34px_-18px_rgba(15,23,42,0.55)] ${
-        isDragOver ? dragHighlightStyles[status] : `${cfg.borderColor} dark:border-slate-800`
+      className={`w-full max-w-full overflow-hidden flex flex-col rounded-2xl border transition-all duration-200 bg-slate-100/70 dark:bg-slate-900/60 ${
+        isDragOver ? dragHighlightStyles[status] : 'border-transparent'
       }`}
     >
-      {/* Column Accordion Header */}
-      <div
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className="flex items-center justify-between p-3.5 sm:p-4 cursor-pointer hover:bg-indigo-50/40 dark:hover:bg-slate-700/50 rounded-3xl transition-colors select-none"
-      >
-        <div className="flex items-center gap-2.5">
-          {/* Collapse/Expand Toggle Icon (+ / -) */}
+      {/* Column header: status, count, add, close */}
+      <div className="flex items-center gap-2 h-12 px-3.5 select-none">
+        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${DOT[status]}`} aria-hidden="true" />
+        <h2 className="text-sm font-bold text-slate-800 dark:text-slate-100">{cfg.title}</h2>
+        <span className="min-w-[24px] h-6 px-2 rounded-full bg-white dark:bg-slate-800 text-xs font-bold text-slate-500 dark:text-slate-300 flex items-center justify-center tabular-nums">
+          {toPersianDigits(tasks.length)}
+        </span>
+        {isDragOver && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white">رها کنید</span>}
+        <span className="flex-1" />
+        {canCreate && (
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsCollapsed(!isCollapsed);
-            }}
-            className={`ui-raised w-7 h-7 rounded-xl flex items-center justify-center font-bold text-sm transition-all ${
-              isCollapsed
-                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900'
-                : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600'
-            }`}
-            title={isCollapsed ? 'باز کردن گروه‌بندی' : 'بستن گروه‌بندی'}
+            onClick={() => onOpenCreateForStatus(status)}
+            title={`فعالیت جدید در «${cfg.title}»`}
+            aria-label={`فعالیت جدید در «${cfg.title}»`}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition-colors"
           >
-            <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : ''}`} />
+            <Plus className="w-4 h-4" />
           </button>
-
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              {cfg.title}
-            </h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">{cfg.description}</p>
-          </div>
-        </div>
-
-        {/* Count Badge on the far left with word "مورد" */}
-        <div className="shrink-0 flex items-center gap-2">
-          {isDragOver && (
-            <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-600 text-white animate-pulse">
-              رها کنید
-            </span>
-          )}
-          <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${cfg.badgeBg} ${cfg.badgeText}`}>
-            {toPersianDigits(tasks.length)} مورد
-          </span>
-        </div>
-
+        )}
+        <button
+          type="button"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          aria-expanded={!isCollapsed}
+          title={isCollapsed ? 'باز کردن ستون' : 'بستن ستون'}
+          aria-label={isCollapsed ? `باز کردن ستون «${cfg.title}»` : `بستن ستون «${cfg.title}»`}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition-colors"
+        >
+          <ChevronDown className={`w-4 h-4 transition-transform ${isCollapsed ? 'rotate-90' : ''}`} />
+        </button>
       </div>
 
       {/* Drop Indicator Header if Collapsed */}
@@ -126,7 +116,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
 
       {/* Accordion Body (Only rendered/visible when NOT collapsed) */}
       {!isCollapsed && (
-        <div className="p-3 sm:p-4 pt-0 border-t border-slate-100 dark:border-slate-700/60 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="px-2.5 pb-2.5 animate-in fade-in duration-200">
           {/* Active Drag Over Drop Box */}
           {isDragOver && (
             <div className="my-3 p-3.5 rounded-2xl border-2 border-dashed border-indigo-500 dark:border-indigo-400 bg-indigo-100/80 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-200 text-center animate-pulse flex items-center justify-center gap-2 font-bold text-xs shadow-inner">
@@ -135,13 +125,13 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
             </div>
           )}
 
-          <div className="space-y-3 mt-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5 pl-0.5">
+          <div className="space-y-2.5 overflow-y-auto max-h-[calc(100vh-300px)] p-0.5">
             {tasks.length === 0 ? (
-              <div className="h-28 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-center">
+              <div className="h-28 flex flex-col items-center justify-center border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-4 text-center">
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-medium mb-2">
                   هیچ فعالیتی در این بخش وجود ندارد
                 </p>
-                {can(currentUser, PERMISSIONS.tasksCreate) && (
+                {canCreate && (
                 <button
                   type="button"
                   onClick={() => onOpenCreateForStatus(status)}
@@ -167,6 +157,15 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
               />
             )}
           </div>
+          {canCreate && tasks.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onOpenCreateForStatus(status)}
+              className="mt-2 w-full inline-flex items-center justify-center gap-1.5 h-9 rounded-xl text-sm font-semibold text-slate-500 hover:text-indigo-700 hover:bg-white dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-indigo-300 cursor-pointer transition-colors"
+            >
+              <Plus className="w-4 h-4" /> افزودن فعالیت
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -143,7 +143,7 @@ const Menu: React.FC<{
  * header; «chip» is the small one. Both open the same menu and use the same state. It narrows what the screens
  * show, and the server then counts only the chosen post's permissions (besides the person's own).
  */
-export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: HiddenInfo; className?: string }> = ({ variant = 'card', className = '' }) => {
+export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip' | 'light'; hidden?: HiddenInfo; className?: string }> = ({ variant = 'card', className = '' }) => {
   const view = useActivePost();
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -178,7 +178,7 @@ export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: 
     />
   );
 
-  if (variant === 'chip') {
+  if (variant === 'chip' || variant === 'light') {
     return (
       <div className={className} data-testid="active-post-switcher-chip">
         <button
@@ -190,8 +190,12 @@ export const ActivePostSwitcher: React.FC<{ variant?: 'card' | 'chip'; hidden?: 
           onKeyDown={onTriggerKey}
           {...aria}
           title={view.narrowed ? `${title}. ${HIDDEN_NOTE}` : title}
-          className={`disabled:opacity-70 disabled:cursor-wait inline-flex items-center gap-1.5 max-w-[11rem] px-2.5 py-1.5 rounded-full border text-[11px] font-bold cursor-pointer transition-colors ${
-            view.narrowed ? 'bg-indigo-500/35 border-indigo-300/70 text-white' : 'bg-indigo-500/25 border-indigo-300/60 text-white hover:bg-indigo-500/40'
+          className={`disabled:opacity-70 disabled:cursor-wait inline-flex items-center gap-1.5 max-w-[13rem] border font-bold cursor-pointer transition-colors ${
+            variant === 'light'
+              ? view.narrowed
+                ? 'h-10 px-3 rounded-xl bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-800 dark:text-indigo-300 text-xs'
+                : 'h-10 px-3 rounded-xl bg-white border-slate-200 text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 text-xs'
+              : `px-2.5 py-1.5 rounded-full text-[11px] ${view.narrowed ? 'bg-indigo-500/35 border-indigo-300/70 text-white' : 'bg-indigo-500/25 border-indigo-300/60 text-white hover:bg-indigo-500/40'}`
           }`}
         >
           <Briefcase className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />

@@ -19,6 +19,10 @@ interface Command {
   run: () => void;
 }
 
+/** Opens the palette from a button (the header's search box). */
+export const OPEN_COMMAND_PALETTE_EVENT = 'nexuscore:open-command-palette';
+export const openCommandPalette = () => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
+
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 export const PALETTE_SHORTCUT_LABEL = isMac ? '⌘K' : 'Ctrl+K';
 
@@ -62,8 +66,16 @@ export const CommandPalette: React.FC<{
         });
       }
     };
+    const onOpen = () => {
+      returnFocus.current = document.activeElement as HTMLElement | null;
+      setOpen(true);
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener(OPEN_COMMAND_PALETTE_EVENT, onOpen);
+    };
   }, []);
 
   useEffect(() => {

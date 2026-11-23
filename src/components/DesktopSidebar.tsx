@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Kanban, Calendar, AlertCircle, Settings, LogOut, MessageSquare, FileText, PanelRightClose, Plus, BarChart3, UserCog, UserX, Archive, Inbox, Timer, ClipboardCheck } from 'lucide-react';
+import React from 'react';
+import {
+  Kanban, Calendar, AlertCircle, Settings, LogOut, MessageSquare, FileText, PanelRightClose, Plus, BarChart3, UserCog,
+  UserX, Archive, Inbox, Timer, ClipboardCheck,
+} from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette, User as UserType } from '../types';
-import { COLOR_PALETTES } from '../utils/theme';
+import { useBranding } from '../utils/branding';
 import { ActiveTab } from './SandwichBar';
 
 interface DesktopSidebarProps {
@@ -22,19 +25,32 @@ interface DesktopSidebarProps {
   onToggleOpen?: () => void;
   /** Whether a section is available to the user (permissions); all are when omitted. */
   canOpenTab?: (tab: ActiveTab) => boolean;
-  /** The tasks the chosen post hides, and why (a note under the post switch). */
 }
 
+/** Width of the sidebar; the header and the page leave this much room on the right while it is open. */
+export const SIDEBAR_WIDTH_CLASS = 'w-64';
+
+interface NavItem {
+  tab: ActiveTab;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: number;
+  /** Red badge (something is late) rather than the neutral one. */
+  alert?: boolean;
+}
+
+/**
+ * The main navigation, full height on the right (RTL): the brand, «افزودن فعالیت», the pages the user may open
+ * (with counts), settings and sign-out, and the progress of the user's tasks at the bottom. Hidden on small
+ * screens (the bottom bar and the menu drawer take over there) and when the user collapses it.
+ */
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   activeTab,
   setActiveTab,
   onOpenCreateModal,
-  onOpenSettings,
-  onOpenPdfCatalog,
   onLogout,
   overdueCount,
   unreadChatCount = 0,
-  appColorPalette = 'indigo',
   totalTasks = 0,
   completedTasks = 0,
   currentUser,
@@ -42,374 +58,133 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   onToggleOpen,
   canOpenTab = (_tab: ActiveTab) => true,
 }) => {
-  const palette = COLOR_PALETTES[appColorPalette] || COLOR_PALETTES.indigo;
+  const brand = useBranding();
+  if (!isOpen) return null;
 
-  // The navbar's real height (it grows when its items wrap on narrower screens), so the gap under
-  // it is the same on every monitor size.
-  const [headerHeight, setHeaderHeight] = useState(77);
-  useEffect(() => {
-    const header = document.querySelector('header.ui-bar');
-    if (!header) return;
-    const update = () => setHeaderHeight(Math.round(header.getBoundingClientRect().height));
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(header);
-    return () => observer.disconnect();
-  }, []);
+  const work: NavItem[] = [
+    { tab: 'kanban', label: 'بورد فعالیت‌ها', icon: Kanban },
+    { tab: 'calendar', label: 'تقویم', icon: Calendar },
+    { tab: 'chat', label: 'گفتگوی تیمی', icon: MessageSquare, badge: unreadChatCount },
+    { tab: 'notes', label: 'یادداشت شخصی', icon: FileText },
+    { tab: 'overdue', label: 'موعد گذشته', icon: AlertCircle, badge: overdueCount, alert: true },
+    { tab: 'reports', label: 'گزارشات', icon: BarChart3 },
+    { tab: 'requests', label: 'درخواست‌ها', icon: Inbox },
+    { tab: 'timesheets', label: 'ساعت کار', icon: Timer },
+    { tab: 'approvals', label: 'کارتابل تأیید', icon: ClipboardCheck },
+    { tab: 'archive', label: 'بایگانی', icon: Archive },
+    { tab: 'substitution', label: 'کارتابل جانشینی', icon: UserCog },
+    { tab: 'unplaced', label: 'افراد بدون پست', icon: UserX },
+  ].filter((item) => canOpenTab(item.tab as ActiveTab)) as NavItem[];
 
-  if (!isOpen) {
-    return null;
-  }
+  const progress = totalTasks > 0 ? Math.min(100, Math.round((completedTasks / totalTasks) * 100)) : 0;
 
-  const progressRatio = totalTasks > 0 ? Math.min(1, completedTasks / totalTasks) : 0;
-  const progressPercent = Math.round(progressRatio * 100);
-  const RADIUS = 40;
-  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-
-  // Fixed to the viewport on every page, same size everywhere: 15px below the sticky header and
-  // 15px above the bottom of the screen. Never sticky (which unsticks near the end of its
-  // container) and never measured from page content, so it doesn't move or resize.
-  // Right offset replicates where this used to sit as a flex item (the ".../mx-auto .../px-3"
-  // main container from App.tsx, right-most child in this RTL row): the page's own side padding,
-  // plus, once the centered max-w-[1920px] container has margins of its own, that margin too.
-  // The spacer div below keeps the width reserved in the flex row so the main content doesn't
-  // shift into the space this now-fixed element used to occupy.
-  const fixedRight = 'max(0.75rem, calc((100vw - 1920px) / 2 + 0.75rem))';
-  const HEADER_HEIGHT_PX = headerHeight;
-  const EDGE_GAP_PX = 15;
+  const item = ({ tab, label, icon: Icon, badge, alert }: NavItem) => {
+    const active = activeTab === tab;
+    return (
+      <button
+        key={tab}
+        type="button"
+        onClick={() => setActiveTab(tab)}
+        aria-current={active ? 'page' : undefined}
+        className={`w-full flex items-center gap-3 h-10 px-3 rounded-xl text-sm font-semibold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-indigo-600 ${
+          active
+            ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/70 dark:hover:text-white'
+        }`}
+      >
+        <Icon className={`w-[18px] h-[18px] shrink-0 ${active ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500'}`} />
+        <span className="flex-1 truncate text-right">{label}</span>
+        {!!badge && badge > 0 && (
+          <span className={`min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+            alert ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300' : 'bg-indigo-600 text-white'
+          }`}>
+            {toPersianDigits(badge > 99 ? '99+' : badge)}
+          </span>
+        )}
+      </button>
+    );
+  };
 
   return (
     <>
-    {/* Reserves the sidebar's width/gap in the flex row; the sidebar itself is fixed (out of flow). */}
-    <div className="hidden lg:block w-48 shrink-0" aria-hidden="true" />
-    <aside
-      className="hidden lg:flex flex-col w-48 shrink-0 gap-1.5 p-2.5 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-sm fixed z-20 overflow-y-auto animate-in fade-in slide-in-from-right-4 duration-300"
-      style={{ right: fixedRight, top: HEADER_HEIGHT_PX + EDGE_GAP_PX, bottom: EDGE_GAP_PX }}
-    >
-
-      {onOpenCreateModal && (
-        <button
-          type="button"
-          onClick={onOpenCreateModal}
-          className={`ui-glow w-full flex items-center justify-center gap-2 py-2 bg-gradient-to-tr ${palette.gradientFromTo} text-white font-bold text-xs rounded-xl shadow-sm hover:opacity-90 active:scale-98 transition-all cursor-pointer`}
-        >
-          <Plus className="w-4 h-4 shrink-0" />
-          <span>افزودن فعالیت</span>
-        </button>
-      )}
-
-      {/* Navigation Section */}
-      <div className="space-y-0.5">
-        <div className="flex items-center justify-between px-2 py-0.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-          <span>منوی دسترسی</span>
+      {/* Keeps the sidebar's width free in the page row; the sidebar itself is fixed to the screen. */}
+      <div className={`hidden lg:block ${SIDEBAR_WIDTH_CLASS} shrink-0`} aria-hidden="true" />
+      <aside
+        aria-label="منوی اصلی"
+        className={`hidden lg:flex flex-col ${SIDEBAR_WIDTH_CLASS} fixed top-0 right-0 bottom-0 z-30 bg-white dark:bg-slate-900 border-l border-slate-200/80 dark:border-slate-800`}
+      >
+        {/* Brand */}
+        <div className="flex items-center gap-3 h-16 px-4 shrink-0">
+          <img
+            src={brand.logo}
+            style={{ visibility: brand.ready ? 'visible' : 'hidden' }}
+            alt=""
+            className="w-10 h-10 rounded-xl object-cover shrink-0"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-extrabold leading-5 text-slate-900 dark:text-white line-clamp-2" title={brand.name}>{brand.name}</p>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">مدیریت یکپارچهٔ فعالیت‌ها</p>
+          </div>
           {onToggleOpen && (
             <button
               type="button"
               onClick={onToggleOpen}
-              title="مخفی‌سازی منوی سمت راست"
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-center justify-center"
+              title="بستن منو"
+              aria-label="بستن منو"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
             >
-              <PanelRightClose className="w-3.5 h-3.5" />
+              <PanelRightClose className="w-4 h-4" />
             </button>
           )}
         </div>
 
-        {/* 1. Kanban View */}
-        {canOpenTab('kanban') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('kanban')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'kanban'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Kanban className="w-4 h-4 shrink-0" />
-            <span className="truncate">بورد کانبان</span>
-          </div>
-        </button>
-        )}
-
-        {/* 2. Jalali Calendar View */}
-        {canOpenTab('calendar') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('calendar')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'calendar'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 shrink-0" />
-            <span className="truncate">نمای تقویم</span>
-          </div>
-        </button>
-        )}
-
-        {/* 3. Team Chat */}
-        <button
-          type="button"
-          onClick={() => setActiveTab('chat')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'chat'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 shrink-0" />
-            <span className="truncate">گفتگوی تیمی</span>
-          </div>
-          {unreadChatCount > 0 && (
-            <span className="px-1.5 py-0.5 rounded-full bg-rose-600 text-white font-black text-[9px] animate-pulse">
-              {toPersianDigits(unreadChatCount)}
-            </span>
-          )}
-        </button>
-
-        {/* 4. Personal Notes */}
-        {canOpenTab('notes') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('notes')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'notes'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 shrink-0" />
-            <span className="truncate">یادداشت شخصی</span>
-          </div>
-        </button>
-        )}
-
-        {/* 5. Overdue Tasks View */}
-        {canOpenTab('overdue') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('overdue')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'overdue'
-              ? 'bg-rose-600 text-white shadow-md shadow-rose-950/20'
-              : 'text-slate-700 dark:text-slate-200 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-600 dark:hover:text-rose-400'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className="truncate">موعد گذشته</span>
-          </div>
-          {overdueCount > 0 && (
-            <span
-              className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${
-                activeTab === 'overdue'
-                  ? 'bg-white text-rose-700'
-                  : 'bg-rose-500 text-white animate-pulse'
-              }`}
+        <div className="px-3 pt-2 pb-3 shrink-0">
+          {onOpenCreateModal && (
+            <button
+              type="button"
+              onClick={onOpenCreateModal}
+              className="w-full inline-flex items-center justify-center gap-2 h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm shadow-indigo-600/25 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
-              {toPersianDigits(overdueCount)}
-            </span>
+              <Plus className="w-4 h-4" />
+              افزودن فعالیت
+            </button>
           )}
-        </button>
-        )}
-
-        {/* 6. Task Reports (only where the backend offers them) */}
-        {canOpenTab('reports') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('reports')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'reports'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 shrink-0" />
-            <span className="truncate">گزارشات</span>
-          </div>
-        </button>
-        )}
-
-        {/* New pages (docs/UI-WORKSTREAMS.md): requests, timesheets - Track 2; archive - Track 1 */}
-        {canOpenTab('requests') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('requests')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'requests'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Inbox className="w-4 h-4 shrink-0" />
-            <span className="truncate">درخواست‌ها</span>
-          </div>
-        </button>
-        )}
-
-        {canOpenTab('timesheets') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('timesheets')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'timesheets'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Timer className="w-4 h-4 shrink-0" />
-            <span className="truncate">ساعت کار</span>
-          </div>
-        </button>
-        )}
-
-        {canOpenTab('approvals') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('approvals')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'approvals'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <ClipboardCheck className="w-4 h-4 shrink-0" />
-            <span className="truncate">کارتابل تأیید</span>
-          </div>
-        </button>
-        )}
-        {canOpenTab('archive') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('archive')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'archive'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Archive className="w-4 h-4 shrink-0" />
-            <span className="truncate">بایگانی</span>
-          </div>
-        </button>
-        )}
-
-        {/* 7. Substitution inbox (only where tasks are given to posts and there is something for the user) */}
-        {canOpenTab('substitution') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('substitution')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'substitution'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <UserCog className="w-4 h-4 shrink-0" />
-            <span className="truncate">کارتابل جانشینی</span>
-          </div>
-        </button>
-        )}
-
-        {/* 8. People without an organisational post (for those who may place people) */}
-        {canOpenTab('unplaced') && (
-        <button
-          type="button"
-          onClick={() => setActiveTab('unplaced')}
-          className={`w-full flex items-center justify-between px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'unplaced'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <UserX className="w-4 h-4 shrink-0" />
-            <span className="truncate">کارتابل افراد بدون پست</span>
-          </div>
-        </button>
-        )}
-      </div>
-
-
-      <div className="border-t border-slate-100 dark:border-slate-800/80" />
-
-      {/* System & Settings Section */}
-      <div className="space-y-0.5">
-        <div className="px-2 py-0.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-          تنظیمات برنامه
         </div>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab('settings')}
-          className={`w-full flex items-center gap-2 px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'settings'
-              ? `ui-glow ${palette.accentBg} text-white shadow-md shadow-indigo-950/20`
-              : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/60'
-          }`}
-        >
-          <Settings className={`w-4 h-4 shrink-0 ${activeTab === 'settings' ? 'text-white' : 'text-slate-400'}`} />
-          <span className="truncate">تنظیمات و پروفایل</span>
-        </button>
+        <nav className="flex-1 overflow-y-auto px-3 pb-3 space-y-0.5">
+          <p className="px-3 pt-1 pb-2 text-[11px] font-bold text-slate-400 dark:text-slate-500">فضای کاری</p>
+          {work.map(item)}
 
-        {currentUser && onLogout && (
-          <button
-            type="button"
-            onClick={onLogout}
-            className="w-full flex items-center gap-2 px-2.5 py-1 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-all cursor-pointer"
-          >
-            <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
-            <span className="truncate">خروج از حساب</span>
-          </button>
+          <p className="px-3 pt-4 pb-2 text-[11px] font-bold text-slate-400 dark:text-slate-500">حساب</p>
+          {item({ tab: 'settings', label: 'تنظیمات و پروفایل', icon: Settings })}
+          {currentUser && onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 h-10 px-3 rounded-xl text-sm font-semibold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-[18px] h-[18px] shrink-0" />
+              <span className="flex-1 text-right">خروج از حساب</span>
+            </button>
+          )}
+        </nav>
+
+        {/* Progress of the user's tasks */}
+        {totalTasks > 0 && (
+          <div className="m-3 mt-0 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 shrink-0">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700 dark:text-slate-200">پیشرفت فعالیت‌ها</span>
+              <span className="font-extrabold text-indigo-600 dark:text-indigo-400 tabular-nums">{toPersianDigits(progress)}٪</span>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="پیشرفت فعالیت‌ها">
+              <div className="h-full rounded-full bg-indigo-600 transition-all duration-500" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              {toPersianDigits(completedTasks)} از {toPersianDigits(totalTasks)} فعالیت خاتمه یافته
+            </p>
+          </div>
         )}
-      </div>
-
-      {/* Progress Summary Widget */}
-      {totalTasks > 0 && (
-        <div className="mt-auto pt-2 border-t border-slate-100 dark:border-slate-800/80 shrink-0 flex flex-col items-center justify-end gap-1">
-          <div className="relative w-16 h-16 shrink-0">
-            <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-              <circle cx="50" cy="50" r={RADIUS} fill="none" strokeWidth="10" className="stroke-slate-100 dark:stroke-slate-800" />
-              <circle
-                cx="50"
-                cy="50"
-                r={RADIUS}
-                fill="none"
-                strokeWidth="10"
-                strokeLinecap="round"
-                className="stroke-emerald-500 transition-all duration-500"
-                strokeDasharray={CIRCUMFERENCE}
-                strokeDashoffset={CIRCUMFERENCE * (1 - progressRatio)}
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-sm font-black text-slate-800 dark:text-slate-100">
-                {toPersianDigits(progressPercent)}٪
-              </span>
-            </div>
-          </div>
-          <div className="text-center">
-            <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200">
-              وضعیت پیشرفت
-            </div>
-            <div className="mt-0.5 text-[9px] text-slate-500 dark:text-slate-400">
-              {toPersianDigits(completedTasks)} از {toPersianDigits(totalTasks)} فعالیت
-            </div>
-          </div>
-        </div>
-      )}
-    </aside>
+      </aside>
     </>
   );
 };
