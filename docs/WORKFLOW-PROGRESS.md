@@ -57,3 +57,9 @@ due dates. Moving that rule to the work calendar too is a product decision.
 Ctrl+K / ⌘K anywhere: go to any page the user may open, «فعالیت جدید», settings sections, and find a task by
 title (opens its detail). Arrow keys / Enter / Esc. `components/palette/CommandPalette.tsx`, mounted once in
 `App.tsx` (shared file: one import, one callback, one element). ✅ pushed, checked in the browser.
+
+# Workflow DB script — done
+
+Core `TMPB-API/db/upgrade-21-workflow.sql` (+ `upgrade-21-rollback.sql`) for databases managed by scripts:
+idempotent, same schema as the API builds at start-up (checked column by column), also brings an older Workflow
+schema up to date. `db/check-upgrades.sql` and `DEPLOYMENT-CONFIG.md` now list steps 19-21. ✅ pushed.
