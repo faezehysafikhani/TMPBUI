@@ -53,6 +53,10 @@ Full plan (features and endpoints per track): https://claude.ai/artifact/LJvotKt
   `updateTask` sends `rowVersion` from `task.server`; `utils/errorMessages.ts` has Persian text for the new
   task refusals (dependencies, criteria, WIP, templates, concurrent edits); `App.tsx` undoes a refused status
   change in the open task detail and shows the reason as a toast.
+- Track 2: `utils/errorMessages.ts` has Persian text for the timesheet, request, automation, report-digest and
+  meeting-action refusals. It also touched its own files `ReportsPage.tsx` (the «ارسال خودکار گزارش» button) and
+  Track 1's slots only through `TaskTimePanel` / `TaskSlaBadge`. Track 1's archive page and date fields now use a
+  date-only Jalali format (`formatJalaliDay`), since `formatToJalali` always adds a time.
 
 ## Not in these tracks
 

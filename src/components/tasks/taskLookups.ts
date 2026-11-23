@@ -3,6 +3,8 @@
 // a change in the settings tab.
 import { refreshLookup, useLookup } from '../../utils/lookupCache';
 import { listCustomFields, listCustomStatuses, listTemplates, listWorkTypes } from '../../services/taskFeaturesApi';
+import { formatToJalali, toPersianDigits } from '../../utils/helpers';
+import { gregorianToJalali, isoToIranDateTimeParts } from '../../utils/jalali';
 import type { CustomField, CustomStatus, TaskTemplate, WorkType } from './types';
 
 const KEYS = {
@@ -28,4 +30,14 @@ export const refreshTemplates = () => refreshLookup(KEYS.templates, listTemplate
 /** A colour from the settings (#rrggbb), or none when it is not a plain colour. */
 export function safeColor(value: string | null | undefined): string | undefined {
   return value && /^#[0-9a-f]{6}$/i.test(value) ? value : undefined;
+}
+
+/** A day (yyyy-MM-dd, or the day part of an ISO date) as a Jalali date «۱۴۰۵/۰۹/۰۲», without a time. */
+export function formatJalaliDay(value: string | null | undefined): string {
+  // A moment (with a time) is first turned into its day in Iran; a plain day is taken as it is.
+  const day = value && value.includes('T') ? isoToIranDateTimeParts(value)?.date ?? value : value;
+  const m = (day || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return value ? formatToJalali(value) : '—';
+  const { jy, jm, jd } = gregorianToJalali(Number(m[1]), Number(m[2]), Number(m[3]));
+  return toPersianDigits(`${jy}/${String(jm).padStart(2, '0')}/${String(jd).padStart(2, '0')}`);
 }

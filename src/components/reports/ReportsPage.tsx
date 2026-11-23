@@ -7,6 +7,7 @@ import { ReportScope } from '../../services/taskReportApi';
 import { ReportsView } from '../ReportsView';
 import { MeetingsReport } from './MeetingsReport';
 import { UsersReport } from './UsersReport';
+import { ReportSchedulesButton } from '../work/ReportSchedules';
 
 /**
  * «گزارشات»: one page, three reports as tabs - activities (with its filters), meetings (the whole
@@ -35,9 +36,13 @@ export const ReportsPage: React.FC<{
   return (
     <div className="w-full space-y-4" dir="rtl">
       <AdminCard className="px-5 pt-5 pb-0">
-        <h2 className="flex items-center gap-2 text-xl font-extrabold text-slate-900 dark:text-white">
-          <BarChart3 className="w-6 h-6 text-indigo-600" /> گزارشات
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-xl font-extrabold text-slate-900 dark:text-white">
+            <BarChart3 className="w-6 h-6 text-indigo-600" /> گزارشات
+          </h2>
+          {/* The person's own scheduled digest by SMS/email (Track 2, CAT-195) */}
+          <ReportSchedulesButton />
+        </div>
         <div className="flex gap-1 overflow-x-auto mt-4 border-b border-slate-200 dark:border-slate-800" role="tablist" aria-label="گزارشات">
           {tabs.map(({ id, label, icon: Icon }) => {
             const selected = id === current;

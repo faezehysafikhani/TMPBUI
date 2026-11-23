@@ -5,7 +5,8 @@ import { AdminCard, IconAction, Notice, Pagination, SearchBox, useDebounced } fr
 import { appConfirm } from '../../utils/appDialog';
 import { showToast } from '../../utils/toast';
 import { userErrorMessage } from '../../utils/errorMessages';
-import { formatToJalali, toPersianDigits } from '../../utils/helpers';
+import { toPersianDigits } from '../../utils/helpers';
+import { formatJalaliDay } from './taskLookups';
 import {
   bulkTaskAction,
   listArchivedTasks,
@@ -156,8 +157,8 @@ export const ArchivedTasksView: React.FC = () => {
                     <td className={td}>{status && <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap ${status.badgeBg} ${status.badgeText}`}>{status.title}</span>}</td>
                     <td className={td}>{priority && <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border whitespace-nowrap ${priority.bgColor} ${priority.textColor} ${priority.borderColor}`}>{priority.title}</span>}</td>
                     <td className={`${td} text-slate-600 dark:text-slate-300 whitespace-nowrap`}>{row.assignedUser?.displayName || '—'}</td>
-                    <td className={`${td} text-slate-600 dark:text-slate-300 whitespace-nowrap`}>{row.dueDate ? formatToJalali(row.dueDate) : '—'}</td>
-                    <td className={`${td} text-slate-600 dark:text-slate-300 whitespace-nowrap`}>{row.archivedAtUtc ? formatToJalali(row.archivedAtUtc) : '—'}</td>
+                    <td className={`${td} text-slate-600 dark:text-slate-300 whitespace-nowrap`}>{row.dueDate ? formatJalaliDay(row.dueDate) : '—'}</td>
+                    <td className={`${td} text-slate-600 dark:text-slate-300 whitespace-nowrap`}>{row.archivedAtUtc ? formatJalaliDay(row.archivedAtUtc) : '—'}</td>
                     <td className={td}>
                       <IconAction icon={ArchiveRestore} label="بازگرداندن از بایگانی" tone="emerald" disabled={busy} onClick={() => restoreOne(row)} />
                     </td>

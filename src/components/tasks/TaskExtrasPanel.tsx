@@ -4,9 +4,8 @@ import type { Task } from '../../types';
 import { inputClass, toLatinDigits } from '../admin/AdminUi';
 import { JalaliDatePicker } from '../JalaliDatePicker';
 import { userErrorMessage } from '../../utils/errorMessages';
-import { formatToJalali } from '../../utils/helpers';
 import { getTaskExtras, saveTaskExtras } from '../../services/taskFeaturesApi';
-import { safeColor, useWorkTypes } from './taskLookups';
+import { formatJalaliDay, safeColor, useWorkTypes } from './taskLookups';
 import type { TaskExtras, TaskFieldValue } from './types';
 
 /** How a stored value reads (dates in Jalali, yes/no in words). */
@@ -14,7 +13,7 @@ function displayValue(field: TaskFieldValue): string {
   const v = field.value;
   if (v === null || v === '') return '—';
   if (field.kind === 'Boolean') return v === 'true' ? 'بله' : 'خیر';
-  if (field.kind === 'Date') return formatToJalali(v);
+  if (field.kind === 'Date') return formatJalaliDay(v);
   return v;
 }
 

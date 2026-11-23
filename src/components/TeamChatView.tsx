@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import { QuickMessageTaskButton } from './work/QuickMessageTaskButton';
 import {
   MessageSquare,
   Send,
@@ -1006,6 +1007,18 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                 >
                                   <CheckSquare className="w-3.5 h-3.5 shrink-0" />
                                 </button>
+                              )}
+                              {/* One click, no form: the message becomes a task and stays its source (Track 2, CAT-133) */}
+                              {onConvertToTask && !isVoiceName(msg.attachmentName) && (
+                                <QuickMessageTaskButton
+                                  messageId={msg.id}
+                                  text={splitReply(msg.text).body}
+                                  className={`p-1 rounded-md transition-colors cursor-pointer ${
+                                    isMine
+                                      ? 'hover:bg-white/20 text-white/90 hover:text-white'
+                                      : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400'
+                                  }`}
+                                />
                               )}
                               {isMine && editingMessageId !== msg.id && (
                                 <button
