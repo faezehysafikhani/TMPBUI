@@ -237,7 +237,7 @@ const MonthPreview: React.FC<{ calendarId: string; version: string }> = ({ calen
             <div
               key={iso}
               title={info?.reason || (off ? 'غیرکاری' : 'کاری')}
-              className={`py-2 rounded-lg font-bold tabular-nums ${off ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300' : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'} ${exception ? 'ring-2 ring-amber-400' : ''}`}
+              className={`py-2 rounded-lg font-bold tabular-nums ${off ? (exception ? 'bg-rose-200 text-rose-800 dark:bg-rose-900/60 dark:text-rose-200' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300') : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'} ${exception ? 'ring-2 ring-amber-400' : ''}`}
             >
               {toPersianDigits(i + 1)}
             </div>

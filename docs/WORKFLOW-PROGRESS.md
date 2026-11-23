@@ -39,3 +39,15 @@ temporary delegation), CAT-123 (approval routing), CAT-108 (approval chains per 
   stale data until the next reload. Not caused by this work; worth a list endpoint that returns what the board needs.
 - Approvals by «مدیر مستقیم» need the person to have a post with a manager in the chart; otherwise use an optional
   step or a named person.
+
+# Work calendar (CAT-85) — done
+
+| # | Step | Status |
+|---|---|---|
+| 1 | TMPB-API: `/api/calendar/work-calendars` mapped, Iranian official holidays installed, tables created at start-up, `db/upgrade-20-work-calendars.sql` (+ rollback) | ✅ pushed (Core `629791b`) |
+| 2 | UI: settings «اتوماسیون و گزارش» → «تقویم کاری»: working week, hours per day, official holidays, default, date exceptions, month preview | ✅ pushed, checked in the browser |
+| 3 | Core: SLA «فقط روزهای کاری» follows the default work calendar (`ISlaWorkingDays`, calendar-tasks integration); without one, the old rule | ✅ pushed; checked: a non-working exception tomorrow → a 48 h SLA comes out at 72 h |
+
+Not changed on purpose: the rule that no task can be due on a Friday or an official holiday (task and meeting
+dates) still uses the fixed Iranian rule, not the work calendar, so an organization's own days off do not block
+due dates. Moving that rule to the work calendar too is a product decision.
