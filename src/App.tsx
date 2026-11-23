@@ -92,6 +92,7 @@ import { isTaskVisibleTo, responsibleIdsOf, responsibleNamesOf } from './utils/t
 import { appAlert, appConfirm } from './utils/appDialog';
 import { showToast } from './utils/toast';
 import { useBranding } from './utils/branding';
+import { CommandPalette } from './components/palette/CommandPalette';
 
 const PAGE_TITLES: Record<string, string> = {
   kanban: 'بورد کانبان',
@@ -914,6 +915,7 @@ export default function App() {
     window.addEventListener('focus', loadHeld);
     return () => { alive = false; window.removeEventListener('focus', loadHeld); };
   }, [currentUser?.id]);
+  const paletteNewTask = useCallback(() => handleOpenCreateModal('todo'), [handleOpenCreateModal]);
   const visibleTasks = useMemo(() => {
     if (!activePost.postIds) return mayViewTasks0;
     const inScope = new Set(mayViewTasks0.filter((t) => taskInPosts(t, activePost.postIds)).map((t) => t.id));
@@ -1729,6 +1731,16 @@ export default function App() {
             currentUser={currentUser}
             existingTasks={visibleTasks}
             registeredUsers={allUsers}
+          />
+        )}
+
+        {currentUser && (
+          <CommandPalette
+            canOpen={canOpenSection}
+            goTo={handleNavigateTab}
+            onNewTask={paletteNewTask}
+            tasks={visibleTasks}
+            onOpenTask={handleOpenTaskDetail}
           />
         )}
 

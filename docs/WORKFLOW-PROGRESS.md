@@ -51,3 +51,9 @@ temporary delegation), CAT-123 (approval routing), CAT-108 (approval chains per 
 Not changed on purpose: the rule that no task can be due on a Friday or an official holiday (task and meeting
 dates) still uses the fixed Iranian rule, not the work calendar, so an organization's own days off do not block
 due dates. Moving that rule to the work calendar too is a product decision.
+
+# Command palette (CAT-107) — done
+
+Ctrl+K / ⌘K anywhere: go to any page the user may open, «فعالیت جدید», settings sections, and find a task by
+title (opens its detail). Arrow keys / Enter / Esc. `components/palette/CommandPalette.tsx`, mounted once in
+`App.tsx` (shared file: one import, one callback, one element). ✅ pushed, checked in the browser.
