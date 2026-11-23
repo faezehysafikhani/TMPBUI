@@ -109,6 +109,16 @@ const ADMIN_ROLE_NAME = 'Administrator';
 
 /** Parallel requests used when a screen needs one call per task. */
 const DETAIL_CONCURRENCY = 6;
+/** Tasks per board-details request (the server's limit is 100). */
+const BOARD_BATCH = 100;
+/** null: not tried yet; false: this server has no board-details endpoint (older Core). */
+let boardDetailsSupported: boolean | null = null;
+
+interface TaskBoardDetailsDto {
+  task: TaskDto;
+  comments: TaskCommentDto[];
+  activity: TaskActivityDto[];
+}
 
 // ---------------------------------------------------------------------------
 // Backend DTOs (camelCase JSON)
@@ -960,21 +970,36 @@ async function downloadFileAsDataUrl(fileId: string): Promise<string> {
  * here. The attachment id is the TaskFile link id - the handle the delete endpoint takes.
  */
 async function mapFiles(files: TaskFileDto[]): Promise<Attachment[]> {
-  return Promise.all(
-    files.map(async (f) => ({
-      id: f.linkId,
-      name: f.fileName,
-      size: f.fileSizeBytes,
-      type: f.contentType,
-      // One unreadable file must not stop the whole board from loading. The entry is kept
-      // (with no content) so its link id survives and a later save does not delete it.
-      dataUrl: await downloadFileAsDataUrl(f.fileId).catch((err) => {
-        console.warn(`Attachment ${f.fileName} could not be downloaded:`, err instanceof Error ? err.message : err);
-        return '';
-      }),
-      createdAt: f.createdAtUtc,
-    }))
-  );
+  // No content here: the board does not download every file on each load. useAttachmentUrl fetches a file
+  // when it is shown (preview, thumbnail, voice message) through loadAttachmentDataUrl.
+  return files.map((f) => ({
+    id: f.linkId,
+    fileId: f.fileId,
+    name: f.fileName,
+    size: f.fileSizeBytes,
+    type: f.contentType,
+    dataUrl: '',
+    createdAt: f.createdAtUtc,
+  }));
+}
+
+const attachmentContent = new Map<string, Promise<string>>();
+
+/** An attachment's content as a data URL (cached per file; a failed read is tried again next time). */
+export function loadAttachmentDataUrl(att: Attachment): Promise<string> {
+  if (att.dataUrl) return Promise.resolve(att.dataUrl);
+  if (!att.fileId) return Promise.resolve('');
+  const fileId = att.fileId;
+  let pending = attachmentContent.get(fileId);
+  if (!pending) {
+    pending = downloadFileAsDataUrl(fileId).catch((err) => {
+      attachmentContent.delete(fileId);
+      console.warn(`Attachment ${att.name} could not be downloaded:`, err instanceof Error ? err.message : err);
+      return '';
+    });
+    attachmentContent.set(fileId, pending);
+  }
+  return pending;
 }
 
 export const ACTIVITY_ACTION_TITLES: Record<string, string> = {
@@ -1463,9 +1488,12 @@ async function getTaskDto(taskId: string): Promise<TaskDto> {
   return request<TaskDto>('GET', `${TASKS}/${taskId}`);
 }
 
-async function fetchComments(taskId: string): Promise<TaskComment[]> {
-  const items = await request<TaskCommentDto[]>('GET', `${TASKS}/${taskId}/comments`);
+async function mapCommentList(items: TaskCommentDto[] | null | undefined): Promise<TaskComment[]> {
   return (await Promise.all((items || []).map(mapCommentWithFiles))).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+async function fetchComments(taskId: string): Promise<TaskComment[]> {
+  return mapCommentList(await request<TaskCommentDto[]>('GET', `${TASKS}/${taskId}/comments`));
 }
 
 /** The creation entry this app writes itself, with the assignees in its text. */
@@ -1518,7 +1546,10 @@ async function fetchCommentsIfAllowed(taskId: string): Promise<TaskComment[]> {
 }
 
 async function fetchActivity(taskId: string): Promise<TaskLog[]> {
-  const items = await request<TaskActivityDto[]>('GET', `${TASKS}/${taskId}/activity`);
+  return mapActivityList(await request<TaskActivityDto[]>('GET', `${TASKS}/${taskId}/activity`));
+}
+
+function mapActivityList(items: TaskActivityDto[] | null | undefined): TaskLog[] {
   return withoutEditDuplicates(withoutDuplicateCreation(items || []).map(mapActivity))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
@@ -1533,6 +1564,25 @@ export async function fetchTasks(): Promise<Task[]> {
   // Signed out: nothing to show, and no point sending requests that can only return 401.
   if (!readSession()) return [];
   const list = await getAllPages<TaskListItemDto>(TASKS, { sortBy: 'CreatedAtUtc', sortDescending: true }, 200);
+  // One request per BOARD_BATCH tasks (detail, comments and history together); an older server without the
+  // batch endpoint gets the three requests per task as before.
+  if (boardDetailsSupported !== false) {
+    try {
+      const batches: string[][] = [];
+      for (let i = 0; i < list.length; i += BOARD_BATCH) batches.push(list.slice(i, i + BOARD_BATCH).map((t) => t.id));
+      const results = await mapWithLimit(batches, 2, (ids) =>
+        request<TaskBoardDetailsDto[]>('POST', `${TASKS}/board-details`, { body: { ids } }));
+      boardDetailsSupported = true;
+      const byId = new Map<string, TaskBoardDetailsDto>();
+      for (const item of results.flat()) byId.set(item.task.id, item);
+      const ordered = list.map((t) => byId.get(t.id)).filter((x): x is TaskBoardDetailsDto => Boolean(x));
+      return mapWithLimit(ordered, DETAIL_CONCURRENCY, async (item) =>
+        mapTask(item.task, await mapCommentList(item.comments), mapActivityList(item.activity)));
+    } catch (error) {
+      if (!(error instanceof NexusApiError && (error.httpStatus === 404 || error.httpStatus === 405))) throw error;
+      boardDetailsSupported = false;
+    }
+  }
   return mapWithLimit(list, DETAIL_CONCURRENCY, async (item) => {
     const [dto, comments, logs] = await Promise.all([
       getTaskDto(item.id),
@@ -1550,7 +1600,10 @@ async function fetchTask(taskId: string): Promise<Task> {
 
 async function uploadAttachment(taskId: string, attachment: Attachment): Promise<void> {
   const form = new FormData();
-  form.append('file', dataUrlToBlob(attachment.dataUrl, attachment.type), attachment.name);
+  // A server file copied from another task or comment arrives without content: read it first.
+  const content = attachment.dataUrl || (await loadAttachmentDataUrl(attachment));
+  if (!content) throw new Error(`فایل «${attachment.name}» خوانده نشد.`);
+  form.append('file', dataUrlToBlob(content, attachment.type), attachment.name);
   await request<TaskFileDto>('POST', `/api/task-management/files/tasks/${taskId}`, { form });
 }
 
@@ -1834,7 +1887,10 @@ export async function fetchTaskComments(taskId: string): Promise<TaskComment[]> 
 
 async function uploadCommentAttachment(commentId: string, attachment: Attachment): Promise<void> {
   const form = new FormData();
-  form.append('file', dataUrlToBlob(attachment.dataUrl, attachment.type), attachment.name);
+  // A server file copied from another task or comment arrives without content: read it first.
+  const content = attachment.dataUrl || (await loadAttachmentDataUrl(attachment));
+  if (!content) throw new Error(`فایل «${attachment.name}» خوانده نشد.`);
+  form.append('file', dataUrlToBlob(content, attachment.type), attachment.name);
   await request<TaskFileDto>('POST', `/api/task-management/files/comments/${commentId}`, { form });
 }
 

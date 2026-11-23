@@ -2,18 +2,41 @@ import React from 'react';
 import { isSafeInlineType } from '../utils/safeBlob';
 import { Attachment } from '../types';
 import { formatFileSize, formatToJalali } from '../utils/helpers';
-import { X, Download, FileText, Image as ImageIcon, ExternalLink } from 'lucide-react';
+import { X, Download, FileText, Image as ImageIcon, ExternalLink, Loader2 } from 'lucide-react';
+import { useAttachmentUrl } from './AttachmentMedia';
 
 interface AttachmentPreviewModalProps {
   attachment: Attachment | null;
   onClose: () => void;
 }
 
-export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
+/** Loads the file's content (server files arrive without it), then shows the preview. */
+export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({ attachment, onClose }) => {
+  const { url, failed } = useAttachmentUrl(attachment);
+  if (!attachment) return null;
+  if (!url) {
+    return (
+      <div className="fixed inset-0 z-[80] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+        <div className="bg-white dark:bg-slate-900 rounded-2xl px-6 py-5 flex items-center gap-3 text-sm font-bold text-slate-700 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
+          {failed ? (
+            <>
+              <span>فایل «{attachment.name}» خوانده نشد.</span>
+              <button type="button" onClick={onClose} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer" aria-label="بستن"><X className="w-4 h-4" /></button>
+            </>
+          ) : (
+            <><Loader2 className="w-5 h-5 animate-spin text-indigo-500" /> در حال دریافت «{attachment.name}»…</>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return <AttachmentPreviewBody attachment={{ ...attachment, dataUrl: url }} onClose={onClose} />;
+};
+
+const AttachmentPreviewBody: React.FC<{ attachment: Attachment; onClose: () => void }> = ({
   attachment,
   onClose,
 }) => {
-  if (!attachment) return null;
 
   const isImage =
     attachment.type.startsWith('image/') || attachment.dataUrl.startsWith('data:image/');

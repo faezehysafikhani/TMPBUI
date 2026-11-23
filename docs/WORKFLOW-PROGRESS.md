@@ -34,9 +34,7 @@ temporary delegation), CAT-123 (approval routing), CAT-108 (approval chains per 
 
 ## Done — follow-ups
 
-- **Load on the board:** every board reload reads each task's detail, comments and history (3 requests per task).
-  A burst of changes can hit the server's rate limit (600 requests a minute per user), and the screen then keeps
-  stale data until the next reload. Not caused by this work; worth a list endpoint that returns what the board needs.
+- ~~Load on the board~~ — fixed, see «Board load» below.
 - Approvals by «مدیر مستقیم» need the person to have a post with a manager in the chart; otherwise use an optional
   step or a named person.
 
@@ -78,4 +76,12 @@ Core `TMPB-API/BACKUP.md`, `tools/backup.ps1`, `tools/restore.ps1`: database, up
 (`FileStorage:RootPath`), data-protection keys, settings; manifest with hashes; schedule and off-server copies.
 Round trip checked on SQL Server 2022 (damage → restore → identical). ✅ pushed (Core `e741a36`).
 
-# Next: board load (one request for the board instead of 3 per task)
+# Board load — done
+
+Before: every board load read each task's detail, comments and history (3 requests per task) and downloaded every
+attachment's content. Now: `POST /api/task-management/tasks/board-details` (Core) returns detail + comments +
+history for up to 100 tasks per request; attachments are fetched only when shown (preview, thumbnail, voice
+message: `components/AttachmentMedia.tsx`, cached). Older Core without the endpoint: the old way. Measured: the
+whole load is 7 task-management requests; opening a preview downloads that one file. Read-only POSTs
+(`board-details`, `in-review`) no longer trigger "TasksChanged" (they would have made every client reload in a
+loop); checked: one change → one reload. ✅ pushed.

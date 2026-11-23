@@ -1,3 +1,4 @@
+import { AttachmentAudio, AttachmentImg } from './AttachmentMedia';
 import React, { useState, useEffect, useRef } from 'react';
 import { TaskTimePanel } from './work/TaskTimePanel';
 import { TaskFeatureActions } from './tasks/TaskFeatureActions';
@@ -995,7 +996,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                               {cmt.attachments.map((att) => {
                                 if (isVoiceName(att.name)) {
-                                  return <audio key={att.id} controls src={att.dataUrl} className="w-full h-9 sm:col-span-2" />;
+                                  return <AttachmentAudio key={att.id} att={att} className="w-full h-9 sm:col-span-2" />;
                                 }
                                 const isImg = att.type.startsWith('image/') || att.dataUrl.startsWith('data:image/');
                                 return (
@@ -1007,7 +1008,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                   >
                                     {isImg ? (
                                       <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
-                                        <img src={att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
+                                        <AttachmentImg att={att} className="w-full h-full object-cover" />
                                       </div>
                                     ) : (
                                       <div className="w-9 h-9 rounded-lg shrink-0 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-amber-600 dark:text-amber-400">
@@ -1148,7 +1149,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         >
                           {isImg ? (
                             <div className="w-4 h-4 rounded overflow-hidden shrink-0 border border-indigo-300 dark:border-indigo-700">
-                              <img src={att.dataUrl} alt={att.name} className="w-full h-full object-cover" />
+                              <AttachmentImg att={att} className="w-full h-full object-cover" />
                             </div>
                           ) : (
                             <FileText className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />

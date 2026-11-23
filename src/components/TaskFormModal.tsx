@@ -1,3 +1,4 @@
+import { AttachmentImg } from './AttachmentMedia';
 import React, { useState, useEffect, useRef } from 'react';
 import { PersianTimeInput } from './PersianTimeInput';
 import { Task, TaskStatus, Priority, Attachment, STATUSES, PRIORITIES, AppColorPalette, User, WorkTeam, WorkTeamMember, RecurringFrequency, RecurringConfig, OccurrenceNth, ProjectCharter, ProjectSubTask, SubTaskImportance, SubTaskProgress, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
@@ -2239,11 +2240,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                       <div className="flex items-center gap-2.5 overflow-hidden">
                         {isImage ? (
                           <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-700">
-                            <img
-                              src={att.dataUrl}
-                              alt={att.name}
-                              className="w-full h-full object-cover"
-                            />
+                            <AttachmentImg att={att} className="w-full h-full object-cover" />
                           </div>
                         ) : (
                           <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-200 dark:border-amber-800">

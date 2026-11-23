@@ -79,7 +79,9 @@ export interface Attachment {
   name: string;
   size: number;
   type: string;
-  dataUrl: string; // Base64 data URL for preview and download
+  dataUrl: string; // Base64 data URL for preview and download; '' for a server file not loaded yet (see fileId)
+  /** The server file behind it: its content is loaded on demand (useAttachmentUrl) when dataUrl is empty. */
+  fileId?: string;
   createdAt: string;
 }
 
