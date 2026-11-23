@@ -1671,6 +1671,9 @@ export async function updateTask(
         charterEndDate: charter !== undefined ? toDateOnly(charter?.endDate) : current.charterEndDate,
         charterStartTime: charter !== undefined ? toTimeOfDay(charter?.startDate) : current.charterStartTime ?? null,
         charterEndTime: charter !== undefined ? toTimeOfDay(charter?.endDate) : current.charterEndTime ?? null,
+        // The version the editor opened (task.server): someone else's save in the meantime is refused (409)
+        // instead of being overwritten. Without it, the last save wins as before.
+        rowVersion: taskData.server?.rowVersion ?? null,
       },
     });
   }
@@ -2757,6 +2760,14 @@ let changeTimer: ReturnType<typeof setTimeout> | null = null;
 async function hubAccessToken(): Promise<string> {
   // A token that is about to expire would get the connection rejected; it is renewed first.
   return (await ensureAccessToken()) || '';
+}
+
+/**
+ * Reloads the task list soon, as a live update would. For a change the server does not announce
+ * (a template used, a hand-off, a task's work type and fields) - Track 1, docs/UI-WORKSTREAMS.md.
+ */
+export function reloadTasksSoon(): void {
+  notifyTaskChange();
 }
 
 function notifyTaskChange(): void {

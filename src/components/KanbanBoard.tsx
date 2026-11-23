@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useMemo } from 'react';
+import { QuickAddBar } from './tasks/QuickAddBar';
 import { Task, TaskStatus, Attachment, User } from '../types';
 import { KanbanColumn } from './KanbanColumn';
 import { TaskGroupColumn } from './TaskGroupColumn';
@@ -73,6 +74,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <div className="w-full space-y-6">
+      {/* Quick add and «from template» (Track 1) */}
+      <QuickAddBar currentUser={currentUser} />
+
       {view.groupBy === 'status' && (
         <div className={`grid gap-4 sm:gap-4.5 items-start grid-cols-1 md:grid-cols-2 lg:grid-cols-4`}>
           {columns.map(({ status, tasks: columnTasks }) => (
@@ -96,7 +100,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       )}
 
       {view.groupBy === 'none' && (
-        <TaskListView tasks={boardTasks} showDetails={view.showDetails} onViewDetails={onViewDetails} />
+        <TaskListView tasks={boardTasks} showDetails={view.showDetails} onViewDetails={onViewDetails} currentUser={currentUser} />
       )}
 
       {view.groupBy === 'matrix' && (

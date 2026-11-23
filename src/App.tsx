@@ -718,6 +718,12 @@ export default function App() {
       console.error('Error updating task status:', err);
       const errMsg = userErrorMessage(err, 'خطا در تغییر وضعیت.');
       setPbError(errMsg);
+      // A refused change (an open dependency, an unmet acceptance criterion, the WIP limit...) is undone in the
+      // open task detail too, and said where it can be seen: the page banner sits behind the dialog.
+      setSelectedTaskForDetail((prev) =>
+        prev && prev.id === taskId ? { ...prev, status: targetTask.status, actualCompletionDate: targetTask.actualCompletionDate } : prev
+      );
+      showToast(errMsg, 'error');
       loadTasks(false);
     }
   }, [tasks, currentUser, loadTasks]);

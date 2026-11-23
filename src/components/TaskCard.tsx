@@ -32,6 +32,7 @@ import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import { isResponsibleFor, responsibleNamesOf } from '../utils/taskPeople';
 import { appAlert } from '../utils/appDialog';
 import { TaskSlaBadge } from './work/TaskSlaBadge';
+import { TaskStatusExtras } from './tasks/TaskStatusExtras';
 
 interface TaskCardProps {
   task: Task;
@@ -326,6 +327,9 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
               <span>مالک: {task.ownerName}</span>
             </span>
           )}
+
+          {/* Custom status and blocker (Track 1) */}
+          <TaskStatusExtras task={task} />
 
           {/* NOTE: main work team tag (task.assignedTeamName) and status tags are excluded from card tags */}
 

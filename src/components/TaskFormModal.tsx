@@ -724,6 +724,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
         projectCharter,
         projectSubTasks: finalSubTasks,
         comments: taskToEdit?.comments || [],
+        // The version this form opened: a save over someone else's change is refused (409), not lost.
+        server: taskToEdit?.server,
       },
       taskToEdit ? taskToEdit.id : undefined
     );

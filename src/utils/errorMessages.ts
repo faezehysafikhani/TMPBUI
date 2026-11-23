@@ -115,6 +115,21 @@ const KNOWN_MESSAGES: Record<string, string> = {
   'The avatar image is too large.': 'حجم تصویر پروفایل بیش از حد مجاز است.',
   // Tasks, subtasks, schedules, tags, files, notes, comments
   'Task not found.': 'فعالیت یافت نشد یا به آن دسترسی ندارید.',
+  // Track 1 (docs/UI-WORKSTREAMS.md): archive, planning, templates, statuses, concurrent edits
+  'Archived task not found.': 'فعالیت بایگانی‌شده پیدا نشد.',
+  'The task was changed by someone else while you were editing it. Reload it and apply your change again.': 'این فعالیت را کس دیگری همین حالا تغییر داده است. فعالیت را دوباره باز کنید و تغییر خود را دوباره اعمال کنید.',
+  'A task cannot wait for itself.': 'یک فعالیت نمی‌تواند منتظر خودش باشد.',
+  'This dependency already exists.': 'این وابستگی قبلاً ثبت شده است.',
+  'This would make the tasks wait for each other.': 'این وابستگی باعث می‌شود دو فعالیت منتظر یکدیگر بمانند.',
+  'The task to wait for was not found.': 'فعالیتی که باید منتظرش بود پیدا نشد.',
+  'Dependency not found.': 'وابستگی پیدا نشد.',
+  'Criterion not found.': 'معیار پذیرش پیدا نشد.',
+  'Only the task owner or a task manager can change this.': 'فقط مالک یا مدیر فعالیت می‌تواند این را تغییر دهد.',
+  'The limit must be between 1 and 1000, or empty for no limit.': 'سقف باید عددی بین ۱ تا ۱۰۰۰ باشد، یا برای «بدون سقف» خالی بماند.',
+  'A template with this name already exists.': 'قالبی با این نام قبلاً ثبت شده است.',
+  'Template not found.': 'قالب پیدا نشد.',
+  'A status with this name already exists.': 'وضعیتی با این نام قبلاً ثبت شده است.',
+  'Status not found.': 'وضعیت پیدا نشد.',
   'Subtask not found.': 'زیرفعالیت یافت نشد یا به آن دسترسی ندارید.',
   'Recurrence schedule not found.': 'زمان‌بندی تکرار یافت نشد.',
   'Tag not found.': 'برچسب یافت نشد.',
@@ -265,6 +280,11 @@ const FIELD_NAMES: Record<string, string> = {
 
 const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/too large|maximum size is/i, () => FILE_TOO_LARGE_ERROR],
+  // Track 1: why a task cannot be completed or started (dependencies, criteria, WIP limit)
+  [/^This task waits for (\d+) unfinished task\(s\)\.?$/i, (m) => `این فعالیت منتظر ${toFa(m[1])} فعالیت ناتمام است و هنوز نمی‌توان آن را تمام کرد.`],
+  [/^(\d+) acceptance criteria are not met yet\.?$/i, (m) => `${toFa(m[1])} معیار پذیرش هنوز برآورده نشده است.`],
+  [/^The limit of (\d+) tasks in progress per person is reached/i, (m) => `سقف ${toFa(m[1])} فعالیت «در حال انجام» برای هر نفر پر شده است؛ اول یکی را تمام یا متوقف کنید.`],
+  [/^A task can have at most (\d+) criteria\.?$/i, (m) => `هر فعالیت حداکثر ${toFa(m[1])} معیار پذیرش می‌تواند داشته باشد.`],
   // SMS templates (the key is shown as the panel shows it)
   [/^Unknown SMS template '(.+)'\.?$/i, () => 'این متن پیامک در این سامانه قابل ویرایش نیست.'],
   [/^The text of '(.+)' cannot be empty\.?$/i, (m) => `متن پیامک «${smsTitle(m[1])}» نمی‌تواند خالی باشد.`],

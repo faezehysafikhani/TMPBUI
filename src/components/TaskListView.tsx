@@ -1,23 +1,45 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Eye, Tag, FolderKanban, Repeat, AlertCircle } from 'lucide-react';
-import { Task, STATUSES, PRIORITIES } from '../types';
+import { Task, User, STATUSES, PRIORITIES } from '../types';
 import { formatToJalali, getTaskLastModifiedTime, isOverdue, toPersianDigits } from '../utils/helpers';
 import { responsibleNamesOf } from '../utils/taskPeople';
+import { can } from '../utils/permissions';
+import { BulkActionBar } from './tasks/BulkActionBar';
+import { TaskStatusExtras } from './tasks/TaskStatusExtras';
+import { TASK_FEATURE_PERMISSIONS } from '../services/taskFeaturesApi';
 
 interface TaskListViewProps {
   tasks: Task[];
   showDetails: boolean;
   onViewDetails?: (task: Task) => void;
+  /** With Tasks.Edit, rows can be selected for bulk actions (CAT-74). */
+  currentUser?: User | null;
 }
 
 const SYSTEM_TAGS = new Set(['تکرارشونده', 'تکرار', 'فعالیت تکرارشونده']);
 
 /** «بدون گروه‌بندی»: every task as one numbered row, newest change first. A row opens the task. */
-export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, onViewDetails }) => {
+export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, onViewDetails, currentUser }) => {
   const rows = useMemo(
     () => [...tasks].sort((a, b) => getTaskLastModifiedTime(b) - getTaskLastModifiedTime(a)),
     [tasks],
   );
+  const selectable = !!currentUser && can(currentUser, TASK_FEATURE_PERMISSIONS.edit);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // A task that left the list (archived, filtered out) is no longer selected.
+  useEffect(() => {
+    setSelected((prev) => {
+      const ids = new Set(rows.map((r) => r.id));
+      const next = new Set([...prev].filter((id) => ids.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [rows]);
+  const toggle = (id: string) => setSelected((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const allSelected = rows.length > 0 && selected.size === rows.length;
 
   if (rows.length === 0) {
     return (
@@ -31,11 +53,27 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, 
   const td = 'px-3 py-2.5 align-middle';
 
   return (
+    <div className="space-y-2">
+    {selectable && selected.size > 0 && (
+      <BulkActionBar selectedIds={[...selected]} onDone={() => setSelected(new Set())} onClear={() => setSelected(new Set())} />
+    )}
     <div className="ui-surface w-full overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
       <div className="relative overflow-x-auto">
         <table className="w-full min-w-[720px] text-xs">
           <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700">
             <tr>
+              {selectable && (
+                <th className={`${th} w-10`}>
+                  <input
+                    type="checkbox"
+                    aria-label="انتخاب همه"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = selected.size > 0 && !allSelected; }}
+                    onChange={() => setSelected(allSelected ? new Set() : new Set(rows.map((r) => r.id)))}
+                    className="cursor-pointer"
+                  />
+                </th>
+              )}
               <th className={`${th} w-12`}>ردیف</th>
               <th className={th}>عنوان فعالیت</th>
               <th className={th}>وضعیت</th>
@@ -58,6 +96,17 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, 
                   onClick={() => onViewDetails?.(task)}
                   className={`transition-colors ${onViewDetails ? 'cursor-pointer hover:bg-indigo-50/50 dark:hover:bg-slate-800/60' : ''}`}
                 >
+                  {selectable && (
+                    <td className={td} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`انتخاب «${task.title}»`}
+                        checked={selected.has(task.id)}
+                        onChange={() => toggle(task.id)}
+                        className="cursor-pointer"
+                      />
+                    </td>
+                  )}
                   <td className={`${td} text-slate-400 font-bold tabular-nums`}>{toPersianDigits(index + 1)}</td>
                   <td className={`${td} min-w-[220px]`}>
                     <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
@@ -76,8 +125,11 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, 
                     )}
                   </td>
                   <td className={td}>
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap ${status.badgeBg} ${status.badgeText}`}>
-                      {status.title}
+                    <span className="inline-flex flex-wrap items-center gap-1">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap ${status.badgeBg} ${status.badgeText}`}>
+                        {status.title}
+                      </span>
+                      <TaskStatusExtras task={task} />
                     </span>
                   </td>
                   <td className={td}>
@@ -112,6 +164,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, 
           </tbody>
         </table>
       </div>
+    </div>
     </div>
   );
 };

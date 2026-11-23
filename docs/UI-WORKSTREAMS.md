@@ -47,6 +47,13 @@ Full plan (features and endpoints per track): https://claude.ai/artifact/LJvotKt
 | Track 3 | `AuthModal.tsx`, `SessionGuard.tsx`, `SettingsView.tsx`, `components/admin/*` (except the step-0 lines in `SystemAdministration.tsx`), `components/admin/orgStructure/*` |
 | Nobody | `services/nexusApi.ts`, `types.ts`, `App.tsx`, `DesktopSidebar.tsx`, `SandwichBar.tsx`, `utils/permissions.ts` |
 
+## Changes made to shared files (agreed exceptions)
+
+- Track 1: `services/nexusApi.ts` exports `reloadTasksSoon()` (for changes the server does not announce) and
+  `updateTask` sends `rowVersion` from `task.server`; `utils/errorMessages.ts` has Persian text for the new
+  task refusals (dependencies, criteria, WIP, templates, concurrent edits); `App.tsx` undoes a refused status
+  change in the open task detail and shows the reason as a toast.
+
 ## Not in these tracks
 
 Review and approvals (CAT-79/80/81/126), weekly timesheet approval (CAT-160), approver delegation (CAT-118, CAT-4),
