@@ -24,6 +24,8 @@ import { useActivePost } from '../../utils/activePost';
 import { TaskSettingsTab, canSeeTaskSettings } from '../tasks/TaskSettingsTab';
 import { AutomationSettingsTab, canSeeAutomationSettings } from '../work/AutomationSettingsTab';
 import { SecuritySettingsTab, canSeeSecuritySettings } from '../security/SecuritySettingsTab';
+import { MfaProfileCard } from '../security/MfaProfileCard';
+import { LdapSyncCard } from '../security/LdapSyncCard';
 
 type MainTab = 'profile' | 'team' | 'appearance' | 'help' | 'sms' | 'users' | 'org' | 'task-settings' | 'automation' | 'security';
 type UsersTab = 'list' | 'roles' | 'titles' | 'history' | 'ldap' | 'sso';
@@ -104,7 +106,7 @@ const UserManagementSection: React.FC<{ currentUserId: string; can: (p: string) 
       )}
       {current === 'titles' && <TitlesPanel />}
       {current === 'history' && <LoginHistoryPanel />}
-      {current === 'ldap' && <LdapPanel canUpdate={can('ldap_settings.update')} canTest={can('ldap_settings.test')} />}
+      {current === 'ldap' && <div className="space-y-5"><LdapPanel canUpdate={can('ldap_settings.update')} canTest={can('ldap_settings.test')} />{can('ldap_settings.update') && <LdapSyncCard />}</div>}
       {current === 'sso' && <SsoPreparationPanel />}
     </div>
   );
@@ -487,7 +489,7 @@ export interface ProfileSections {
   account: React.ReactNode;
 }
 
-type ProfileTab = 'avatar' | 'password' | 'phone' | 'sessions' | 'account';
+type ProfileTab = 'avatar' | 'password' | 'phone' | 'mfa' | 'sessions' | 'account';
 
 /**
  * «پروفایل»: one page for everything about the signed-in person - profile and avatar, password,
@@ -499,6 +501,7 @@ const ProfileHub: React.FC<{ sections: ProfileSections; can: (permission: string
     { id: 'avatar', label: 'پروفایل و آواتار', icon: UserIcon },
     { id: 'password', label: 'تغییر رمز عبور', icon: KeyRound },
     { id: 'phone', label: 'تغییر شماره موبایل', icon: Smartphone },
+    { id: 'mfa', label: 'ورود دومرحله‌ای', icon: ShieldCheck },
     { id: 'sessions', label: 'نشست‌ها', icon: MonitorSmartphone },
     { id: 'account', label: 'حساب کاربری و خروج', icon: LogOut },
   ];
@@ -544,6 +547,7 @@ const ProfileHub: React.FC<{ sections: ProfileSections; can: (permission: string
         {active === 'avatar' && <>{sections.avatar}{placement}</>}
         {active === 'password' && sections.password}
         {active === 'phone' && sections.phone}
+        {active === 'mfa' && <MfaProfileCard />}
         {active === 'sessions' && <SessionsPanel can={can} />}
         {active === 'account' && sections.account}
       </div>

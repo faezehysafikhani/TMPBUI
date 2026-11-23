@@ -164,6 +164,11 @@ const KNOWN_MESSAGES: Record<string, string> = {
   'There is no action left to turn into a task.': 'اقدامی برای تبدیل به فعالیت باقی نمانده است.',
   'Turning actions into tasks needs the right to edit meetings and to create tasks.': 'برای تبدیل اقدام‌ها به فعالیت، مجوز ویرایش جلسه و ایجاد فعالیت لازم است.',
   'Only the one who made or runs the meeting can turn its actions into tasks.': 'فقط سازنده یا برگزارکنندهٔ جلسه می‌تواند اقدام‌ها را به فعالیت تبدیل کند.',
+  // Track 3 (docs/UI-WORKSTREAMS.md): plan, CSV import, LDAP
+  'The plan needs a name, positive limits and an end date after its start.': 'پلن نام لازم دارد، سقف‌ها باید مثبت باشند و پایان اعتبار بعد از شروع آن.',
+  'Send the CSV text (up to 2 million characters).': 'متن فایل CSV را بفرستید (حداکثر ۲ میلیون نویسه).',
+  'The CSV needs a header line and at least one row.': 'فایل CSV باید یک سطر عنوان ستون‌ها و دست‌کم یک ردیف داشته باشد.',
+  'The header must have at least the columns title and dueDate.': 'سطر اول باید دست‌کم ستون‌های title (عنوان) و dueDate (سررسید) را داشته باشد.',
   'Subtask not found.': 'زیرفعالیت یافت نشد یا به آن دسترسی ندارید.',
   'Recurrence schedule not found.': 'زمان‌بندی تکرار یافت نشد.',
   'Tag not found.': 'برچسب یافت نشد.',
@@ -318,6 +323,7 @@ const PATTERNS: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/^This task waits for (\d+) unfinished task\(s\)\.?$/i, (m) => `این فعالیت منتظر ${toFa(m[1])} فعالیت ناتمام است و هنوز نمی‌توان آن را تمام کرد.`],
   [/^(\d+) acceptance criteria are not met yet\.?$/i, (m) => `${toFa(m[1])} معیار پذیرش هنوز برآورده نشده است.`],
   [/^The limit of (\d+) tasks in progress per person is reached/i, (m) => `سقف ${toFa(m[1])} فعالیت «در حال انجام» برای هر نفر پر شده است؛ اول یکی را تمام یا متوقف کنید.`],
+  [/^At most (\d+) rows at a time\.?$/i, (m) => `در هر بار حداکثر ${toFa(m[1])} ردیف می‌توان وارد کرد.`],
   [/^A task can have at most (\d+) criteria\.?$/i, (m) => `هر فعالیت حداکثر ${toFa(m[1])} معیار پذیرش می‌تواند داشته باشد.`],
   // SMS templates (the key is shown as the panel shows it)
   [/^Unknown SMS template '(.+)'\.?$/i, () => 'این متن پیامک در این سامانه قابل ویرایش نیست.'],

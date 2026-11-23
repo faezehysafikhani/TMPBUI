@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CalendarDays, KanbanSquare, MessagesSquare, Network, LogIn, KeyRound, User as UserIcon, AlertCircle, X, Loader2, Eye, EyeOff, CheckCircle2, ArrowRight, Mail, RefreshCw, ShieldCheck } from 'lucide-react';
 import { AppTheme } from '../types';
 import { completeLoginPB, confirmPasswordResetPB, loginPB, requestPasswordResetPB, verifyPasswordResetCodePB } from '../services/dataService';
@@ -6,6 +6,8 @@ import { userErrorMessage } from '../utils/errorMessages';
 import { useBranding } from '../utils/branding';
 import { CAPTCHA_ERROR_CODES, LoginCaptcha, NexusApiError, SessionLimitChallenge, SessionLimitError, requestLoginCaptcha } from '../services/nexusApi';
 import { SessionLimitPicker } from './SessionLimitPicker';
+import { MfaCodeStep, SsoButtons, takeSsoResult } from './security/SignInExtras';
+import { completeMfaLogin, completeSsoSignIn, MfaChallenge, MfaRequiredError } from '../services/nexusApi';
 
 
 /** Live Jalali date and time on the brand side of the sign-in page. */
@@ -72,6 +74,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // The password was right but the user has as many sessions open as they may: they choose which to close.
   const [limit, setLimit] = useState<SessionLimitChallenge | null>(null);
+  // Sign-in waiting for the SMS code (Track 3, MFA).
+  const [mfa, setMfa] = useState<MfaChallenge | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -124,6 +128,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       onSuccess();
       if (canClose) onClose();
     } catch (err: any) {
+      if (err instanceof MfaRequiredError) {
+        setMfa(err.challenge);
+        setPassword('');
+        setCaptcha(null);
+        setCaptchaAnswer('');
+        return;
+      }
       if (err instanceof SessionLimitError) {
         setLimit(err.challenge);
         setPassword('');
@@ -141,6 +152,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setIsLoading(false);
     }
   };
+
+  // Step 2 with the SMS code; the session limit may still follow.
+  const handleMfaCode = async (code: string) => {
+    if (!mfa) return;
+    setErrorMsg(null);
+    setIsLoading(true);
+    try {
+      const user = await completeMfaLogin(mfa.challengeId, code);
+      setMfa(null);
+      if (user.theme) onThemeSelect(user.theme);
+      onSuccess();
+      if (canClose) onClose();
+    } catch (err: any) {
+      if (err instanceof SessionLimitError) {
+        setMfa(null);
+        setLimit(err.challenge);
+        return;
+      }
+      setErrorMsg(userErrorMessage(err, 'کد تأیید درست نیست یا منقضی شده است.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Back from single sign-on: the server set the session cookie (?sso=ok) or says why not (?sso_error=…).
+  useEffect(() => {
+    const result = takeSsoResult();
+    if (!result) return;
+    if (result.error !== null) {
+      setErrorMsg(result.error || 'ورود یکپارچه انجام نشد.');
+      return;
+    }
+    setIsLoading(true);
+    completeSsoSignIn()
+      .then((user) => {
+        if (user.theme) onThemeSelect(user.theme);
+        onSuccess();
+        if (canClose) onClose();
+      })
+      .catch((err) => setErrorMsg(userErrorMessage(err, 'ورود یکپارچه کامل نشد. دوباره تلاش کنید.')))
+      .finally(() => setIsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCompleteLimit = async (closeIds: string[], closeOldest: boolean) => {
     if (!limit) return;
@@ -295,7 +349,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
-          {mode === 'login' && limit ? (
+          {mode === 'login' && mfa ? (
+            <MfaCodeStep challenge={mfa} busy={isLoading} onSubmit={handleMfaCode} onCancel={() => { setMfa(null); setErrorMsg(null); }} />
+          ) : mode === 'login' && limit ? (
             <SessionLimitPicker
               challenge={limit}
               busy={isLoading}
@@ -425,6 +481,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </>
                 )}
               </button>
+              <SsoButtons />
             </form>
           ) : (
             /* Forgot Password Form */

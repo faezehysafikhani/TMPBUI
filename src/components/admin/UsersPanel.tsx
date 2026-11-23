@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pencil, ShieldCheck, UserX, UserCheck, UserPlus, Loader2, Lock, UserRound, Building2, ImagePlus, Upload, MonitorSmartphone } from 'lucide-react';
+import { Pencil, ShieldCheck, UserX, UserCheck, UserPlus, Loader2, Lock, UserRound, Building2, ImagePlus, Upload, MonitorSmartphone, UserCog, MessageSquareLock } from 'lucide-react';
+import { UserSecurityDialog } from '../security/UserSecurityDialog';
 import {
   AdminUser, AdminUserInput, AdminRole, UserAccess, UserAccessEntry, NexusApiError,
   listUsersPage, adminCreateUser, adminUpdateUser, setUserActive,
@@ -67,6 +68,8 @@ export const UsersPanel: React.FC<{
   const [editing, setEditing] = useState<AdminUser | 'new' | null>(null);
   const [accessOf, setAccessOf] = useState<AdminUser | null>(null);
   const [sessionsOf, setSessionsOf] = useState<AdminUser | null>(null);
+  // «امنیت و خروج» (Track 3): MFA reset, guest and access end, leaving / moving posts.
+  const [securityOf, setSecurityOf] = useState<AdminUser | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,6 +149,9 @@ export const UsersPanel: React.FC<{
                           <Lock className="w-3 h-3" /> مدیر اصلی
                         </StatusBadge>
                       )}
+                      {user.kind === 'Guest' && <StatusBadge tone="amber" title="فرد بیرونی با دسترسی محدود">مهمان</StatusBadge>}
+                      {user.kind === 'ServiceAccount' && <StatusBadge tone="slate" title="حساب غیرانسانی برای اتصال سامانه‌ها">حساب سرویس</StatusBadge>}
+                      {user.mfaEnabled && <span title="ورود دومرحله‌ای فعال است" className="text-emerald-600"><MessageSquareLock className="w-3.5 h-3.5" /></span>}
                     </div>
                     {user.email && <div className="text-xs text-slate-400 mt-0.5 dir-ltr text-right">{user.email}</div>}
                   </td>
@@ -175,6 +181,9 @@ export const UsersPanel: React.FC<{
                       {rights.viewSessions && (
                         <IconAction icon={MonitorSmartphone} label="نشست‌ها" onClick={() => setSessionsOf(user)} />
                       )}
+                      {(rights.update || (orgStructureAvailable && canManageOrgAssignments)) && !user.isSystem && (
+                        <IconAction icon={UserCog} label="امنیت و خروج" onClick={() => setSecurityOf(user)} />
+                      )}
                       {rights.changeStatus && (
                         user.isActive
                           ? <IconAction icon={UserX} label="غیرفعال‌سازی" tone="rose" onClick={() => toggleStatus(user)} disabled={!!lockedReason} disabledReason={lockedReason} />
@@ -190,6 +199,16 @@ export const UsersPanel: React.FC<{
       </div>
 
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} onPage={setPage} />
+
+      {securityOf && (
+        <UserSecurityDialog
+          user={securityOf}
+          canUpdate={!!rights.update}
+          canManageAssignments={orgStructureAvailable && canManageOrgAssignments}
+          onClose={() => setSecurityOf(null)}
+          onChanged={() => { void load(); }}
+        />
+      )}
 
       {editing && (
         <UserFormDialog

@@ -153,7 +153,7 @@ const FieldInput: React.FC<{ field: TaskFieldValue; value: string; onChange: (va
     case 'Date':
       return (
         <div>{label}
-          <JalaliDatePicker value={value || undefined} onChange={(v) => onChange(v || '')} ariaLabel={field.name} allowYearSelection />
+          <JalaliDatePicker value={value || undefined} onChange={(v) => onChange(v || '')} ariaLabel={field.name} />
         </div>
       );
     case 'Number':

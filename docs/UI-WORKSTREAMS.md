@@ -57,6 +57,11 @@ Full plan (features and endpoints per track): https://claude.ai/artifact/LJvotKt
   meeting-action refusals. It also touched its own files `ReportsPage.tsx` (the «ارسال خودکار گزارش» button) and
   Track 1's slots only through `TaskTimePanel` / `TaskSlaBadge`. Track 1's archive page and date fields now use a
   date-only Jalali format (`formatJalaliDay`), since `formatToJalali` always adds a time.
+- Track 3: `services/nexusApi.ts` adds the SMS-code sign-in step (`MfaRequiredError`, `completeMfaLogin`), the
+  session pickup after single sign-on (`completeSsoSignIn`) and `kind` / `mfaEnabled` on `AdminUser`;
+  `services/orgStructureApi.ts` carries a node's `validFrom` / `validTo`; `utils/errorMessages.ts` has Persian text
+  for the plan, CSV and LDAP refusals. Date pickers for future days no longer use `allowYearSelection` (it offers
+  only past years, for birth dates).
 
 ## Not in these tracks
 

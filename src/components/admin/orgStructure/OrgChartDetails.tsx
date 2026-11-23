@@ -7,9 +7,11 @@ import { AdminCard, AdminDialog, Field, Notice, PrimaryButton, SecondaryButton, 
 import { userErrorMessage } from '../../../utils/errorMessages';
 import { NexusApiError } from '../../../services/nexusApi';
 import { toPersianDigits } from '../../../utils/helpers';
+import { isoToIranDateTimeParts, iranDateTimeToISO } from '../../../utils/jalali';
+import { JalaliDatePicker } from '../../JalaliDatePicker';
 import {
   type Company, ChartCompany, ChartMember, ChartPosition, ChartUnit, LinkType, NodeType, OrgUiLevel, NodeTypeRule, OrgNode, Position, UnitPosition, UnplacedUser, UserAssignment, MANAGER_SOURCE_TITLES,
-  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, setCompanyUiLevel, setNodeDetails, deactivateNode, isConflict, reorderNode, setNodeManager, updateNode,
+  ORG_STRUCTURE_PERMISSIONS as P, ORG_UNIT_PERMISSIONS as U, activateNode, canNode, setCompanyUiLevel, setNodeDetails, setNodeValidity, deactivateNode, isConflict, reorderNode, setNodeManager, updateNode,
   addUnitPosition, createOrgUnit, createPosition, getAssignment, linkUnitToCompany, listCompanies, listUnitPositions,
   orderUnitPositions, positionsForCompany, removeUnitPosition, setAssignment, updateCompany, updateOrgUnit,
   addCompanyPosition, headTitleOf, postLabel, setPostParent, updateUnitPositionCode,
@@ -891,7 +893,11 @@ const ChartDialog: React.FC<{
   const [typeId, setTypeId] = useState(dialog.kind === 'editUnit' ? dialog.unit.nodeType?.nodeTypeId ?? '' : '');
   // A node's optional information (tabs: main, supplementary, contact), from the node list.
   const editedNode = dialog.kind === 'editUnit' ? nodeOf(dialog.unit.unitId) : undefined;
-  const [tab, setTab] = useState<'main' | 'extra' | 'contact'>('main');
+  const [tab, setTab] = useState<'main' | 'extra' | 'contact' | 'validity'>('main');
+  // When the unit exists (OPEN-05): Iranian days, empty = no limit.
+  const dayOf = (iso: string | null | undefined) => (iso ? isoToIranDateTimeParts(iso)?.date : undefined);
+  const [validFrom, setValidFrom] = useState<string | undefined>(dayOf(editedNode?.validFrom));
+  const [validTo, setValidTo] = useState<string | undefined>(dayOf(editedNode?.validTo));
   const [nodeCode, setNodeCode] = useState(editedNode?.code ?? '');
   const [latinName, setLatinName] = useState(editedNode?.latinName ?? '');
   const [letterTitle, setLetterTitle] = useState(editedNode?.correspondenceTitle ?? '');
@@ -993,6 +999,8 @@ const ChartDialog: React.FC<{
       const mainChanged = name.trim() !== unit.name || typeId !== (unit.nodeType?.nodeTypeId ?? '');
       const detailsChanged = nodeCode.trim() !== (editedNode?.code ?? '') || latinName.trim() !== (editedNode?.latinName ?? '')
         || letterTitle.trim() !== (editedNode?.correspondenceTitle ?? '') || phone.trim() !== (editedNode?.phone ?? '') || address.trim() !== (editedNode?.address ?? '');
+      const validityChanged = (validFrom ?? null) !== (dayOf(editedNode?.validFrom) ?? null) || (validTo ?? null) !== (dayOf(editedNode?.validTo) ?? null);
+      if (validFrom && validTo && validTo < validFrom) canSave = false;
       save = async () => done(await run(
         async () => {
           if (!useNodeApi) return updateOrgUnit(unit.unitId, { name: name.trim(), managerUserId: personId, isActive: active });
@@ -1000,12 +1008,15 @@ const ChartDialog: React.FC<{
           let version = versionOf(unit.unitId);
           if (mainChanged) version = (await updateNode(unit.unitId, { name: name.trim(), nodeTypeId: typeId || null, rowVersion: version })).rowVersion;
           if (detailsChanged) {
-            await setNodeDetails(unit.unitId, { code: nodeCode.trim() || null, latinName: latinName.trim() || null, correspondenceTitle: letterTitle.trim() || null, phone: phone.trim() || null, address: address.trim() || null, rowVersion: version });
+            version = (await setNodeDetails(unit.unitId, { code: nodeCode.trim() || null, latinName: latinName.trim() || null, correspondenceTitle: letterTitle.trim() || null, phone: phone.trim() || null, address: address.trim() || null, rowVersion: version })).rowVersion;
+          }
+          if (validityChanged) {
+            await setNodeValidity(unit.unitId, { validFrom: validFrom ? iranDateTimeToISO(validFrom) ?? null : null, validTo: validTo ? iranDateTimeToISO(validTo) ?? null : null, rowVersion: version });
           }
           return undefined;
         },
         'واحد ویرایش شد.', 'ویرایش واحد انجام نشد.'));
-      const tabs = [{ id: 'main' as const, label: 'اطلاعات اصلی' }, { id: 'extra' as const, label: 'تکمیلی' }, { id: 'contact' as const, label: 'تماس' }];
+      const tabs = [{ id: 'main' as const, label: 'اطلاعات اصلی' }, { id: 'extra' as const, label: 'تکمیلی' }, { id: 'contact' as const, label: 'تماس' }, { id: 'validity' as const, label: 'اعتبار' }];
       content = (
         <>
           {useNodeApi && (
@@ -1042,7 +1053,15 @@ const ChartDialog: React.FC<{
               <Field label="نشانی" hint="اختیاری."><textarea rows={3} className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={500} /></Field>
             </>
           )}
-          {useNodeApi && (tab !== 'main') && <p className="text-[11px] text-slate-500">خالی گذاشتن یک فیلد یعنی «ندارد».</p>}
+          {useNodeApi && tab === 'validity' && (
+            <>
+              <Field label="شروع وجود واحد" hint="خالی: از ابتدا"><JalaliDatePicker value={validFrom} onChange={setValidFrom} ariaLabel="شروع وجود واحد" /></Field>
+              <Field label="پایان وجود واحد" hint="خالی: بدون پایان"><JalaliDatePicker value={validTo} onChange={setValidTo} ariaLabel="پایان وجود واحد" /></Field>
+              {validFrom && validTo && validTo < validFrom && <p className="text-[11px] text-rose-600">پایان باید بعد از شروع باشد.</p>}
+              <p className="text-[11px] text-slate-500 leading-5">این تاریخ‌ها فقط در «نمایش چارت در یک تاریخ گذشته» اثر دارند: واحد بیرون از این بازه در چارت آن روز دیده نمی‌شود.</p>
+            </>
+          )}
+          {useNodeApi && (tab === 'extra' || tab === 'contact') && <p className="text-[11px] text-slate-500">خالی گذاشتن یک فیلد یعنی «ندارد».</p>}
         </>
       );
       break;

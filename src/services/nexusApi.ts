@@ -142,6 +142,19 @@ interface AuthResponse {
   /** Instead of tokens, when the user is at the concurrent-session limit. */
   sessionLimit?: SessionLimitChallenge | null;
   session?: SessionStatus | null;
+  /** Instead of tokens, when the sign-in waits for the SMS code (Track 3, MFA). */
+  mfa?: MfaChallenge | null;
+}
+
+/** The SMS code step of a sign-in: which challenge, the masked mobile number it went to, how long it lasts. */
+export interface MfaChallenge { challengeId: string; maskedPhone: string; expiresInSeconds: number }
+
+/** Thrown by login when the password was right and the account signs in with an SMS code too. */
+export class MfaRequiredError extends Error {
+  constructor(public readonly challenge: MfaChallenge) {
+    super('MFA required');
+    this.name = 'MfaRequiredError';
+  }
 }
 
 // --- Sessions ---------------------------------------------------------------------------
@@ -1208,9 +1221,42 @@ export async function login(
     }
     throw err;
   }
+  // With the SMS code on, no token yet: the code is asked for first (completeMfaLogin).
+  if (auth.mfa) throw new MfaRequiredError(auth.mfa);
   // At the concurrent-session limit no token is issued: the user chooses a session to close first.
   if (auth.sessionLimit) throw new SessionLimitError(auth.sessionLimit);
   if (!auth.accessToken) throw new NexusApiError('ورود کامل نشد. لطفاً دوباره تلاش کنید.', 200);
+  saveAuthResponse(auth);
+  return mapUserDto(auth.user);
+}
+
+/** Step 2 of a sign-in that asked for the SMS code. The session limit may still follow (SessionLimitError). */
+export async function completeMfaLogin(challengeId: string, code: string): Promise<User> {
+  const auth = await request<AuthResponse>('POST', '/api/identity/auth/login/mfa', {
+    body: { challengeId, code: code.trim() },
+    auth: false,
+    retryOnUnauthorized: false,
+    cookieSession: true,
+    unauthorizedMessage: 'کد تأیید درست نیست یا منقضی شده است.',
+  });
+  if (auth.sessionLimit) throw new SessionLimitError(auth.sessionLimit);
+  if (!auth.accessToken) throw new NexusApiError('ورود کامل نشد. لطفاً دوباره تلاش کنید.', 200);
+  saveAuthResponse(auth);
+  return mapUserDto(auth.user);
+}
+
+/**
+ * After a single sign-on (OIDC / SAML) the server has set the session cookie and sent the browser back with
+ * ?sso=ok: the session is taken up from that cookie (Track 3).
+ */
+export async function completeSsoSignIn(): Promise<User> {
+  const auth = await request<AuthResponse>('POST', '/api/identity/auth/refresh', {
+    auth: false,
+    retryOnUnauthorized: false,
+    cookieSession: true,
+    unauthorizedMessage: 'ورود یکپارچه کامل نشد. دوباره تلاش کنید.',
+  });
+  if (!auth.accessToken) throw new NexusApiError('ورود یکپارچه کامل نشد. دوباره تلاش کنید.', 200);
   saveAuthResponse(auth);
   return mapUserDto(auth.user);
 }
@@ -1999,9 +2045,13 @@ export interface AdminUser {
   isSystem: boolean;
   roles: string[];
   lastLoginAtUtc: string | null;
+  /** Normal, Guest (an outside person) or ServiceAccount (Track 3). */
+  kind: 'Normal' | 'Guest' | 'ServiceAccount';
+  /** Signs in with an SMS code too. */
+  mfaEnabled: boolean;
 }
 
-function toAdminUser(u: UserDto & { firstName?: string | null; lastName?: string | null; isSystem?: boolean }): AdminUser {
+function toAdminUser(u: UserDto & { firstName?: string | null; lastName?: string | null; isSystem?: boolean; kind?: string | null; mfaEnabled?: boolean }): AdminUser {
   return {
     address: u.address || '', fatherName: u.fatherName || '', birthDate: u.birthDate || '', avatarUrl: u.avatarUrl || '',
     id: u.id,
@@ -2015,6 +2065,8 @@ function toAdminUser(u: UserDto & { firstName?: string | null; lastName?: string
     isSystem: !!u.isSystem,
     roles: u.roles || [],
     lastLoginAtUtc: u.lastLoginAtUtc,
+    kind: u.kind === 'Guest' || u.kind === 'ServiceAccount' ? u.kind : 'Normal',
+    mfaEnabled: !!u.mfaEnabled,
   };
 }
 

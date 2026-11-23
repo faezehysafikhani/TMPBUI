@@ -535,6 +535,9 @@ export interface OrgNode {
   correspondenceTitle?: string | null;
   phone?: string | null;
   address?: string | null;
+  /** When the node exists (each null: no limit); only the chart on a past day filters by them. */
+  validFrom?: string | null;
+  validTo?: string | null;
 }
 
 export interface NodePathItem { id: string; name: string }
