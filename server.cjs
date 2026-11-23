@@ -54,8 +54,8 @@ function buildHeaders(config) {
 
 // security-headers.json
 var security_headers_default = {
-  _comment: 'The one place the response security headers are defined. server.ts reads it; public/web.config and vercel.json are generated from it (npm run headers:sync) and checked by npm run headers:check. The Content-Security-Policy starts in report-only mode: violations are reported to /api/platform/csp-report and nothing is blocked. After the reports of about two weeks are clean, change "cspMode" to "enforce" and run npm run headers:sync.',
-  cspMode: "report-only",
+  _comment: 'The one place the response security headers are defined. server.ts reads it; public/web.config and vercel.json are generated from it (npm run headers:sync) and checked by npm run headers:check. The Content-Security-Policy is enforced (OPEN-03): anything outside it is blocked and reported to /api/platform/csp-report. If a release needs a new source, add it here and run npm run headers:sync; as a stop-gap, "cspMode": "report-only" (or CSP_MODE=report-only for npm start) reports without blocking.',
+  cspMode: "enforce",
   cspReportUri: "/api/platform/csp-report",
   connectSrcExtra: [],
   contentSecurityPolicy: [
@@ -108,6 +108,8 @@ app.use(import_express.default.json({ limit: "100kb" }));
 app.disable("x-powered-by");
 var securityHeaders = process.env.NODE_ENV === "production" ? buildHeaders({
   ...security_headers_default,
+  // CSP_MODE=report-only (or off) is a stop-gap without a rebuild if the enforced policy blocks something.
+  cspMode: process.env.CSP_MODE || security_headers_default.cspMode,
   // When the API is on another origin (not the intended same-origin setup): its address for the
   // report endpoint and for connect-src, e.g. CSP_REPORT_URI=http://localhost:5271/api/platform/csp-report
   // CSP_CONNECT_SRC="http://localhost:5271 ws://localhost:5271".

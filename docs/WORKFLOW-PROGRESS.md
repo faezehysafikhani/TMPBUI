@@ -63,3 +63,11 @@ title (opens its detail). Arrow keys / Enter / Esc. `components/palette/CommandP
 Core `TMPB-API/db/upgrade-21-workflow.sql` (+ `upgrade-21-rollback.sql`) for databases managed by scripts:
 idempotent, same schema as the API builds at start-up (checked column by column), also brings an older Workflow
 schema up to date. `db/check-upgrades.sql` and `DEPLOYMENT-CONFIG.md` now list steps 19-21. ✅ pushed.
+
+# CSP enforce (OPEN-03) — done
+
+`security-headers.json` → `"cspMode": "enforce"`; `public/web.config` and `vercel.json` regenerated. Before the
+switch, the production build was served with the policy enforced and walked in the browser: every menu page,
+settings tabs, task detail, new task, Ctrl+K palette, image/PDF attachment preview and open-in-new-window (blob),
+report Excel export, tutorial video, SignalR — no violation, no page error. Stop-gap without a rebuild:
+`CSP_MODE=report-only` for `npm start` (checked), or the header name in `web.config` on IIS. ✅ pushed.

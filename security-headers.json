@@ -1,6 +1,6 @@
 {
-  "_comment": "The one place the response security headers are defined. server.ts reads it; public/web.config and vercel.json are generated from it (npm run headers:sync) and checked by npm run headers:check. The Content-Security-Policy starts in report-only mode: violations are reported to /api/platform/csp-report and nothing is blocked. After the reports of about two weeks are clean, change \"cspMode\" to \"enforce\" and run npm run headers:sync.",
-  "cspMode": "report-only",
+  "_comment": "The one place the response security headers are defined. server.ts reads it; public/web.config and vercel.json are generated from it (npm run headers:sync) and checked by npm run headers:check. The Content-Security-Policy is enforced (OPEN-03): anything outside it is blocked and reported to /api/platform/csp-report. If a release needs a new source, add it here and run npm run headers:sync; as a stop-gap, \"cspMode\": \"report-only\" (or CSP_MODE=report-only for npm start) reports without blocking.",
+  "cspMode": "enforce",
   "cspReportUri": "/api/platform/csp-report",
   "connectSrcExtra": [],
   "contentSecurityPolicy": [
