@@ -43,7 +43,7 @@ const STATUS_BADGE: Record<ApprovalStatus, { tone: 'slate' | 'amber' | 'green' |
   NotSubmitted: { tone: 'slate', label: 'ثبت نهایی نشده' },
   PendingApproval: { tone: 'amber', label: 'در انتظار تأیید' },
   Approved: { tone: 'green', label: 'ثبت نهایی شده' },
-  Rejected: { tone: 'red', label: 'رد شده' },
+  Rejected: { tone: 'red', label: 'رد شده؛ اصلاح و دوباره ارسال کنید' },
 };
 
 type Tab = 'week' | 'workload';
@@ -112,10 +112,11 @@ const WeekPanel: React.FC<{ me: User | null; canLog: boolean; canViewAll: boolea
 
   const submit = async () => {
     if (!week) return;
-    if (!(await appConfirm(`هفتهٔ ${formatJalaliDay(week.weekStart)} با ${formatMinutes(week.totalMinutes)} ثبت نهایی شود؟ بعد از آن زمان‌های این هفته قابل تغییر نیستند.`, { confirmLabel: 'ثبت نهایی' }))) return;
+    if (!(await appConfirm(`هفتهٔ ${formatJalaliDay(week.weekStart)} با ${formatMinutes(week.totalMinutes)} ثبت نهایی شود؟ اگر مسیر تأیید ساعت کار تعریف شده باشد برای تأیید فرستاده می‌شود، وگرنه همین حالا نهایی می‌شود. بعد از آن زمان‌های این هفته قابل تغییر نیستند.`, { confirmLabel: 'ثبت نهایی' }))) return;
     try {
-      setWeek(await submitTimesheetWeek(week.weekStart));
-      showToast('هفته ثبت نهایی شد.', 'ok');
+      const sent = await submitTimesheetWeek(week.weekStart);
+      setWeek(sent);
+      showToast(sent.status === 'PendingApproval' ? 'هفته برای تأیید فرستاده شد.' : 'هفته ثبت نهایی شد.', 'ok');
     } catch (err) {
       showToast(userErrorMessage(err, 'هفته ثبت نهایی نشد.'), 'error');
     }
@@ -208,7 +209,7 @@ const WeekPanel: React.FC<{ me: User | null; canLog: boolean; canViewAll: boolea
                     <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">{e.note || '—'}</td>
                     <td className="px-3 py-2.5">{e.source === 'Timer' ? <StatusBadge tone="indigo">زمان‌سنج</StatusBadge> : <StatusBadge tone="slate">دستی</StatusBadge>}</td>
                     <td className="px-3 py-2.5">
-                      {editable && e.status === 'NotSubmitted' && (
+                      {editable && (e.status === 'NotSubmitted' || e.status === 'Rejected') && (
                         <span className="flex gap-1">
                           <IconAction icon={Pencil} label="ویرایش" onClick={() => setEditing(e)} />
                           <IconAction icon={Trash2} label="حذف" tone="rose" onClick={() => remove(e)} />

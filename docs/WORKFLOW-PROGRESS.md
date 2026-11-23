@@ -15,8 +15,8 @@ temporary delegation), CAT-123 (approval routing), CAT-108 (approval chains per 
 | 1 | Core / TMPB-API: Workflow added (services, `/api/workflow/*` endpoints, schema at start-up) | ✅ pushed (Core `3806036`); round trip checked: chain → submit task review → Approval Center → approve → task completed |
 | 2 | UI service + types (`services/approvalsApi.ts`, `components/approvals/types.ts`) | ✅ pushed |
 | 3 | «کارتابل تأیید» page: pending approvals with titles, approve / reject with a comment (menu item, `Workflow.View`) | ✅ pushed (not yet checked in the browser) |
-| 4 | Task detail: «ارسال برای بازبینی» and the review status | ⏳ |
-| 5 | Timesheet: «ارسال برای تأیید» wording and status when a chain exists | ⏳ |
+| 4 | Task detail: «ارسال برای بازبینی» and the review status (pending / rejected with reason / approved) | ✅ pushed (not yet checked in the browser) |
+| 5 | Timesheet: submission says whether it went for approval; rejected entries editable and resendable | ✅ pushed |
 | 6 | Settings: approval chains per kind (TaskReview, Timesheet): steps by person or by role in the chart (Manager, Approver1/2) | ⏳ |
 | 7 | Approver delegation (period, kind, reason; revoke) — tab «جانشینی تأیید» on the approvals page | ✅ pushed (not yet checked in the browser) |
 | 8 | End-to-end check in the real app, then commit | ⏳ |

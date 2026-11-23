@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TaskTimePanel } from './work/TaskTimePanel';
 import { TaskFeatureActions } from './tasks/TaskFeatureActions';
+import { TaskReviewBox } from './approvals/TaskReviewBox';
 import { TaskExtrasPanel } from './tasks/TaskExtrasPanel';
 import { TaskPlanningPanel } from './tasks/TaskPlanningPanel';
 import { Task, TaskComment, TaskLog, TaskStatus, User, STATUSES, PRIORITIES, Attachment, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
@@ -707,6 +708,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </button>
             </div>
           )}
+
+          {/* Review through the approval chain (Workflow) */}
+          <TaskReviewBox task={task} canSubmit={can(currentUser, PERMISSIONS.tasksEdit) && (isOwnerOrTaskAdmin || (isAssignee && allowStatusUpdateForAssignee))} />
 
           {/* Track 1: hand-off, many subtasks, save as template, archive; work type and fields; what stands between the task and done */}
           <TaskFeatureActions
