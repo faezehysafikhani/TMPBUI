@@ -44,7 +44,8 @@ function buildHeaders(config) {
   headers["Strict-Transport-Security"] = config.strictTransportSecurity;
   headers["Permissions-Policy"] = config.permissionsPolicy;
   if (config.cspMode !== "off") {
-    const policy = [...config.contentSecurityPolicy];
+    const extra = (config.connectSrcExtra || []).join(" ");
+    const policy = config.contentSecurityPolicy.map((directive) => extra && directive.startsWith("connect-src ") ? `${directive} ${extra}` : directive);
     if (config.cspReportUri) policy.push(`report-uri ${config.cspReportUri}`);
     headers[config.cspMode === "enforce" ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only"] = policy.join("; ");
   }
@@ -56,6 +57,7 @@ var security_headers_default = {
   _comment: 'The one place the response security headers are defined. server.ts reads it; public/web.config and vercel.json are generated from it (npm run headers:sync) and checked by npm run headers:check. The Content-Security-Policy starts in report-only mode: violations are reported to /api/platform/csp-report and nothing is blocked. After the reports of about two weeks are clean, change "cspMode" to "enforce" and run npm run headers:sync.',
   cspMode: "report-only",
   cspReportUri: "/api/platform/csp-report",
+  connectSrcExtra: [],
   contentSecurityPolicy: [
     "default-src 'self'",
     "script-src 'self'",
@@ -85,10 +87,33 @@ var security_headers_default = {
 // server.ts
 import_dotenv.default.config();
 var app = (0, import_express.default)();
+function apiOriginsFromEnv() {
+  const origins = /* @__PURE__ */ new Set();
+  for (const value of [process.env.VITE_API_BASE_URL, process.env.VITE_SIGNALR_BASE_URL]) {
+    try {
+      const url = new URL(String(value || "").trim());
+      if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+      origins.add(url.origin);
+      origins.add(url.origin.replace(/^http/, "ws"));
+    } catch {
+    }
+  }
+  return [...origins];
+}
 var PORT = process.env.PORT || 3e3;
+var API_PROXY_TARGET = process.env.API_PROXY_TARGET || "https://localhost:7271";
+var devProxy = null;
+app.use((req, res, next) => devProxy ? devProxy(req, res, next) : next());
 app.use(import_express.default.json({ limit: "100kb" }));
 app.disable("x-powered-by");
-var securityHeaders = process.env.NODE_ENV === "production" ? buildHeaders(security_headers_default) : {
+var securityHeaders = process.env.NODE_ENV === "production" ? buildHeaders({
+  ...security_headers_default,
+  // When the API is on another origin (not the intended same-origin setup): its address for the
+  // report endpoint and for connect-src, e.g. CSP_REPORT_URI=http://localhost:5271/api/platform/csp-report
+  // CSP_CONNECT_SRC="http://localhost:5271 ws://localhost:5271".
+  cspReportUri: process.env.CSP_REPORT_URI || security_headers_default.cspReportUri,
+  connectSrcExtra: process.env.CSP_CONNECT_SRC ? process.env.CSP_CONNECT_SRC.split(/\s+/).filter(Boolean) : [...security_headers_default.connectSrcExtra, ...apiOriginsFromEnv()]
+}) : {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer"
@@ -126,6 +151,15 @@ app.get(["/icon.svg", "/favicon.svg"], (req, res) => {
 async function startServer() {
   if (process.env.VERCEL !== "1") {
     if (process.env.NODE_ENV !== "production") {
+      const { createProxyMiddleware } = await import("http-proxy-middleware");
+      devProxy = createProxyMiddleware({
+        target: API_PROXY_TARGET,
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        pathFilter: (pathname) => pathname.startsWith("/api/") && pathname !== "/api/health" || pathname.startsWith("/hubs/")
+      });
+      console.log(`Dev proxy: /api and /hubs -> ${API_PROXY_TARGET}`);
       const { createServer: createViteServer } = await import("vite");
       const vite = await createViteServer({
         server: { middlewareMode: true },
@@ -162,9 +196,10 @@ async function startServer() {
         res.sendFile(indexPath);
       });
     }
-    app.listen(Number(PORT), "0.0.0.0", () => {
+    const server = app.listen(Number(PORT), "0.0.0.0", () => {
       console.log(`Server listening on http://0.0.0.0:${PORT}`);
     });
+    if (devProxy?.upgrade) server.on("upgrade", devProxy.upgrade);
   }
 }
 startServer();
