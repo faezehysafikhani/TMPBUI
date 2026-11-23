@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Kanban, Calendar, Plus, AlertCircle, Settings, MessageSquare, FileText, Layers, X, BarChart3, UserCog, UserX, Archive, Inbox, Timer } from 'lucide-react';
+import { Kanban, Calendar, Plus, AlertCircle, Settings, MessageSquare, FileText, Layers, X, BarChart3, UserCog, UserX, Archive, Inbox, Timer, ClipboardCheck } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import { AppColorPalette } from '../types';
 import { COLOR_PALETTES } from '../utils/theme';
 
 export type ActiveTab = 'kanban' | 'calendar' | 'overdue' | 'chat' | 'notes' | 'reports' | 'substitution' | 'unplaced' | 'settings'
   // New pages (docs/UI-WORKSTREAMS.md): archive - Track 1; requests, timesheets - Track 2.
-  | 'archive' | 'requests' | 'timesheets';
+  | 'archive' | 'requests' | 'timesheets'
+  // The Approval Center (Workflow).
+  | 'approvals';
 
 interface SandwichBarProps {
   activeTab: ActiveTab;
@@ -170,6 +172,26 @@ export const SandwichBar: React.FC<SandwichBarProps> = ({
                   </button>
                   )}
 
+                  {canOpenTab('approvals') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsToolsMenuOpen(false);
+                      setActiveTab('approvals');
+                    }}
+                    className={`relative w-11 h-11 rounded-full shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer ring-2 ring-white/20 animate-in fade-in slide-in-from-bottom-2 duration-100 ${
+                      activeTab === 'approvals'
+                        ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
+                        : 'bg-slate-800 hover:bg-slate-700 text-sky-400'
+                    }`}
+                    title="کارتابل تأیید"
+                    aria-label="کارتابل تأیید"
+                  >
+                    <ClipboardCheck className="w-5.5 h-5.5" />
+
+                    <span className="absolute right-full mr-2 whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg pointer-events-none">کارتابل تأیید</span>
+                  </button>
+                  )}
                   {canOpenTab('archive') && (
                   <button
                     type="button"

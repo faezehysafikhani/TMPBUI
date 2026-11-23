@@ -33,6 +33,7 @@ const SettingsView = lazy(() => import('./components/SettingsView').then(m => ({
 const ArchivedTasksView = lazy(() => import('./components/tasks/ArchivedTasksView').then(m => ({ default: m.ArchivedTasksView })));
 const RequestsView = lazy(() => import('./components/work/RequestsView').then(m => ({ default: m.RequestsView })));
 const TimesheetsView = lazy(() => import('./components/work/TimesheetsView').then(m => ({ default: m.TimesheetsView })));
+const ApprovalsView = lazy(() => import('./components/approvals/ApprovalsView').then(m => ({ default: m.ApprovalsView })));
 
 const TaskFormModal = lazy(() => import('./components/TaskFormModal').then(m => ({ default: m.TaskFormModal })));
 const TaskDetailModal = lazy(() => import('./components/TaskDetailModal').then(m => ({ default: m.TaskDetailModal })));
@@ -1627,6 +1628,14 @@ export default function App() {
               <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
                 <ErrorBoundary title="خطا در نمایش ساعت کار">
                   <TimesheetsView />
+                </ErrorBoundary>
+              </Suspense>
+            )}
+
+            {activeTab === 'approvals' && canOpenSection('approvals') && (
+              <Suspense fallback={<PageViewLoader appColorPalette={appColorPalette} />}>
+                <ErrorBoundary title="خطا در نمایش کارتابل تأیید">
+                  <ApprovalsView />
                 </ErrorBoundary>
               </Suspense>
             )}

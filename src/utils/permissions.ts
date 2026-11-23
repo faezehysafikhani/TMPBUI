@@ -36,6 +36,7 @@ export const PERMISSIONS = {
   requestsSubmit: 'Requests.Submit',
   requestsHandle: 'Requests.Handle',
   requestsManage: 'Requests.Manage',
+  workflowView: 'Workflow.View',
 } as const;
 
 /**
@@ -79,6 +80,7 @@ const TAB_PERMISSION: Partial<Record<ActiveTab, string>> = {
   notes: PERMISSIONS.notesManage,
   reports: PERMISSIONS.tasksView,
   archive: PERMISSIONS.tasksView,
+  approvals: PERMISSIONS.workflowView,
 };
 
 /** Whether a section (menu entry and page) is available to the user. Chat and settings always are. */
