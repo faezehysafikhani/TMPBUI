@@ -1,9 +1,10 @@
+import { useSchedulingCalendarVersion } from '../utils/useSchedulingCalendar';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { toPersianDigits } from '../utils/helpers';
 import {
-  getCurrentJalali, getJalaliHoliday, getJalaliMonthDays, getJalaliMonthFirstDayOfWeek, gregorianToJalali, jalaliToGregorian, getIranTodayISO,
+  getCurrentJalali, getJalaliMonthDays, getJalaliMonthFirstDayOfWeek, gregorianToJalali, jalaliToGregorian, schedulingOffDayInfo, getIranTodayISO,
 } from '../utils/jalali';
 
 const MONTHS = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
@@ -37,6 +38,7 @@ export const JalaliDatePicker: React.FC<{
   /** Past days, Fridays and official holidays cannot be picked (scheduling tasks and meetings). */
   blockOffDays?: boolean;
 }> = ({ value, onChange, placeholder = 'انتخاب تاریخ', ariaLabel, allowYearSelection = false, blockOffDays = false }) => {
+  useSchedulingCalendarVersion();
   const today = getCurrentJalali();
   const selected = value ? toJalali(value) : null;
   const [open, setOpen] = useState(false);
@@ -148,7 +150,8 @@ export const JalaliDatePicker: React.FC<{
             {cells.map((d, i) => {
               if (d === null) return <span key={`e${i}`} />;
               const day = { jy: view.jy, jm: view.jm, jd: d };
-              const off = i % 7 === 6 || getJalaliHoliday(view.jy, view.jm, d).isHoliday;
+              const offInfo = schedulingOffDayInfo(toIso({ jy: view.jy, jm: view.jm, jd: d }));
+              const off = offInfo.off;
               const past = blockOffDays && toIso({ jy: view.jy, jm: view.jm, jd: d }) < getIranTodayISO();
               const isSelected = same(selected, day);
               const isToday = same(today, day);
@@ -158,7 +161,7 @@ export const JalaliDatePicker: React.FC<{
                   key={d}
                   type="button"
                   disabled={blocked}
-                  title={blocked ? past ? 'روز گذشته؛ امکان انتخاب وجود ندارد' : 'روز تعطیل؛ امکان انتخاب وجود ندارد' : undefined}
+                  title={blocked ? past ? 'روز گذشته؛ امکان انتخاب وجود ندارد' : `${offInfo.title || 'روز تعطیل'}؛ امکان انتخاب وجود ندارد` : off ? offInfo.title : undefined}
                   onClick={() => pick(day)}
                   aria-label={toPersianDigits(`${d} ${MONTHS[view.jm - 1]} ${view.jy}`)}
                   aria-pressed={isSelected}

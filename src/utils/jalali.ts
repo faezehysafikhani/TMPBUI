@@ -436,14 +436,38 @@ export function isPastDay(isoDate: string): boolean {
   return !!day && day < getIranTodayISO();
 }
 
-/** Friday or an official Iranian holiday. `isoDate` is yyyy-MM-dd (or a full ISO instant, read in Iran time). */
-export function isSchedulingOffDay(isoDate: string): boolean {
-  const day = isoToIranDateTimeParts(isoDate)?.date;
+/**
+ * The organization's default work calendar, when it has one (CAT-85): its days off in the loaded range. null:
+ * no work calendar (or not loaded) - Friday and the official Iranian holidays decide, as on the server.
+ * Filled by services/workCalendarApi.loadSchedulingDays().
+ */
+let workCalendarOffDays: { from: string; to: string; days: Map<string, string | null> } | null = null;
+
+export function setSchedulingCalendar(value: { from: string; to: string; offDays: { date: string; reason: string | null }[] } | null): void {
+  workCalendarOffDays = value ? { from: value.from, to: value.to, days: new Map(value.offDays.map((d) => [d.date, d.reason])) } : null;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SCHEDULING_CALENDAR_EVENT));
+}
+/** Fired when the work calendar's days are (re)loaded, so open pickers redraw. */
+export const SCHEDULING_CALENDAR_EVENT = 'nexuscore:scheduling-calendar';
+
+/** Whether a day takes no new task or meeting, and why (for a tooltip). `isoDate` is yyyy-MM-dd or an ISO instant. */
+export function schedulingOffDayInfo(isoDate: string): { off: boolean; title?: string; fromWorkCalendar: boolean } {
+  const day = isoToIranDateTimeParts(isoDate)?.date ?? (/^\d{4}-\d{2}-\d{2}$/.test(isoDate) ? isoDate : undefined);
   const [gy, gm, gd] = (day ?? '').split('-').map(Number);
-  if (!gy || !gm || !gd) return false;
-  if (new Date(Date.UTC(gy, gm - 1, gd)).getUTCDay() === 5) return true;
+  if (!day || !gy || !gm || !gd) return { off: false, fromWorkCalendar: false };
+  if (workCalendarOffDays && day >= workCalendarOffDays.from && day <= workCalendarOffDays.to) {
+    const off = workCalendarOffDays.days.has(day);
+    return { off, title: off ? workCalendarOffDays.days.get(day) || 'تعطیل در تقویم کاری' : undefined, fromWorkCalendar: true };
+  }
+  if (new Date(Date.UTC(gy, gm - 1, gd)).getUTCDay() === 5) return { off: true, title: 'جمعه (تعطیل)', fromWorkCalendar: false };
   const { jy, jm, jd } = gregorianToJalali(gy, gm, gd);
-  return getJalaliHoliday(jy, jm, jd).isHoliday;
+  const holiday = getJalaliHoliday(jy, jm, jd);
+  return { off: holiday.isHoliday, title: holiday.title, fromWorkCalendar: false };
+}
+
+/** Takes no new task or meeting: a day off in the work calendar, or (without one) Friday or an official holiday. */
+export function isSchedulingOffDay(isoDate: string): boolean {
+  return schedulingOffDayInfo(isoDate).off;
 }
 
 export const SCHEDULING_OFF_DAY_MESSAGE = 'در روز جمعه و تعطیلات رسمی ایران امکان ایجاد وظیفه یا جلسه وجود ندارد.';
@@ -452,5 +476,9 @@ export const SCHEDULING_PAST_DAY_MESSAGE = 'امکان ایجاد وظیفه ی�
 /** Why a task or meeting cannot be scheduled on this day, or null when it can. */
 export function schedulingBlockReason(isoDate: string): string | null {
   if (isPastDay(isoDate)) return SCHEDULING_PAST_DAY_MESSAGE;
-  return isSchedulingOffDay(isoDate) ? SCHEDULING_OFF_DAY_MESSAGE : null;
+  const info = schedulingOffDayInfo(isoDate);
+  if (!info.off) return null;
+  return info.fromWorkCalendar
+    ? `این روز در تقویم کاری سازمان تعطیل است${info.title && info.title !== 'تعطیل در تقویم کاری' ? ` (${info.title})` : ''}.`
+    : SCHEDULING_OFF_DAY_MESSAGE;
 }

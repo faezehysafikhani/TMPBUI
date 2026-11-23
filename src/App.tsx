@@ -93,6 +93,7 @@ import { appAlert, appConfirm } from './utils/appDialog';
 import { showToast } from './utils/toast';
 import { useBranding } from './utils/branding';
 import { CommandPalette } from './components/palette/CommandPalette';
+import { loadSchedulingDays } from './services/workCalendarApi';
 
 const PAGE_TITLES: Record<string, string> = {
   kanban: 'بورد کانبان',
@@ -867,6 +868,8 @@ export default function App() {
   // one unit). Only what the screens show is narrowed; sub-tasks follow their parent task.
   const activePost = useActivePost();
   useEffect(() => { setActivePostUser(currentUser?.id ?? null); }, [currentUser?.id]);
+  // Which days take new tasks and meetings: the organization's default work calendar (or the built-in rule).
+  useEffect(() => { if (currentUser?.id) void loadSchedulingDays(); }, [currentUser?.id]);
   // Working as another post changes what the person may do (the server then counts only that post's permissions):
   // the menus and the sections follow at once, not at the next sign-in or focus. The switch stays locked (with a
   // small spinner) until the permissions and what the server shows for them are read, so a quick second switch

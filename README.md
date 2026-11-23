@@ -116,7 +116,8 @@ npm start
   Select Fields، فیلد `URI Query (cs-uri-query)` را غیرفعال کنید تا توکن در لاگ نماند.
 - **وابستگی‌ها:** `npm audit --omit=dev` در CI اجرا می‌شود (`.github/workflows/security-checks.yml`).
 - **سرور Node:** خروجی `server.cjs` کنار `dist` ساخته می‌شود، نه داخل آن، و source map ندارد؛
-  فقط محتوای `dist` را روی وب‌سرور منتشر کنید.
+  فقط محتوای `dist` را روی وب‌سرور منتشر کنید. `server.cjs` مثل `dist` در گیت نیست: پیش از `npm start`
+  یک بار `npm run build` بزنید.
 
 ## ساختار پروژه
 

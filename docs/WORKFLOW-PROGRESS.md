@@ -46,9 +46,11 @@ temporary delegation), CAT-123 (approval routing), CAT-108 (approval chains per 
 | 2 | UI: settings «اتوماسیون و گزارش» → «تقویم کاری»: working week, hours per day, official holidays, default, date exceptions, month preview | ✅ pushed, checked in the browser |
 | 3 | Core: SLA «فقط روزهای کاری» follows the default work calendar (`ISlaWorkingDays`, calendar-tasks integration); without one, the old rule | ✅ pushed; checked: a non-working exception tomorrow → a 48 h SLA comes out at 72 h |
 
-Not changed on purpose: the rule that no task can be due on a Friday or an official holiday (task and meeting
-dates) still uses the fixed Iranian rule, not the work calendar, so an organization's own days off do not block
-due dates. Moving that rule to the work calendar too is a product decision.
+Due dates and meeting dates follow the default work calendar too (decided by the product owner): its days off
+take no new task or meeting, an extra working day (e.g. a Friday) does; without a default calendar, Friday and
+the official Iranian holidays as before. Core `WorkCalendarSchedulingDayPolicy` + `GET /api/calendar/scheduling-days`;
+UI `loadSchedulingDays()` feeds `utils/jalali` (forms, CSV import preview, both date pickers). ✅ pushed, checked:
+a company day off refused with its reason, a working Friday accepted, server and form alike.
 
 # Command palette (CAT-107) — done
 

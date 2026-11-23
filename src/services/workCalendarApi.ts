@@ -3,6 +3,7 @@
  * Iran's official holidays apply, and date exceptions. Use apiRequest; see docs/WORKFLOW-PROGRESS.md.
  */
 import { apiRequest, getSessionTenantId } from './nexusApi';
+import { getIranTodayISO, setSchedulingCalendar } from '../utils/jalali';
 import type { CalendarDay, SaveWorkCalendar, WorkCalendar } from '../components/calendar/types';
 
 const BASE = '/api/calendar/work-calendars';
@@ -28,12 +29,45 @@ type Raw = Omit<WorkCalendar, 'workingDays'> & { workingDays: string | number };
 const toCalendar = (r: Raw): WorkCalendar => ({ ...r, workingDays: parseMask(r.workingDays) });
 
 export const listWorkCalendars = async () => (await apiRequest<Raw[]>('GET', BASE, { cache: 'no-store' })).map(toCalendar);
-export const createWorkCalendar = async (input: SaveWorkCalendar) =>
-  toCalendar(await apiRequest<Raw>('POST', BASE, { body: { tenantId: getSessionTenantId(), ...input } }));
+// After any change the scheduling days are read again: the default calendar decides which days take tasks.
+export const createWorkCalendar = async (input: SaveWorkCalendar) => {
+  const saved = toCalendar(await apiRequest<Raw>('POST', BASE, { body: { tenantId: getSessionTenantId(), ...input } }));
+  void loadSchedulingDays();
+  return saved;
+};
 /** Saves the whole calendar; its exceptions become exactly the given ones. */
-export const updateWorkCalendar = async (id: string, input: SaveWorkCalendar) =>
-  toCalendar(await apiRequest<Raw>('PUT', `${BASE}/${id}`, { body: input }));
-export const deleteWorkCalendar = (id: string) => apiRequest<void>('DELETE', `${BASE}/${id}`);
+export const updateWorkCalendar = async (id: string, input: SaveWorkCalendar) => {
+  const saved = toCalendar(await apiRequest<Raw>('PUT', `${BASE}/${id}`, { body: input }));
+  void loadSchedulingDays();
+  return saved;
+};
+export const deleteWorkCalendar = async (id: string) => {
+  await apiRequest<void>('DELETE', `${BASE}/${id}`);
+  void loadSchedulingDays();
+};
 /** Each day in the range as the calendar sees it, and why. */
 export const getCalendarDays = (id: string, from: string, to: string) =>
   apiRequest<CalendarDay[]>('GET', `${BASE}/${id}/days`, { query: { from, to }, cache: 'no-store' });
+
+/**
+ * Loads which days take no new tasks or meetings (the default work calendar's days off, for any signed-in user)
+ * into utils/jalali, so the forms and date pickers refuse exactly what the server refuses. No work calendar, an
+ * older server or an error: the built-in rule (Friday and official holidays).
+ */
+export async function loadSchedulingDays(): Promise<void> {
+  const today = getIranTodayISO();
+  const from = addDaysIso(today, -1);
+  const to = addDaysIso(today, 900);
+  try {
+    const r = await apiRequest<{ usesWorkCalendar: boolean; offDays: { date: string; reason?: string | null }[] }>(
+      'GET', '/api/calendar/scheduling-days', { query: { from, to }, cache: 'no-store' });
+    setSchedulingCalendar(r.usesWorkCalendar ? { from, to, offDays: (r.offDays || []).map((d) => ({ date: d.date.slice(0, 10), reason: d.reason ?? null })) } : null);
+  } catch {
+    setSchedulingCalendar(null);
+  }
+}
+
+function addDaysIso(day: string, n: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}

@@ -10,7 +10,9 @@ import {
   jalaliToISO,
   parseISOToJalali,
   getJalaliHoliday,
+  schedulingOffDayInfo,
 } from '../utils/jalali';
+import { useSchedulingCalendarVersion } from '../utils/useSchedulingCalendar';
 import { toPersianDigits } from '../utils/helpers';
 import {
   Calendar as CalendarIcon,
@@ -47,6 +49,7 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
   optional = false,
   emptyText = 'بدون تاریخ',
 }) => {
+  useSchedulingCalendarVersion();
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -372,9 +375,13 @@ export const JalaliDateTimePicker: React.FC<JalaliDateTimePickerProps> = ({
                 const dayOfWeekIdx = (firstDayOfWeek + idx) % 7;
                 const isWeekend = dayOfWeekIdx === 5 || dayOfWeekIdx === 6;
                 const holidayInfo = getJalaliHoliday(viewJy, viewJm, day);
-                const isRedDay = isWeekend || holidayInfo.isHoliday;
+                // With a work calendar, its days off are the red days (an extra working Friday is not red).
+                const calendarDay = schedulingOffDayInfo(jalaliToISO(viewJy, viewJm, day, 12, 0));
+                const isRedDay = calendarDay.fromWorkCalendar ? calendarDay.off : isWeekend || holidayInfo.isHoliday;
 
-                const tooltipText = holidayInfo.isHoliday
+                const tooltipText = calendarDay.fromWorkCalendar
+                  ? calendarDay.off ? calendarDay.title : undefined
+                  : holidayInfo.isHoliday
                   ? holidayInfo.title
                   : isWeekend
                   ? dayOfWeekIdx === 5
