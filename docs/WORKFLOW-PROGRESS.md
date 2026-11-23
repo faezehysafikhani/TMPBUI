@@ -17,7 +17,7 @@ temporary delegation), CAT-123 (approval routing), CAT-108 (approval chains per 
 | 3 | «کارتابل تأیید» page: pending approvals with titles, approve / reject with a comment (menu item, `Workflow.View`) | ✅ pushed (not yet checked in the browser) |
 | 4 | Task detail: «ارسال برای بازبینی» and the review status (pending / rejected with reason / approved) | ✅ pushed (not yet checked in the browser) |
 | 5 | Timesheet: submission says whether it went for approval; rejected entries editable and resendable | ✅ pushed |
-| 6 | Settings: approval chains per kind (TaskReview, Timesheet): steps by person or by role in the chart (Manager, Approver1/2) | ⏳ |
+| 6 | Settings «اتوماسیون و گزارش» → «مسیرهای تأیید»: steps per kind, by chart role (direct manager, one level up, owner) or a person; optional steps; order | ✅ pushed (not yet checked in the browser) |
 | 7 | Approver delegation (period, kind, reason; revoke) — tab «جانشینی تأیید» on the approvals page | ✅ pushed (not yet checked in the browser) |
 | 8 | End-to-end check in the real app, then commit | ⏳ |
 

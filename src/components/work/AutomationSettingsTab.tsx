@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { FolderInput, History, Pencil, Plus, Trash2, Workflow, X } from 'lucide-react';
+import { ClipboardCheck, FolderInput, History, Pencil, Plus, Trash2, Workflow, X } from 'lucide-react';
+import { ApprovalChainsSection } from '../approvals/ApprovalChainsSection';
+import { APPROVAL_PERMISSIONS } from '../../services/approvalsApi';
 import type { User, WorkTeam } from '../../types';
 import {
   AdminCard,
@@ -52,10 +54,10 @@ import type {
  * two exports (docs/UI-WORKSTREAMS.md). Each user's own report digests are on the reports page.
  */
 export function canSeeAutomationSettings(can: (permission: string) => boolean): boolean {
-  return can(WORK_PERMISSIONS.manageAutomation) || can(WORK_PERMISSIONS.manageRequests);
+  return can(WORK_PERMISSIONS.manageAutomation) || can(WORK_PERMISSIONS.manageRequests) || can(APPROVAL_PERMISSIONS.configure);
 }
 
-type Section = 'rules' | 'log' | 'categories';
+type Section = 'rules' | 'log' | 'categories' | 'approvals';
 
 export const AutomationSettingsTab: React.FC<{ can: (permission: string) => boolean }> = ({ can }) => {
   const automation = can(WORK_PERMISSIONS.manageAutomation);
@@ -63,6 +65,7 @@ export const AutomationSettingsTab: React.FC<{ can: (permission: string) => bool
   const tabs: TabItem<Section>[] = [
     ...(automation ? ([{ id: 'rules', label: 'قواعد خودکار', icon: Workflow }, { id: 'log', label: 'گزارش اجرا', icon: History }] as TabItem<Section>[]) : []),
     ...(requests ? ([{ id: 'categories', label: 'دسته‌های درخواست', icon: FolderInput }] as TabItem<Section>[]) : []),
+    ...(can(APPROVAL_PERMISSIONS.configure) ? ([{ id: 'approvals', label: 'مسیرهای تأیید', icon: ClipboardCheck }] as TabItem<Section>[]) : []),
   ];
   const [active, setActive] = useState<Section>(tabs[0]?.id ?? 'categories');
   const current = tabs.some((t) => t.id === active) ? active : tabs[0]?.id;
@@ -72,6 +75,7 @@ export const AutomationSettingsTab: React.FC<{ can: (permission: string) => bool
       {current === 'rules' && <RulesSection />}
       {current === 'log' && <LogSection />}
       {current === 'categories' && <CategoriesSection />}
+      {current === 'approvals' && <ApprovalChainsSection />}
     </div>
   );
 };
