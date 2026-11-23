@@ -14,12 +14,12 @@ temporary delegation), CAT-123 (approval routing), CAT-108 (approval chains per 
 |---|---|---|
 | 1 | Core / TMPB-API: Workflow added (services, `/api/workflow/*` endpoints, schema at start-up) | ✅ pushed (Core `3806036`); round trip checked: chain → submit task review → Approval Center → approve → task completed |
 | 2 | UI service + types (`services/approvalsApi.ts`, `components/approvals/types.ts`) | ✅ pushed |
-| 3 | «کارتابل تأیید» page: pending approvals with titles, approve / reject with a comment (menu item, `Workflow.View`) | ✅ pushed (not yet checked in the browser) |
-| 4 | Task detail: «ارسال برای بازبینی» and the review status (pending / rejected with reason / approved) | ✅ pushed (not yet checked in the browser) |
+| 3 | «کارتابل تأیید» page: pending approvals with titles, approve / reject with a comment (menu item, `Workflow.View`) | ✅ pushed |
+| 4 | Task detail: «ارسال برای بازبینی» and the review status (pending / rejected with reason / approved) | ✅ pushed |
 | 5 | Timesheet: submission says whether it went for approval; rejected entries editable and resendable | ✅ pushed |
-| 6 | Settings «اتوماسیون و گزارش» → «مسیرهای تأیید»: steps per kind, by chart role (direct manager, one level up, owner) or a person; optional steps; order | ✅ pushed (not yet checked in the browser) |
-| 7 | Approver delegation (period, kind, reason; revoke) — tab «جانشینی تأیید» on the approvals page | ✅ pushed (not yet checked in the browser) |
-| 8 | End-to-end check in the real app, then commit | ⏳ |
+| 6 | Settings «اتوماسیون و گزارش» → «مسیرهای تأیید»: steps per kind, by chart role (direct manager, one level up, owner) or a person; optional steps; order | ✅ pushed |
+| 7 | Approver delegation (period, kind, reason; revoke) — tab «جانشینی تأیید» on the approvals page | ✅ pushed |
+| 8 | End-to-end check in the real app | ✅ chains saved; task submitted → rejected with a reason (shown in the detail, task back to «در حال اجرا») → resent → approved (task completed); timesheet week submitted → approved; delegation recorded; no page errors, no 5xx |
 
 ## Facts the UI relies on
 
@@ -31,3 +31,11 @@ temporary delegation), CAT-123 (approval routing), CAT-108 (approval chains per 
 - Permissions: `Workflow.View`, `Workflow.Configure`, `Workflow.Approve`, `Workflow.Reject`.
 - Titles for the Approval Center list: `POST /api/task-management/tasks/in-review` (TaskReview ids) and
   `POST /api/task-management/timesheets/in-review` (Timesheet ids).
+
+## Done — follow-ups
+
+- **Load on the board:** every board reload reads each task's detail, comments and history (3 requests per task).
+  A burst of changes can hit the server's rate limit (600 requests a minute per user), and the screen then keeps
+  stale data until the next reload. Not caused by this work; worth a list endpoint that returns what the board needs.
+- Approvals by «مدیر مستقیم» need the person to have a post with a manager in the chart; otherwise use an optional
+  step or a named person.
