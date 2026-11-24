@@ -1,3 +1,4 @@
+import { PageHeader, btnPrimary } from './layout/PageHeader';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText,
@@ -39,6 +40,9 @@ interface PersonalNotesViewProps {
   /** `onCreated` runs with the new task's id once the task has really been saved. */
   onConvertToTask?: (title: string, description?: string, onCreated?: (taskId: string) => void) => void;
 }
+
+const NOTE_DOT: Record<string, string> = { amber: 'bg-amber-400', indigo: 'bg-indigo-500', emerald: 'bg-emerald-500', rose: 'bg-rose-500', cyan: 'bg-cyan-500', slate: 'bg-slate-400' };
+const COLOR_NAMES: Record<string, string> = { amber: 'زرد', indigo: 'نیلی', emerald: 'سبز', rose: 'قرمز', cyan: 'آبی', slate: 'خاکستری' };
 
 const COLOR_CONFIGS: Record<string, { bg: string; border: string; badge: string; text: string }> = {
   amber: {
@@ -88,6 +92,7 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
 
   const [notes, setNotes] = useState<PersonalNote[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [colorFilter, setColorFilter] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Modal State for Note Form
@@ -281,8 +286,9 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
   // Filter & Sort Notes
   const filteredNotes = notes.filter(
     (n) =>
-      n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      n.content.toLowerCase().includes(searchQuery.toLowerCase())
+      (!colorFilter || (n.color || 'amber') === colorFilter) &&
+      (n.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        n.content.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Separate Pinned and Unpinned
@@ -300,47 +306,36 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full">
       
-      {/* Header Bar */}
-      <div className="bg-white dark:bg-slate-800/90 p-4 sm:p-5 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-2xl ${palette.accentBg} text-white shadow-md shadow-indigo-950/20 shrink-0`}>
-            <FileText className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              یادداشت‌های شخصی
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              دفترچه یادداشت دیجیتال، ایده‌ها و یادآوری‌های اختصاصی ({toPersianDigits(notes.length)} یادداشت)
-            </p>
-          </div>
-        </div>
-
-        {/* Search & New Note Button */}
-        <div className="flex items-center gap-2.5">
-          <div className="relative flex-1 sm:w-60 min-w-0">
+      <PageHeader
+        title="یادداشت شخصی"
+        subtitle={`ایده‌ها، یادآوری‌ها و چک‌لیست‌های شخصی شما؛ فقط خودتان می‌بینید. ${toPersianDigits(notes.length)} یادداشت`}
+        actions={<button type="button" onClick={handleOpenCreate} className={btnPrimary}><Plus className="w-4 h-4" /> یادداشت جدید</button>}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              type="text"
+              type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="جستجو در یادداشت‌ها..."
-              className="w-full pr-9 pl-3 py-2 bg-slate-50 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+              placeholder="جستجو در عنوان و متن…"
+              aria-label="جستجو در یادداشت‌ها"
+              className="w-full h-10 pr-9 pl-3 bg-white dark:bg-slate-900 text-sm text-slate-800 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400"
             />
           </div>
-
-          <button
-            type="button"
-            onClick={handleOpenCreate}
-            className={`flex items-center gap-2 px-4 py-2.5 ${palette.accentBg} ${palette.accentHover} text-white text-xs font-bold rounded-2xl shadow-sm transition-all cursor-pointer shrink-0`}
-          >
-            <Plus className="w-4 h-4" />
-            <span>یادداشت جدید</span>
-          </button>
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-800/80" role="group" aria-label="رنگ">
+            <button type="button" onClick={() => setColorFilter('')} aria-pressed={!colorFilter} className={`h-8 px-3 rounded-lg text-xs font-semibold cursor-pointer ${!colorFilter ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'}`}>همه</button>
+            {Object.keys(COLOR_CONFIGS).map((c) => (
+              <button key={c} type="button" onClick={() => setColorFilter(colorFilter === c ? '' : c)} aria-pressed={colorFilter === c} aria-label={`رنگ ${COLOR_NAMES[c] || c}`} title={COLOR_NAMES[c] || c}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer ${colorFilter === c ? 'bg-white shadow-sm dark:bg-slate-900' : 'hover:bg-white/60 dark:hover:bg-slate-900/60'}`}>
+                <span className={`w-3.5 h-3.5 rounded-full ${NOTE_DOT[c]}`} />
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Main Grid Content */}
       {isLoading ? (
@@ -348,9 +343,9 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
           در حال بارگذاری یادداشت‌ها...
         </div>
       ) : filteredNotes.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800/90 rounded-3xl p-12 text-center border border-slate-200 dark:border-slate-700 space-y-3">
-          <Sparkles className="w-12 h-12 text-amber-400 mx-auto opacity-70" />
-          <h3 className="font-bold text-base text-slate-800 dark:text-slate-100">{searchQuery.trim() ? 'یادداشتی با این جستجو پیدا نشد' : 'هیچ یادداشتی یافت نشد'}</h3>
+        <div className="rounded-2xl p-12 text-center border border-dashed border-slate-300 dark:border-slate-700 space-y-3">
+          <span className="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center"><Sparkles className="w-7 h-7 text-indigo-500" /></span>
+          <h3 className="font-bold text-base text-slate-800 dark:text-slate-100">{searchQuery.trim() || colorFilter ? 'یادداشتی با این جستجو پیدا نشد' : 'هنوز یادداشتی ندارید'}</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
             {searchQuery.trim()
               ? 'عبارت دیگری را جستجو کنید یا جستجو را پاک کنید.'
@@ -359,7 +354,7 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
           <button
             type="button"
             onClick={handleOpenCreate}
-            className={`inline-flex items-center gap-2 px-4 py-2 ${palette.accentBg} text-white text-xs font-bold rounded-xl cursor-pointer shadow-xs mt-2`}
+            className={`${btnPrimary} mt-2`}
           >
             <Plus className="w-4 h-4" />
             <span>ثبت یادداشت جدید</span>
@@ -371,12 +366,12 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
           {/* Pinned Section */}
           {pinnedNotes.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                <Pin className="w-4 h-4 text-amber-500 fill-amber-500" />
-                <span>یادداشت‌های سنجاق شده ({toPersianDigits(pinnedNotes.length)})</span>
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                <Pin className="w-3.5 h-3.5" />
+                <span>سنجاق‌شده‌ها · {toPersianDigits(pinnedNotes.length)}</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="columns-1 md:columns-2 xl:columns-3 gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
                 {pinnedNotes.map((note) => renderNoteCard(note))}
               </div>
             </div>
@@ -386,12 +381,12 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
           {unpinnedNotes.length > 0 && (
             <div className="space-y-3">
               {pinnedNotes.length > 0 && (
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider pt-2">
-                  <span>سایر یادداشت‌ها ({toPersianDigits(unpinnedNotes.length)})</span>
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-400 pt-2">
+                  <span>سایر یادداشت‌ها · {toPersianDigits(unpinnedNotes.length)}</span>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="columns-1 md:columns-2 xl:columns-3 gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
                 {unpinnedNotes.map((note) => renderNoteCard(note))}
               </div>
             </div>
@@ -402,21 +397,19 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
 
       {/* CREATE / EDIT NOTE MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/55 backdrop-blur-md animate-in fade-in">
-          <div className="bg-white/95 dark:bg-slate-800/95 w-full max-w-lg rounded-[28px] shadow-[0_28px_90px_-30px_rgba(15,23,42,0.75)] border border-white/80 dark:border-slate-700 ring-1 ring-indigo-100/70 dark:ring-indigo-500/15 overflow-hidden space-y-5 p-6 sm:p-7">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-[2px] animate-in fade-in">
+          <div role="dialog" aria-modal="true" className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden space-y-5 p-6">
             
             {/* Modal Header */}
-            <div className="relative -mx-6 -mt-6 sm:-mx-7 sm:-mt-7 px-6 sm:px-7 pt-7 pb-5 flex items-center justify-between border-b border-indigo-200/70 dark:border-indigo-900/60 bg-gradient-to-l from-indigo-100/90 via-white to-violet-100/80 dark:from-indigo-950/70 dark:via-slate-900 dark:to-violet-950/50 overflow-hidden">
-              <div className="absolute top-0 right-0 left-0 h-1 bg-gradient-to-l from-violet-500 via-indigo-500 to-sky-400" />
-              <div className="absolute -top-14 -left-8 w-32 h-32 rounded-full bg-violet-400/20 blur-3xl pointer-events-none" />
-              <h3 className="relative font-black tracking-tight text-base text-slate-900 dark:text-white flex items-center gap-3">
-                <span className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/30 ring-4 ring-white/80 dark:ring-slate-800 rotate-[-4deg]"><FileText className="w-5 h-5" /></span>
+            <div className="-mx-6 -mt-6 px-6 h-16 flex items-center justify-between border-b border-slate-100 dark:border-slate-800">
+                                          <h3 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-3">
+                <span className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 flex items-center justify-center"><FileText className="w-5 h-5" /></span>
                 <span>{editingNote ? 'ویرایش یادداشت شخصی' : 'ثبت یادداشت شخصی جدید'}</span>
               </h3>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="relative p-2 text-indigo-400 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-white bg-white/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-700 rounded-xl border border-indigo-100/80 dark:border-slate-600 shadow-sm transition-all hover:rotate-90 cursor-pointer"
+                className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -600,125 +593,71 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
     const dateStr = new Date(note.createdAt).toLocaleDateString('fa-IR');
 
     return (
-      <div
+      <article
         key={note.id}
-        className={`p-4 sm:p-5 rounded-3xl border ${cfg.bg} ${cfg.border} shadow-2xs flex flex-col justify-between space-y-3 relative group transition-all hover:shadow-md`}
+        className="group relative flex flex-col gap-3 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all"
       >
-        {/* Top Header Row */}
-        <div className="flex items-start justify-between gap-2">
-          <h3 className={`font-bold text-sm sm:text-base leading-snug break-words ${cfg.text}`}>
-            {note.title}
-          </h3>
-
-          <div className="flex items-center gap-1 shrink-0">
-            {/* Pin Button */}
-            <button
-              type="button"
-              onClick={() => handleTogglePin(note)}
-              className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
-                note.isPinned
-                  ? 'bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-100'
-                  : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'
-              }`}
-              title={note.isPinned ? 'برداشتن سنجاق' : 'سنجاق کردن به ابتدا'}
-            >
-              <Pin className={`w-3.5 h-3.5 ${note.isPinned ? 'fill-amber-600 text-amber-600' : ''}`} />
-            </button>
-          </div>
+        <span className={`absolute top-0 right-4 left-4 h-1 rounded-b-full ${NOTE_DOT[note.color || 'amber'] || NOTE_DOT.amber}`} aria-hidden="true" />
+        <div className="flex items-start gap-2 pt-1">
+          <h3 className="flex-1 min-w-0 text-base font-bold leading-7 break-words text-slate-900 dark:text-white">{note.title}</h3>
+          <button
+            type="button"
+            onClick={() => handleTogglePin(note)}
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer shrink-0 ${note.isPinned ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/60 dark:text-indigo-300' : 'text-slate-300 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-visible:opacity-100'}`}
+            title={note.isPinned ? 'برداشتن سنجاق' : 'سنجاق به بالا'}
+            aria-label={note.isPinned ? 'برداشتن سنجاق' : 'سنجاق به بالا'}
+            aria-pressed={!!note.isPinned}
+          >
+            <Pin className={`w-4 h-4 ${note.isPinned ? 'fill-current' : ''}`} />
+          </button>
         </div>
 
-        {/* Content */}
         {note.content && (
-          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap break-words line-clamp-6">
-            {note.content}
-          </p>
+          <p className="text-sm text-slate-600 dark:text-slate-300 leading-7 whitespace-pre-wrap break-words line-clamp-[10]">{note.content}</p>
         )}
 
-        {/* Attachments rendering */}
         {note.attachments && note.attachments.length > 0 && (
-          <div className="space-y-1.5 pt-1">
-            <div className="flex flex-wrap gap-1.5">
-              {note.attachments.map((att) => {
-                const isImg = att.type?.startsWith('image/') || att.dataUrl?.startsWith('data:image/');
-                return (
-                  <a
-                    key={att.id}
-                    href={att.dataUrl}
-                    download={att.name}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 px-2.5 py-1 bg-white/70 dark:bg-slate-900/70 border border-slate-200/80 dark:border-slate-700/80 rounded-xl text-[11px] font-medium text-slate-800 dark:text-slate-200 hover:border-indigo-400 transition-colors cursor-pointer group/att"
-                    title={`دانلود / دانلود فایل ${att.name}`}
-                  >
-                    {isImg ? (
-                      <ImageIcon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                    ) : (
-                      <Paperclip className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    )}
-                    <span className="truncate max-w-[110px]">{att.name}</span>
-                    <Download className="w-3 h-3 text-slate-400 group-hover/att:text-indigo-600 dark:group-hover/att:text-indigo-400 shrink-0" />
-                  </a>
-                );
-              })}
-            </div>
+          <div className="flex flex-wrap gap-1.5">
+            {note.attachments.map((att) => {
+              const isImg = att.type?.startsWith('image/') || att.dataUrl?.startsWith('data:image/');
+              return (
+                <a key={att.id} href={att.dataUrl} download={att.name} target="_blank" rel="noreferrer" title={`دانلود ${att.name}`}
+                  className="inline-flex items-center gap-1.5 h-7 px-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-700 dark:hover:text-indigo-300">
+                  {isImg ? <ImageIcon className="w-3.5 h-3.5 shrink-0" /> : <Paperclip className="w-3.5 h-3.5 shrink-0" />}
+                  <span className="truncate max-w-[120px]">{att.name}</span>
+                  <Download className="w-3 h-3 shrink-0 opacity-60" />
+                </a>
+              );
+            })}
           </div>
         )}
 
-        {/* Footer Bar */}
-        <div className="pt-2 border-t border-black/5 dark:border-white/5 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-2">
-            <span>{toPersianDigits(dateStr)}</span>
-            {onConvertToTask && (convertedNotes[note.id] ? (
-              <span
-                className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-md bg-emerald-100/70 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60"
-                title="از این یادداشت یک وظیفه ساخته شده است"
-              >
-                <CheckSquare className="w-3 h-3" />
-                <span>به وظیفه تبدیل شد</span>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onConvertToTask(note.title, note.content || '', (taskId) => markConverted(note.id, taskId))}
-                className="flex items-center gap-1 text-[10px] font-bold text-indigo-700 dark:text-indigo-400 hover:underline px-2 py-0.5 rounded-md bg-indigo-100/60 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
-                title="تبدیل این یادداشت به یک وظیفه جدید"
-              >
-                <CheckSquare className="w-3 h-3" />
-                <span>تبدیل به وظیفه</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity">
-            <button
-              type="button"
-              onClick={() => handleCopyNote(note)}
-              className="p-1 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg cursor-pointer"
-              title="رونوشت از متن"
-            >
-              {copiedNoteId === note.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+        <div className="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
+          <span className="tabular-nums">{toPersianDigits(dateStr)}</span>
+          {onConvertToTask && (convertedNotes[note.id] ? (
+            <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400" title="از این یادداشت فعالیت ساخته شده است">
+              <CheckSquare className="w-3.5 h-3.5" /> به فعالیت تبدیل شد
+            </span>
+          ) : (
+            <button type="button" onClick={() => onConvertToTask(note.title, note.content || '', (taskId) => markConverted(note.id, taskId))}
+              className="inline-flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer" title="ساختن فعالیت از این یادداشت">
+              <CheckSquare className="w-3.5 h-3.5" /> تبدیل به فعالیت
             </button>
-
-            <button
-              type="button"
-              onClick={() => handleOpenEdit(note)}
-              className="p-1 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg cursor-pointer"
-              title="ویرایش"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
+          ))}
+          <span className="flex-1" />
+          <div className="flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+            <button type="button" onClick={() => handleCopyNote(note)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" title="رونوشت متن" aria-label="رونوشت متن">
+              {copiedNoteId === note.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
             </button>
-
-            <button
-              type="button"
-              onClick={() => handleDeleteNote(note.id)}
-              className="p-1 text-slate-500 hover:text-rose-600 rounded-lg cursor-pointer"
-              title="حذف"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
+            <button type="button" onClick={() => handleOpenEdit(note)} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" title="ویرایش" aria-label="ویرایش">
+              <Edit2 className="w-4 h-4" />
+            </button>
+            <button type="button" onClick={() => handleDeleteNote(note.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer" title="حذف" aria-label="حذف">
+              <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
-      </div>
+      </article>
     );
   }
 };
