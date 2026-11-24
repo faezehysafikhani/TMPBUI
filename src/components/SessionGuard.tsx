@@ -23,11 +23,11 @@ import {
 import { userErrorMessage } from '../utils/errorMessages';
 import { toPersianDigits } from '../utils/helpers';
 
-/** The warning appears this long before the idle timeout ends the session. */
-const IDLE_WARNING_SECONDS = 120;
+/** The warning appears this long before the idle timeout ends the session (the server may send a shorter one). */
+const IDLE_WARNING_SECONDS = 60;
 /** The notice about the end of the sign-in appears this long before its absolute limit. */
 const ABSOLUTE_WARNING_SECONDS = 600;
-/** The server moves the idle clock at most every 30 s; the local estimate leaves room for that. */
+/** The server moves the idle clock at most every min(30 s, idle/12); the local estimate leaves room for that. */
 const SERVER_LAG_MS = 30_000;
 const HEARTBEAT_MS = 20_000;
 const RESYNC_MS = 60_000;
@@ -48,7 +48,7 @@ const formatClock = (seconds: number) => {
  * The browser side of the session limits. The server decides when a session ends; this only
  * tells the user before it happens and keeps the server informed that they are there.
  *
- * - Idle: two minutes before the end, a dialog counts down with Continue and Sign out. It is the
+ * - Idle: a minute before the end (3 minutes without any activity), a dialog counts down with Continue and Sign out. It is the
  *   same in every tab (a BroadcastChannel carries activity and the choice), and moving the mouse
  *   does not dismiss it. The remaining time always comes from the server, so a sleeping laptop or
  *   a wrong clock cannot make the warning wrong.
@@ -110,8 +110,8 @@ export const SessionGuard: React.FC<{ identifier: string; onSignOut: () => void 
   useEffect(() => onActivity((at) => {
     const current = deadlinesRef.current;
     if (!current) return;
-    // The server moves its clock at most every min(30 s, idle/4); the estimate leaves room for that.
-    const lag = Math.min(SERVER_LAG_MS, (current.idleSeconds * 1000) / 4);
+    // The server moves its clock at most every min(30 s, idle/12); the estimate leaves room for that.
+    const lag = Math.min(SERVER_LAG_MS, (current.idleSeconds * 1000) / 12);
     const idleAt = Math.max(current.idleAt, at + current.idleSeconds * 1000 - lag);
     if (idleAt !== current.idleAt) {
       const next = { ...current, idleAt };
