@@ -1,3 +1,4 @@
+import { PageHeader, surface } from './layout/PageHeader';
 import React, { useState } from 'react';
 import { Task, TaskStatus, Attachment, PRIORITIES, User, Priority } from '../types';
 import { isOverdue, toPersianDigits, formatToJalali, getDaysDiff } from '../utils/helpers';
@@ -57,11 +58,6 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
   const delayDays = daysDiffInfo.isPast ? Math.abs(daysDiffInfo.days) : 0;
   const isCritical = delayDays >= 2 || (item.priority === 'high' && delayDays >= 1);
 
-  let pulseDuration = 1.6;
-  if (delayDays >= 7) pulseDuration = 0.4;
-  else if (delayDays >= 4) pulseDuration = 0.7;
-  else if (delayDays >= 2) pulseDuration = 1.1;
-  else if (isCritical) pulseDuration = 1.4;
 
   const [dragX, setDragX] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -160,139 +156,48 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
           transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s ease',
           opacity: isCompletedAnim ? 0 : 1,
         }}
-        className={`relative z-10 grid grid-cols-12 gap-3 px-5 py-3.5 items-center transition-colors cursor-grab active:cursor-grabbing bg-white dark:bg-slate-900 ${
-          isCritical
-            ? 'bg-rose-50/80 dark:bg-rose-950/30 border-r-4 border-r-rose-600 dark:border-r-rose-500 hover:bg-rose-100/90 dark:hover:bg-rose-950/50'
-            : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
-        }`}
+        className="relative z-10 flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
       >
-        {/* Row Number */}
-        <div className="col-span-1 flex justify-center">
-          <span
-            style={isCritical ? { animationDuration: `${pulseDuration}s` } : undefined}
-            className={`w-7 h-7 rounded-xl font-bold text-xs flex items-center justify-center shrink-0 border ${
-              isCritical
-                ? 'bg-rose-600 text-white border-rose-500 animate-pulse shadow-xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-            }`}
-          >
-            {toPersianDigits(index + 1)}
-          </span>
-        </div>
+        {/* Severity bar */}
+        <span className={`self-stretch w-1 rounded-full shrink-0 ${delayDays >= 7 ? 'bg-rose-600' : isCritical ? 'bg-rose-400' : 'bg-amber-400'}`} aria-hidden="true" />
+        <span className="hidden sm:inline w-6 text-center text-xs font-semibold text-slate-400 tabular-nums shrink-0">{toPersianDigits(index + 1)}</span>
 
-        {/* Task Title & Details */}
-        <div className="col-span-7 sm:col-span-7 md:col-span-8 flex flex-col md:flex-row md:items-center justify-between gap-2 min-w-0 pr-1">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            {isCritical && (
-              <span
-                style={{ animationDuration: `${pulseDuration}s` }}
-                className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-ping shrink-0"
-                title={`تاخیر: ${toPersianDigits(delayDays)} روز`}
-              />
-            )}
-            <span className="font-bold text-xs sm:text-sm text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
-              {item.title.replace(/\*\*/g, "")}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
-            {/* Priority Tag */}
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${priorityCfg.bgColor} ${priorityCfg.textColor}`}>
-              {priorityCfg.title}
-            </span>
-
-            {/* Due date relative tag */}
-            {isCritical ? (
-              <span
-                style={{ animationDuration: `${pulseDuration}s` }}
-                className={`inline-flex items-center gap-1 text-[10px] font-bold text-white px-2 py-0.5 rounded-lg shadow-xs shrink-0 ${
-                  delayDays >= 7
-                    ? 'bg-rose-700'
-                    : 'bg-rose-600'
-                }`}
-              >
-                <AlertTriangle
-                  className="w-3 h-3 text-amber-300 shrink-0"
-                />
-                <span>
-                  {delayDays >= 7 ? 'تاخیر شدید' : 'موعد گذشته'} ({getDaysDiff(item.dueDate).text})
-                </span>
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/60 px-2 py-0.5 rounded-lg border border-rose-200 dark:border-rose-900/60 shrink-0">
-                <Calendar className="w-3 h-3 shrink-0" />
-                <span>{getDaysDiff(item.dueDate).text || formatToJalali(item.dueDate)}</span>
-              </span>
-            )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">{item.title.replace(/\*\*/g, '')}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+            {item.isSubTask && <span className="truncate max-w-[14rem]">از «{parent.title}»</span>}
+            <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{formatToJalali(item.dueDate)}</span>
+            <span className="inline-flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${item.priority === 'high' ? 'bg-rose-500' : item.priority === 'low' ? 'bg-emerald-500' : 'bg-amber-400'}`} />اولویت {priorityCfg.title}</span>
+            {commentCount > 0 && <span className="inline-flex items-center gap-1"><MessageSquare className="w-3.5 h-3.5" />{toPersianDigits(commentCount)}</span>}
           </div>
         </div>
 
-        {/* Actions Column */}
-        <div className="col-span-4 sm:col-span-4 md:col-span-3 flex items-center justify-end gap-1.5 pl-1 shrink-0">
-          {/* Complete Button (Mark as finished) */}
+        <span className={`hidden md:inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-xs font-bold shrink-0 tabular-nums ${delayDays >= 7 ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'}`}>
+          {delayDays > 0 ? `${toPersianDigits(delayDays)} روز تأخیر` : 'امروز'}
+        </span>
+
+        <div className="flex items-center gap-1 shrink-0">
           {canCompleteTask && (
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsCompletedAnim(true);
-                setTimeout(() => {
-                  onCompleteItem(item);
-                }, 200);
-              }}
-              className="px-2.5 py-1 text-emerald-700 dark:text-emerald-400 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/80 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 text-[11px] font-bold border border-emerald-200/80 dark:border-emerald-800/80 shrink-0 whitespace-nowrap shadow-2xs"
-              title="خاتمه یافته (تکمیل سریع)"
+              onClick={(e) => { e.stopPropagation(); setIsCompletedAnim(true); setTimeout(() => onCompleteItem(item), 200); }}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 cursor-pointer whitespace-nowrap"
+              title="ثبت به‌عنوان خاتمه یافته"
             >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span className="hidden sm:inline">تبدیل به خاتمه یافته</span>
+              <CheckCircle2 className="w-4 h-4" /><span className="hidden sm:inline">خاتمه</span>
             </button>
           )}
-
-          {/* Discussion / View Details */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (onViewDetails) {
-                onViewDetails(parent);
-              } else {
-                onEditTask(parent);
-              }
-            }}
-            className="p-1.5 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700/80 rounded-lg transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-bold"
-            title="مشاهده جزئیات و گفتگو"
-          >
-            <MessageSquare className="w-3.5 h-3.5" />
-            {commentCount > 0 && <span>({toPersianDigits(commentCount)})</span>}
+          <button type="button" onClick={(e) => { e.stopPropagation(); if (onViewDetails) onViewDetails(parent); else onEditTask(parent); }} className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" title="جزئیات و گفتگو" aria-label="جزئیات و گفتگو">
+            <MessageSquare className="w-4 h-4" />
           </button>
-
-          {/* Edit Button */}
           {canEditTask && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEditTask(parent);
-              }}
-              className="p-1.5 text-slate-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700/80 rounded-lg transition-colors cursor-pointer"
-              title="ویرایش کامل فعالیت (مالک)"
-            >
-              <Edit2 className="w-3.5 h-3.5" />
+            <button type="button" onClick={(e) => { e.stopPropagation(); onEditTask(parent); }} className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" title="ویرایش" aria-label="ویرایش">
+              <Edit2 className="w-4 h-4" />
             </button>
           )}
-
-          {/* Delete Button */}
           {canDeleteTask && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setDeletingTaskId(parent.id);
-              }}
-              className="p-1.5 text-slate-400 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/80 rounded-lg transition-colors cursor-pointer"
-              title="حذف فعالیت"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
+            <button type="button" onClick={(e) => { e.stopPropagation(); setDeletingTaskId(parent.id); }} className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer" title="حذف" aria-label="حذف">
+              <Trash2 className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -457,49 +362,46 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
     }
   };
 
-  return (
-    <div className="space-y-6">
-      
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-rose-500 via-rose-600 to-amber-600 rounded-3xl p-5 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 mt-0.5">
-            <AlertCircle className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold">فعالیت‌های از موعد گذشته</h2>
-            <p className="text-xs text-rose-100 mt-0.5">
-              لیست فعالیت‌هایی که تاریخ موعد آن‌ها سپری شده اما هنوز تکمیل نشده‌اند
-            </p>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <div className="inline-flex items-center gap-1.5 text-[11px] text-amber-100 bg-black/20 px-2.5 py-1 rounded-xl font-medium border border-white/10">
-                <ArrowDownUp className="w-3.5 h-3.5 shrink-0 text-amber-300" />
-                <span>مرتب‌شده بر اساس <b>بیشترین تاخیر</b> و <b>اولویت بالاتر</b></span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-100 bg-emerald-900/40 px-2.5 py-1 rounded-xl font-medium border border-emerald-400/20">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-300" />
-                <span>با <b>درگ به سمت چپ</b>، فعالیت به «خاتمه یافته» تغییر می‌یابد</span>
-              </div>
-            </div>
-          </div>
-        </div>
+  const stats = (() => {
+    let week = 0, high = 0, max = 0;
+    for (const it of overdueItems) {
+      const d = getDaysDiff(it.dueDate);
+      const late = d.isPast ? Math.abs(d.days) : 0;
+      if (late >= 7) week++;
+      if (it.priority === 'high') high++;
+      if (late > max) max = late;
+    }
+    return { week, high, max };
+  })();
 
-        <div className="px-3.5 py-1.5 rounded-2xl bg-white/20 backdrop-blur-md text-xs font-bold border border-white/30 shrink-0 self-end sm:self-auto">
-          {toPersianDigits(overdueItems.length)} مورد موعد گذشته
-        </div>
+  return (
+    <div className="w-full">
+      <PageHeader
+        title="موعد گذشته"
+        subtitle="فعالیت‌هایی که موعدشان گذشته و هنوز خاتمه نیافته‌اند؛ بیشترین تأخیر و اولویت بالاتر اول."
+      />
+
+      {/* Summary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        {[
+          { label: 'کل موارد', value: toPersianDigits(overdueItems.length), tone: 'text-slate-900 dark:text-white' },
+          { label: 'بیش از یک هفته تأخیر', value: toPersianDigits(stats.week), tone: stats.week ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white' },
+          { label: 'اولویت زیاد', value: toPersianDigits(stats.high), tone: 'text-slate-900 dark:text-white' },
+          { label: 'بیشترین تأخیر', value: stats.max ? `${toPersianDigits(stats.max)} روز` : '—', tone: 'text-slate-900 dark:text-white' },
+        ].map((k) => (
+          <div key={k.label} className={`${surface} px-4 py-3.5`}>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{k.label}</p>
+            <p className={`mt-1 text-2xl font-extrabold tabular-nums ${k.tone}`}>{k.value}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Overdue Task List (جدول / لیست) */}
       {overdueItems.length > 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-          {/* Table Header */}
-          <div className="grid grid-cols-12 gap-3 px-5 py-3.5 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400">
-            <div className="col-span-1 text-center">ردیف</div>
-            <div className="col-span-7 sm:col-span-7 md:col-span-8">عنوان فعالیت و زمان‌بندی</div>
-            <div className="col-span-4 sm:col-span-4 md:col-span-3 text-left pl-2">عملیات</div>
+        <div className={`${surface} overflow-hidden`}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3 border-b border-slate-100 dark:border-slate-800 text-xs text-slate-400">
+            <span className="inline-flex items-center gap-1.5"><ArrowDownUp className="w-3.5 h-3.5" /> مرتب بر اساس بیشترین تأخیر و اولویت</span>
+            <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> روی موبایل با کشیدن ردیف به چپ، خاتمه می‌یابد</span>
           </div>
-
-          {/* List Items */}
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {overdueItems.map((item, index) => (
               <OverdueTaskRow
@@ -517,23 +419,19 @@ export const OverdueTasksView: React.FC<OverdueTasksViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700 p-12 text-center shadow-xs">
-          <div className="w-16 h-16 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
-            <CheckCircle2 className="w-8 h-8" />
+        <div className="rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 p-12 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-3">
+            <CheckCircle2 className="w-7 h-7" />
           </div>
-          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">
-            عالی است! هیچ فعالیت معوقه‌ای وجود ندارد 🎉
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-            تمام فعالیت‌های زمان‌بندی شده شما به‌موقع در حال پیگیری یا تکمیل هستند.
-          </p>
+          <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">هیچ فعالیتی عقب نیفتاده است</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">همهٔ فعالیت‌های شما در موعد خود پیش می‌روند.</p>
         </div>
       )}
 
       {/* Delete Confirmation Modal */}
       {deletingTaskId && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 max-w-sm w-full border border-rose-200 dark:border-rose-900 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div role="alertdialog" aria-modal="true" className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-sm w-full border border-slate-200 dark:border-slate-800 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto">
               <AlertCircle className="w-6 h-6" />
             </div>
