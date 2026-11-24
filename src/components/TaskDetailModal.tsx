@@ -105,6 +105,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [logsList, setLogsList] = useState<TaskLog[]>(task.logs || []);
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<'details' | 'chat' | 'history'>('details');
   const [visibleLogCount, setVisibleLogCount] = useState(LOGS_PAGE_SIZE);
   const [isLoadingComments, setIsLoadingComments] = useState<boolean>(false);
   const [isLoadingLogs, setIsLoadingLogs] = useState<boolean>(false);
@@ -421,27 +422,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 my-auto text-slate-800 dark:text-slate-100">
-        
-        {/* Header Bar */}
-        <div className="flex items-center justify-between px-5 py-4 bg-slate-50 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-              <MessageSquare className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100">
-                گفتگو و جزئیات: {task.title}
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                مشاهده مشخصات و گفتگوهای اعضای تیم کاری
-              </p>
-            </div>
-          </div>
+  const tabBtn = (id: 'details' | 'chat' | 'history', label: string, count?: number) => (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={detailTab === id}
+      onClick={() => { setDetailTab(id); if (id === 'history') setLogsOpen(true); }}
+      className={`relative h-11 px-1 text-sm font-semibold cursor-pointer transition-colors ${detailTab === id ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}
+    >
+      {label}
+      {count !== undefined && count > 0 && <span className="mr-1.5 inline-flex min-w-[20px] h-5 px-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-[11px] font-bold items-center justify-center">{toPersianDigits(count)}</span>}
+      {detailTab === id && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-indigo-600" />}
+    </button>
+  );
 
-          <div className="flex items-center gap-2">
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-[2px] flex justify-end" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div role="dialog" aria-modal="true" aria-label={task.title} className="relative h-full w-full max-w-[760px] bg-white dark:bg-slate-900 shadow-2xl border-r border-slate-200 dark:border-slate-800 flex flex-col animate-in slide-in-from-left-8 fade-in duration-200 text-slate-800 dark:text-slate-100">
+
+        {/* Header: actions, title, tabs */}
+        <div className="px-5 sm:px-6 pt-4 border-b border-slate-200/80 dark:border-slate-800 shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-semibold text-slate-400">{task.isProject ? 'پروژه' : task.isRecurring ? 'فعالیت تکرارشونده' : 'فعالیت'}</span>
+            <div className="flex items-center gap-1">
             {/* Project Details Button */}
             {task.isProject && (
               <button
@@ -482,7 +485,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   onClose();
                   onDeleteTask(task.id);
                 }}
-                className="order-first me-3 p-2 text-rose-500 hover:text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
+                className="p-2 text-rose-500 hover:text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/60 rounded-xl transition-colors cursor-pointer"
                 title="حذف فعالیت"
               >
                 <Trash2 className="w-4 h-4" />
@@ -498,13 +501,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               <X className="w-5 h-5" />
             </button>
           </div>
+          </div>
+          <h2 className="mt-2 text-xl sm:text-2xl font-extrabold leading-9 text-slate-900 dark:text-white break-words">{task.title}</h2>
+          <div className="mt-2 flex items-center gap-5" role="tablist">
+            {tabBtn('details', 'جزئیات')}
+            {canUseConversation && !conversationDenied && tabBtn('chat', 'گفتگو', commentsList.length)}
+            {tabBtn('history', 'تاریخچه')}
+          </div>
         </div>
 
-        {/* Modal Scrollable Body */}
-        <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+        {/* Body */}
+        <div className="flex-1 min-h-0 p-5 sm:p-6 space-y-5 overflow-y-auto">
+          {detailTab === 'details' && (<>
 
           {/* Status & Permission Control Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-500 dark:text-slate-400">وضعیت فعالیت:</span>
               {canChangeStatus ? (
@@ -583,11 +594,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           </div>
 
           {/* Task Description Section (توضیحات فعالیت) */}
-          <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-slate-800/80 border border-indigo-100 dark:border-slate-700/80 space-y-2.5 shadow-2xs">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-900 dark:text-slate-100">
-                <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <span>توضیحات فعالیت</span>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-slate-100">
+                <span>شرح فعالیت</span>
               </div>
 
               {/* Due date & Priority chips */}
@@ -634,7 +644,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
 
             {task.description && task.description.trim() ? (
-              <div className="text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap bg-white dark:bg-slate-900/90 p-3.5 rounded-xl border border-slate-200/70 dark:border-slate-700/60 select-text">
+              <div className="text-sm text-slate-700 dark:text-slate-200 leading-7 whitespace-pre-wrap select-text">
                 {task.description}
               </div>
             ) : (
@@ -808,9 +818,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
           )}
 
+          </>)}
+
           {/* Discussion & Chat Section */}
+          {detailTab === 'chat' && (<>
           {canUseConversation && !conversationDenied ? (
-          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
@@ -1240,8 +1253,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           <div className="pt-3 border-t border-slate-200 dark:border-slate-800"><div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300 font-medium"><Users className="w-3.5 h-3.5 shrink-0" />گفتگوی این فعالیت فقط برای مالک و مسئولان تعیین‌شده قابل مشاهده است.</div></div>
           )}
 
+          </>)}
+
           {/* Activity Log / Change History Timeline */}
-          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+          {detailTab === 'history' && (
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <button
                 type="button"
@@ -1324,6 +1340,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
               </div>
             )}
           </div>
+          )}
 
         </div>
 
