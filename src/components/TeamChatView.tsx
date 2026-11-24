@@ -638,6 +638,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
   const onlineInTeam = activeTeam ? activeTeam.members.filter((m) => m.userId !== currentUser.id && presence[m.userId] === true).length : 0;
   const partnerPresence = activePartnerId ? presence[activePartnerId] : undefined;
   const isGroup = !!activeTeam;
+  const sharedFiles = messages.filter((m) => m.attachmentUrl && !isVoiceName(m.attachmentName)).slice().reverse();
   const nameOf = (userId: string, fallback: string) =>
     userId === currentUser.id ? 'شما' : contacts.find((c) => c.userId === userId)?.name || fallback;
 
@@ -648,7 +649,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
       {/* RIGHT SIDEBAR (RTL): team threads and people */}
       <div
-        className={`w-full md:w-80 lg:w-88 min-h-0 border-b md:border-b-0 md:border-l border-slate-200/80 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 ${
+        className={`w-full md:w-64 min-h-0 border-b md:border-b-0 md:border-l border-slate-200/80 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 ${
           hasConversation ? 'hidden md:flex' : 'flex'
         }`}
       >
@@ -692,7 +693,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
           {filteredTeams.length > 0 && (
             <div data-chat-section="teams">
               <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500">
-                گفتگوی تیمی ({toPersianDigits(filteredTeams.length)})
+                کانال‌های تیم
               </div>
               {filteredTeams.map((team) => {
                 const isSelected = team.id === activeTeamChatId;
@@ -703,23 +704,15 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                     type="button"
                     data-chat-team={team.id}
                     onClick={() => openTeamChat(team.id)}
-                    className={`w-[calc(100%-1rem)] mx-2 flex items-center justify-between gap-2 p-2.5 rounded-xl transition-colors cursor-pointer text-right ${
-                      isSelected
-                        ? 'bg-indigo-50 dark:bg-indigo-950/60'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                    title={`${toPersianDigits(team.members.length)} عضو`}
+                    className={`w-[calc(100%-1rem)] mx-2 flex items-center gap-2 h-10 px-2.5 rounded-lg transition-colors cursor-pointer text-right ${
+                      isSelected ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 flex items-center justify-center shrink-0">
-                        <Users className="w-5 h-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate">{team.name}</p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{toPersianDigits(team.members.length)} عضو</p>
-                      </div>
-                    </div>
+                    <span className={`w-7 text-center text-base font-bold ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`} aria-hidden="true">#</span>
+                    <span className={`flex-1 min-w-0 truncate text-sm ${unread > 0 ? 'font-bold' : 'font-medium'}`}>{team.name}</span>
                     {unread > 0 && (
-                      <span className="shrink-0 min-w-[22px] h-[22px] px-1.5 rounded-full bg-indigo-600 text-white font-bold text-[11px] flex items-center justify-center">{toPersianDigits(unread)}</span>
+                      <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-indigo-600 text-white font-bold text-[11px] flex items-center justify-center">{toPersianDigits(unread)}</span>
                     )}
                   </button>
                 );
@@ -730,7 +723,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
           {/* People: direct conversations with anyone, team members included */}
           <div data-chat-section="people">
             <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500">
-              گفتگوی مستقیم ({toPersianDigits(filteredContacts.length)})
+              پیام‌های مستقیم
             </div>
             {filteredContacts.length === 0 ? (
               <div className="p-8 text-center text-slate-400 dark:text-slate-500 space-y-2">
@@ -793,7 +786,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
                 <div className="min-w-0">
                   <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate" data-chat-title>
-                    {conversationTitle}
+                    {isGroup && <span className="text-slate-400 ml-1">#</span>}{conversationTitle}
                   </h3>
                   {isGroup ? (
                     <span className="text-[11px] text-slate-500 dark:text-slate-400" data-chat-status>
@@ -842,7 +835,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 ref={listRef}
                 onScroll={handleListScroll}
                 data-chat-messages
-                className="absolute inset-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6 space-y-2 bg-slate-50/70 dark:bg-slate-950/40"
+                className="absolute inset-0 overflow-y-auto overscroll-contain px-3 py-3 sm:px-6 space-y-1.5"
               >
                 {isLoadingMessages ? (
                   <div className="h-full flex items-center justify-center text-slate-400 text-xs">در حال دریافت پیام‌ها...</div>
@@ -860,35 +853,47 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                     const previous = index > 0 ? messages[index - 1] : null;
                     const firstOfRun = !previous || previous.senderId !== msg.senderId;
                     const senderName = nameOf(msg.senderId, msg.senderName);
+                    const onBrand = false;
 
+                    const showDay = !previous || dayKey(previous.createdAt) !== dayKey(msg.createdAt);
+                    const head = firstOfRun || showDay;
                     return (
+                      <React.Fragment key={msg.id}>
+                      {showDay && (
+                        <div className="flex items-center gap-3 py-2" aria-hidden="true">
+                          <span className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                          <span className="text-[11px] font-semibold text-slate-400">{dayLabel(msg.createdAt)}</span>
+                          <span className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+                        </div>
+                      )}
                       <div
-                        key={msg.id}
                         data-chat-message={msg.id}
                         data-mine={isMine ? 'true' : 'false'}
-                        className={`flex items-end gap-2 ${isMine ? 'justify-start' : 'justify-end'} ${firstOfRun ? 'pt-1.5' : ''}`}
+                        className={`group/msg flex items-start gap-3 ${head ? 'pt-2' : ''}`}
                       >
-                        {/* Others' initials in a group (on the outer side of their bubbles) */}
-                        {!isMine && isGroup && (
-                          <div className={`w-7 h-7 rounded-xl shrink-0 flex items-center justify-center text-[11px] font-bold order-last ${firstOfRun ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200' : 'opacity-0'}`} aria-hidden="true">
-                            {senderName.charAt(0)}
+                        {/* Avatar on the first message of a run */}
+                        <div className="w-9 shrink-0" aria-hidden="true">
+                          {head && (
+                            <span className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold ${isMine ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'}`}>
+                              {(isMine ? currentUser.name || 'ش' : senderName).charAt(0)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                        {head && (
+                          <div className="flex items-baseline gap-2 mb-1">
+                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100" data-chat-sender>{isMine ? (currentUser.name || 'شما') : senderName}</span>
+                            <span className="text-[11px] text-slate-400 tabular-nums">{formatTime24h(msg.createdAt)}</span>
                           </div>
                         )}
                         <div
                           data-msg-id={msg.id}
-                          className={`group/msg max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed space-y-1.5 ${
+                          className={`inline-block max-w-[min(92%,40rem)] px-3.5 py-2.5 rounded-2xl rounded-tr-md text-sm leading-relaxed space-y-1.5 text-slate-900 dark:text-slate-100 border ${
                             isMine
-                              ? 'bg-indigo-600 text-white rounded-br-md'
-                              : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700 rounded-bl-md shadow-[0_1px_2px_rgba(15,23,42,0.04)]'
+                              ? 'bg-indigo-50 border-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900/60'
+                              : 'bg-white border-slate-200/80 dark:bg-slate-800 dark:border-slate-700'
                           }`}
                         >
-                          {/* Sender name in group conversations */}
-                          {!isMine && isGroup && firstOfRun && (
-                            <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-300" data-chat-sender>
-                              {senderName}
-                            </div>
-                          )}
-
                           {/* Message Content or Inline Edit Form */}
                           {editingMessageId === msg.id ? (
                             <div className="space-y-2 py-1">
@@ -896,7 +901,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                 value={editingText}
                                 onChange={(e) => setEditingText(e.target.value)}
                                 className={`w-full p-2 text-xs sm:text-sm rounded-xl border focus:outline-none resize-none ${
-                                  isMine
+                                  onBrand
                                     ? 'bg-white/20 text-white border-white/40 placeholder:text-white/60 focus:ring-1 focus:ring-white'
                                     : 'bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 border-slate-300 dark:border-slate-700 focus:ring-1 focus:ring-indigo-500'
                                 }`}
@@ -916,7 +921,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                   type="button"
                                   onClick={handleCancelEdit}
                                   className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                                    isMine
+                                    onBrand
                                       ? 'bg-white/20 text-white hover:bg-white/30'
                                       : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600'
                                   }`}
@@ -936,7 +941,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                       type="button"
                                       onClick={() => document.querySelector(`[data-msg-id="${reply.id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}
                                       className={`block w-full min-w-[140px] text-right border-r-2 pr-2 py-0.5 rounded-sm text-[11px] cursor-pointer ${
-                                        isMine ? 'border-white/60 bg-white/10 text-white/90' : 'border-indigo-400 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300'
+                                        onBrand ? 'border-white/60 bg-white/10 text-white/90' : 'border-indigo-400 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300'
                                       }`}
                                     >
                                       <span className="block font-bold truncate">{reply.name}</span>
@@ -956,7 +961,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                           {msg.attachmentUrl && !isVoiceName(msg.attachmentName) && (
                             <div
                               className={`p-2 rounded-xl flex items-center gap-2 border ${
-                                isMine ? 'bg-white/10 border-white/20 text-white' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
+                                onBrand ? 'bg-white/10 border-white/20 text-white' : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-700'
                               }`}
                             >
                               <FileText className="w-4 h-4 shrink-0" />
@@ -967,7 +972,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                           )}
 
                           {/* Footer: actions and time */}
-                          <div className={`flex items-center justify-between gap-2 text-[10px] ${isMine ? 'text-white/80' : 'text-slate-400'}`}>
+                          <div className={`flex items-center justify-between gap-2 text-[10px] text-slate-400`}>
                             <div className="flex items-center gap-1 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/msg:opacity-100 focus-within:opacity-100">
                               <button
                                 type="button"
@@ -981,7 +986,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                   composerRef.current?.focus();
                                 }}
                                 className={`p-1 rounded-md transition-colors cursor-pointer ${
-                                  isMine
+                                  onBrand
                                     ? 'hover:bg-white/20 text-white/90 hover:text-white'
                                     : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400'
                                 }`}
@@ -1003,7 +1008,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                     onConvertToTask(title, desc);
                                   }}
                                   className={`p-1 rounded-md transition-colors cursor-pointer ${
-                                    isMine
+                                    onBrand
                                       ? 'hover:bg-white/20 text-white/90 hover:text-white'
                                       : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400'
                                   }`}
@@ -1018,7 +1023,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                   messageId={msg.id}
                                   text={splitReply(msg.text).body}
                                   className={`p-1 rounded-md transition-colors cursor-pointer ${
-                                    isMine
+                                    onBrand
                                       ? 'hover:bg-white/20 text-white/90 hover:text-white'
                                       : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-400'
                                   }`}
@@ -1028,7 +1033,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleStartEdit(msg)}
-                                  className="p-1 rounded-md transition-colors cursor-pointer hover:bg-white/20 text-white/90 hover:text-white"
+                                  className="p-1 rounded-md transition-colors cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-indigo-600"
                                   title="ویرایش پیام"
                                 >
                                   <Pencil className="w-3.5 h-3.5 shrink-0" />
@@ -1038,7 +1043,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteMessage(msg.id)}
-                                  className="p-1 rounded-md transition-colors cursor-pointer hover:bg-white/20 text-white/90 hover:text-rose-200"
+                                  className="p-1 rounded-md transition-colors cursor-pointer hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-500 hover:text-rose-600"
                                   title="حذف پیام"
                                 >
                                   <Trash2 className="w-3.5 h-3.5 shrink-0" />
@@ -1046,12 +1051,14 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                               )}
                             </div>
                             <div className="flex items-center gap-1 mr-auto">
-                              <span>{formatTime24h(msg.createdAt)}</span>
+                              {!head && <span className="tabular-nums">{formatTime24h(msg.createdAt)}</span>}
                               {isMine && !isGroup && <CheckCircle className={`w-3 h-3 stroke-[2.5] ${msg.isRead ? '' : 'opacity-50'}`} />}
                             </div>
                           </div>
                         </div>
+                        </div>
                       </div>
+                      </React.Fragment>
                     );
                   })
                 )}
@@ -1105,7 +1112,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
             {/* Input area */}
             <form
               onSubmit={handleSendMessage}
-              className="p-3 border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-end gap-1 sm:gap-1.5 shrink-0"
+              className="m-3 mt-2 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-500/10 flex items-end gap-1 shrink-0 transition-shadow"
             >
               <label
                 title="افزودن فایل پیوست"
@@ -1138,7 +1145,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 dir="rtl"
                 aria-label="متن پیام"
                 placeholder={isGroup ? `پیام به تیم ${conversationTitle}...` : `پیام به ${conversationTitle}...`}
-                className="flex-1 min-w-0 resize-none max-h-32 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400"
+                className="flex-1 min-w-0 resize-none max-h-32 bg-transparent text-sm text-slate-900 dark:text-slate-100 px-2 py-2.5 focus:outline-hidden placeholder:text-slate-400"
               />
 
               <button
@@ -1163,6 +1170,32 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Files shared in this conversation (wide screens, while the activities panel is closed) */}
+      {hasConversation && !showTaskDrawer && (
+        <aside className="hidden xl:flex flex-col w-64 shrink-0 border-r border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900" aria-label="فایل‌های گفتگو">
+          <div className="h-16 px-4 flex items-center border-b border-slate-200/80 dark:border-slate-800">
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">فایل‌های گفتگو</h3>
+            <span className="mr-auto text-xs text-slate-400">{toPersianDigits(sharedFiles.length)}</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {sharedFiles.length === 0 ? (
+              <p className="p-4 text-center text-xs text-slate-400">هنوز فایلی در این گفتگو فرستاده نشده است.</p>
+            ) : sharedFiles.map((f) => {
+              const ext = (f.attachmentName || '').split('.').pop()?.slice(0, 4).toUpperCase() || 'FILE';
+              return (
+                <a key={f.id} href={f.attachmentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                  <span className="w-10 h-10 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 text-[10px] font-bold flex items-center justify-center shrink-0" dir="ltr">{ext}</span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100 truncate" dir="auto">{f.attachmentName || 'فایل پیوست'}</span>
+                    <span className="block text-[11px] text-slate-400">{nameOf(f.senderId, f.senderName)} · {dayLabel(f.createdAt)}</span>
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+        </aside>
+      )}
 
       {/* ACTIVITY DESCRIPTIONS DRAWER / SIDE-PANEL (مشاهده توضیحات فعالیت) */}
       {showTaskDrawer && (
@@ -1422,6 +1455,16 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 };
 
 // Subcomponent for Contact Row
+const dayKey = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tehran' }).format(new Date(iso));
+const dayLabel = (iso: string) => {
+  const key = dayKey(iso);
+  const today = dayKey(new Date().toISOString());
+  const yesterday = dayKey(new Date(Date.now() - 86_400_000).toISOString());
+  if (key === today) return 'امروز';
+  if (key === yesterday) return 'دیروز';
+  return new Intl.DateTimeFormat('fa-IR-u-ca-persian', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Tehran' }).format(new Date(iso));
+};
+
 const ContactRowItem: React.FC<{
   contact: ChatContact;
   isSelected: boolean;
@@ -1435,63 +1478,28 @@ const ContactRowItem: React.FC<{
       type="button"
       onClick={onClick}
       data-chat-contact={contact.userId}
-      className={`w-[calc(100%-1rem)] mx-2 flex items-center justify-between p-2.5 rounded-xl transition-colors cursor-pointer text-right ${
-        isSelected
-          ? 'bg-indigo-50 dark:bg-indigo-950/60'
-          : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
+      title={contact.username ? `@${contact.username}` : contact.name}
+      className={`w-[calc(100%-1rem)] mx-2 flex items-center gap-2.5 h-10 px-2.5 rounded-lg transition-colors cursor-pointer text-right ${
+        isSelected ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60'
       }`}
     >
-      <div className="flex items-center gap-3 min-w-0">
-        {/* Avatar */}
-        <div className="relative shrink-0">
-          {contact.avatar ? (
-            <img
-              src={contact.avatar}
-              alt={contact.name}
-              className="w-10 h-10 rounded-full object-cover"
-            />
-          ) : (
-            <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
-                contact.isExternal
-                  ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300'
-                  : 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300'
-              }`}
-            >
-              {contact.name ? contact.name.charAt(0) : <UserIcon className="w-5 h-5" />}
-            </div>
-          )}
-          {isOnline !== undefined && (
-            <span
-              data-presence={isOnline ? 'online' : 'offline'}
-              title={isOnline ? 'آنلاین' : 'آفلاین'}
-              className={`w-2.5 h-2.5 rounded-full absolute bottom-0 left-0 border-2 border-white dark:border-slate-800 ${isOnline ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-            />
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 truncate">
-              {contact.name}
-            </span>
-            {!contact.isExternal && (
-              <span className="px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[9px] font-bold shrink-0">
-                هم‌تیمی
-              </span>
-            )}
-          </div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-            {contact.username ? `@${contact.username}` : ''}
-          </div>
-        </div>
-      </div>
-
-      {/* Unread Count Badge */}
+      <span className="relative shrink-0">
+        {contact.avatar ? (
+          <img src={contact.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
+        ) : (
+          <span className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] ${contact.isExternal ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'}`}>
+            {contact.name ? contact.name.charAt(0) : <UserIcon className="w-4 h-4" />}
+          </span>
+        )}
+        {isOnline !== undefined && (
+          <span data-presence={isOnline ? 'online' : 'offline'} title={isOnline ? 'آنلاین' : 'آفلاین'}
+            className={`w-2.5 h-2.5 rounded-full absolute -bottom-0.5 -left-0.5 border-2 border-white dark:border-slate-900 ${isOnline ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`} />
+        )}
+      </span>
+      <span className={`flex-1 min-w-0 truncate text-sm ${unreadCount > 0 ? 'font-bold' : 'font-medium'}`}>{contact.name}</span>
+      {contact.isExternal && <span className="text-[10px] text-amber-600 dark:text-amber-400 shrink-0">بیرون از تیم</span>}
       {unreadCount > 0 && (
-        <span className="shrink-0 min-w-[22px] h-[22px] px-1.5 rounded-full bg-indigo-600 text-white font-bold text-[11px] flex items-center justify-center">
-          {toPersianDigits(unreadCount)}
-        </span>
+        <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-indigo-600 text-white font-bold text-[11px] flex items-center justify-center">{toPersianDigits(unreadCount)}</span>
       )}
     </button>
   );
