@@ -18,6 +18,9 @@ interface TaskListViewProps {
 
 const SYSTEM_TAGS = new Set(['تکرارشونده', 'تکرار', 'فعالیت تکرارشونده']);
 
+const STATUS_DOT: Record<string, string> = { todo: 'bg-slate-400', in_progress: 'bg-blue-500', paused: 'bg-amber-500', completed: 'bg-emerald-500' };
+const PRIORITY_DOT: Record<string, string> = { high: 'bg-rose-500', medium: 'bg-amber-400', low: 'bg-emerald-500' };
+
 /** «بدون گروه‌بندی»: every task as one numbered row, newest change first. A row opens the task. */
 export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, onViewDetails, currentUser }) => {
   const rows = useMemo(
@@ -43,24 +46,24 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, 
 
   if (rows.length === 0) {
     return (
-      <div className="h-32 flex items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-900/40">
+      <div className="h-32 flex items-center justify-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
         <p className="text-sm text-slate-400 dark:text-slate-500 font-medium">هیچ فعالیتی برای نمایش وجود ندارد</p>
       </div>
     );
   }
 
-  const th = 'px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap';
-  const td = 'px-3 py-2.5 align-middle';
+  const th = 'px-4 py-3 text-right text-xs font-semibold text-slate-400 dark:text-slate-500 whitespace-nowrap';
+  const td = 'px-4 py-3 align-middle';
 
   return (
     <div className="space-y-2">
     {selectable && selected.size > 0 && (
       <BulkActionBar selectedIds={[...selected]} onDone={() => setSelected(new Set())} onClear={() => setSelected(new Set())} />
     )}
-    <div className="ui-surface w-full overflow-hidden rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <div className="w-full overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900">
       <div className="relative overflow-x-auto">
-        <table className="w-full min-w-[720px] text-xs">
-          <thead className="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="bg-slate-50/70 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800">
             <tr>
               {selectable && (
                 <th className={`${th} w-10`}>
@@ -94,7 +97,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, 
                 <tr
                   key={task.id}
                   onClick={() => onViewDetails?.(task)}
-                  className={`transition-colors ${onViewDetails ? 'cursor-pointer hover:bg-indigo-50/50 dark:hover:bg-slate-800/60' : ''}`}
+                  className={`transition-colors ${onViewDetails ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''}`}
                 >
                   {selectable && (
                     <td className={td} onClick={(e) => e.stopPropagation()}>
@@ -109,7 +112,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, 
                   )}
                   <td className={`${td} text-slate-400 font-bold tabular-nums`}>{toPersianDigits(index + 1)}</td>
                   <td className={`${td} min-w-[220px]`}>
-                    <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-100">
+                    <div className="flex items-center gap-1.5 font-semibold text-slate-900 dark:text-slate-100">
                       {task.isProject && <FolderKanban className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
                       {task.isRecurring && <Repeat className="w-3.5 h-3.5 text-violet-600 shrink-0" />}
                       <span className="line-clamp-1" title={task.title}>{task.title}</span>
@@ -117,7 +120,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, 
                     {showDetails && tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {tags.map((t) => (
-                          <span key={t} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          <span key={t} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                             <Tag className="w-2.5 h-2.5" />#{t}
                           </span>
                         ))}
@@ -126,19 +129,21 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, showDetails, 
                   </td>
                   <td className={td}>
                     <span className="inline-flex flex-wrap items-center gap-1">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap ${status.badgeBg} ${status.badgeText}`}>
+                      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                        <span className={`w-2 h-2 rounded-full ${STATUS_DOT[task.status]}`} aria-hidden="true" />
                         {status.title}
                       </span>
                       <TaskStatusExtras task={task} />
                     </span>
                   </td>
                   <td className={td}>
-                    <span className={`inline-flex px-2 py-0.5 rounded-lg text-[11px] font-semibold border whitespace-nowrap ${priority.bgColor} ${priority.textColor} ${priority.borderColor}`}>
+                    <span className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                      <span className={`w-2 h-2 rounded-full ${PRIORITY_DOT[task.priority || 'medium']}`} aria-hidden="true" />
                       {priority.title}
                     </span>
                   </td>
                   {showDetails && <td className={`${td} text-slate-600 dark:text-slate-300 whitespace-nowrap`}>{task.ownerName || '—'}</td>}
-                  {showDetails && <td className={`${td} text-slate-600 dark:text-slate-300`}>{responsibleNamesOf(task) || '—'}</td>}
+                  {showDetails && <td className={`${td} text-slate-600 dark:text-slate-300 whitespace-nowrap max-w-[14rem] truncate`} title={responsibleNamesOf(task) || undefined}>{responsibleNamesOf(task) || "—"}</td>}
                   <td className={`${td} whitespace-nowrap ${overdue ? 'text-rose-600 dark:text-rose-400 font-bold' : 'text-slate-600 dark:text-slate-300'}`}>
                     <span className="inline-flex items-center gap-1">
                       {overdue && <AlertCircle className="w-3.5 h-3.5" />}
