@@ -109,8 +109,10 @@ const ADMIN_ROLE_NAME = 'Administrator';
 
 /** Parallel requests used when a screen needs one call per task. */
 const DETAIL_CONCURRENCY = 6;
-/** Tasks per board-details request (the server's limit is 100). */
-const BOARD_BATCH = 100;
+/** Tasks per board-details request (the server allows 100; small batches stay well inside the request timeout). */
+const BOARD_BATCH = 20;
+/** board-details requests at once. */
+const BOARD_BATCH_CONCURRENCY = 3;
 /** null: not tried yet; false: this server has no board-details endpoint (older Core). */
 let boardDetailsSupported: boolean | null = null;
 
@@ -1564,33 +1566,38 @@ export async function fetchTasks(): Promise<Task[]> {
   // Signed out: nothing to show, and no point sending requests that can only return 401.
   if (!readSession()) return [];
   const list = await getAllPages<TaskListItemDto>(TASKS, { sortBy: 'CreatedAtUtc', sortDescending: true }, 200);
-  // One request per BOARD_BATCH tasks (detail, comments and history together); an older server without the
-  // batch endpoint gets the three requests per task as before.
-  if (boardDetailsSupported !== false) {
-    try {
-      const batches: string[][] = [];
-      for (let i = 0; i < list.length; i += BOARD_BATCH) batches.push(list.slice(i, i + BOARD_BATCH).map((t) => t.id));
-      const results = await mapWithLimit(batches, 2, (ids) =>
-        request<TaskBoardDetailsDto[]>('POST', `${TASKS}/board-details`, { body: { ids } }));
-      boardDetailsSupported = true;
-      const byId = new Map<string, TaskBoardDetailsDto>();
-      for (const item of results.flat()) byId.set(item.task.id, item);
-      const ordered = list.map((t) => byId.get(t.id)).filter((x): x is TaskBoardDetailsDto => Boolean(x));
-      return mapWithLimit(ordered, DETAIL_CONCURRENCY, async (item) =>
-        mapTask(item.task, await mapCommentList(item.comments), mapActivityList(item.activity)));
-    } catch (error) {
-      if (!(error instanceof NexusApiError && (error.httpStatus === 404 || error.httpStatus === 405))) throw error;
-      boardDetailsSupported = false;
-    }
-  }
-  return mapWithLimit(list, DETAIL_CONCURRENCY, async (item) => {
-    const [dto, comments, logs] = await Promise.all([
-      getTaskDto(item.id),
-      fetchCommentsIfAllowed(item.id),
-      fetchActivity(item.id),
-    ]);
+  // One request per BOARD_BATCH tasks (detail, comments and history together); an older server without the batch
+  // endpoint gets three requests per task.
+  const loadOne = async (id: string) => {
+    const [dto, comments, logs] = await Promise.all([getTaskDto(id), fetchCommentsIfAllowed(id), fetchActivity(id)]);
     return mapTask(dto, comments, logs);
-  });
+  };
+  const batches: string[][] = [];
+  for (let i = 0; i < list.length; i += BOARD_BATCH) batches.push(list.slice(i, i + BOARD_BATCH).map((t) => t.id));
+  // A batch that times out (or a server error) is split in two and asked again, so a slow server still answers;
+  // only a handful of tasks fall back to three requests each (many of those would hit the server's request limit).
+  const loadBatch = async (ids: string[]): Promise<Task[]> => {
+    if (boardDetailsSupported !== false) {
+      try {
+        const items = await request<TaskBoardDetailsDto[]>('POST', `${TASKS}/board-details`, { body: { ids } });
+        boardDetailsSupported = true;
+        return mapWithLimit(items, DETAIL_CONCURRENCY, async (item) =>
+          mapTask(item.task, await mapCommentList(item.comments), mapActivityList(item.activity)));
+      } catch (error) {
+        if (!(error instanceof NexusApiError)) throw error;
+        if (error.httpStatus === 404 || error.httpStatus === 405) boardDetailsSupported = false;
+        else if (error.httpStatus !== 0 && error.httpStatus < 500) throw error;
+        else if (ids.length > 5) {
+          const half = Math.ceil(ids.length / 2);
+          return [...(await loadBatch(ids.slice(0, half))), ...(await loadBatch(ids.slice(half)))];
+        }
+      }
+    }
+    return mapWithLimit(ids, DETAIL_CONCURRENCY, loadOne);
+  };
+  const loaded = await mapWithLimit(batches, BOARD_BATCH_CONCURRENCY, loadBatch);
+  const byId = new Map(loaded.flat().map((t) => [t.id, t]));
+  return list.map((t) => byId.get(t.id)).filter((t): t is Task => Boolean(t));
 }
 
 async function fetchTask(taskId: string): Promise<Task> {
