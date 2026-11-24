@@ -115,7 +115,7 @@ export const MeetingActionsPanel: React.FC<{
             {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <JalaliDatePicker value={dueDate} onChange={setDueDate} ariaLabel="موعد اقدام" placeholder="موعد" />
-          <button type="submit" disabled={busy || !title.trim()} className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-xl bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"><Plus className="w-3.5 h-3.5" /> افزودن</button>
+          <button type="submit" disabled={busy || !title.trim()} className="inline-flex items-center justify-center gap-1 px-3 py-2.5 rounded-xl bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">{busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} افزودن</button>
         </form>
       )}
     </section>

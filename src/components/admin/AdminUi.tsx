@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, ChevronRight, ChevronLeft, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { Search, ChevronRight, ChevronLeft, AlertCircle, CheckCircle2, X, Loader2 } from 'lucide-react';
 import { toPersianDigits } from '../../utils/helpers';
 
 /** Shared building blocks of the administration screens (Settings), in one visual language. */
@@ -301,17 +301,61 @@ export const AdminDialog: React.FC<{ title: string; onClose: () => void; childre
   );
 };
 
-export const PrimaryButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = ({ className = '', ...props }) => (
-  <button
+export type ActionButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  /** A save or create is running: the button shows a spinner instead of its icon and cannot be pressed again. */
+  loading?: boolean;
+};
+
+/**
+ * A button that tells the user something is being saved. It is busy while `loading` is true and,
+ * on its own, while a promise returned by `onClick` has not settled - so `onClick={save}` with an
+ * async `save` needs nothing more. A form's submit button gets `loading={submitting}`.
+ */
+export const ActionButton: React.FC<ActionButtonProps & { baseClassName: string }> = ({
+  loading = false, baseClassName, className = '', disabled, onClick, children, ...props
+}) => {
+  const [running, setRunning] = React.useState(false);
+  const mounted = React.useRef(true);
+  React.useEffect(() => () => { mounted.current = false; }, []);
+  const busy = loading || running;
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (busy) { event.preventDefault(); return; }
+    const result = onClick?.(event) as unknown;
+    if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+      setRunning(true);
+      Promise.resolve(result).catch(() => undefined).finally(() => { if (mounted.current) setRunning(false); });
+    }
+  };
+  return (
+    <button
+      {...props}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      onClick={handleClick}
+      className={`${baseClassName} ${busy ? '[&>svg:not(.action-spinner)]:hidden cursor-wait' : ''} ${className}`}
+    >
+      {busy && <Loader2 className="action-spinner w-4 h-4 shrink-0 animate-spin" aria-hidden="true" />}
+      {children}
+    </button>
+  );
+};
+
+/** Shown in place of a button's icon while it saves. */
+export const ButtonSpinner: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <Loader2 className={`${className} shrink-0 animate-spin`} aria-hidden="true" />
+);
+
+export const PrimaryButton: React.FC<ActionButtonProps> = (props) => (
+  <ActionButton
     {...props}
-    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-800 hover:bg-indigo-900 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-sm font-bold shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    baseClassName="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-800 hover:bg-indigo-900 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white text-sm font-bold shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
   />
 );
 
-export const SecondaryButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = ({ className = '', ...props }) => (
-  <button
+export const SecondaryButton: React.FC<ActionButtonProps> = (props) => (
+  <ActionButton
     {...props}
-    className={`inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    baseClassName="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
   />
 );
 

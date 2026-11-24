@@ -401,7 +401,7 @@ const WipSection: React.FC = () => {
         <Field label="سقف برای هر نفر" hint="خالی: بدون سقف" className="flex-1">
           <input id="wip-limit" className={inputClass} inputMode="numeric" dir="ltr" value={value} disabled={!loaded} onChange={(e) => setValue(toLatinDigits(e.target.value))} placeholder="بدون سقف" />
         </Field>
-        <PrimaryButton type="submit" disabled={saving || !loaded}>ذخیره</PrimaryButton>
+        <PrimaryButton loading={saving} type="submit" disabled={saving || !loaded}>ذخیره</PrimaryButton>
       </form>
     </SectionCard>
   );

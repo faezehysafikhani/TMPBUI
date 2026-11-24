@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   Briefcase,
   Lock,
+  Loader2,
 } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
 import PeoplePicker from './PeoplePicker';
@@ -2313,11 +2314,12 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isUploading}
-              className={`px-5 py-2.5 rounded-xl ${palette.accentBg} ${palette.accentHover} text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
+              disabled={isUploading || submitting}
+              aria-busy={submitting || undefined}
+              className={`px-5 py-2.5 rounded-xl ${palette.accentBg} ${palette.accentHover} text-white text-xs font-bold shadow-lg shadow-indigo-500/25 transition-all hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${submitting ? 'cursor-wait' : ''}`}
             >
-              <Check className="w-4 h-4 stroke-[2.5]" />
-              <span>{taskToEdit ? 'ذخیره تغییرات' : isProject ? 'ثبت پروژه جدید' : 'ثبت فعالیت جدید'}</span>
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 stroke-[2.5]" />}
+              <span>{submitting ? 'در حال ثبت…' : taskToEdit ? 'ذخیره تغییرات' : isProject ? 'ثبت پروژه جدید' : 'ثبت فعالیت جدید'}</span>
             </button>
           </div>
 

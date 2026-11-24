@@ -177,7 +177,7 @@ const BlockerRow: React.FC<{ reason: string | null; canEdit: boolean; busy: bool
         onSubmit={async (e) => { e.preventDefault(); if (await onSave(text)) setEditing(false); }}
       >
         <input id="task-blocker" className={inputClass} value={text} onChange={(e) => setText(e.target.value)} maxLength={500} placeholder="چه چیزی جلوی پیشرفت این فعالیت را گرفته است؟" autoFocus />
-        <button type="submit" disabled={busy} className="px-3 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">ذخیره</button>
+        <button type="submit" disabled={busy} className="inline-flex items-center gap-1 px-3 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">{busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}ذخیره</button>
         <button type="button" onClick={() => { setText(reason || ''); setEditing(false); }} className="px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold cursor-pointer">انصراف</button>
       </form>
     );
@@ -199,17 +199,24 @@ const BlockerRow: React.FC<{ reason: string | null; canEdit: boolean; busy: bool
 
 const AddCriterion: React.FC<{ disabled: boolean; onAdd: (text: string) => Promise<boolean> }> = ({ disabled, onAdd }) => {
   const [text, setText] = useState('');
+  const [adding, setAdding] = useState(false);
   return (
     <form
       className="flex gap-2"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (text.trim() && (await onAdd(text))) setText('');
+        if (!text.trim() || adding) return;
+        setAdding(true);
+        try {
+          if (await onAdd(text)) setText('');
+        } finally {
+          setAdding(false);
+        }
       }}
     >
       <input id="task-new-criterion" className={inputClass} value={text} onChange={(e) => setText(e.target.value)} maxLength={300} placeholder="معیار جدید، مثلاً «تأیید واحد مالی گرفته شود»" />
-      <button type="submit" disabled={disabled || !text.trim()} className="shrink-0 inline-flex items-center gap-1 px-3 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">
-        <Plus className="w-3.5 h-3.5" /> افزودن
+      <button type="submit" disabled={disabled || adding || !text.trim()} className="shrink-0 inline-flex items-center gap-1 px-3 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">
+        {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} افزودن
       </button>
     </form>
   );

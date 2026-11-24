@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Pencil, Shapes } from 'lucide-react';
+import { Loader2, Pencil, Shapes } from 'lucide-react';
 import type { Task } from '../../types';
 import { inputClass, toLatinDigits } from '../admin/AdminUi';
 import { JalaliDatePicker } from '../JalaliDatePicker';
@@ -117,7 +117,7 @@ export const TaskExtrasPanel: React.FC<{ task: Task; canEdit: boolean }> = ({ ta
             <FieldInput key={f.fieldId} field={f} value={values[f.fieldId] ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, [f.fieldId]: v }))} />
           ))}
           <div className="flex gap-2">
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">{saving ? 'در حال ذخیره...' : 'ذخیره'}</button>
+            <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">{saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{saving ? 'در حال ذخیره...' : 'ذخیره'}</button>
             <button type="button" onClick={() => setEditing(false)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold cursor-pointer">انصراف</button>
           </div>
         </form>

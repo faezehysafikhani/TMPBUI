@@ -62,7 +62,7 @@ export const MfaProfileCard: React.FC = () => {
           <Field label={`کد پیامک‌شده به ${toPersianDigits(challenge.maskedPhone)}`} className="flex-1">
             <input id="mfa-enable-code" className={`${inputClass} text-center tracking-widest`} dir="ltr" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} autoFocus />
           </Field>
-          <PrimaryButton type="submit" disabled={busy || !code.trim()}>تأیید</PrimaryButton>
+          <PrimaryButton loading={busy} type="submit" disabled={busy || !code.trim()}>تأیید</PrimaryButton>
           <SecondaryButton type="button" onClick={() => { setChallenge(null); setCode(''); }}>انصراف</SecondaryButton>
         </form>
       )}
@@ -87,7 +87,7 @@ export const MfaProfileCard: React.FC = () => {
           <Field label="رمز عبور فعلی" className="flex-1">
             <input id="mfa-disable-password" type="password" className={inputClass} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoFocus />
           </Field>
-          <PrimaryButton type="submit" disabled={busy || !password} className="bg-rose-700 hover:bg-rose-800">خاموش کردن</PrimaryButton>
+          <PrimaryButton loading={busy} type="submit" disabled={busy || !password} className="bg-rose-700 hover:bg-rose-800">خاموش کردن</PrimaryButton>
           <SecondaryButton type="button" onClick={() => { setDisabling(false); setPassword(''); }}>انصراف</SecondaryButton>
         </form>
       )}

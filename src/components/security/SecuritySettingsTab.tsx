@@ -245,7 +245,7 @@ const PasswordPolicySection: React.FC = () => {
           </select>
         </Field>
         {message && <p className="text-xs text-slate-500 dark:text-slate-400">آنچه کاربران می‌بینند: «{message}»</p>}
-        <PrimaryButton type="submit" disabled={saving}>ذخیره</PrimaryButton>
+        <PrimaryButton loading={saving} type="submit" disabled={saving}>ذخیره</PrimaryButton>
       </form>
     </SectionCard>
   );
@@ -398,7 +398,7 @@ const RetentionSection: React.FC<{ canManage: boolean }> = ({ canManage }) => {
         <Field label="سابقهٔ ارسال وب‌هوک (روز)" hint="خالی: همیشه نگه داشته می‌شود">
           <input id="ret-webhook" className={inputClass} inputMode="numeric" dir="ltr" value={webhook} disabled={!canManage} onChange={(e) => setWebhook(toLatinDigits(e.target.value))} />
         </Field>
-        {canManage && <PrimaryButton type="submit" disabled={saving}>ذخیره</PrimaryButton>}
+        {canManage && <PrimaryButton loading={saving} type="submit" disabled={saving}>ذخیره</PrimaryButton>}
       </form>
     </SectionCard>
   );

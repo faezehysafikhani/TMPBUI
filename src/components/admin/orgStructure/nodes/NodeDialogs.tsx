@@ -212,7 +212,7 @@ export const AddNodeDialog: React.FC<{
               placeholder={parent ? 'مثلاً: اداره کل' : 'مثلاً: معاونت'}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void makeType(); } }}
             />
-            <SecondaryButton type="button" disabled={busy || !newType.trim()} onClick={() => void makeType()}>ساخت این نوع</SecondaryButton>
+            <SecondaryButton loading={busy} type="button" disabled={busy || !newType.trim()} onClick={() => void makeType()}>ساخت این نوع</SecondaryButton>
             {(types.length > 0 || others.length > 0) && <SecondaryButton type="button" disabled={busy} onClick={() => setNewType(null)}>بستن</SecondaryButton>}
           </div>
           {(() => {

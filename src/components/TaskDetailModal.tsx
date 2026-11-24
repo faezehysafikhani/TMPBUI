@@ -97,6 +97,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onFinalizeProject,
   onConvertToTask,
 }) => {
+  const [postingComment, setPostingComment] = useState(false);
   if (!isOpen || !task) return null;
 
   const [commentsList, setCommentsList] = useState<TaskComment[]>(
@@ -339,7 +340,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCommentText.trim() && commentAttachments.length === 0) return;
+    if (postingComment || (!newCommentText.trim() && commentAttachments.length === 0)) return;
 
     const textToSubmit = newCommentText.trim();
     const attsToSubmit = [...commentAttachments];
@@ -347,6 +348,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     setNewCommentText('');
     setCommentAttachments([]);
 
+    setPostingComment(true);
     try {
       const createdComment = await createTaskCommentPB({
         taskId: task.id,
@@ -362,6 +364,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       onUpdateComments(task.id, updatedComments);
     } catch (err) {
       console.error('Failed to post comment to task_comments:', err);
+      // Nothing is lost: what was written comes back so it can be sent again.
+      setNewCommentText((current) => current || textToSubmit);
+      setCommentAttachments((current) => (current.length ? current : attsToSubmit));
+      void appAlert(userErrorMessage(err, 'نظر ثبت نشد.'));
+    } finally {
+      setPostingComment(false);
     }
   };
 
@@ -1225,11 +1233,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                 <button
                   type="submit"
-                  disabled={(!newCommentText.trim() && commentAttachments.length === 0) || isUploadingCommentFiles}
-                  className="w-8 h-8 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl transition-all cursor-pointer shadow-xs shrink-0"
-                  title="ارسال"
+                  disabled={postingComment || (!newCommentText.trim() && commentAttachments.length === 0) || isUploadingCommentFiles}
+                  aria-busy={postingComment || undefined}
+                  className={`w-8 h-8 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all cursor-pointer shadow-xs shrink-0 ${postingComment ? 'opacity-80 cursor-wait' : 'disabled:opacity-40'}`}
+                  title={postingComment ? 'در حال ارسال…' : 'ارسال'}
                 >
-                  <Send className="w-4 h-4 rotate-180" />
+                  {postingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 rotate-180" />}
                 </button>
               </div>
             </form>

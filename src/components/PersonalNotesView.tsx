@@ -17,6 +17,7 @@ import {
   File,
   UploadCloud,
   CheckSquare,
+  Loader2,
 } from 'lucide-react';
 import { User, PersonalNote, NoteAttachment, AppColorPalette, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_LABEL } from '../types';
 import { toPersianDigits, formatFileSize } from '../utils/helpers';
@@ -218,10 +219,13 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
   };
 
   // Save Note (Create or Update)
+  const [savingNote, setSavingNote] = useState(false);
   const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formTitle.trim() || !currentUser) return;
+    if (!formTitle.trim() || !currentUser || savingNote) return;
 
+    setSavingNote(true);
+    try {
     if (editingNote) {
       // Update
       const updated = await updatePersonalNotePB(editingNote.id, currentUser.id, {
@@ -247,6 +251,9 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
     }
 
     setIsModalOpen(false);
+    } finally {
+      setSavingNote(false);
+    }
   };
 
   // Delete Note
@@ -580,9 +587,12 @@ export const PersonalNotesView: React.FC<PersonalNotesViewProps> = ({
 
                 <button
                   type="submit"
-                  className={`px-5 py-2.5 ${palette.accentBg} ${palette.accentHover} text-white text-xs font-bold rounded-2xl shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer`}
+                  disabled={savingNote}
+                  aria-busy={savingNote || undefined}
+                  className={`inline-flex items-center gap-1.5 px-5 py-2.5 ${palette.accentBg} ${palette.accentHover} text-white text-xs font-bold rounded-2xl shadow-lg shadow-indigo-500/25 hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-wait`}
                 >
-                  {editingNote ? 'ذخیره تغییرات' : 'ثبت یادداشت'}
+                  {savingNote && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {savingNote ? 'در حال ثبت…' : editingNote ? 'ذخیره تغییرات' : 'ثبت یادداشت'}
                 </button>
               </div>
             </form>

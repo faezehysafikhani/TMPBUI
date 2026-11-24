@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Clock3, Pencil, Play, Plus, Square } from 'lucide-react';
+import { Clock3, Loader2, Pencil, Play, Plus, Square } from 'lucide-react';
 import type { Task } from '../../types';
 import { inputClass, toLatinDigits } from '../admin/AdminUi';
 import { showToast } from '../../utils/toast';
@@ -128,7 +128,7 @@ export const TaskTimePanel: React.FC<{ task: Task }> = ({ task }) => {
       {editingEstimate && (
         <form onSubmit={saveEstimate} className="flex gap-2">
           <input id="task-estimate" className={inputClass} dir="ltr" value={estimate} onChange={(e) => setEstimate(toLatinDigits(e.target.value))} placeholder="8:00" aria-label="برآورد (ساعت:دقیقه)" autoFocus />
-          <button type="submit" disabled={busy} className="px-3 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">ذخیره</button>
+          <button type="submit" disabled={busy} className="inline-flex items-center gap-1 px-3 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">{busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}ذخیره</button>
           <button type="button" onClick={() => setEditingEstimate(false)} className="px-3 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold cursor-pointer">انصراف</button>
         </form>
       )}
@@ -136,7 +136,7 @@ export const TaskTimePanel: React.FC<{ task: Task }> = ({ task }) => {
       {logging && (
         <form onSubmit={saveLog} className="flex gap-2">
           <input id="task-log-duration" className={inputClass} dir="ltr" value={duration} onChange={(e) => setDuration(toLatinDigits(e.target.value))} placeholder="1:30" aria-label="مدت امروز (ساعت:دقیقه)" autoFocus />
-          <button type="submit" disabled={busy} className="shrink-0 px-3 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">ثبت برای امروز</button>
+          <button type="submit" disabled={busy} className="shrink-0 inline-flex items-center gap-1 px-3 rounded-xl bg-indigo-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50">{busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}ثبت برای امروز</button>
         </form>
       )}
     </section>

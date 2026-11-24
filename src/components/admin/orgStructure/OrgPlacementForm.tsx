@@ -111,7 +111,7 @@ const SelectWithAdd: React.FC<{
             maxLength={200}
             className={`${inputClass} flex-1 min-w-0`}
           />
-          <SecondaryButton type="button" disabled={busy || !name.trim() || (!!extra && extra.options.length === 0 && !typed.trim())} onClick={() => void add()}><Check className="w-4 h-4" /> ساخت</SecondaryButton>
+          <SecondaryButton loading={busy} type="button" disabled={busy || !name.trim() || (!!extra && extra.options.length === 0 && !typed.trim())} onClick={() => void add()}><Check className="w-4 h-4" /> ساخت</SecondaryButton>
         </div>
       )}
       {adding && onAdd && extra && (
@@ -425,8 +425,8 @@ export const OrgPlacementForm: React.FC<{
 
         <div className="md:col-span-2 flex flex-wrap items-center justify-end gap-2">
           {draft.companyId && <SecondaryButton type="button" disabled={busy} onClick={() => { setDraft(EMPTY); setMessage(null); }}>پاک کردن فرم</SecondaryButton>}
-          <SecondaryButton type="button" disabled={busy || !ready || !canAssign} onClick={() => void save(true)}>ثبت و افزودن بعدی</SecondaryButton>
-          <PrimaryButton type="submit" disabled={busy || !ready || !canAssign}>افزودن به پست</PrimaryButton>
+          <SecondaryButton loading={busy} type="button" disabled={busy || !ready || !canAssign} onClick={() => void save(true)}>ثبت و افزودن بعدی</SecondaryButton>
+          <PrimaryButton loading={busy} type="submit" disabled={busy || !ready || !canAssign}>افزودن به پست</PrimaryButton>
         </div>
       </form>
       {draft.startDate && draft.startDate > todayIso() && (

@@ -31,13 +31,14 @@ import {
   TrendingUp,
   TrendingDown,
   Target,
+  Loader2,
 } from 'lucide-react';
 
 interface ProjectDetailModalProps {
   task: Task;
   isOpen: boolean;
   onClose: () => void;
-  onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
+  onUpdateTask: (taskId: string, updates: Partial<Task>) => void | Promise<unknown>;
   appColorPalette?: AppColorPalette;
 }
 
@@ -105,6 +106,8 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     }
   }, [task]);
 
+  const [savingSub, setSavingSub] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   if (!isOpen) return null;
 
   const subTasks: ProjectSubTask[] = task.projectSubTasks || [];
@@ -127,10 +130,11 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     setTimeout(() => setIsCharterSaved(false), 2500);
   };
 
-  // Add / Edit Subtask handler
-  const handleSaveSubTask = (e: React.FormEvent) => {
+  // Add / Edit Subtask handler. The button shows a spinner until the server has the change.
+  const handleSaveSubTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!subTitle.trim()) return;
+    if (!subTitle.trim() || savingSub) return;
+    let save: void | Promise<unknown>;
 
     if (editingSubId) {
       // Edit existing
@@ -145,7 +149,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
             }
           : st
       );
-      onUpdateTask(task.id, {
+      save = onUpdateTask(task.id, {
         projectSubTasks: updatedList,
         status: computeAutoTaskStatus(updatedList),
       });
@@ -162,10 +166,19 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
         createdAt: new Date().toISOString(),
       };
       const updatedList = [...subTasks, newSub];
-      onUpdateTask(task.id, {
+      save = onUpdateTask(task.id, {
         projectSubTasks: updatedList,
         status: computeAutoTaskStatus(updatedList),
       });
+    }
+
+    setSavingSub(true);
+    try {
+      await save;
+    } catch {
+      // The page reports a failed save itself.
+    } finally {
+      setSavingSub(false);
     }
 
     setSubTitle('');
@@ -204,7 +217,7 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
     const question = open > 0
       ? `ثبت نهایی پروژه؟ ${toPersianDigits(open)} زیرفعالیت باز هم تکمیل‌شده ثبت می‌شود.`
       : 'ثبت نهایی پروژه؟';
-    if (!(await appConfirm(question))) return;
+    if (finalizing || !(await appConfirm(question))) return;
     const nowIso = new Date().toISOString();
     const finished = subTasks.map((st) => ({
       ...st,
@@ -213,7 +226,14 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
       actualStartDate: st.actualStartDate || nowIso,
       actualCompletedDate: st.actualCompletedDate || nowIso,
     }));
-    onUpdateTask(task.id, { projectSubTasks: finished, status: 'completed', actualCompletionDate: task.actualCompletionDate || nowIso });
+    setFinalizing(true);
+    try {
+      await onUpdateTask(task.id, { projectSubTasks: finished, status: 'completed', actualCompletionDate: task.actualCompletionDate || nowIso });
+    } catch {
+      // The page reports a failed save itself.
+    } finally {
+      setFinalizing(false);
+    }
   };
 
   const handleDeleteSubTask = (subId: string) => {
@@ -815,10 +835,11 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                   <div className="flex justify-end pt-1">
                     <button
                       type="submit"
-                      disabled={!subTitle.trim()}
+                      disabled={!subTitle.trim() || savingSub}
+                      aria-busy={savingSub || undefined}
                       className={`px-4 py-2 rounded-xl ${palette.accentBg} text-white font-bold text-xs shadow-xs hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50`}
                     >
-                      <Plus className="w-4 h-4" />
+                      {savingSub ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                       <span>{editingSubId ? 'بروزرسانی زیرفعالیت' : 'افزودن زیرفعالیت'}</span>
                     </button>
                   </div>
@@ -830,9 +851,11 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
                     <button
                       type="button"
                       onClick={handleFinalizeProject}
-                      className="shrink-0 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      disabled={finalizing}
+                      aria-busy={finalizing || undefined}
+                      className="shrink-0 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-70 disabled:cursor-wait"
                     >
-                      <CheckCircle2 className="w-4 h-4" />
+                      {finalizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                       <span>ثبت نهایی پروژه</span>
                     </button>
                   </div>
