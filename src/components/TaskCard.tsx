@@ -48,6 +48,12 @@ interface TaskCardProps {
   showDetails?: boolean;
 }
 
+const PRIORITY_CHIP: Record<string, string> = {
+  high: 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300',
+  medium: 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
+  low: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
+};
+
 const TaskCardBase: React.FC<TaskCardProps> = ({
   task,
   currentUser,
@@ -174,13 +180,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
 
   const commentCount = task.comments?.length || 0;
 
-  const priorityBorderShadowMap: Record<Priority, string> = {
-    high: 'border-r-[3px] border-r-rose-500',
-    medium: 'border-r-[3px] border-r-amber-400 dark:border-r-amber-500',
-    low: 'border-r-[3px] border-r-emerald-500',
-  };
 
-  const priorityStyle = priorityBorderShadowMap[task.priority || 'medium'];
 
   return (
     <div className="relative overflow-hidden rounded-2xl select-none">
@@ -236,361 +236,156 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
         } ${
           isDraggingCard
             ? 'opacity-30 scale-95 border-dashed border-indigo-500 shadow-2xl ring-2 ring-indigo-500/80 bg-indigo-50 dark:bg-indigo-950'
-            : overdue && task.status !== 'completed'
-            ? 'border-slate-200 dark:border-slate-700 bg-rose-50/40 dark:bg-rose-950/40'
             : 'border-slate-200/80 dark:border-slate-700/80 hover:border-indigo-300 dark:hover:border-indigo-500/60 bg-white dark:bg-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.04)]'
-        } ${priorityStyle} p-3.5 flex flex-col justify-between overflow-hidden`}
+        } p-3.5 flex flex-col overflow-hidden`}
       >
-      {/* Top Section: Title & Actions First, then Tags below */}
-      <div>
-        <div className="flex items-start justify-between gap-2 mb-2">
-          {/* Title & Drag Handle */}
-          <div className="flex items-start gap-1 flex-1 min-w-0">
-            {canChangeStatus && (
-              <div
-                className="opacity-40 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing text-slate-400 dark:text-slate-500 pt-0.5 shrink-0"
-                title="برای انتقال به ستون دیگر کشیده و رها کنید (Drag & Drop)"
-              >
-                <GripVertical className="w-3.5 h-3.5" />
-              </div>
-            )}
-            <h3
-              onClick={() => onViewDetails && onViewDetails(task)}
-              title={canChangeStatus ? 'امکان کشیدن و رها کردن (Drag & Drop) یا کلیک جهت جزئیات' : 'مشاهده جزئیات'}
-              className={`text-[13px] font-bold leading-6 cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors flex-1 break-words ${
-                task.status === 'completed' || task.status === 'paused'
-                  ? 'line-through text-slate-400 dark:text-slate-500'
-                  : 'text-slate-900 dark:text-slate-100'
-              }`}
-            >
-              {task.title}
-            </h3>
-          </div>
-
-          {/* Card Action Buttons (Horizontal layout) */}
-          <div className="flex flex-row items-center gap-1 opacity-90 sm:opacity-70 group-hover:opacity-100 transition-opacity shrink-0 flex-nowrap pt-0.5">
-            {/* View Details / Discussion Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onViewDetails) onViewDetails(task);
-              }}
-              className="p-1 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700/80 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-0.5 text-[10px] font-bold"
-              title="مشاهده جزئیات و گفتگو"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              {commentCount > 0 && <span>{toPersianDigits(commentCount)}</span>}
-            </button>
-
-            {/* Edit Button - STRICTLY allowed ONLY for Owner/Admin */}
-            {canEditTask && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(task);
-                }}
-                className="p-1 text-slate-400 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700/80 rounded-lg transition-colors cursor-pointer"
-                title="ویرایش کامل فعالیت (مالک)"
-              >
-                <Edit2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-
-            {/* Delete Button - Strictly Owner/Admin */}
-            {canDeleteTask && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowConfirmDelete(true);
-                }}
-                className="p-1 text-slate-400 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700/80 rounded-lg transition-colors cursor-pointer"
-                title="حذف فعالیت"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Tags Row - Rendered BELOW Title */}
-        <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
-          {overdue && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 animate-pulse">
-              <AlertCircle className="w-2.5 h-2.5" />
-              موعد گذشته
+      {/* Top: priority, then the actions on hover */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`inline-flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-semibold whitespace-nowrap ${PRIORITY_CHIP[task.priority || 'medium']}`} title={`اولویت ${priorityCfg.title}`}>
+          {priorityCfg.title}
+        </span>
+        {overdue && task.status !== 'completed' && (
+          <span className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-semibold whitespace-nowrap bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-300">
+            <AlertCircle className="w-3 h-3" /> موعد گذشته
+          </span>
+        )}
+        <span className="flex-1" />
+        <div className="flex items-center gap-0.5 [@media(hover:hover)]:opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          {canChangeStatus && (
+            <span className="p-1 text-slate-300 dark:text-slate-600 cursor-grab" title="برای انتقال به ستون دیگر بکشید" aria-hidden="true">
+              <GripVertical className="w-3.5 h-3.5" />
             </span>
           )}
-
-          {showDetails && task.ownerName && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700" title="مالک / ایجادکننده فعالیت">
-              <UserIcon className="w-2.5 h-2.5 text-slate-500 dark:text-slate-400" />
-              <span>مالک: {task.ownerName}</span>
-            </span>
-          )}
-
-          {/* Custom status and blocker (Track 1) */}
-          <TaskStatusExtras task={task} />
-
-          {/* NOTE: main work team tag (task.assignedTeamName) and status tags are excluded from card tags */}
-
-          {showDetails && responsibleNamesOf(task) && (
-            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-              <UserIcon className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
-              <span>مسئول: {responsibleNamesOf(task)}</span>
-            </span>
-          )}
-
-          {showDetails && task.standIns && task.standIns.length > 0 && (
-            <span
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-violet-50 dark:bg-violet-950/80 text-violet-800 dark:text-violet-300 border border-violet-200 dark:border-violet-800"
-              title={task.standIns.map((s) => `${s.name}${s.note ? ` (${s.note})` : ''}`).join('، ')}
-              data-stand-in
-            >
-              <UserIcon className="w-2.5 h-2.5 text-violet-600 dark:text-violet-400" />
-              <span>جانشین: {task.standIns.map((s) => s.name).join('، ')}</span>
-            </span>
-          )}
-
-          {task.isProject && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenProjectDetails && onOpenProjectDetails(task);
-              }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-colors cursor-pointer"
-              title="مشاهده داشبورد پروژه"
-            >
-              <FolderKanban className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-              <span>پروژه</span>
+          {canEditTask && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); onEdit(task); }} className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer" title="ویرایش فعالیت" aria-label="ویرایش فعالیت">
+              <Edit2 className="w-3.5 h-3.5" />
             </button>
           )}
-
-          {showDetails && task.tags &&
-            task.tags
-              .filter((t) => t !== 'تکرارشونده' && t !== 'تکرار' && t !== 'فعالیت تکرارشونده')
-              .map((t, idx) => (
-                <span key={idx} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  <Tag className="w-2.5 h-2.5 text-indigo-500" />
-                  <span>#{t}</span>
-                </span>
-              ))}
+          {canDeleteTask && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); setShowConfirmDelete(true); }} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer" title="حذف فعالیت" aria-label="حذف فعالیت">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
-
-        {/* Description */}
-        {task.description && (
-          <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed mb-3 line-clamp-3 whitespace-pre-line bg-slate-50/60 dark:bg-slate-900/50 p-2 rounded-xl border border-slate-100 dark:border-slate-700/60">
-            {task.description}
-          </p>
-        )}
-
-        {/* Attachments Section */}
-        {task.attachments && task.attachments.length > 0 && (
-          <div className="mb-3.5 pt-2 border-t border-slate-100 dark:border-slate-700/60">
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 font-medium mb-1.5">
-              <Paperclip className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
-              <span>فایل‌های ضمیمه ({toPersianDigits(task.attachments.length)}):</span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {task.attachments.map((att) => {
-                const isImage = att.type.startsWith('image/') || att.dataUrl.startsWith('data:image/');
-                return (
-                  <button
-                    key={att.id}
-                    onClick={() => onPreviewAttachment(att)}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700/60 hover:bg-indigo-50 dark:hover:bg-indigo-950 text-slate-700 dark:text-slate-200 hover:text-indigo-700 dark:hover:text-indigo-300 text-[11px] border border-slate-200 dark:border-slate-600 transition-all max-w-full truncate cursor-pointer"
-                    title={`${att.name} (${formatFileSize(att.size)})`}
-                  >
-                    {isImage ? (
-                      <ImageIcon className="w-3 h-3 text-indigo-500 dark:text-indigo-400 shrink-0" />
-                    ) : (
-                      <FileText className="w-3 h-3 text-amber-500 shrink-0" />
-                    )}
-                    <span className="truncate max-w-[120px]">{att.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        {/* Subtasks / Recurring Occurrences Section */}
-        {((task.projectSubTasks && task.projectSubTasks.length > 0) || task.isRecurring) && (
-          <div className="mb-3 pt-2 border-t border-slate-100 dark:border-slate-700/60">
-            {(() => {
-              const subList = task.projectSubTasks || [];
-              const completedCount = subList.filter((s) => s.completed).length;
-              const totalCount = subList.length;
-
-              const getRecurringDetailStr = () => {
-                const cfg = task.recurringConfig;
-                if (!cfg) return 'تکرارشونده';
-                const sTime = cfg.startTime || cfg.dailyTime || cfg.time;
-                const eTime = cfg.endTime;
-                let timeStr = '';
-                if (sTime && eTime) {
-                  timeStr = ` ${toPersianDigits(sTime)} تا ${toPersianDigits(eTime)}`;
-                } else if (sTime) {
-                  timeStr = ` ${toPersianDigits(sTime)}`;
-                }
-
-                if (cfg.frequency === 'weekly') {
-                  const dayNames = ['شنبه', '۱شنبه', '۲شنبه', '۳شنبه', '۴شنبه', '۵شنبه', 'جمعه'];
-                  const selected = (cfg.weeklyDays || [0]).map((d) => dayNames[d] || '').filter(Boolean);
-                  return `هفتگی (${selected.join('، ')}${timeStr})`;
-                } else if (cfg.frequency === 'monthly') {
-                  const selected = (cfg.monthlyDays || [1]).map((d) => toPersianDigits(d));
-                  return `ماهیانه (${selected.join('، ')}${timeStr})`;
-                } else if (sTime) {
-                  return `روزانه (${toPersianDigits(sTime)})`;
-                }
-                return 'روزانه';
-              };
-
-              return (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowSubTasks((prev) => !prev);
-                  }}
-                  className="w-full flex items-center justify-between p-1.5 rounded-lg bg-purple-50/80 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/50 text-purple-800 dark:text-purple-200 text-[10px] font-bold border border-purple-200/80 dark:border-purple-800/80 transition-all cursor-pointer select-none"
-                >
-                  <div className="flex items-center gap-1 overflow-hidden">
-                    <Repeat className="w-3 h-3 text-purple-600 dark:text-purple-400 shrink-0" />
-                    <span className="truncate">
-                      {task.isRecurring
-                        ? `تکرارهای فعالیتی: ${getRecurringDetailStr()}${totalCount > 0 ? ` (${toPersianDigits(completedCount)} از ${toPersianDigits(totalCount)})` : ''}`
-                        : `زیرفعالیت‌ها (${toPersianDigits(completedCount)} از ${toPersianDigits(totalCount)})`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {totalCount > 0 && (
-                      <span className="text-[9px] px-1 py-0.5 rounded-md bg-purple-200/80 dark:bg-purple-900/80 text-purple-900 dark:text-purple-100 font-bold">
-                        {toPersianDigits(Math.round((completedCount / totalCount) * 100))}٪
-                      </span>
-                    )}
-                    {showSubTasks ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </div>
-                </button>
-              );
-            })()}
-
-            {/* Expanded Subtasks List */}
-            {showSubTasks && task.projectSubTasks && task.projectSubTasks.length > 0 && (
-              <div className="mt-2 space-y-1.5 max-h-52 overflow-y-auto pr-1 pl-1">
-                {task.projectSubTasks.map((st) => {
-                  const isDone = !!st.completed;
-                  return (
-                    <div
-                      key={st.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleSubTaskClick(st.id);
-                      }}
-                      className={`flex items-start gap-2 p-2 rounded-xl border text-xs transition-all cursor-pointer ${
-                        isDone
-                          ? 'bg-slate-50/80 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 line-through'
-                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 hover:border-purple-300 dark:hover:border-purple-700'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isDone}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          handleToggleSubTaskClick(st.id);
-                        }}
-                        className="w-4 h-4 mt-0.5 rounded text-purple-600 focus:ring-purple-500 border-slate-300 dark:border-slate-600 cursor-pointer shrink-0"
-                      />
-                      {/* The title gets the row's width (the date goes under it), so it is never squeezed out on a narrow card. */}
-                      <div className="min-w-0 flex-1">
-                        <span className="block font-semibold text-xs leading-5 break-words line-clamp-2" title={st.title}>{st.title}</span>
-                        {st.startDate && (
-                          <span className="block text-[10px] text-slate-400 dark:text-slate-500 font-medium dir-rtl">
-                            {formatToJalali(st.startDate)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Footer Info: Due Date & Status Selector */}
-      <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-2 mt-2 text-xs">
-        
-        {/* Due Date Indicator */}
-        <div className="flex items-center gap-1.5 text-xs md:text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-          <Calendar className={`w-3.5 h-3.5 ${overdue ? 'text-rose-500' : 'text-slate-400 dark:text-slate-500'}`} />
-          <span className={overdue ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
-            {formatToJalali(task.dueDate)}
-          </span>
-          {daysDiff.text && task.status !== 'completed' && (
-            <span className={`text-[10px] md:text-[9px] px-1.5 py-0.5 rounded-md ${
-              overdue ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-            }`}>
-              ({daysDiff.text})
-            </span>
-          )}
-        </div>
+      {/* Title */}
+      <h3
+        onClick={() => onViewDetails && onViewDetails(task)}
+        title="مشاهدهٔ جزئیات"
+        className={`text-sm font-bold leading-6 break-words cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ${
+          task.status === 'completed' ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-900 dark:text-slate-100'
+        }`}
+      >
+        {task.title}
+      </h3>
 
-        {/* SLA badge (Track 2 owns TaskSlaBadge; docs/UI-WORKSTREAMS.md) */}
-        <TaskSlaBadge task={task} />
+      {/* Description, two lines */}
+      {task.description && (
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 leading-5 line-clamp-2 whitespace-pre-line">{task.description}</p>
+      )}
 
-        {/* Actual Completion Date for completed tasks */}
-        {task.status === 'completed' && (task.actualCompletionDate || task.updatedAt) && (() => {
-          const completionDate = task.actualCompletionDate || task.updatedAt;
-          const isDelayed = isCompletionDelayed(task.dueDate, completionDate);
+      {/* Soft chips: custom status, project, stand-ins, tags */}
+      {(() => {
+        const tags = showDetails ? (task.tags || []).filter((t) => t !== 'تکرارشونده' && t !== 'تکرار' && t !== 'فعالیت تکرارشونده') : [];
+        const hasStandIns = showDetails && task.standIns && task.standIns.length > 0;
+        return (
+          <div className="flex items-center gap-1.5 flex-wrap mt-2.5 empty:hidden">
+            <TaskStatusExtras task={task} />
+            {task.isProject && (
+              <button type="button" onClick={(e) => { e.stopPropagation(); onOpenProjectDetails && onOpenProjectDetails(task); }} className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 cursor-pointer" title="داشبورد پروژه">
+                <FolderKanban className="w-3 h-3" /> پروژه
+              </button>
+            )}
+            {hasStandIns && (
+              <span className="inline-flex items-center gap-1 h-6 px-2 rounded-md text-[11px] font-semibold bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300" data-stand-in
+                title={task.standIns!.map((s) => `${s.name}${s.note ? ` (${s.note})` : ''}`).join('، ')}>
+                <UserIcon className="w-3 h-3" /> جانشین: {task.standIns!.map((s) => s.name).join('، ')}
+              </span>
+            )}
+            {tags.map((t, idx) => (
+              <span key={idx} className="inline-flex items-center h-6 px-2 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-700/60 dark:text-slate-300">
+                <Tag className="w-3 h-3 ml-1 text-slate-400" />{t}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* Subtasks / occurrences: progress, list on demand */}
+      {((task.projectSubTasks && task.projectSubTasks.length > 0) || task.isRecurring) && (() => {
+        const subList = task.projectSubTasks || [];
+        const done = subList.filter((x) => x.completed).length;
+        const total = subList.length;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        return (
+          <div className="mt-3">
+            <button type="button" onClick={(e) => { e.stopPropagation(); setShowSubTasks((v) => !v); }} className="w-full flex items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-indigo-600 cursor-pointer" aria-expanded={showSubTasks}>
+              {task.isRecurring ? <Repeat className="w-3.5 h-3.5 shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
+              <span className="truncate">{task.isRecurring ? 'تکرارها' : 'زیرفعالیت‌ها'}</span>
+              {total > 0 && <span className="tabular-nums">{toPersianDigits(done)}/{toPersianDigits(total)}</span>}
+              <span className="flex-1" />
+              {showSubTasks ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+            {total > 0 && (
+              <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                <div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${pct}%` }} />
+              </div>
+            )}
+            {showSubTasks && total > 0 && (
+              <div className="mt-2 space-y-1 max-h-52 overflow-y-auto">
+                {subList.map((st) => (
+                  <label key={st.id} onClick={(e) => e.stopPropagation()} className={`flex items-start gap-2 p-1.5 rounded-lg text-xs cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/40 ${st.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
+                    <input type="checkbox" checked={!!st.completed} onChange={(e) => { e.stopPropagation(); handleToggleSubTaskClick(st.id); }} className="w-4 h-4 mt-0.5 rounded accent-indigo-600 cursor-pointer shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium leading-5 break-words line-clamp-2" title={st.title}>{st.title}</span>
+                      {st.startDate && <span className="block text-[10px] text-slate-400">{formatToJalali(st.startDate)}</span>}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* Footer: people, counts, date */}
+      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center gap-2 flex-wrap">
+        {showDetails && (() => {
+          const names = (task.responsibleUserNames && task.responsibleUserNames.length ? task.responsibleUserNames : (task.assignedUserName ? [task.assignedUserName] : [])).filter(Boolean);
+          if (!names.length) return null;
           return (
-            <div
-              className={`w-full flex items-center justify-between gap-1.5 text-xs md:text-[10px] font-medium px-2 py-1 rounded-lg border mt-1 transition-colors ${
-                isDelayed
-                  ? 'text-rose-700 dark:text-rose-300 bg-rose-50/90 dark:bg-rose-950/50 border-rose-200/80 dark:border-rose-800/60'
-                  : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/90 dark:bg-emerald-950/50 border-emerald-200/70 dark:border-emerald-800/50'
-              }`}
-              title={isDelayed ? 'تکمیل با تاخیر نسبت به تاریخ برنامه‌ریزی شده' : 'تکمیل در موعد برنامه‌ریزی شده (به‌موقع)'}
-            >
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2
-                  className={`w-3.5 h-3.5 shrink-0 ${
-                    isDelayed ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
-                  }`}
-                />
-                <span>تکمیل واقعی:</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span
-                  className={`font-bold ${
-                    isDelayed ? 'text-rose-800 dark:text-rose-200' : 'text-emerald-800 dark:text-emerald-200'
-                  }`}
-                >
-                  {formatToJalali(completionDate)}
-                </span>
-                {isDelayed && (
-                  <span className="text-[9px] px-1 py-0.2 rounded bg-rose-200/80 dark:bg-rose-900/80 text-rose-800 dark:text-rose-200 font-semibold mr-0.5">
-                    تاخیر
-                  </span>
-                )}
-              </div>
-            </div>
+            <span className="flex -space-x-1.5 space-x-reverse" title={`مسئول: ${responsibleNamesOf(task)}${task.ownerName ? ` · مالک: ${task.ownerName}` : ''}`}>
+              {names.slice(0, 3).map((n, i) => (
+                <span key={i} className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 ring-2 ring-white dark:ring-slate-800 text-[10px] font-bold flex items-center justify-center">{n.trim().charAt(0)}</span>
+              ))}
+              {names.length > 3 && <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-700 ring-2 ring-white dark:ring-slate-800 text-[10px] font-bold flex items-center justify-center">+{toPersianDigits(names.length - 3)}</span>}
+            </span>
           );
         })()}
-
-        {/* Priority Tag Group (Status tag removed per user request) */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Priority Tag */}
-          <span
-            className={`inline-flex items-center px-2 py-1 rounded-xl text-xs font-semibold border ${priorityCfg.bgColor} ${priorityCfg.textColor} ${priorityCfg.borderColor} dark:bg-slate-900/90 dark:text-slate-200 dark:border-slate-700`}
-            title={`اولویت ${priorityCfg.title}`}
-          >
-            {priorityCfg.title}
-          </span>
-        </div>
-
+        <button type="button" onClick={(e) => { e.stopPropagation(); onViewDetails && onViewDetails(task); }} className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 cursor-pointer" title="گفتگو و جزئیات">
+          <MessageSquare className="w-3.5 h-3.5" />{commentCount > 0 && <span className="tabular-nums">{toPersianDigits(commentCount)}</span>}
+        </button>
+        {task.attachments && task.attachments.length > 0 && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); if (task.attachments!.length === 1) onPreviewAttachment(task.attachments![0]); else onViewDetails && onViewDetails(task); }} className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-indigo-600 cursor-pointer" title={task.attachments.map((a) => `${a.name} (${formatFileSize(a.size)})`).join('\n')}>
+            <Paperclip className="w-3.5 h-3.5" /><span className="tabular-nums">{toPersianDigits(task.attachments.length)}</span>
+          </button>
+        )}
+        <span className="flex-1" />
+        <TaskSlaBadge task={task} />
+        <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${overdue ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`} title={formatToJalali(task.dueDate)}>
+          <Calendar className="w-3.5 h-3.5" />
+          {daysDiff.text && task.status !== 'completed' ? daysDiff.text : formatToJalali(task.dueDate).split(' ')[0]}
+        </span>
+        {task.status === 'completed' && (task.actualCompletionDate || task.updatedAt) && (() => {
+          const completionDate = task.actualCompletionDate || task.updatedAt;
+          const late = isCompletionDelayed(task.dueDate, completionDate);
+          return (
+            <span className={`w-full inline-flex items-center gap-1.5 text-[11px] font-medium ${late ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`} title={late ? 'تکمیل با تأخیر' : 'تکمیل به‌موقع'}>
+              <CheckCircle2 className="w-3.5 h-3.5" /> تکمیل: {formatToJalali(completionDate)}{late && ' · با تأخیر'}
+            </span>
+          );
+        })()}
       </div>
 
       {/* Delete Confirmation Modal Overlay inside card context or confirm popover */}
