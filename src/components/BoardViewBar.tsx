@@ -1,6 +1,6 @@
-import React from 'react';
-import { X, Columns3, UserCheck, Users, AlertTriangle, CalendarDays, Tag, ListOrdered, Grid3x3 } from 'lucide-react';
-import { BoardGroupBy, BoardViewSettings, BOARD_GROUP_LABELS } from '../utils/boardView';
+import React, { useEffect, useRef } from 'react';
+import { Check, Columns3, UserCheck, Users, AlertTriangle, CalendarDays, Tag, ListOrdered, Grid3x3 } from 'lucide-react';
+import { BoardGroupBy, BoardViewSettings } from '../utils/boardView';
 
 interface BoardViewBarProps {
   settings: BoardViewSettings;
@@ -8,42 +8,65 @@ interface BoardViewBarProps {
   onClose: () => void;
 }
 
-const OPTIONS: { id: BoardGroupBy; icon: React.ElementType; wide?: boolean }[] = [
-  { id: 'status', icon: Columns3 },
-  { id: 'owner', icon: UserCheck },
-  { id: 'responsible', icon: Users },
-  { id: 'priority', icon: AlertTriangle },
-  { id: 'dueDate', icon: CalendarDays },
-  { id: 'tag', icon: Tag },
-  { id: 'matrix', icon: Grid3x3 },
-  { id: 'none', icon: ListOrdered, wide: true },
+/** Short names and one line each, so the list reads at a glance. */
+const OPTIONS: { id: BoardGroupBy; icon: React.ElementType; label: string; hint: string }[] = [
+  { id: 'status', icon: Columns3, label: 'وضعیت', hint: 'کانبان: شروع نشده تا خاتمه یافته' },
+  { id: 'responsible', icon: Users, label: 'مسئول', hint: 'یک ستون برای هر مسئول' },
+  { id: 'owner', icon: UserCheck, label: 'مالک', hint: 'یک ستون برای هر ایجادکننده' },
+  { id: 'priority', icon: AlertTriangle, label: 'اولویت', hint: 'زیاد، متوسط و کم' },
+  { id: 'dueDate', icon: CalendarDays, label: 'موعد انجام', hint: 'عقب‌افتاده، امروز، هفت روز آینده و بعد' },
+  { id: 'tag', icon: Tag, label: 'برچسب', hint: 'یک ستون برای هر برچسب' },
+  { id: 'matrix', icon: Grid3x3, label: 'ماتریس اهمیت و فوریت', hint: 'نه خانه: اهمیت (اولویت) و فوریت (موعد)' },
+  { id: 'none', icon: ListOrdered, label: 'فهرست ساده', hint: 'همه در یک جدول، بدون گروه' },
 ];
 
-const Switch: React.FC<{ label: string; title: string; checked: boolean; onChange: (value: boolean) => void }> = ({ label, title, checked, onChange }) => (
+const Switch: React.FC<{ label: string; hint: string; checked: boolean; onChange: (value: boolean) => void }> = ({ label, hint, checked, onChange }) => (
   <button
     type="button"
     role="switch"
     aria-checked={checked}
-    title={title}
     onClick={() => onChange(!checked)}
-    className="inline-flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 cursor-pointer transition-colors"
+    className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-right hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
   >
-    <span className={`relative inline-flex w-8 h-[18px] shrink-0 rounded-full transition-colors ${checked ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}>
-      <span className={`absolute top-[3px] w-3 h-3 rounded-full bg-white shadow transition-all ${checked ? 'right-[3px]' : 'right-[17px]'}`} />
+    <span className="flex-1 min-w-0">
+      <span className="block text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</span>
+      <span className="block text-xs text-slate-400">{hint}</span>
     </span>
-    {label}
+    <span className={`relative inline-flex w-9 h-5 shrink-0 rounded-full transition-colors ${checked ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}>
+      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${checked ? 'right-0.5' : 'right-[18px]'}`} />
+    </span>
   </button>
 );
 
-/** «گروه‌بندی و نما»: how the board groups its cards and what they show - one compact row under the toolbar. */
+/**
+ * «گروه‌بندی و نما»: a menu under its toolbar button - how the board groups its cards (one choice) and what
+ * the cards show. Closes on a click outside or Escape.
+ */
 export const BoardViewBar: React.FC<BoardViewBarProps> = ({ settings, onChange, onClose }) => {
   const set = (patch: Partial<BoardViewSettings>) => onChange({ ...settings, ...patch });
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const el = ref.current;
+      if (el && !el.contains(e.target as Node) && !(el.parentElement?.contains(e.target as Node))) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [onClose]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 p-2 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800" dir="rtl">
-      <span className="px-2 text-xs font-bold text-slate-400 dark:text-slate-500">گروه‌بندی</span>
-      <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0" role="radiogroup" aria-label="گروه‌بندی کارت‌ها">
-        {OPTIONS.map(({ id, icon: Icon }) => {
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label="گروه‌بندی و نما"
+      dir="rtl"
+      className="absolute z-30 top-full mt-2 right-0 w-[min(20rem,calc(100vw-2rem))] p-2 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-xl animate-in fade-in zoom-in-95 duration-150"
+    >
+      <p className="px-3 pt-1.5 pb-1 text-xs font-bold text-slate-400">گروه‌بندی بر اساس</p>
+      <div role="radiogroup" aria-label="گروه‌بندی کارت‌ها">
+        {OPTIONS.map(({ id, icon: Icon, label, hint }) => {
           const active = settings.groupBy === id;
           return (
             <button
@@ -51,25 +74,26 @@ export const BoardViewBar: React.FC<BoardViewBarProps> = ({ settings, onChange, 
               type="button"
               role="radio"
               aria-checked={active}
+              aria-label={label}
               onClick={() => set({ groupBy: id })}
-              className={`inline-flex items-center gap-1.5 h-9 px-3 rounded-xl border text-sm font-semibold transition-colors cursor-pointer ${
-                active
-                  ? 'bg-indigo-600 border-indigo-600 text-white'
-                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-right cursor-pointer transition-colors ${
+                active ? 'bg-indigo-50 dark:bg-indigo-950/60' : 'hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
-              <Icon className={`w-4 h-4 ${active ? 'text-white' : 'text-slate-400'}`} />
-              {BOARD_GROUP_LABELS[id]}
+              <Icon className={`w-[18px] h-[18px] shrink-0 ${active ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
+              <span className="flex-1 min-w-0">
+                <span className={`block text-sm font-semibold ${active ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-800 dark:text-slate-100'}`}>{label}</span>
+                <span className="block text-xs text-slate-400 truncate">{hint}</span>
+              </span>
+              {active && <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />}
             </button>
           );
         })}
       </div>
-      <span className="hidden md:block w-px h-6 bg-slate-200 dark:bg-slate-700" aria-hidden="true" />
-      <Switch label="جزئیات کارت" title="تگ‌های مالک، مسئول و برچسب روی کارت‌ها" checked={settings.showDetails} onChange={(showDetails) => set({ showDetails })} />
-      <Switch label="فقط جاری" title="فقط فعالیت‌های خاتمه‌نیافته" checked={settings.currentOnly} onChange={(currentOnly) => set({ currentOnly })} />
-      <button type="button" onClick={onClose} title="بستن" aria-label="بستن گروه‌بندی و نما" className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-white dark:hover:bg-slate-800 cursor-pointer">
-        <X className="w-4 h-4" />
-      </button>
+      <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+      <p className="px-3 pt-1 pb-1 text-xs font-bold text-slate-400">نمایش</p>
+      <Switch label="جزئیات کارت" hint="مالک، مسئول و برچسب‌ها روی کارت" checked={settings.showDetails} onChange={(showDetails) => set({ showDetails })} />
+      <Switch label="فقط فعالیت‌های جاری" hint="خاتمه‌یافته‌ها پنهان شوند" checked={settings.currentOnly} onChange={(currentOnly) => set({ currentOnly })} />
     </div>
   );
 };

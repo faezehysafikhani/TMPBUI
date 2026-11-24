@@ -155,9 +155,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           </button>
         )}
         {onToggleView && (
-          <button type="button" onClick={onToggleView} aria-expanded={viewOpen} className={toolbarButton(viewOpen)}>
-            <SlidersHorizontal className="w-4 h-4" /> گروه‌بندی و نما
-          </button>
+          <div className="relative">
+            <button type="button" onClick={onToggleView} aria-expanded={viewOpen} aria-haspopup="dialog" className={toolbarButton(viewOpen)}>
+              <SlidersHorizontal className="w-4 h-4" /> گروه‌بندی و نما
+            </button>
+            {viewPanel}
+          </div>
         )}
         <span className="flex-1" />
         <span className="text-xs text-slate-400 dark:text-slate-500">{toPersianDigits(boardTasks.length)} فعالیت</span>
@@ -166,7 +169,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         </button>
       </div>
       {filterPanel}
-      {viewPanel}
 
       {view.groupBy === 'status' && (
         <div className={`grid gap-4 sm:gap-4.5 items-start grid-cols-1 md:grid-cols-2 lg:grid-cols-4`}>
