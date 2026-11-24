@@ -1,3 +1,4 @@
+import { PageHeader } from './layout/PageHeader';
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { QuickMessageTaskButton } from './work/QuickMessageTaskButton';
 import {
@@ -641,20 +642,22 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
     userId === currentUser.id ? 'شما' : contacts.find((c) => c.userId === userId)?.name || fallback;
 
   return (
-    <div className="bg-white dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-md overflow-hidden flex flex-col md:flex-row h-[75vh] lg:h-[min(75vh,calc(100dvh-12rem))] min-h-[480px] relative" data-chat-root>
+    <div className="w-full">
+    <PageHeader title="گفتگوی تیمی" subtitle="هم‌فکری سریع با تیم و همکاران، در کنار فعالیت‌ها." />
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden flex flex-col md:flex-row h-[calc(100dvh-13rem)] min-h-[520px] relative" data-chat-root>
 
       {/* RIGHT SIDEBAR (RTL): team threads and people */}
       <div
-        className={`w-full md:w-80 lg:w-88 min-h-0 border-b md:border-b-0 md:border-l border-slate-200 dark:border-slate-700/80 flex flex-col bg-slate-50/60 dark:bg-slate-900/60 ${
+        className={`w-full md:w-80 lg:w-88 min-h-0 border-b md:border-b-0 md:border-l border-slate-200/80 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 ${
           hasConversation ? 'hidden md:flex' : 'flex'
         }`}
       >
-        <div className="p-4 border-b border-slate-200 dark:border-slate-700/80 space-y-3 bg-white dark:bg-slate-800/90">
+        <div className="p-3 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <h2 className="font-bold text-base text-slate-800 dark:text-slate-100">گفتگوها</h2>
+              <h2 className="px-1 font-extrabold text-base text-slate-900 dark:text-white">گفتگوها</h2>
             </div>
+            {!hasConversation && (
             <button
               type="button"
               onClick={() => setShowTaskDrawer(!showTaskDrawer)}
@@ -668,6 +671,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
               <FileText className="w-3.5 h-3.5" />
               <span className="text-[10px] font-bold hidden sm:inline">فعالیت‌ها</span>
             </button>
+            )}
           </div>
 
           <div className="relative">
@@ -678,7 +682,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
               onChange={(e) => setMemberSearch(e.target.value)}
               placeholder="جستجوی تیم یا فرد..."
               aria-label="جستجوی تیم یا فرد"
-              className="w-full pr-9 pl-3 py-1.5 bg-slate-100 dark:bg-slate-900 text-xs text-slate-800 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-700/80 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+              className="w-full h-10 pr-9 pl-3 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400"
             />
           </div>
         </div>
@@ -687,7 +691,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
           {/* Team threads: one shared conversation per team */}
           {filteredTeams.length > 0 && (
             <div data-chat-section="teams">
-              <div className="px-3.5 py-2 bg-slate-100/70 dark:bg-slate-900/40 text-[10px] font-extrabold text-slate-500 dark:text-slate-400">
+              <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500">
                 گفتگوی تیمی ({toPersianDigits(filteredTeams.length)})
               </div>
               {filteredTeams.map((team) => {
@@ -699,14 +703,14 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                     type="button"
                     data-chat-team={team.id}
                     onClick={() => openTeamChat(team.id)}
-                    className={`w-full flex items-center justify-between gap-2 p-3.5 transition-colors cursor-pointer text-right border-b border-slate-100 dark:border-slate-800/60 ${
+                    className={`w-[calc(100%-1rem)] mx-2 flex items-center justify-between gap-2 p-2.5 rounded-xl transition-colors cursor-pointer text-right ${
                       isSelected
-                        ? 'bg-indigo-50/90 dark:bg-indigo-950/70 border-r-4 border-r-indigo-600 dark:border-r-indigo-400'
-                        : 'hover:bg-slate-100/80 dark:hover:bg-slate-800/50'
+                        ? 'bg-indigo-50 dark:bg-indigo-950/60'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 flex items-center justify-center shrink-0">
                         <Users className="w-5 h-5" />
                       </div>
                       <div className="min-w-0">
@@ -715,7 +719,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                       </div>
                     </div>
                     {unread > 0 && (
-                      <span className="shrink-0 px-2 py-0.5 rounded-full bg-rose-600 text-white font-black text-[10px]">{toPersianDigits(unread)}</span>
+                      <span className="shrink-0 min-w-[22px] h-[22px] px-1.5 rounded-full bg-indigo-600 text-white font-bold text-[11px] flex items-center justify-center">{toPersianDigits(unread)}</span>
                     )}
                   </button>
                 );
@@ -725,7 +729,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
           {/* People: direct conversations with anyone, team members included */}
           <div data-chat-section="people">
-            <div className="px-3.5 py-2 bg-slate-100/70 dark:bg-slate-900/40 text-[10px] font-extrabold text-slate-500 dark:text-slate-400">
+            <div className="px-4 pt-3 pb-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500">
               گفتگوی مستقیم ({toPersianDigits(filteredContacts.length)})
             </div>
             {filteredContacts.length === 0 ? (
@@ -751,14 +755,14 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
       {/* LEFT CHAT AREA: Conversation View */}
       <div
-        className={`flex-1 min-w-0 min-h-0 flex flex-col bg-white dark:bg-slate-800/90 ${
+        className={`flex-1 min-w-0 min-h-0 flex flex-col bg-white dark:bg-slate-900 ${
           !hasConversation ? 'hidden md:flex' : 'flex'
         }`}
       >
         {hasConversation ? (
           <>
             {/* Conversation header */}
-            <div className="px-3 py-2.5 sm:px-4 sm:py-3 border-b border-slate-200 dark:border-slate-700/80 flex items-center justify-between gap-2 bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
+            <div className="h-16 px-3 sm:px-4 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <button
                   type="button"
@@ -771,14 +775,14 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 </button>
 
                 {isGroup ? (
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 flex items-center justify-center shrink-0">
                     <Users className="w-5 h-5" />
                   </div>
                 ) : activePartner?.avatar ? (
-                  <img src={activePartner.avatar} alt={activePartner.name} className="w-10 h-10 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0" />
+                  <img src={activePartner.avatar} alt={activePartner.name} className="w-10 h-10 rounded-full object-cover shrink-0" />
                 ) : (
                   <div className="relative shrink-0">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-sm">
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center font-bold text-sm">
                       {(activePartner?.name || '?').charAt(0)}
                     </div>
                     {partnerPresence !== undefined && (
@@ -815,14 +819,14 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowTaskDrawer(!showTaskDrawer)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 h-9 px-3 rounded-xl text-sm font-semibold transition-colors border cursor-pointer shrink-0 ${
                   showTaskDrawer
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
                 title="مشاهده توضیحات و مشخصات فعالیت‌ها"
               >
-                <FileText className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                <FileText className="w-4 h-4" />
                 <span className="hidden sm:inline">فعالیت‌ها</span>
                 {!isGroup && partnerTasksCount > 0 && (
                   <span className={`px-1.5 rounded-full text-[10px] font-extrabold ${showTaskDrawer ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'}`}>
@@ -838,7 +842,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 ref={listRef}
                 onScroll={handleListScroll}
                 data-chat-messages
-                className="absolute inset-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5 space-y-2.5 bg-slate-50/40 dark:bg-slate-900/30"
+                className="absolute inset-0 overflow-y-auto overscroll-contain px-3 py-4 sm:px-6 space-y-2 bg-slate-50/70 dark:bg-slate-950/40"
               >
                 {isLoadingMessages ? (
                   <div className="h-full flex items-center justify-center text-slate-400 text-xs">در حال دریافت پیام‌ها...</div>
@@ -872,10 +876,10 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                         )}
                         <div
                           data-msg-id={msg.id}
-                          className={`group/msg max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-2xs space-y-1.5 ${
+                          className={`group/msg max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed space-y-1.5 ${
                             isMine
-                              ? `${palette.accentBg} text-white rounded-br-md`
-                              : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700/80 rounded-bl-md'
+                              ? 'bg-indigo-600 text-white rounded-br-md'
+                              : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200/80 dark:border-slate-700 rounded-bl-md shadow-[0_1px_2px_rgba(15,23,42,0.04)]'
                           }`}
                         >
                           {/* Sender name in group conversations */}
@@ -1101,22 +1105,22 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
             {/* Input area */}
             <form
               onSubmit={handleSendMessage}
-              className="p-2.5 sm:p-3 border-t border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/90 flex items-end gap-1.5 sm:gap-2 shrink-0"
+              className="p-3 border-t border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-end gap-1 sm:gap-1.5 shrink-0"
             >
               <label
                 title="افزودن فایل پیوست"
-                className="p-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-xl cursor-pointer transition-colors shrink-0"
+                className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors shrink-0"
               >
                 <Paperclip className="w-5 h-5" />
                 <input type="file" accept={ALLOWED_UPLOAD_ACCEPT} className="hidden" onChange={handleFileUpload} />
               </label>
 
-              <EmojiButton onPick={(emoji) => setInputMessage((t) => t + emoji)} className="p-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-xl cursor-pointer transition-colors shrink-0" />
+              <EmojiButton onPick={(emoji) => setInputMessage((t) => t + emoji)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors shrink-0" />
 
               <VoiceButton
                 onRecorded={(v) => setAttachedFile({ name: v.name, url: v.url })}
                 onError={setSendError}
-                className="p-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-xl cursor-pointer transition-colors shrink-0"
+                className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors shrink-0"
               />
 
               <textarea
@@ -1134,13 +1138,13 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
                 dir="rtl"
                 aria-label="متن پیام"
                 placeholder={isGroup ? `پیام به تیم ${conversationTitle}...` : `پیام به ${conversationTitle}...`}
-                className="flex-1 min-w-0 resize-none max-h-32 bg-slate-100 dark:bg-slate-900 text-xs sm:text-sm text-slate-900 dark:text-slate-100 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-400"
+                className="flex-1 min-w-0 resize-none max-h-32 bg-slate-50 dark:bg-slate-800 text-sm text-slate-900 dark:text-slate-100 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:border-indigo-300 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400"
               />
 
               <button
                 type="submit"
                 disabled={(!inputMessage.trim() && !attachedFile) || isSending}
-                className={`h-10 px-3 sm:px-4 ${palette.accentBg} ${palette.accentHover} disabled:opacity-40 text-white rounded-2xl shadow-sm transition-all cursor-pointer shrink-0 flex items-center gap-1.5 text-xs font-bold`}
+                className="h-10 px-3 sm:px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl transition-colors cursor-pointer shrink-0 flex items-center gap-1.5 text-sm font-bold"
                 title="ارسال پیام"
                 aria-label="ارسال پیام"
               >
@@ -1151,7 +1155,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
           </>
         ) : (
           <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 dark:text-slate-500 space-y-3 my-auto">
-            <MessageSquare className="w-14 h-14 text-indigo-400/40" />
+            <span className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center"><MessageSquare className="w-8 h-8 text-indigo-500" /></span>
             <h3 className="font-bold text-base text-slate-700 dark:text-slate-300">گفتگویی انتخاب نشده است</h3>
             <p className="text-xs max-w-xs leading-relaxed">
               یک تیم را برای گفتگوی گروهی، یا یک نفر را برای گفتگوی مستقیم از فهرست انتخاب کنید.
@@ -1162,7 +1166,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
 
       {/* ACTIVITY DESCRIPTIONS DRAWER / SIDE-PANEL (مشاهده توضیحات فعالیت) */}
       {showTaskDrawer && (
-        <div className="w-full md:w-96 lg:w-[420px] border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-850 flex flex-col h-full shadow-xl md:shadow-none z-30 absolute md:static inset-0 transition-all">
+        <div className="w-full md:w-96 lg:w-[420px] border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 flex flex-col h-full shadow-xl md:shadow-none z-30 absolute md:static inset-0 transition-all">
           {/* Drawer Header */}
           <div className="p-4 border-b border-slate-200 dark:border-slate-700/80 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1413,6 +1417,7 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
         </div>
       )}
     </div>
+    </div>
   );
 };
 
@@ -1430,10 +1435,10 @@ const ContactRowItem: React.FC<{
       type="button"
       onClick={onClick}
       data-chat-contact={contact.userId}
-      className={`w-full flex items-center justify-between p-3.5 transition-colors cursor-pointer text-right border-b border-slate-100 dark:border-slate-800/60 ${
+      className={`w-[calc(100%-1rem)] mx-2 flex items-center justify-between p-2.5 rounded-xl transition-colors cursor-pointer text-right ${
         isSelected
-          ? 'bg-indigo-50/90 dark:bg-indigo-950/70 border-r-4 border-indigo-600 dark:border-indigo-400'
-          : 'hover:bg-slate-100/80 dark:hover:bg-slate-800/50'
+          ? 'bg-indigo-50 dark:bg-indigo-950/60'
+          : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
       }`}
     >
       <div className="flex items-center gap-3 min-w-0">
@@ -1443,11 +1448,11 @@ const ContactRowItem: React.FC<{
             <img
               src={contact.avatar}
               alt={contact.name}
-              className="w-10 h-10 rounded-2xl object-cover border border-slate-200 dark:border-slate-700"
+              className="w-10 h-10 rounded-full object-cover"
             />
           ) : (
             <div
-              className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
                 contact.isExternal
                   ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300'
                   : 'bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300'
@@ -1484,7 +1489,7 @@ const ContactRowItem: React.FC<{
 
       {/* Unread Count Badge */}
       {unreadCount > 0 && (
-        <span className="shrink-0 px-2 py-0.5 rounded-full bg-rose-600 text-white font-black text-[10px] animate-pulse shadow-xs">
+        <span className="shrink-0 min-w-[22px] h-[22px] px-1.5 rounded-full bg-indigo-600 text-white font-bold text-[11px] flex items-center justify-center">
           {toPersianDigits(unreadCount)}
         </span>
       )}

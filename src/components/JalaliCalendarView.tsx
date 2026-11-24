@@ -3,6 +3,7 @@ import { Task, TaskStatus, Priority, Attachment, User } from '../types';
 import {
   PERSIAN_MONTH_NAMES,
   PERSIAN_WEEK_DAYS,
+  PERSIAN_WEEK_DAYS_SHORT,
   getJalaliMonthDays,
   getJalaliMonthFirstDayOfWeek,
   getCurrentJalali,
@@ -38,6 +39,9 @@ import { isoToIranDateTimeParts } from '../utils/jalali';
 import { Notice } from './admin/AdminUi';
 import { userErrorMessage } from '../utils/errorMessages';
 import { showToast } from '../utils/toast';
+import { PageHeader, btnPrimary, btnSecondary, surface } from './layout/PageHeader';
+import { schedulingOffDayInfo } from '../utils/jalali';
+import { useSchedulingCalendarVersion } from '../utils/useSchedulingCalendar';
 
 interface JalaliCalendarViewProps {
   tasks: Task[];
@@ -178,7 +182,7 @@ const CalendarTaskCardItem: React.FC<{
           transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0, 0, 1)',
           touchAction: 'pan-y',
         }}
-        className={`group flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50/90 dark:bg-slate-900/60 hover:bg-indigo-50/50 dark:hover:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 ${priorityStyle} transition-all cursor-pointer`}
+        className={`group flex items-center justify-between gap-3 p-3 rounded-xl bg-white dark:bg-slate-800 hover:border-indigo-300 border border-slate-200/80 dark:border-slate-700/80 ${priorityStyle} transition-colors cursor-pointer`}
       >
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {/* Index Badge */}
@@ -268,6 +272,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
   onPreviewAttachment,
   onViewDetails,
 }) => {
+  useSchedulingCalendarVersion();
   const currentJ = getCurrentJalali();
   const [viewYear, setViewYear] = useState<number>(currentJ.jy);
   const [viewMonth, setViewMonth] = useState<number>(currentJ.jm);
@@ -496,359 +501,237 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
     return getTaskLastModifiedTime(b.parentTask) - getTaskLastModifiedTime(a.parentTask);
   });
 
+  const canCreateAny = !!onOpenCreateForDate || !!meetingPeople?.canCreate;
+  const PRIORITY_DOT: Record<Priority, string> = { high: 'bg-rose-500', medium: 'bg-amber-400', low: 'bg-emerald-500' };
+  const navBtn = 'w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-700 cursor-pointer transition-colors';
+  const isTodayView = currentJ.jy === viewYear && currentJ.jm === viewMonth;
+  const rows = Math.ceil((firstDayOfWeek + totalDays) / 7);
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      
-      {/* Calendar Header & Grid Box */}
-      <div className="lg:col-span-7 xl:col-span-8 bg-white dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-6">
-        
-        {/* Navigation & Title Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-5 border-b border-slate-100 dark:border-slate-700/60">
-          
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-2xl bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <CalendarIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">تقویم شمسی فعالیت‌ها</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                مشاهده و مدیریت برنامه‌ها بر اساس موعد انجام
-              </p>
+    <div className="w-full">
+      <PageHeader
+        title="تقویم"
+        subtitle="جلسه‌ها، موعد فعالیت‌ها و روزهای کاری سازمان در یک نگاه."
+        actions={<>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!showAllTasks}
+            onClick={() => setShowAllTasks((prev) => !prev)}
+            title="نمایش یا پنهان کردن فعالیت‌های خاتمه‌یافته و متوقف"
+            className="inline-flex items-center gap-2 h-10 px-3 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 cursor-pointer"
+          >
+            <span className={`relative inline-flex w-8 h-[18px] rounded-full transition-colors ${!showAllTasks ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}>
+              <span className={`absolute top-[3px] w-3 h-3 rounded-full bg-white shadow transition-all ${!showAllTasks ? 'right-[3px]' : 'right-[17px]'}`} />
+            </span>
+            فقط جاری
+          </button>
+          {canCreateAny && !isPastDay(dayDate(Math.min(selectedDay, totalDays))) && !schedulingOffDayInfo(dayDate(Math.min(selectedDay, totalDays))).off && (
+            <button type="button" className={btnPrimary} onClick={(e) => openCreateMenu(selectedDay, e.currentTarget)}><Plus className="w-4 h-4" /> افزودن</button>
+          )}
+        </>}
+      />
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-4 items-start">
+        {/* Month */}
+        <section className={`${surface} p-3 sm:p-4`} aria-label="ماه">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <h2 className="text-lg font-extrabold text-slate-900 dark:text-white min-w-[9rem]">{PERSIAN_MONTH_NAMES[viewMonth - 1]} {toPersianDigits(viewYear)}</h2>
+            <span className="flex-1" />
+            {!isTodayView && <button type="button" onClick={handleGoToToday} className={`${btnSecondary} !h-9`}>امروز</button>}
+            <div className="flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
+              <button type="button" onClick={handlePrevYear} className={navBtn} title="سال قبل" aria-label="سال قبل"><ChevronsRight className="w-4 h-4" /></button>
+              <button type="button" onClick={handlePrevMonth} className={navBtn} title="ماه قبل" aria-label="ماه قبل"><ChevronRight className="w-4 h-4" /></button>
+              <button type="button" onClick={handleNextMonth} className={navBtn} title="ماه بعد" aria-label="ماه بعد"><ChevronLeft className="w-4 h-4" /></button>
+              <button type="button" onClick={handleNextYear} className={navBtn} title="سال بعد" aria-label="سال بعد"><ChevronsLeft className="w-4 h-4" /></button>
             </div>
           </div>
 
-          {/* Month/Year Switchers, Today Button & All Tasks Switch */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Toggle Switch */}
-            <button
-              type="button"
-              onClick={() => setShowAllTasks((prev) => !prev)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                showAllTasks
-                  ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 shadow-2xs'
-                  : 'bg-slate-100 dark:bg-slate-700/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-              }`}
-              title="نمایش یا عدم نمایش کارهای خاتمه‌یافته و متوقف"
-            >
-              <div
-                className={`w-7 h-4 rounded-full p-0.5 transition-colors flex items-center ${
-                  showAllTasks ? 'bg-indigo-600 justify-end' : 'bg-slate-300 dark:bg-slate-600 justify-start'
-                }`}
-              >
-                <div className="w-3 h-3 rounded-full bg-white shadow-xs" />
+          <div className="grid grid-cols-7 text-center mb-1">
+            {PERSIAN_WEEK_DAYS.map((dayName, idx) => (
+              <div key={dayName} className="py-2 text-xs font-semibold text-slate-400 dark:text-slate-500">
+                <span className="hidden sm:inline">{dayName}</span>
+                <span className="sm:hidden" aria-label={dayName}>{PERSIAN_WEEK_DAYS_SHORT[idx]}</span>
               </div>
-              <span>{showAllTasks ? 'همه موارد' : 'فقط جاری'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleGoToToday}
-              className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-            >
-              امروز
-            </button>
-
-            <div className="flex items-center bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-1 gap-1">
-              <button
-                type="button"
-                onClick={handlePrevYear}
-                className="p-1.5 hover:bg-white dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl transition-all cursor-pointer"
-                title="سال قبل"
-              >
-                <ChevronsRight className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handlePrevMonth}
-                className="p-1.5 hover:bg-white dark:hover:bg-slate-800 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-xl transition-all cursor-pointer"
-                title="ماه قبل"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-
-              <span className="px-3 text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 min-w-[100px] text-center">
-                {PERSIAN_MONTH_NAMES[viewMonth - 1]} {toPersianDigits(viewYear)}
-              </span>
-
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                className="p-1.5 hover:bg-white dark:hover:bg-slate-800 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 rounded-xl transition-all cursor-pointer"
-                title="ماه بعد"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleNextYear}
-                className="p-1.5 hover:bg-white dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 rounded-xl transition-all cursor-pointer"
-                title="سال بعد"
-              >
-                <ChevronsLeft className="w-4 h-4" />
-              </button>
-            </div>
+            ))}
           </div>
 
-        </div>
-
-        {/* Days of Week Header Grid */}
-        <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center pt-4 mb-2">
-          {PERSIAN_WEEK_DAYS.map((dayName, idx) => (
-            <div
-              key={dayName}
-              className={`py-1.5 text-xs font-bold rounded-xl ${
-                idx === 6
-                  ? 'text-rose-600 bg-rose-50/70 dark:bg-rose-950/50 dark:text-rose-400 border border-rose-200/50 dark:border-rose-900/40'
-                  : 'text-slate-600 dark:text-slate-300 bg-slate-50/80 dark:bg-slate-700/60'
-              }`}
-            >
-              {dayName}
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar Days Grid */}
-        <div
-          className="grid grid-cols-7 gap-1 sm:gap-2 text-center"
-          // Desktop: 5rem cells, shrunk (to 3.5rem at most) only when the month's rows would
-          // otherwise push the page past the screen height.
-          style={{ '--cal-cell-h': `clamp(3.5rem, calc((100dvh - 22rem) / ${Math.ceil((firstDayOfWeek + totalDays) / 7)} - 0.5rem), 5rem)` } as React.CSSProperties}
-        >
-          
-          {/* Empty Cells Offset */}
-          {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-            <div key={`offset-${i}`} className="h-14 sm:h-20 lg:h-(--cal-cell-h) rounded-2xl bg-slate-50/30 dark:bg-slate-900/30" />
-          ))}
-
-          {/* Month Day Cells */}
-          {Array.from({ length: totalDays }).map((_, i) => {
-            const dayNum = i + 1;
-            const isToday =
-              currentJ.jy === viewYear &&
-              currentJ.jm === viewMonth &&
-              currentJ.jd === dayNum;
-            const isSelected = selectedDay === dayNum;
-            const dayItems = dayItemsMap[dayNum] || [];
-            const itemCount = dayItems.length + meetings.filter(m => m.details.date === dayDate(dayNum)).length;
-
-            const dayOfWeekIdx = (firstDayOfWeek + i) % 7;
-            const isFriday = dayOfWeekIdx === 6;
-            const holidayInfo = getJalaliHoliday(viewYear, viewMonth, dayNum);
-            const isRedDay = isFriday || holidayInfo.isHoliday;
-            const creationBlocked = isRedDay || isPastDay(dayDate(dayNum));
-
-            return (
-              <div
-                key={`day-${dayNum}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleSelectDay(dayNum)}
-                onKeyDown={(e) => {
-                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
-                    e.preventDefault();
-                    handleSelectDay(dayNum);
-                  }
-                }}
-                title={holidayInfo.isHoliday ? holidayInfo.title : undefined}
-                className={`group/day relative h-14 sm:h-20 lg:h-(--cal-cell-h) p-1 sm:p-2 lg:p-1.5 rounded-2xl border transition-all duration-200 flex flex-col justify-between items-center cursor-pointer ${
-                  isSelected
-                    ? isRedDay
-                      ? 'bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-200 dark:shadow-none scale-102 z-10'
-                      : 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200 dark:shadow-none scale-102 z-10'
-                    : isToday
-                    ? isRedDay
-                      ? 'bg-rose-100/90 dark:bg-rose-950/70 text-rose-950 dark:text-rose-100 border-rose-400 dark:border-rose-500 font-bold ring-2 ring-rose-400 dark:ring-rose-800'
-                      : 'bg-indigo-50/80 dark:bg-indigo-950/60 text-indigo-900 dark:text-indigo-200 border-indigo-300 dark:border-indigo-500 font-bold'
-                    : isRedDay
-                    ? 'bg-rose-50/60 dark:bg-rose-950/35 hover:bg-rose-100/70 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 border-rose-200/80 dark:border-rose-900/60'
-                    : 'bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/70 text-slate-800 dark:text-slate-200 border-slate-200/80 dark:border-slate-700'
-                }`}
-              >
-                {/* Day Number */}
-                <div className="flex items-center justify-between w-full text-xs sm:text-sm font-semibold">
-                  <span
-                    className={
-                      isSelected
-                        ? 'text-white font-bold'
-                        : isToday
-                        ? isRedDay
-                          ? 'text-rose-700 dark:text-rose-300 font-extrabold'
-                          : 'text-indigo-700 dark:text-indigo-300'
-                        : isRedDay
-                        ? 'text-rose-600 dark:text-rose-400 font-extrabold'
-                        : 'text-slate-700 dark:text-slate-200'
-                    }
-                  >
-                    {toPersianDigits(dayNum)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    {isToday && !isSelected && (
-                      <span className={`w-1.5 h-1.5 rounded-full ${isRedDay ? 'bg-rose-600 dark:bg-rose-400' : 'bg-indigo-600 dark:bg-indigo-400'}`} />
-                    )}
-                    {/* New activity on this day: the only way a day opens the form */}
-                    {(!!onOpenCreateForDate || !!meetingPeople?.canCreate) && !creationBlocked && (
+          <div
+            className="grid grid-cols-7 gap-px rounded-xl overflow-hidden bg-slate-200/70 dark:bg-slate-800 border border-slate-200/70 dark:border-slate-800"
+            style={{ '--cal-cell-h': `clamp(5.5rem, calc((100dvh - 22rem) / ${rows}), 8rem)` } as React.CSSProperties}
+          >
+            {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+              <div key={`offset-${i}`} className="h-20 sm:h-24 lg:h-(--cal-cell-h) bg-slate-50 dark:bg-slate-900/70" />
+            ))}
+            {Array.from({ length: totalDays }).map((_, i) => {
+              const dayNum = i + 1;
+              const iso = dayDate(dayNum);
+              const isToday = isTodayView && currentJ.jd === dayNum;
+              const isSelected = selectedDay === dayNum;
+              const off = schedulingOffDayInfo(iso);
+              const past = isPastDay(iso);
+              const creationBlocked = off.off || past;
+              const dayTasks = dayItemsMap[dayNum] || [];
+              const dayMeets = meetings.filter((m) => m.details.date === iso);
+              const chips = [
+                ...dayMeets.map((m) => ({ key: 'm' + m.id, label: m.details.title, meeting: true as const, dot: '' })),
+                ...dayTasks.map((t, n) => ({ key: 't' + t.id + n, label: t.title, meeting: false as const, dot: PRIORITY_DOT[t.priority || 'medium'] })),
+              ];
+              const shownChips = chips.slice(0, 2);
+              return (
+                <div
+                  key={`day-${dayNum}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  aria-label={`${toPersianDigits(dayNum)} ${PERSIAN_MONTH_NAMES[viewMonth - 1]}${off.off ? `، ${off.title || 'تعطیل'}` : ''}، ${toPersianDigits(chips.length)} مورد`}
+                  onClick={() => handleSelectDay(dayNum)}
+                  onKeyDown={(e) => {
+                    if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleSelectDay(dayNum); }
+                  }}
+                  title={off.off ? off.title : undefined}
+                  className={`group/day relative h-20 sm:h-24 lg:h-(--cal-cell-h) p-1.5 sm:p-2 flex flex-col gap-1 text-right cursor-pointer transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 ${
+                    isSelected
+                      ? 'bg-indigo-50 dark:bg-indigo-950/50 ring-2 ring-inset ring-indigo-500'
+                      : off.off
+                      ? 'bg-rose-50/50 hover:bg-rose-50 dark:bg-rose-950/15 dark:hover:bg-rose-950/30'
+                      : 'bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/70'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold tabular-nums ${
+                      isToday ? 'bg-indigo-600 text-white' : off.off ? 'text-rose-500 dark:text-rose-400' : past ? 'text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'
+                    }`}>{toPersianDigits(dayNum)}</span>
+                    {canCreateAny && !creationBlocked && (
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedDay(dayNum);
-                          openCreateMenu(dayNum,e.currentTarget);
-                        }}
-                        title="افزودن فعالیت در این روز"
-                        aria-label={`افزودن فعالیت در روز ${toPersianDigits(dayNum)}`}
-                        className={`w-4 h-4 sm:w-5 sm:h-5 rounded-md flex items-center justify-center transition-all cursor-pointer [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/day:opacity-100 focus-visible:opacity-100 ${
-                          isSelected
-                            ? 'bg-white/20 hover:bg-white/35 text-white'
-                            : isRedDay
-                            ? 'text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60'
-                            : 'text-indigo-500 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
-                        }`}
+                        onClick={(e) => { e.stopPropagation(); setSelectedDay(dayNum); openCreateMenu(dayNum, e.currentTarget); }}
+                        title="افزودن در این روز"
+                        aria-label={`افزودن در روز ${toPersianDigits(dayNum)}`}
+                        className="w-6 h-6 rounded-md flex items-center justify-center text-indigo-500 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 cursor-pointer [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/day:opacity-100 focus-visible:opacity-100"
                       >
-                        <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        <Plus className="w-3.5 h-3.5" />
                       </button>
                     )}
-                  </span>
-                </div>
-
-                {/* Official Holiday Title Badge on Tile - removed per user request */}
-
-                {/* Items Count Badge (Small Circle) */}
-                {itemCount > 0 && (
-                  <div className="w-full flex justify-center">
-                    <span
-                      className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold leading-none transition-all ${
-                        isSelected
-                          ? isRedDay
-                            ? 'bg-white text-rose-700 shadow-2xs'
-                            : 'bg-white text-indigo-700 shadow-2xs'
-                          : isRedDay
-                          ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-200/80 dark:border-rose-800'
-                          : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800'
-                      }`}
-                    >
-                      {toPersianDigits(itemCount)}
-                    </span>
                   </div>
-                )}
-              </div>
-            );
-          })}
-
-        </div>
-
-      </div>
-
-      {/* Selected Day Task List Details Side Section */}
-      {(() => {
-        const selectedHolidayInfo = getJalaliHoliday(viewYear, viewMonth, selectedDay);
-        const selectedDayOfWeekIdx = (firstDayOfWeek + selectedDay - 1) % 7;
-        const isSelectedFriday = selectedDayOfWeekIdx === 6;
-        const isSelectedPast = isPastDay(dayDate(selectedDay));
-        const selectedCreationBlocked = selectedHolidayInfo.isHoliday || isSelectedFriday || isSelectedPast;
-
-        return (
-          <div className="lg:col-span-5 xl:col-span-4 bg-white dark:bg-slate-800/90 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 sm:p-5 space-y-4">
-            
-            <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-700/60">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
-                    روز {toPersianDigits(selectedDay)} {PERSIAN_MONTH_NAMES[viewMonth - 1]}
-                  </h3>
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {toPersianDigits(selectedDayItems.length)} وظیفه · {toPersianDigits(dayMeetings.length)} جلسه
-                  </span>
+                  {/* Up to two items, then a count */}
+                  <div className="hidden sm:flex flex-col gap-0.5 min-w-0">
+                    {shownChips.map((c) => (
+                      <span key={c.key} className={`flex items-center gap-1 px-1.5 h-5 rounded-md text-[11px] font-semibold truncate ${c.meeting ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}>
+                        {!c.meeting && <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />}
+                        <span className="truncate">{c.label}</span>
+                      </span>
+                    ))}
+                    {chips.length > 2 && <span className="text-[11px] font-semibold text-slate-400 px-1">{toPersianDigits(chips.length - 2)}+ مورد دیگر</span>}
+                  </div>
+                  {chips.length > 0 && (
+                    <span className="sm:hidden mt-auto mx-auto w-1.5 h-1.5 rounded-full bg-indigo-500" aria-hidden="true" />
+                  )}
                 </div>
-              </div>
-
-              {/* Quick Create for this Day */}
-              {(!!onOpenCreateForDate || !!meetingPeople?.canCreate) && !selectedCreationBlocked && (
-                <button
-                  type="button"
-                  onClick={e => openCreateMenu(selectedDay,e.currentTarget)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-bold border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer shrink-0"
-                  title="افزودن فعالیت جدید"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>افزودن</span>
-                </button>
-              )}
-            </div>
-
-            {/* Holiday / Weekend Banner */}
-            {selectedHolidayInfo.isHoliday ? (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-2xl bg-rose-50 dark:bg-rose-950/70 border border-rose-200 dark:border-rose-800/80 text-rose-800 dark:text-rose-200 text-xs font-bold shadow-2xs">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 animate-pulse"></span>
-                <span>تعطیل رسمی: {selectedHolidayInfo.title}</span>
-              </div>
-            ) : isSelectedFriday ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-rose-50/80 dark:bg-rose-950/50 border border-rose-200/70 dark:border-rose-900/40 text-rose-700 dark:text-rose-300 text-xs font-bold">
-                <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0"></span>
-                <span>تعطیل پایان هفته (جمعه)؛ امکان ایجاد وظیفه یا جلسه وجود ندارد.</span>
-              </div>
-            ) : isSelectedPast ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold">
-                <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
-                <span>روز گذشته؛ امکان ایجاد وظیفه یا جلسه وجود ندارد.</span>
-              </div>
-            ) : null}
-
-        <section className="space-y-2" aria-label="جلسات روز انتخاب‌شده">
-          <div className="flex items-center justify-between"><h4 className="text-sm font-bold text-sky-700 dark:text-sky-300">جلسات</h4><button type="button" onClick={()=>setReloadMeetings(n=>n+1)} className="text-xs text-slate-400 hover:text-indigo-600">تازه‌سازی</button></div>
-          {meetingError && <Notice type="error">{meetingError}</Notice>}
-          {meetingsLoading && <p className="text-xs text-slate-400">در حال دریافت جلسات…</p>}
-          {!meetingsLoading && !meetingError && dayMeetings.length === 0 && <p className="text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-3">جلسه‌ای برای این روز ثبت نشده است.</p>}
-          {dayMeetings.map(m=><div key={m.id} className="rounded-2xl border border-sky-200 dark:border-sky-900 bg-sky-50/60 dark:bg-sky-950/30 p-3 space-y-2">
-            <div className="flex items-start justify-between gap-2"><span className="text-right font-bold text-sm text-sky-900 dark:text-sky-200">{m.details.title}</span><span className="flex items-center gap-1 shrink-0"><button type="button" title={m.canEdit ? 'جزئیات و ویرایش جلسه' : 'مشاهده جزئیات جلسه'} aria-label={(m.canEdit ? 'جزئیات و ویرایش جلسه ' : 'مشاهده جلسه ')+m.details.title} onClick={()=>{setEditingMeeting(m);setMeetingDate(m.details.date);}} className="p-1 rounded-lg text-sky-600 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 cursor-pointer"><Eye className="w-4 h-4" /></button>{m.canDelete && <button type="button" title="حذف جلسه" aria-label={'حذف جلسه '+m.details.title} onClick={()=>removeMeeting(m)} className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"><Trash2 className="w-4 h-4" /></button>}</span></div>
-            <p className="text-xs text-sky-700 dark:text-sky-300">{toPersianDigits(m.details.startTime)} تا {toPersianDigits(m.details.endTime)}{m.details.location && ' · '+m.details.location}</p>
-            <p className="text-[11px] text-slate-500">{toPersianDigits(m.details.participantIds.length)} فرد مرتبط · {toPersianDigits(m.details.agenda.length)} بند</p>          </div>)}
-        </section>
-        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 border-t border-slate-100 dark:border-slate-700 pt-3">وظایف</h4>
-        {/* Tasks List */}
-        {selectedDayItems.length > 0 ? (
-          <div className="space-y-2 max-h-[520px] overflow-y-auto pr-0.5">
-            {selectedDayItems.map((item, index) => {
-              const parent = item.parentTask;
-              const commentCount = parent.comments?.length || 0;
-              const { canEditTask, canDeleteTask, canChangeStatus } = checkTaskPermissions(parent);
-              const itemPriority: Priority = item.priority || 'medium';
-              const priorityStyle = {
-                high: 'border-r-[5px] border-r-rose-500 shadow-[4px_0_10px_-2px_rgba(244,63,94,0.35)] dark:shadow-[4px_0_12px_-2px_rgba(244,63,94,0.45)]',
-                medium: 'border-r-[5px] border-r-amber-400 dark:border-r-amber-500 shadow-[4px_0_10px_-2px_rgba(251,191,36,0.35)] dark:shadow-[4px_0_12px_-2px_rgba(245,158,11,0.45)]',
-                low: 'border-r-[5px] border-r-emerald-500 shadow-[4px_0_10px_-2px_rgba(16,185,129,0.35)] dark:shadow-[4px_0_10px_-2px_rgba(16,185,129,0.45)]',
-              }[itemPriority];
-
-              return (
-                <CalendarTaskCardItem
-                  key={item.id + '_' + index}
-                  item={item}
-                  index={index}
-                  parent={parent}
-                  commentCount={commentCount}
-                  canEditTask={canEditTask}
-                  canDeleteTask={canDeleteTask}
-                  canChangeStatus={canChangeStatus}
-                  priorityStyle={priorityStyle}
-                  onViewDetails={onViewDetails}
-                  onEditTask={onEditTask}
-                  onStatusChange={onStatusChange}
-                  onDeleteRequest={(id) => setDeletingTaskId(id)}
-                />
               );
             })}
           </div>
-        ) : (
-          <div className="text-center py-8 px-3 bg-slate-50/60 dark:bg-slate-900/40 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
-            <CalendarIcon className="w-8 h-8 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
-            <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
-              هیچ وظیفه‌ای برای این تاریخ ثبت نشده است.
-            </p>
+          <div className="flex flex-wrap items-center gap-4 mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-sky-100 dark:bg-sky-950" /> جلسه</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-500" /> اولویت زیاد</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-rose-50 border border-rose-100 dark:bg-rose-950/30 dark:border-rose-900" /> تعطیل در تقویم کاری</span>
           </div>
-        )}
+        </section>
+
+        {/* Selected day */}
+        {(() => {
+          const iso = dayDate(Math.min(selectedDay, totalDays));
+          const off = schedulingOffDayInfo(iso);
+          const past = isPastDay(iso);
+          const blocked = off.off || past;
+          const weekday = PERSIAN_WEEK_DAYS[(firstDayOfWeek + selectedDay - 1) % 7];
+          return (
+            <aside className={`${surface} p-4 space-y-4 xl:sticky xl:top-20`} aria-label="روز انتخاب‌شده">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-slate-400">{weekday}</p>
+                  <h3 className="text-lg font-extrabold text-slate-900 dark:text-white">{toPersianDigits(selectedDay)} {PERSIAN_MONTH_NAMES[viewMonth - 1]}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{toPersianDigits(selectedDayItems.length)} فعالیت · {toPersianDigits(dayMeetings.length)} جلسه</p>
+                </div>
+                {canCreateAny && !blocked && (
+                  <button type="button" onClick={(e) => openCreateMenu(selectedDay, e.currentTarget)} className={`${btnSecondary} !h-9`}><Plus className="w-4 h-4" /> افزودن</button>
+                )}
+              </div>
+
+              {off.off ? (
+                <p className="flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  {off.title || 'تعطیل'}؛ فعالیت یا جلسهٔ جدید در این روز ثبت نمی‌شود.
+                </p>
+              ) : past ? (
+                <p className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+                  روز گذشته؛ فعالیت یا جلسهٔ جدید ثبت نمی‌شود.
+                </p>
+              ) : null}
+
+              <section className="space-y-2" aria-label="جلسات روز">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-400">جلسه‌ها</h4>
+                  <button type="button" onClick={() => setReloadMeetings((n) => n + 1)} className="text-xs font-semibold text-slate-400 hover:text-indigo-600 cursor-pointer">تازه‌سازی</button>
+                </div>
+                {meetingError && <Notice type="error">{meetingError}</Notice>}
+                {meetingsLoading && <p className="text-xs text-slate-400">در حال دریافت جلسه‌ها…</p>}
+                {!meetingsLoading && !meetingError && dayMeetings.length === 0 && <p className="text-xs text-slate-400 py-2">جلسه‌ای ثبت نشده است.</p>}
+                {dayMeetings.map((m) => (
+                  <div key={m.id} className="group/meet flex gap-3 p-3 rounded-xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/60">
+                    <span className="w-1 rounded-full bg-sky-500 shrink-0" aria-hidden="true" />
+                    <button type="button" onClick={() => { setEditingMeeting(m); setMeetingDate(m.details.date); }} className="flex-1 min-w-0 text-right cursor-pointer" title={m.canEdit ? 'جزئیات و ویرایش جلسه' : 'مشاهده جزئیات جلسه'}>
+                      <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">{m.details.title}</p>
+                      <p className="text-xs text-sky-700 dark:text-sky-300 mt-0.5 tabular-nums">{toPersianDigits(m.details.startTime)} تا {toPersianDigits(m.details.endTime)}{m.details.location && ' · ' + m.details.location}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{toPersianDigits(m.details.participantIds.length)} نفر · {toPersianDigits(m.details.agenda.length)} بند دستور جلسه</p>
+                    </button>
+                    <span className="flex flex-col gap-1 shrink-0">
+                      <button type="button" title="مشاهده" aria-label={'مشاهده جلسه ' + m.details.title} onClick={() => { setEditingMeeting(m); setMeetingDate(m.details.date); }} className="p-1 rounded-lg text-sky-600 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 cursor-pointer"><Eye className="w-4 h-4" /></button>
+                      {m.canDelete && <button type="button" title="حذف جلسه" aria-label={'حذف جلسه ' + m.details.title} onClick={() => removeMeeting(m)} className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"><Trash2 className="w-4 h-4" /></button>}
+                    </span>
+                  </div>
+                ))}
+              </section>
+
+              <section className="space-y-2" aria-label="فعالیت‌های روز">
+                <h4 className="text-xs font-bold text-slate-400">فعالیت‌ها</h4>
+                {selectedDayItems.length > 0 ? (
+                  <div className="space-y-2 max-h-[520px] overflow-y-auto p-0.5">
+                    {selectedDayItems.map((item, index) => {
+                      const parent = item.parentTask;
+                      const { canEditTask, canDeleteTask, canChangeStatus } = checkTaskPermissions(parent);
+                      const priorityStyle = { high: 'border-r-[3px] border-r-rose-500', medium: 'border-r-[3px] border-r-amber-400', low: 'border-r-[3px] border-r-emerald-500' }[item.priority || 'medium'];
+                      return (
+                        <CalendarTaskCardItem
+                          key={item.id + '_' + index}
+                          item={item}
+                          index={index}
+                          parent={parent}
+                          commentCount={parent.comments?.length || 0}
+                          canEditTask={canEditTask}
+                          canDeleteTask={canDeleteTask}
+                          canChangeStatus={canChangeStatus}
+                          priorityStyle={priorityStyle}
+                          onViewDetails={onViewDetails}
+                          onEditTask={onEditTask}
+                          onStatusChange={onStatusChange}
+                          onDeleteRequest={(id) => setDeletingTaskId(id)}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                    <CalendarIcon className="w-7 h-7 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">فعالیتی با موعد این روز نیست.</p>
+                  </div>
+                )}
+              </section>
+            </aside>
+          );
+        })()}
       </div>
-    );
-  })()}
 
       {createMenu && <CalendarCreateMenu anchor={createMenu.anchor} canCreateMeeting={!!meetingPeople?.canCreate} canCreateTask={!!onOpenCreateForDate} meetingReason={meetingPeopleError || meetingPeople?.message || (!meetingPeople?'در حال بررسی دسترسی…':!meetingPeople.canCreate?'دسترسی ایجاد جلسه ندارید.':undefined)} onClose={()=>setCreateMenu(null)} onTask={()=>{const day=createMenu.day;setCreateMenu(null);openCreateForDay(day);}} onMeeting={()=>{if(!meetingPeople?.canCreate)return;setEditingMeeting(undefined);setMeetingDate(dayDate(createMenu.day));setCreateMenu(null);}} />}
       {meetingDate && currentUser && <MeetingFormModal initialDate={meetingDate} meeting={editingMeeting} currentUser={currentUser} people={registeredUsers} tasks={tasks} onClose={()=>{setMeetingDate(null);setEditingMeeting(undefined);}} onSaved={savedMeeting} onConvertToTask={onConvertMeetingToTask && ((title,isoDate,tags,onCreated)=>onConvertMeetingToTask(title,isoDate,tags,onCreated))} onLinked={m=>setMeetings(rows=>rows.map(old=>old.id===m.id?m:old))} />}
