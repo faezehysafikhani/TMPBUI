@@ -96,7 +96,11 @@ export const ProgressiveTaskCardList: React.FC<ListProps> = ({ tasks, ...cardPro
     const jump = jumpToRef.current;
     if (!jump || loadingMore) return;
     jumpToRef.current = null;
-    jump.root.scrollTop = jump.top;
+    // Forward only, and at most one column height from where the user is: it brings the new cards into view,
+    // it never leaps over them.
+    const { root } = jump;
+    const target = Math.min(jump.top, root.scrollTop + root.clientHeight);
+    if (target > root.scrollTop) root.scrollTop = target;
   }, [shownCount, loadingMore]);
 
   const shown = tasks.slice(0, shownCount);
@@ -106,11 +110,14 @@ export const ProgressiveTaskCardList: React.FC<ListProps> = ({ tasks, ...cardPro
   return (
     <>
       <TaskCardList tasks={shown.slice(0, split)} {...cardProps} />
-      <div ref={sentinelRef} className="space-y-3">
+      {/* Not a scroll anchor: this block (and the loader) moves down by a whole page when cards are added, and a
+          browser anchored to it would scroll along with it - thousands of pixels in one step. */}
+      <div ref={sentinelRef} className="space-y-3" style={{ overflowAnchor: 'none' }}>
         <TaskCardList tasks={shown.slice(split)} {...cardProps} />
       </div>
       <div
         ref={loaderRef}
+        style={{ overflowAnchor: 'none' }}
         className="flex items-center justify-center gap-2 py-3 text-xs text-gray-500 dark:text-gray-400"
         role="status"
         aria-live="polite"
