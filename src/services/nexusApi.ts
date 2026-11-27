@@ -97,6 +97,8 @@ const ADMIN_ROLE_NAME = 'Administrator';
 
 /** Parallel requests used when a screen needs one call per task. */
 const DETAIL_CONCURRENCY = 6;
+/** Board pages read at the same time once the first page has told how many there are. */
+const BOARD_PAGE_CONCURRENCY = 2;
 
 // ---------------------------------------------------------------------------
 // Backend DTOs (camelCase JSON)
@@ -309,6 +311,8 @@ interface TaskDto {
   recurrence: RepetitiveTaskDto | null;
   createdAtUtc: string;
   modifiedAtUtc: string | null;
+  /** How many comments the task has (only for people who may read them); older servers leave it out. */
+  commentCount?: number;
   /** Time of day on dueDate ("HH:mm:ss"); null when the task has only a date. */
   dueTime?: string | null;
   /** Times of day on the charter dates, like dueTime. */
@@ -318,6 +322,49 @@ interface TaskDto {
 }
 
 interface TaskListItemDto { id: string; }
+
+/**
+ * A task as the board shows it (GET /tasks/board): people as id and name (the first responsible person is the old
+ * assignedUser), the access list as the index of a list in its page's accessLists (sent once per page, not per task),
+ * tags as names, no charter, subtasks without their tags and files, and of the task's posts only the ones the signed-in
+ * user holds (postIds) plus whether it has any (hasPosts) - «نمایش بر اساس پست» compares with the user's own posts.
+ */
+interface BoardPersonDto { id: string; displayName: string; }
+interface TaskBoardItemDto {
+  id: string;
+  title: string;
+  description: string | null;
+  isProject: boolean;
+  isRecurring: boolean;
+  status: string;
+  priority: string;
+  dueDate: string;
+  dueTime?: string | null;
+  actualCompletionDateUtc: string | null;
+  owner: BoardPersonDto | null;
+  assignedUserGroup: { id: string; name: string } | null;
+  responsibleUsers: BoardPersonDto[];
+  accessList: number;
+  standIns: { id: string; displayName: string; note: string | null }[];
+  allowAssigneeStatusUpdate: boolean;
+  subTasks: SubTaskDto[];
+  tags: string[];
+  files: TaskFileDto[];
+  recurrence: RepetitiveTaskDto | null;
+  hasPosts: boolean;
+  postIds: string[];
+  parentTaskId?: string | null;
+  commentCount: number;
+  createdAtUtc: string;
+  modifiedAtUtc: string | null;
+}
+interface TaskBoardPageDto {
+  items: TaskBoardItemDto[];
+  accessLists: string[][];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
 
 interface TaskCommentDto {
   id: string;
@@ -600,7 +647,26 @@ export function apiRequest<T>(method: string, path: string, options: RequestOpti
   return request<T>(method, path, options);
 }
 
+/**
+ * The same GET asked for again while the first is still on its way (several screens wanting the same list as the page
+ * starts, React running effects twice in development) waits for that one instead of sending another. Each caller gets
+ * its own copy of the answer, so one changing it cannot change another's.
+ */
+const getsInFlight = new Map<string, Promise<unknown>>();
+
 async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+  const shareable = method === 'GET' && (options.responseType ?? 'json') === 'json' && !options.form && !options.cache;
+  if (!shareable) return sendRequest<T>(method, path, options);
+  const key = `${options.auth === false ? 'anon' : 'auth'}|${activePostsHeader() ?? ''}|${buildUrl(path, options.query)}`;
+  const pending = getsInFlight.get(key);
+  if (pending) return pending.then((value) => (value === undefined ? value : structuredClone(value))) as Promise<T>;
+  const sent = sendRequest<T>(method, path, options);
+  getsInFlight.set(key, sent);
+  sent.then(() => getsInFlight.delete(key), () => getsInFlight.delete(key));
+  return sent;
+}
+
+async function sendRequest<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
   const { body, form, query, auth = true, retryOnUnauthorized = true, responseType = 'json' } = options;
 
   const headers: Record<string, string> = { Accept: responseType === 'json' ? 'application/json' : '*/*' };
@@ -649,7 +715,7 @@ async function request<T>(method: string, path: string, options: RequestOptions 
   // The longest the sign-in may last has come: the user types the password again in place and the
   // page (and anything half-filled in it) stays where it is. Any other reason ends the session.
   if (endedReason === 'session.absolute_expired' && absoluteReauth && retryOnUnauthorized) {
-    if (await absoluteReauth()) return request<T>(method, path, { ...options, retryOnUnauthorized: false });
+    if (await absoluteReauth()) return sendRequest<T>(method, path, { ...options, retryOnUnauthorized: false });
   }
   if (endedReason) {
     endSession(endedReason);
@@ -658,7 +724,7 @@ async function request<T>(method: string, path: string, options: RequestOptions 
 
   if (response.status === 401 && auth && retryOnUnauthorized) {
     if (await refreshSession()) {
-      return request<T>(method, path, { ...options, retryOnUnauthorized: false });
+      return sendRequest<T>(method, path, { ...options, retryOnUnauthorized: false });
     }
   }
 
@@ -920,13 +986,28 @@ async function downloadFileAsDataUrl(fileId: string): Promise<string> {
  * The UI shows and downloads attachments straight from `dataUrl`, so the bytes are fetched
  * here. The attachment id is the TaskFile link id - the handle the delete endpoint takes.
  */
-async function mapFiles(files: TaskFileDto[]): Promise<Attachment[]> {
+async function mapFiles(files: TaskFileDto[], withoutContent = false): Promise<Attachment[]> {
+  // The board lists attachments by name only: their bytes are fetched (by fileId) when one is previewed, so a board of
+  // hundreds of tasks does not download every file. An entry with no content keeps its link id, so saving the task
+  // does not delete it.
+  if (withoutContent) {
+    return files.map((f) => ({
+      id: f.linkId,
+      name: f.fileName,
+      size: f.fileSizeBytes,
+      type: f.contentType,
+      dataUrl: '',
+      createdAt: f.createdAtUtc,
+      fileId: f.fileId,
+    }));
+  }
   return Promise.all(
     files.map(async (f) => ({
       id: f.linkId,
       name: f.fileName,
       size: f.fileSizeBytes,
       type: f.contentType,
+      fileId: f.fileId,
       // One unreadable file must not stop the whole board from loading. The entry is kept
       // (with no content) so its link id survives and a later save does not delete it.
       dataUrl: await downloadFileAsDataUrl(f.fileId).catch((err) => {
@@ -1005,7 +1086,11 @@ function responsibleOf(dto: TaskDto): UserSummaryDto[] {
   return dto.assignedUser ? [dto.assignedUser] : [];
 }
 
-async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[]): Promise<Task> {
+/**
+ * partial: the board load - the task without its conversation and history (comments and logs stay undefined, the
+ * count comes from the server) and with attachments listed without their content. Both arrive when the task is opened.
+ */
+async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[], options: { partial?: boolean } = {}): Promise<Task> {
   const hasCharter =
     dto.charterDescription || dto.charterProjectManager || dto.charterStartDate || dto.charterEndDate;
 
@@ -1017,7 +1102,7 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
     actualCompletionDate: dto.actualCompletionDateUtc || undefined,
     priority: LEVEL_FROM_API[dto.priority] || 'medium',
     status: STATUS_FROM_API[dto.status] || 'todo',
-    attachments: await mapFiles(dto.files || []),
+    attachments: await mapFiles(dto.files || [], options.partial),
     user: dto.owner?.id,
     ownerName: dto.owner?.displayName,
     assignedUserId: dto.assignedUser?.id,
@@ -1046,8 +1131,9 @@ async function mapTask(dto: TaskDto, comments?: TaskComment[], logs?: TaskLog[])
         }
       : undefined,
     projectSubTasks: [...(dto.subTasks || [])].sort((a, b) => a.sortOrder - b.sortOrder).map(mapSubTask),
-    comments: comments || [],
-    logs: logs || [],
+    comments: comments ?? (options.partial ? undefined : []),
+    logs: logs ?? (options.partial ? undefined : []),
+    commentCount: dto.commentCount,
     createdAt: dto.createdAtUtc,
     updatedAt: dto.modifiedAtUtc || dto.createdAtUtc,
   };
@@ -1376,9 +1462,12 @@ async function getTaskDto(taskId: string): Promise<TaskDto> {
   return request<TaskDto>('GET', `${TASKS}/${taskId}`);
 }
 
-async function fetchComments(taskId: string): Promise<TaskComment[]> {
-  const items = await request<TaskCommentDto[]>('GET', `${TASKS}/${taskId}/comments`);
+async function buildComments(items: TaskCommentDto[] | null | undefined): Promise<TaskComment[]> {
   return (await Promise.all((items || []).map(mapCommentWithFiles))).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}
+
+async function fetchComments(taskId: string): Promise<TaskComment[]> {
+  return buildComments(await request<TaskCommentDto[]>('GET', `${TASKS}/${taskId}/comments`));
 }
 
 /** The creation entry this app writes itself, with the assignees in its text. */
@@ -1430,30 +1519,90 @@ async function fetchCommentsIfAllowed(taskId: string): Promise<TaskComment[]> {
   }
 }
 
-async function fetchActivity(taskId: string): Promise<TaskLog[]> {
-  const items = await request<TaskActivityDto[]>('GET', `${TASKS}/${taskId}/activity`);
+function buildActivity(items: TaskActivityDto[] | null | undefined): TaskLog[] {
   return withoutEditDuplicates(withoutDuplicateCreation(items || []).map(mapActivity))
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
+async function fetchActivity(taskId: string): Promise<TaskLog[]> {
+  return buildActivity(await request<TaskActivityDto[]>('GET', `${TASKS}/${taskId}/activity`));
+}
+
 /**
- * The list endpoint returns a trimmed TaskListItemDto (no description, subtasks, files,
- * charter or recurrence), while the board needs the full task. So the list supplies the ids
- * and each task is then read in full, together with its comments and activity (the
- * notification bell is built from those).
+ * The board load: full tasks (subtasks, tags, people, schedule, attachment names, comment count) a page of 200 at a
+ * time from /tasks/board - a handful of requests however many tasks there are. The conversation and the history are
+ * NOT loaded here: the task screen asks for them (fetchTaskDiscussion) when a task is opened, and a change announced
+ * by the live channel re-reads just that task (fetchTaskForBoard).
  */
 export async function fetchTasks(): Promise<Task[]> {
   // Signed out: nothing to show, and no point sending requests that can only return 401.
   if (!readSession()) return [];
-  const list = await getAllPages<TaskListItemDto>(TASKS, { sortBy: 'CreatedAtUtc', sortDescending: true }, 200);
-  return mapWithLimit(list, DETAIL_CONCURRENCY, async (item) => {
-    const [dto, comments, logs] = await Promise.all([
-      getTaskDto(item.id),
-      fetchCommentsIfAllowed(item.id),
-      fetchActivity(item.id),
-    ]);
-    return mapTask(dto, comments, logs);
-  });
+  const pages = await getAllBoardPages(`${TASKS}/board`, { sortBy: 'CreatedAtUtc', sortDescending: true }, 200, BOARD_PAGE_CONCURRENCY);
+  // Each page names its own access lists: an item is mapped with the lists of the page it came in.
+  return Promise.all(pages.flatMap((page) => page.items.map((item) => mapBoardTask(item, page.accessLists))));
+}
+
+/** The board's pages: the first says how many there are, the rest are read a few at a time. */
+async function getAllBoardPages(path: string, query: RequestOptions['query'], pageSize: number, concurrency: number): Promise<TaskBoardPageDto[]> {
+  const first = await request<TaskBoardPageDto>('GET', path, { query: { ...query, pageNumber: 1, pageSize } });
+  const count = Math.ceil(first.totalCount / pageSize);
+  if (count <= 1 || first.items.length === 0) return [first];
+  const numbers = Array.from({ length: count - 1 }, (_, i) => i + 2);
+  const rest = await mapWithLimit(numbers, concurrency, (pageNumber) =>
+    request<TaskBoardPageDto>('GET', path, { query: { ...query, pageNumber, pageSize } })
+  );
+  return [first, ...rest];
+}
+
+/**
+ * A board item as a Task, through the same mapping as a full task: what the board does not carry stays undefined
+ * (the access list's names, the charter, the posts' details) - the task form and the project screen read the whole
+ * task before they open.
+ */
+async function mapBoardTask(item: TaskBoardItemDto, accessLists: string[][]): Promise<Task> {
+  const person = (p: BoardPersonDto) => ({ id: p.id, displayName: p.displayName, email: null });
+  const asTaskDto = {
+    ...item,
+    owner: item.owner ? person(item.owner) : null,
+    assignedUser: item.responsibleUsers[0] ? person(item.responsibleUsers[0]) : null,
+    responsibleUsers: item.responsibleUsers.map(person),
+    assignees: (accessLists[item.accessList] || []).map((id) => ({ id, displayName: '', email: null })),
+    tags: item.tags.map((name) => ({ id: '', name, color: null })),
+    charterDescription: null,
+    charterProjectManager: null,
+    charterStartDate: null,
+    charterEndDate: null,
+    posts: item.postIds.map((postId) => ({ postId, role: 'access', title: '', code: '', place: '', holderUserId: null, holderName: null })),
+  } as unknown as TaskDto;
+  const task = await mapTask(asTaskDto, undefined, undefined, { partial: true });
+  return { ...task, teamMemberNames: undefined, responsiblePostIds: undefined, hasPosts: item.hasPosts };
+}
+
+/**
+ * One task as the board holds it (no conversation or history): the live channel's answer to "this task changed".
+ * Null when the server no longer shows it to this user (deleted, or taken off them): the board drops it.
+ */
+export async function fetchTaskForBoard(taskId: string): Promise<Task | null> {
+  try {
+    return await mapTask(await getTaskDto(taskId), undefined, undefined, { partial: true });
+  } catch (error) {
+    if (error instanceof NexusApiError && error.httpStatus === 404) return null;
+    throw error;
+  }
+}
+
+/**
+ * What a task adds to the board once it is opened: its conversation and history, in one request. canSeeConversation is
+ * false for people who may not read the comments (the server then sends none).
+ */
+export async function fetchTaskDiscussion(taskId: string): Promise<{ comments: TaskComment[]; logs: TaskLog[]; canSeeConversation: boolean }> {
+  const dto = await request<{ comments: TaskCommentDto[]; activity: TaskActivityDto[]; canSeeConversation: boolean }>('GET', `${TASKS}/${taskId}/discussion`);
+  return { comments: await buildComments(dto.comments), logs: buildActivity(dto.activity), canSeeConversation: dto.canSeeConversation };
+}
+
+/** The bytes of an attachment the board listed without content (see Attachment.fileId), as a data URL. */
+export function downloadAttachmentContent(fileId: string): Promise<string> {
+  return downloadFileAsDataUrl(fileId);
 }
 
 async function fetchTask(taskId: string): Promise<Task> {
@@ -2704,7 +2853,8 @@ export async function addTaskActivityEntry(taskId: string, action: string, detai
 // Live updates (SignalR hub of the TaskManagement module)
 // ---------------------------------------------------------------------------
 
-const taskChangeListeners = new Set<() => void>();
+/** ids: the tasks that changed; null: reload everything. */
+const taskChangeListeners = new Set<(ids: string[] | null) => void>();
 let taskHub: HubConnection | null = null;
 /** Whose connection taskHub is: never reused for someone else signing in. */
 let taskHubUserId: string | null = null;
@@ -2718,12 +2868,26 @@ async function hubAccessToken(): Promise<string> {
   return (await ensureAccessToken()) || '';
 }
 
-function notifyTaskChange(): void {
-  // Several writes in a row (a form save touches many endpoints) become one reload.
+/** More changed tasks than this in one burst: reading them one by one costs more than reloading the board. */
+const MAX_INCREMENTAL_TASKS = 25;
+const changedTaskIds = new Set<string>();
+let changeOfUnknownTask = false;
+
+/**
+ * taskId: the task the server says changed. Without one (a change that names no task, or a reconnect that may have
+ * missed some) listeners are told to reload everything.
+ */
+function notifyTaskChange(taskId?: string | null): void {
+  if (taskId) changedTaskIds.add(taskId);
+  else changeOfUnknownTask = true;
+  // Several writes in a row (a form save touches many endpoints) become one notification.
   if (changeTimer) clearTimeout(changeTimer);
   changeTimer = setTimeout(() => {
     changeTimer = null;
-    taskChangeListeners.forEach((listener) => listener());
+    const ids = changeOfUnknownTask || changedTaskIds.size > MAX_INCREMENTAL_TASKS ? null : [...changedTaskIds];
+    changedTaskIds.clear();
+    changeOfUnknownTask = false;
+    taskChangeListeners.forEach((listener) => listener(ids));
   }, 400);
 }
 
@@ -2731,7 +2895,7 @@ function notifyTaskChange(): void {
  * Calls onChange whenever tasks, subtasks, comments, files, tags or schedules change anywhere
  * in the tenant - whenever tasks change.
  */
-export function subscribeToTaskChanges(onChange: () => void): () => void {
+export function subscribeToTaskChanges(onChange: (ids: string[] | null) => void): () => void {
   const session = readSession();
   if (!session) return () => {};
 
@@ -2767,7 +2931,7 @@ function startTaskHub(userId: string): void {
     // here: one warning, then a retry while anyone is still listening.
     .configureLogging(LogLevel.None)
     .build();
-  hub.on('TasksChanged', notifyTaskChange);
+  hub.on('TasksChanged', (message?: { taskId?: string | null }) => notifyTaskChange(message?.taskId ?? null));
   hub.onreconnected(() => {
     taskHubRetryDelay = 15_000;
     notifyTaskChange(); // changes made while disconnected

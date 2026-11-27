@@ -425,13 +425,21 @@ export const TeamChatView: React.FC<TeamChatViewProps> = ({
       }
     } catch (err) {}
 
+    // One check at a time: when the server is slow a new one every 4 seconds only piles up behind the last.
+    let loading = false;
     const loadUnread = async () => {
-      const counts = await fetchUnreadMessageCountsPB(currentUser.id);
-      setUnreadCounts(counts);
+      if (loading) return;
+      loading = true;
       try {
-        localStorage.setItem(cacheKey, JSON.stringify(counts));
-      } catch (err) {}
-      setTeamUnreadCounts(await fetchTeamUnreadCountsPB().catch(() => ({})));
+        const counts = await fetchUnreadMessageCountsPB(currentUser.id);
+        setUnreadCounts(counts);
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(counts));
+        } catch (err) {}
+        setTeamUnreadCounts(await fetchTeamUnreadCountsPB().catch(() => ({})));
+      } finally {
+        loading = false;
+      }
     };
 
     loadUnread();

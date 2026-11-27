@@ -286,7 +286,9 @@ export const AdminDialog: React.FC<{ title: string; onClose: () => void; childre
     if (el && !el.contains(document.activeElement)) (el.querySelector<HTMLElement>('input,select,textarea') ?? el).focus();
   }, []);
   return (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs" onClick={(e) => e.target === e.currentTarget && onClose()}>
+  // A click outside the dialog does not close it - nor does a press that starts in a field and is released outside
+  // (selecting text, dragging): what was typed stays. It closes with ×, «انصراف» or Esc.
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/50 backdrop-blur-xs">
     <div ref={box} tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }} role="dialog" aria-modal="true" aria-label={title} className={`w-full ${compact ? 'max-w-2xl' : wide ? 'max-w-3xl' : 'max-w-xl'} max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 focus:outline-hidden`}>
       <div className={`flex items-center justify-between border-b border-slate-100 dark:border-slate-800 ${compact ? 'px-4 py-3' : 'px-5 py-4'}`}>
         <h3 className="text-base font-extrabold text-slate-900 dark:text-white">{title}</h3>

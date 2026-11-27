@@ -8,7 +8,7 @@ import {
   createTaskCommentPB,
   deleteTaskCommentPB,
   updateTaskCommentPB,
-  fetchTaskLogsPB
+  fetchTaskDiscussionPB
 } from '../services/dataService';
 import {
   X,
@@ -60,6 +60,8 @@ interface TaskDetailModalProps {
   /** «ثبت نهایی»: finishes a project or recurring task at once. */
   onFinalizeProject?: (taskId: string) => void;
   onConvertToTask?: (title: string, description?: string, parent?: { id: string; title: string }) => void;
+  /** Changes when the live channel says this task changed while it is open: the conversation and history are read again. */
+  refreshKey?: number;
 }
 
 const LOGS_PAGE_SIZE = 10;
@@ -90,6 +92,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onToggleSubTask,
   onFinalizeProject,
   onConvertToTask,
+  refreshKey,
 }) => {
   if (!isOpen || !task) return null;
 
@@ -125,71 +128,62 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     return () => document.removeEventListener('keydown', onKey);
   }, [isOpen, onClose]);
 
-  // Load comments & activity logs from the server
+  // Load the conversation and the history from the server. The board holds the task itself; what a task adds once it
+  // is opened comes in ONE request (comments and history together), and again when the live channel says it changed.
   const toldGoneRef = useRef(false);
   const [conversationDenied, setConversationDenied] = useState(false);
   useEffect(() => { setConversationDenied(false); }, [task?.id]);
   useEffect(() => {
-    if (task && task.id) {
-      // The conversation belongs to the owner and the responsible people only; everything else loads for all.
-      if (canUseConversation) {
-      setIsLoadingComments(true);
-      fetchCommentsForTaskPB(task.id)
-        .then((fetched) => {
-          const sorted = [...fetched].sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          setCommentsList(sorted);
-          onUpdateComments(task.id, sorted);
-        })
-        .catch((err) => {
-          // The server keeps the conversation for the owner and the responsible people: a 404 here
-          // means this user is not one of them (the task itself being gone is read from its log below).
-          if (err instanceof NexusApiError && err.httpStatus === 404) {
-            setConversationDenied(true);
-            setCommentsList([]);
-            return;
+    if (!task || !task.id) return undefined;
+    const taskId = task.id;
+    let cancelled = false;
+    setIsLoadingComments(true);
+    setIsLoadingLogs(true);
+    fetchTaskDiscussionPB(taskId)
+      .then(({ comments, logs, canSeeConversation }) => {
+        if (cancelled) return;
+        // The conversation belongs to the owner and the responsible people only: for anyone else the server sends none.
+        setConversationDenied(!canSeeConversation);
+        if (canSeeConversation) {
+          setCommentsList(comments);
+          onUpdateComments(taskId, comments);
+        } else {
+          setCommentsList([]);
+        }
+        // Exclude comments / discussions from activity logs
+        const filtered = logs.filter(
+          (l) => !l.action.includes('نظر') && !l.action.includes('گفتگو') && !l.action.includes('پیام')
+        );
+        setLogsList([...filtered, ...fakeLogs(taskId)]);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        // The server no longer shows this task to the user (taken off it, or deleted) - e.g.
+        // opened from an old notification: say so instead of showing what the screen had.
+        if (err instanceof NexusApiError && err.httpStatus === 404) {
+          if (!toldGoneRef.current) {
+            toldGoneRef.current = true;
+            showToast('این فعالیت دیگر در دسترس شما نیست.', 'info');
           }
-          const sorted = [...(task.comments || [])].sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          setCommentsList(sorted);
-        })
-        .finally(() => {
-          setIsLoadingComments(false);
-        });
-      }
-
-      setIsLoadingLogs(true);
-      fetchTaskLogsPB(task.id)
-        .then((fetchedLogs) => {
-          // Exclude comments / discussions from activity logs
-          const filtered = fetchedLogs.filter(
-            (l) => !l.action.includes('نظر') && !l.action.includes('گفتگو') && !l.action.includes('پیام')
-          );
-          setLogsList([...filtered, ...fakeLogs(task.id)]);
-        })
-        .catch((err) => {
-          // The server no longer shows this task to the user (taken off it, or deleted) - e.g.
-          // opened from an old notification: say so instead of showing what the screen had.
-          if (err instanceof NexusApiError && err.httpStatus === 404) {
-            if (!toldGoneRef.current) {
-              toldGoneRef.current = true;
-              showToast('این فعالیت دیگر در دسترس شما نیست.', 'info');
-            }
-            onClose();
-            return;
-          }
-          const filtered = (task.logs || []).filter(
-            (l) => !l.action.includes('نظر') && !l.action.includes('گفتگو') && !l.action.includes('پیام')
-          );
-          setLogsList(filtered);
-        })
-        .finally(() => {
-          setIsLoadingLogs(false);
-        });
-    }
-  }, [task?.id]);
+          onClose();
+          return;
+        }
+        setCommentsList(
+          [...(task.comments || [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        );
+        setLogsList(
+          (task.logs || []).filter((l) => !l.action.includes('نظر') && !l.action.includes('گفتگو') && !l.action.includes('پیام'))
+        );
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsLoadingComments(false);
+        setIsLoadingLogs(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [task?.id, refreshKey]);
 
   const isAdmin = isTaskAdmin(currentUser);
 

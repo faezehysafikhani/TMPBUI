@@ -298,8 +298,24 @@ export async function deleteTaskFromPB(taskId: string): Promise<boolean> {
     return true;
 }
 
-export function subscribeToTasksPB(onChange: () => void): () => void {
+/** onChange gets the ids of the tasks that changed, or null when everything should be reloaded. */
+export function subscribeToTasksPB(onChange: (ids: string[] | null) => void): () => void {
   return nexusApi.subscribeToTaskChanges(onChange);
+}
+
+/** One task as the board holds it; null when the server no longer shows it to this user. */
+export async function fetchTaskForBoardPB(taskId: string): Promise<Task | null> {
+  return nexusApi.fetchTaskForBoard(taskId);
+}
+
+/** A task's conversation and history in one request (what a task adds once it is opened). */
+export async function fetchTaskDiscussionPB(taskId: string) {
+  return nexusApi.fetchTaskDiscussion(taskId);
+}
+
+/** The bytes of an attachment the board listed without content, as a data URL. */
+export async function fetchAttachmentContentPB(fileId: string): Promise<string> {
+  return nexusApi.downloadAttachmentContent(fileId);
 }
 
 // Task comments

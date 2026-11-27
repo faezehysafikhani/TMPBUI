@@ -11,7 +11,7 @@ import {
   getJalaliHoliday,
   isPastDay,
 } from '../utils/jalali';
-import { toPersianDigits, getTaskLastModifiedTime } from '../utils/helpers';
+import { toPersianDigits, getTaskLastModifiedTime, getCommentCount } from '../utils/helpers';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -810,7 +810,7 @@ export const JalaliCalendarView: React.FC<JalaliCalendarViewProps> = ({
           <div className="space-y-2 max-h-[520px] overflow-y-auto pr-0.5">
             {selectedDayItems.map((item, index) => {
               const parent = item.parentTask;
-              const commentCount = parent.comments?.length || 0;
+              const commentCount = getCommentCount(parent);
               const { canEditTask, canDeleteTask, canChangeStatus } = checkTaskPermissions(parent);
               const itemPriority: Priority = item.priority || 'medium';
               const priorityStyle = {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Task, TaskStatus, STATUSES, Attachment, User } from '../types';
-import { TaskCardList } from './TaskCardList';
+import { ProgressiveTaskCardList } from './ProgressiveTaskCardList';
 import { toPersianDigits } from '../utils/helpers';
 import { Plus, ChevronDown, Move } from 'lucide-react';
 import { can, PERMISSIONS } from '../utils/permissions';
@@ -135,7 +135,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
             </div>
           )}
 
-          <div className="space-y-3 mt-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5 pl-0.5">
+          <div data-scroll-root className="space-y-3 mt-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5 pl-0.5">
             {tasks.length === 0 ? (
               <div className="h-28 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-center">
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-medium mb-2">
@@ -153,7 +153,7 @@ const KanbanColumnBase: React.FC<KanbanColumnProps> = ({
                 )}
               </div>
             ) : (
-              <TaskCardList
+              <ProgressiveTaskCardList
                 tasks={tasks}
                 currentUser={currentUser}
                 showDetails={showDetails}

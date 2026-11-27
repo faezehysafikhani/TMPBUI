@@ -160,3 +160,29 @@ export function getDaysDiff(dueDateString: string): { days: number; text: string
   }
 }
 
+/**
+ * How many comments a task has: the count the server gave with the board (for people who may read them) or the
+ * conversation once it is loaded, whichever is higher - a comment just written shows at once, before the next refresh.
+ */
+export function getCommentCount(task: { comments?: unknown[]; commentCount?: number } | null | undefined): number {
+  if (!task) return 0;
+  return Math.max(task.commentCount ?? 0, task.comments?.length ?? 0);
+}
+
+/**
+ * The board load leaves out what a task adds once it is opened (conversation, history, attachment bytes). A task that
+ * is read again keeps those from the copy the screen already holds, so a refresh never empties an open task.
+ */
+export function keepLoadedDetails<T extends { comments?: unknown[]; logs?: unknown[]; attachments?: Array<{ id: string; dataUrl: string }> }>(
+  fresh: T,
+  old: T | null | undefined
+): T {
+  if (!old) return fresh;
+  const content = new Map((old.attachments || []).filter((a) => a.dataUrl).map((a) => [a.id, a.dataUrl] as const));
+  return {
+    ...fresh,
+    comments: fresh.comments ?? old.comments,
+    logs: fresh.logs ?? old.logs,
+    attachments: (fresh.attachments || []).map((a) => (a.dataUrl ? a : { ...a, dataUrl: content.get(a.id) ?? '' })),
+  };
+}

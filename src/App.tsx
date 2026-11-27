@@ -3,7 +3,7 @@ import { TaskTitleContext } from './components/TaskCardList';
 import { Task, TaskStatus, Priority, Attachment, User, WorkTeam, AppTheme, AppColorPalette, TaskComment, STATUSES, PRIORITIES, AppNotification, setMaxAttachmentBytes, SubTaskProgress } from './types';
 import { getUploadPolicy, refreshUploadPolicy } from './utils/uploadPolicy';
 import { iranDateTimeToISO, schedulingBlockReason } from './utils/jalali';
-import { isOverdue, toPersianDigits, formatToJalali, getTaskLastModifiedTime, computeAutoTaskStatus } from './utils/helpers';
+import { isOverdue, toPersianDigits, formatToJalali, getTaskLastModifiedTime, computeAutoTaskStatus, keepLoadedDetails } from './utils/helpers';
 import { requestSettingsTab } from './utils/profileEvents';
 import { Navbar } from './components/Navbar';
 import { FilterBar } from './components/FilterBar';
@@ -42,6 +42,7 @@ const FeatureListPdfModal = lazy(() => import('./components/FeatureListPdfModal'
 
 import {
   fetchTasksFromPB,
+  fetchTaskForBoardPB,
   createTaskInPB,
   updateTaskInPB,
   deleteTaskFromPB,
@@ -260,26 +261,60 @@ export default function App() {
   // user list needs users.view - a restricted user (a plain task assignee/team member) does
   // not have it, so this only asks for it when the user actually holds the permission, instead
   // of firing a request that is bound to 403 on every Dashboard/Home load.
+  // Keyed on who is signed in and whether they may list users - not on the whole user object, which is replaced several
+  // times as the page starts (profile, permissions, theme): each replacement read the user list again.
+  const currentUserRef = useRef(currentUser);
+  currentUserRef.current = currentUser;
+  const signedInUserId = currentUser?.id;
+  const mayListUsers = can(currentUser, 'users.view');
+  // The organization's user list is not read when the page starts: only the task form, the meeting form (calendar)
+  // and the reports choose or name people from it. It is read the first time one of them opens (usersWantedRef) and
+  // then kept, and re-read with the teams only once it has been wanted.
+  const usersWantedRef = useRef(false);
   const loadUsersAndTeams = useCallback(async () => {
+    const me = currentUserRef.current;
     try {
       const [usersList, teamsList] = await Promise.all([
-        can(currentUser, 'users.view') ? fetchAllUsersPB() : Promise.resolve(null),
-        currentUser ? fetchUserTeamsAsyncPB(currentUser.id) : Promise.resolve(null),
+        mayListUsers && usersWantedRef.current ? fetchAllUsersPB() : Promise.resolve(null),
+        signedInUserId ? fetchUserTeamsAsyncPB(signedInUserId) : Promise.resolve(null),
       ]);
       if (usersList) {
         setAllUsers(usersList);
-      } else if (currentUser) {
-        setAllUsers([currentUser]);
+      } else if (me) {
+        setAllUsers([me]);
       }
       if (teamsList) setAllTeams(teamsList);
     } catch (err) {
       console.warn('Could not load user/team context:', err);
     }
-  }, [currentUser]);
+  }, [signedInUserId, mayListUsers]);
 
   useEffect(() => {
     loadUsersAndTeams();
   }, [loadUsersAndTeams]);
+
+  // Someone else signs in, or the permission to list users changes: the list is wanted again only when needed.
+  useEffect(() => {
+    usersWantedRef.current = false;
+  }, [signedInUserId, mayListUsers]);
+  const ensureAllUsers = useCallback(async () => {
+    if (usersWantedRef.current) return;
+    usersWantedRef.current = true;
+    const me = currentUserRef.current;
+    if (!mayListUsers) {
+      if (me) setAllUsers([me]);
+      return;
+    }
+    try {
+      setAllUsers(await fetchAllUsersPB());
+    } catch (err) {
+      usersWantedRef.current = false;
+      console.warn('Could not load the user list:', err);
+    }
+  }, [mayListUsers]);
+  useEffect(() => {
+    if (isFormModalOpen || activeTab === 'calendar' || activeTab === 'reports') void ensureAllUsers();
+  }, [isFormModalOpen, activeTab, ensureAllUsers]);
 
   const handleTeamsUpdated = useCallback(async (updatedTeams?: WorkTeam[]) => {
     if (updatedTeams) {
@@ -295,11 +330,19 @@ export default function App() {
       setTotalUnreadChatCount(0);
       return;
     }
+    // One check at a time: when the server is slow a new one every 4 seconds only piles up behind the last.
+    let checking = false;
     const checkUnread = async () => {
-      // Direct conversations and team threads alike.
-      const [counts, teamCounts] = await Promise.all([fetchUnreadMessageCountsPB(currentUser.id), fetchTeamUnreadCountsPB()]);
-      const sum = [...Object.values(counts), ...Object.values(teamCounts)].reduce((a, b) => a + b, 0);
-      setTotalUnreadChatCount(sum);
+      if (checking) return;
+      checking = true;
+      try {
+        // Direct conversations and team threads alike.
+        const [counts, teamCounts] = await Promise.all([fetchUnreadMessageCountsPB(currentUser.id), fetchTeamUnreadCountsPB()]);
+        const sum = [...Object.values(counts), ...Object.values(teamCounts)].reduce((a, b) => a + b, 0);
+        setTotalUnreadChatCount(sum);
+      } finally {
+        checking = false;
+      }
     };
     checkUnread();
     // A hidden tab does not poll: nobody is looking, and the requests only cost the server.
@@ -317,8 +360,25 @@ export default function App() {
     }
   });
 
-  // Fetch tasks
+  // A project or recurring task with subtasks takes its status from them; one with none keeps the status the server
+  // holds (it can be finished directly with «ثبت نهایی»).
+  const withComputedStatus = (t: Task): Task =>
+    t.projectSubTasks && t.projectSubTasks.length > 0 ? { ...t, status: computeAutoTaskStatus(t.projectSubTasks) } : t;
+
+  // Fetch tasks: the whole board, a page of 200 at a time. One load at a time: a request that comes while one is
+  // running makes it run once more when it ends, instead of starting a second, overlapping load.
+  const loadingTasksRef = useRef(false);
+  const reloadQueuedRef = useRef(false);
+  const loadStartedAtRef = useRef(0);
   const loadTasks = useCallback(async (showLoadingSpinner = false) => {
+    if (loadingTasksRef.current) {
+      // A request made in the same moment the load began (React runs mount effects twice in development) is the same
+      // request: nothing can have changed yet. A later one is a change to catch up on after this load.
+      if (Date.now() - loadStartedAtRef.current > 250) reloadQueuedRef.current = true;
+      return;
+    }
+    loadingTasksRef.current = true;
+    loadStartedAtRef.current = Date.now();
     if (showLoadingSpinner) {
       setIsLoading(true);
     }
@@ -326,23 +386,58 @@ export default function App() {
     setPbError(null);
     try {
       const fetched = await fetchTasksFromPB();
-      const processed = fetched.map((t) => {
-        // With subtasks the status follows them; a project or recurring task with none keeps the status the server holds
-        // (it can be finished directly with «ثبت نهایی»).
-        if (t.projectSubTasks && t.projectSubTasks.length > 0) {
-          return { ...t, status: computeAutoTaskStatus(t.projectSubTasks) };
-        }
-        return t;
+      // What the board load leaves out (conversation, history, attachment content) stays as the screen already has it.
+      setTasks((prev) => {
+        const known = new Map(prev.map((t) => [t.id, t] as const));
+        return fetched.map((t) => keepLoadedDetails(withComputedStatus(t), known.get(t.id)));
       });
-      setTasks(processed);
     } catch (error: any) {
       console.error('Error connecting to database:', error);
       setPbError(userErrorMessage(error, 'دریافت فعالیت‌ها از سرور انجام نشد. لطفاً دوباره تلاش کنید.'));
     } finally {
+      loadingTasksRef.current = false;
       setIsLoading(false);
       setIsSyncing(false);
+      if (reloadQueuedRef.current) {
+        reloadQueuedRef.current = false;
+        void loadTasks(false);
+      }
     }
   }, []);
+
+  // The live channel named the tasks that changed (a new task, an edit, a comment, a deleted one): only those are read
+  // again - one request each - instead of the whole board. A task the server no longer shows is dropped.
+  const openDetailIdRef = useRef<string | null>(null);
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0);
+  const refreshTasksByIds = useCallback(async (ids: string[]) => {
+    const openId = openDetailIdRef.current;
+    const results = await Promise.all(ids.map(async (id) => {
+      try {
+        return { id, task: await fetchTaskForBoardPB(id), failed: false };
+      } catch {
+        return { id, task: null, failed: true };
+      }
+    }));
+    // One of them could not be read (offline, rate limit): the safe answer is the whole board once the dust settles.
+    if (results.some((r) => r.failed)) {
+      void loadTasks(false);
+      return;
+    }
+    const gone = new Set(results.filter((r) => r.task === null).map((r) => r.id));
+    const changed = new Map(results.filter((r) => r.task !== null).map((r) => [r.id, withComputedStatus(r.task as Task)] as const));
+    setTasks((prev) => {
+      const known = new Set(prev.map((t) => t.id));
+      const kept = prev.filter((t) => !gone.has(t.id)).map((t) => (changed.has(t.id) ? keepLoadedDetails(changed.get(t.id) as Task, t) : t));
+      const added = [...changed.values()].filter((t) => !known.has(t.id));
+      return [...added, ...kept];
+    });
+    // The task screen is open on one of them: it shows the new data and reads its conversation and history again.
+    if (openId && ids.includes(openId)) {
+      const updated = changed.get(openId);
+      if (updated) setSelectedTaskForDetail((prev) => (prev && prev.id === openId ? keepLoadedDetails(updated, prev) : prev));
+      setDetailRefreshKey((k) => k + 1);
+    }
+  }, [loadTasks]);
 
   // Load tasks & sync user profile on mount
   useEffect(() => {
@@ -368,14 +463,20 @@ export default function App() {
   const liveUserId = currentUser?.id;
   useEffect(() => {
     if (!liveUserId) return undefined;
-    return subscribeToTasksPB(() => {
-      loadTasks(false);
+    return subscribeToTasksPB((ids) => {
+      if (ids === null) {
+        loadTasks(false);
+        // Not known which task changed: the open task screen reads its conversation and history again too.
+        if (openDetailIdRef.current) setDetailRefreshKey((k) => k + 1);
+      } else {
+        void refreshTasksByIds(ids);
+      }
       // A post falling vacant (or filled) changes the substitution inbox, and whether its menu shows
       // (only where the inbox exists: it answered with tasks given to posts).
       const key = `${liveUserId}:substitution`;
       if (readLookup<SubstitutionInbox | null>(key)?.enabled) refreshLookup(key, getSubstitutionInbox).catch(() => {});
     });
-  }, [loadTasks, liveUserId]);
+  }, [loadTasks, refreshTasksByIds, liveUserId]);
 
   // The server ended the session (account disabled, tokens revoked): back to sign-in.
   useEffect(() => {
@@ -721,6 +822,7 @@ export default function App() {
   // Task Detail & Discussion Modal State
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<Task | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  openDetailIdRef.current = isDetailModalOpen ? selectedTaskForDetail?.id ?? null : null;
 
   // Project Detail Modal State
   const [selectedProjectTask, setSelectedProjectTask] = useState<Task | null>(null);
@@ -731,8 +833,16 @@ export default function App() {
     setIsDetailModalOpen(true);
   }, []);
 
-  const handleOpenProjectDetails = useCallback((task: Task) => {
-    setSelectedProjectTask(task);
+  const handleOpenProjectDetails = useCallback(async (task: Task) => {
+    // The board does not carry the charter (and the project screen saves it): it reads the whole task first.
+    let full = task;
+    try {
+      const read = await fetchTaskForBoardPB(task.id);
+      if (read) full = keepLoadedDetails(read, task);
+    } catch {
+      // It opens with what the board has.
+    }
+    setSelectedProjectTask(full);
     setIsProjectDetailOpen(true);
   }, []);
 
@@ -832,8 +942,16 @@ export default function App() {
   }, [handleOpenCreateModal]);
 
   // Open Form Modal for Editing Task
-  const handleOpenEditModal = useCallback((task: Task) => {
-    setTaskToEdit(task);
+  const handleOpenEditModal = useCallback(async (task: Task) => {
+    // The board lists tasks without the posts they are given to (the bulk of its size): the form reads the whole task.
+    let toEdit = task;
+    try {
+      const full = await fetchTaskForBoardPB(task.id);
+      if (full) toEdit = keepLoadedDetails(full, task);
+    } catch {
+      // The form opens with what the board has.
+    }
+    setTaskToEdit(toEdit);
     setInitialDueDateForNewTask(undefined);
     setInitialTitleForNewTask('');
     setInitialTagsForNewTask([]);
@@ -915,7 +1033,7 @@ export default function App() {
     const shown = new Set(visibleTasks.map((t) => t.id));
     for (const t of mayViewTasks0) {
       if (t.parentTaskId || shown.has(t.id)) continue;
-      if ((t.posts?.length ?? 0) === 0) info.noPost++;
+      if (!(t.hasPosts ?? (t.posts?.length ?? 0) > 0)) info.noPost++;
       else if (t.standIns?.some((s) => s.userId === currentUser?.id)) info.standIn++;
       else info.other++;
       if (info.titles.length < 6) info.titles.push(t.title);
@@ -1706,6 +1824,7 @@ export default function App() {
             onToggleSubTask={handleToggleSubTask}
             onFinalizeProject={handleFinalizeProject}
             onConvertToTask={handleConvertToTask}
+            refreshKey={detailRefreshKey}
           />
         )}
 

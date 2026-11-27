@@ -3,7 +3,7 @@ import { Doughnut, Bar } from 'react-chartjs-2';
 import type { ChartData, ChartOptions } from 'chart.js';
 import { CHART_FONT_FAMILY, barNameLabels, isDarkMode, persianIntegerTick, rtlTooltip } from '../utils/chartSetup';
 import { Task, PRIORITIES, Priority, STATUSES, User } from '../types';
-import { toPersianDigits, isOverdue, formatToJalali, getDaysDiff } from '../utils/helpers';
+import { toPersianDigits, isOverdue, formatToJalali, getDaysDiff, getCommentCount } from '../utils/helpers';
 import {
   Clock,
   X,
@@ -585,7 +585,7 @@ export const DashboardCharts: React.FC<DashboardChartsProps> = ({
                   {sortedModalItems.map((item, idx) => {
                     const parent = item.parentTask;
                     const priorityCfg = PRIORITIES[item.priority] || PRIORITIES.medium;
-                    const commentCount = parent.comments?.length || 0;
+                    const commentCount = getCommentCount(parent);
                     const { canEditTask, canDeleteTask } = checkTaskPermissions(parent);
 
                     return (

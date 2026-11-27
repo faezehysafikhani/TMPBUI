@@ -6,7 +6,8 @@ import {
   isOverdue,
   isCompletionDelayed,
   toPersianDigits,
-  formatFileSize
+  formatFileSize,
+  getCommentCount
 } from '../utils/helpers';
 import {
   Calendar,
@@ -170,7 +171,7 @@ const TaskCardBase: React.FC<TaskCardProps> = ({
   const canEditTask = (isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails) && can(currentUser, PERMISSIONS.tasksEdit);
   const canDeleteTask = (isAdmin || (isTaskCreator && (!isAssignee && !isTeamMember || isTaskCreator)) || isOwnerByDetails) && can(currentUser, PERMISSIONS.tasksDelete);
 
-  const commentCount = task.comments?.length || 0;
+  const commentCount = getCommentCount(task);
 
   const priorityBorderShadowMap: Record<Priority, string> = {
     high: 'border-r-[5px] border-r-rose-500 shadow-[4px_0_12px_-2px_rgba(244,63,94,0.35)] dark:shadow-[4px_0_14px_-2px_rgba(244,63,94,0.45)]',

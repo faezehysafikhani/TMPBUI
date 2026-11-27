@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Task, TaskStatus, Attachment, User } from '../types';
-import { TaskCardList } from './TaskCardList';
+import { ProgressiveTaskCardList } from './ProgressiveTaskCardList';
 import { toPersianDigits } from '../utils/helpers';
 import { GROUP_TONES, TaskGroup } from '../utils/boardView';
 
@@ -77,13 +77,13 @@ const TaskGroupColumnBase: React.FC<TaskGroupColumnProps> = ({
 
       {!isCollapsed && (
         <div className="p-3 sm:p-4 pt-0 border-t border-slate-100 dark:border-slate-700/60 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="space-y-3 mt-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5 pl-0.5">
+          <div data-scroll-root className="space-y-3 mt-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5 pl-0.5">
             {group.tasks.length === 0 ? (
               <div className="h-28 flex items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-4 text-center">
                 <p className="text-xs text-slate-400 dark:text-slate-500 font-medium">هیچ فعالیتی در این بخش وجود ندارد</p>
               </div>
             ) : (
-              <TaskCardList
+              <ProgressiveTaskCardList
                 tasks={group.tasks}
                 currentUser={currentUser}
                 showDetails={showDetails}

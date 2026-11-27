@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { isSafeInlineType } from '../utils/safeBlob';
 import { Attachment } from '../types';
+import { fetchAttachmentContentPB } from '../services/dataService';
 import { formatFileSize, formatToJalali } from '../utils/helpers';
 import { X, Download, FileText, Image as ImageIcon, ExternalLink } from 'lucide-react';
 
@@ -9,11 +10,46 @@ interface AttachmentPreviewModalProps {
   onClose: () => void;
 }
 
-export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({
-  attachment,
-  onClose,
-}) => {
+/**
+ * The board lists attachments without their bytes (Attachment.fileId, empty dataUrl). They are downloaded here, when
+ * one is opened - not for every task of the board when it loads.
+ */
+export const AttachmentPreviewModal: React.FC<AttachmentPreviewModalProps> = ({ attachment, onClose }) => {
+  const [downloaded, setDownloaded] = useState<Attachment | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setDownloaded(null);
+    setFailed(false);
+    if (!attachment || attachment.dataUrl || !attachment.fileId) return undefined;
+    let cancelled = false;
+    fetchAttachmentContentPB(attachment.fileId)
+      .then((dataUrl) => {
+        if (!cancelled) setDownloaded({ ...attachment, dataUrl });
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attachment]);
+
   if (!attachment) return null;
+  const ready = attachment.dataUrl || !attachment.fileId ? attachment : downloaded;
+  if (!ready) {
+    return (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4" onClick={onClose} role="dialog" aria-modal="true">
+        <div className="rounded-xl bg-white px-6 py-4 text-sm font-semibold text-slate-700 shadow-xl dark:bg-slate-800 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
+          {failed ? 'دریافت فایل انجام نشد.' : 'در حال دریافت فایل...'}
+        </div>
+      </div>
+    );
+  }
+  return <AttachmentPreviewContent attachment={ready} onClose={onClose} />;
+};
+
+const AttachmentPreviewContent: React.FC<{ attachment: Attachment; onClose: () => void }> = ({ attachment, onClose }) => {
 
   const isImage =
     attachment.type.startsWith('image/') || attachment.dataUrl.startsWith('data:image/');

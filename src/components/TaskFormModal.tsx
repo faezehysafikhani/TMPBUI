@@ -293,11 +293,14 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     setResponsibleIds(Array.from(new Set(responsiblePostIds.map((id) => holderOf.get(id)).filter((id): id is string => !!id))));
   }, [postMode, responsiblePostIds, taskToEdit]);
 
-  // Fetch all registered users for quick search & assignment
+  // The people to choose from: the list the app read when this form opened (registeredUsers). Read here only when the
+  // app has none beyond the signed-in user - someone without users.view, for whom fetchAllUsersPB falls back to the
+  // people chat lets them reach - instead of a second read of the same list on every opening.
   useEffect(() => {
     if (registeredUsers && registeredUsers.length > 0) {
       setAllRegisteredUsers(registeredUsers);
     }
+    if (!isOpen || (registeredUsers && registeredUsers.length > 1)) return;
     fetchAllUsersPB()
       .then((users) => {
         if (users && users.length > 0) {
@@ -2228,7 +2231,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             {attachments.length > 0 && (
               <div className="mt-3 space-y-2">
                 {attachments.map((att) => {
-                  const isImage = att.type.startsWith('image/') || att.dataUrl.startsWith('data:image/');
+                  // An attachment the board listed without its bytes (dataUrl empty) shows as a file until it is previewed.
+                  const isImage = !!att.dataUrl && (att.type.startsWith('image/') || att.dataUrl.startsWith('data:image/'));
                   return (
                     <div
                       key={att.id}

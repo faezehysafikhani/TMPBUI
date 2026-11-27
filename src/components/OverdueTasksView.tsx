@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Task, TaskStatus, Attachment, PRIORITIES, User, Priority } from '../types';
-import { isOverdue, toPersianDigits, formatToJalali, getDaysDiff } from '../utils/helpers';
+import { isOverdue, toPersianDigits, formatToJalali, getDaysDiff, getCommentCount } from '../utils/helpers';
 import { parseDateSafely } from '../utils/jalali';
 import { AlertCircle, AlertTriangle, CheckCircle2, Calendar, MessageSquare, Edit2, Trash2, ArrowDownUp } from 'lucide-react';
 import { can, isTaskAdmin, PERMISSIONS } from '../utils/permissions';
@@ -50,7 +50,7 @@ const OverdueTaskRow: React.FC<OverdueTaskRowProps> = ({
 }) => {
   const parent = item.parentTask;
   const priorityCfg = PRIORITIES[item.priority] || PRIORITIES.medium;
-  const commentCount = parent.comments?.length || 0;
+  const commentCount = getCommentCount(parent);
   const { canEditTask, canDeleteTask, canCompleteTask } = checkTaskPermissions(parent);
 
   const daysDiffInfo = getDaysDiff(item.dueDate);

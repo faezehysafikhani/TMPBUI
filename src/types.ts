@@ -79,8 +79,10 @@ export interface Attachment {
   name: string;
   size: number;
   type: string;
-  dataUrl: string; // Base64 data URL for preview and download
+  dataUrl: string; // Base64 data URL for preview and download; '' until the content is downloaded (see fileId)
   createdAt: string;
+  /** The stored file on the server: the board lists attachments without their bytes, and they are fetched from this when previewed. */
+  fileId?: string;
 }
 
 export interface TaskComment {
@@ -199,8 +201,16 @@ export interface Task {
   recurringConfig?: RecurringConfig;
   projectCharter?: ProjectCharter;
   projectSubTasks?: ProjectSubTask[];
+  /** The conversation and the history are loaded when a task is opened: undefined until then (see commentCount for the board). */
   comments?: TaskComment[];
   logs?: TaskLog[];
+  /** How many comments the task has, from the board load - only for people who may read them. */
+  commentCount?: number;
+  /**
+   * From the board load: whether the task is given to any post (the board carries the posts as ids only, the screens
+   * of one task read their details).
+   */
+  hasPosts?: boolean;
   createdAt: string;
   updatedAt: string;
 }
