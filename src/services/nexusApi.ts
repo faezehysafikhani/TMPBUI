@@ -557,8 +557,37 @@ if (typeof window !== 'undefined') {
   });
 }
 
+/** Whose tokens this tab holds; a session adopted from another tab may belong to someone else. */
+let tokensUserId: string | null = null;
+
+/**
+ * Another tab of this browser signed in again and the server replaced this tab's session
+ * (session.replaced_by_relogin). The shared cookie now belongs to the new session: take it over
+ * with one refresh instead of signing out. True when this tab can go on (same person).
+ */
+let adoptInFlight: Promise<boolean> | null = null;
+function adoptReplacingSession(): Promise<boolean> {
+  adoptInFlight ??= (async () => {
+    const before = tokensUserId;
+    tokens = null;
+    try {
+      if (!(await refreshSession())) return false;
+    } catch {
+      return false;
+    }
+    if (before && tokensUserId && before !== tokensUserId) {
+      // Someone else signed in there: nothing of the previous person may stay on this page.
+      window.location.reload();
+      return false;
+    }
+    return true;
+  })().finally(() => { adoptInFlight = null; });
+  return adoptInFlight;
+}
+
 function saveAuthResponse(auth: AuthResponse): void {
   const previous = readSession();
+  tokensUserId = auth.user?.id ?? null;
   tokens = {
     accessToken: auth.accessToken,
     accessTokenExpiresAtUtc: auth.accessTokenExpiresAtUtc,
@@ -765,6 +794,10 @@ async function sendRequest<T>(method: string, path: string, options: RequestOpti
   // page (and anything half-filled in it) stays where it is. Any other reason ends the session.
   if (endedReason === 'session.absolute_expired' && absoluteReauth && retryOnUnauthorized) {
     if (await absoluteReauth()) return sendRequest<T>(method, path, { ...options, retryOnUnauthorized: false });
+  }
+  // Replaced by a sign-in in another tab of this browser: carry on with that session.
+  if (endedReason === 'session.replaced_by_relogin' && retryOnUnauthorized) {
+    if (await adoptReplacingSession()) return sendRequest<T>(method, path, { ...options, retryOnUnauthorized: false });
   }
   if (endedReason) {
     endSession(endedReason);
