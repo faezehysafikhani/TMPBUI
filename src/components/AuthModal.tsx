@@ -55,6 +55,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // After the session ended by itself or was closed (idle, absolute, revoked...) the browser must not
   // offer saved credentials; after the user's own sign-out it may. Read-only until focused stops autofill.
   const [noSuggestions] = useState(() => wasSignedOutBySession());
+  const [secretSuffix] = useState(() => Math.random().toString(36).slice(2, 10));
   const [loginFieldsUnlocked, setLoginFieldsUnlocked] = useState(!noSuggestions);
 
   // CAPTCHA: shown only once the server asks for one (after a failed sign-in). Each one can be
@@ -320,7 +321,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={identity}
                     onChange={(e) => setIdentity(e.target.value)}
                     placeholder="نام کاربری یا ۰۹۱۲۳۴۵۶۷۸۹"
-                    name={noSuggestions ? 'login-id-x' : 'username'}
+                    name={noSuggestions ? `li-${secretSuffix}` : 'username'}
+                    {...(noSuggestions ? { 'data-lpignore': 'true', 'data-1p-ignore': 'true', 'data-bwignore': 'true', 'data-form-type': 'other' } : {})}
                     autoComplete={noSuggestions ? 'off' : 'username'}
                     readOnly={!loginFieldsUnlocked}
                     onFocus={() => setLoginFieldsUnlocked(true)}
@@ -353,11 +355,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 <div className="relative">
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    // After a session end: a text field drawn as dots - Chrome offers saved passwords for any type="password".
+                    type={noSuggestions || showPassword ? 'text' : 'password'}
+                    style={noSuggestions && !showPassword ? ({ WebkitTextSecurity: 'disc' } as React.CSSProperties) : undefined}
+                    {...(noSuggestions ? { 'data-lpignore': 'true', 'data-1p-ignore': 'true', 'data-bwignore': 'true', 'data-form-type': 'other', spellCheck: false, autoCapitalize: 'off', autoCorrect: 'off' } : {})}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    name={noSuggestions ? 'login-secret-x' : 'password'}
-                    autoComplete={noSuggestions ? 'new-password' : 'current-password'}
+                    name={noSuggestions ? `ls-${secretSuffix}` : 'password'}
+                    autoComplete={noSuggestions ? 'off' : 'current-password'}
                     readOnly={!loginFieldsUnlocked}
                     onFocus={() => setLoginFieldsUnlocked(true)}
                     placeholder="••••••••"
