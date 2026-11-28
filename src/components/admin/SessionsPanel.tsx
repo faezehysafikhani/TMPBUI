@@ -252,9 +252,9 @@ const PolicyNumberField: React.FC<{ label: string; range: string; unit?: string;
       {label}
       <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-950/50 rounded-full px-2">{range}</span>
     </span>
-    <span className="relative inline-block">
-      <input type="number" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} aria-invalid={!!error} className={`${policyInputClass} ${unit ? 'pl-[46px]' : ''} ${error ? '!border-rose-500 !ring-rose-500/40' : ''}`} />
-      {unit && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 pointer-events-none">{unit}</span>}
+    <span className="inline-flex items-center gap-2">
+      <input type="number" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} aria-invalid={!!error} className={`${policyInputClass} ${error ? '!border-rose-500 !ring-rose-500/40' : ''}`} />
+      {unit && <span className="text-[11px] text-slate-500 dark:text-slate-400">{unit}</span>}
     </span>
     {error && <span className="block text-[11px] text-rose-600 dark:text-rose-400 mt-1">{error}</span>}
   </label>
