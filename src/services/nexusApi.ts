@@ -587,6 +587,8 @@ async function refreshSession(): Promise<boolean> {
  * show hints of the previous backend ("collection tasks not found"), which would be wrong here.
  */
 export class NexusApiError extends Error {
+  /** Field-by-field validation errors of a 400 (ProblemDetails `errors`), keyed by field name. */
+  fieldErrors?: Record<string, string[]>;
   constructor(message: string, public readonly httpStatus: number, public readonly code?: string) {
     super(message);
     this.name = 'NexusApiError';
@@ -639,7 +641,9 @@ function toApiError(status: number, body: any, unauthorizedMessage?: string): Ne
   if (status === 401 && unauthorizedMessage) {
     return new NexusApiError(unauthorizedMessage, status, code);
   }
-  return new NexusApiError(persianApiMessage(status, code, detail), status, code);
+  const error = new NexusApiError(persianApiMessage(status, code, detail), status, code);
+  if (body && typeof body.errors === 'object' && body.errors) error.fieldErrors = body.errors;
+  return error;
 }
 
 /** The same client for API modules kept in their own file (e.g. orgStructureApi.ts). */
@@ -676,7 +680,10 @@ async function sendRequest<T>(method: string, path: string, options: RequestOpti
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     // Only a request that follows a real interaction (click, key, scroll, touch, mouse move) tells
     // the server the user is there. Polling and background calls never do.
+    // Everything else says so explicitly: the server then only checks the session and does not
+    // move LastActivity/IdleExpires (polling of unread counts, notifications, sessions/current...).
     if (takeActivityFlag()) headers['X-Nexus-Activity'] = '1';
+    else headers['X-Background-Request'] = '1';
     // «Work as this post»: the server then counts only that post's permissions (never more than the person has).
     const activePosts = activePostsHeader();
     if (activePosts) headers['X-Active-Posts'] = activePosts;

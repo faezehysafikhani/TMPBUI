@@ -17,9 +17,17 @@ export const SessionSummary: React.FC<{ session: SessionInfo }> = ({ session }) 
   <div className="min-w-0 text-right">
     <div className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{session.deviceLabel || 'دستگاه نامشخص'}</div>
     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
-      {session.lastIp && <span dir="ltr" className="font-mono bg-slate-400/15 rounded-md px-1.5">{toPersianDigits(session.lastIp)}</span>}
+      {session.createdIp && session.lastIp && session.createdIp !== session.lastIp ? (
+        <>
+          <span>IP ورود: <span dir="ltr" className="font-mono bg-slate-400/15 rounded-md px-1.5">{toPersianDigits(session.createdIp)}</span></span>
+          <span>IP فعلی: <span dir="ltr" className="font-mono bg-slate-400/15 rounded-md px-1.5">{toPersianDigits(session.lastIp)}</span></span>
+        </>
+      ) : (
+        (session.lastIp || session.createdIp) && <span dir="ltr" className="font-mono bg-slate-400/15 rounded-md px-1.5">{toPersianDigits((session.lastIp || session.createdIp)!)}</span>
+      )}
       <span>ورود: {formatTime(session.createdAtUtc)}</span>
       <span>آخرین فعالیت: {formatTime(session.lastActivityAtUtc)}</span>
+      {!session.isActive && session.endedAtUtc && <span>پایان: {formatTime(session.endedAtUtc)}</span>}
     </div>
   </div>
 );

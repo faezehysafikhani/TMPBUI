@@ -30,8 +30,19 @@ function note(at: number, fromOtherTab: boolean): void {
   listeners.forEach((listener) => listener(at));
 }
 
-function onInteraction(): void {
+let lastPointer: { x: number; y: number } | null = null;
+
+function onInteraction(event: Event): void {
   if (paused) return;
+  // Only the user's own input: not events fired by code, and not a mousemove the browser sends
+  // when the page changes under a cursor that did not move (chat messages arriving, re-renders).
+  if (!event.isTrusted) return;
+  if (event.type === 'mousemove') {
+    const { screenX: x, screenY: y } = event as MouseEvent;
+    const moved = !lastPointer || lastPointer.x !== x || lastPointer.y !== y;
+    lastPointer = { x, y };
+    if (!moved) return;
+  }
   const now = Date.now();
   if (now - lastNoteAt < THROTTLE_MS) return;
   lastNoteAt = now;
@@ -48,7 +59,9 @@ export function startActivityTracking(): void {
   if (started || typeof window === 'undefined') return;
   started = true;
   const options = { passive: true, capture: true } as const;
-  for (const name of ['pointerdown', 'keydown', 'wheel', 'scroll', 'touchstart', 'mousemove'] as const) {
+  // No 'scroll': it also fires when code scrolls (a chat list following new messages). Wheel, keys
+  // and touch cover the user scrolling.
+  for (const name of ['pointerdown', 'keydown', 'wheel', 'touchstart', 'mousemove'] as const) {
     window.addEventListener(name, onInteraction, options);
   }
   try {
