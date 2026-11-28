@@ -4,7 +4,7 @@ import { AppTheme } from '../types';
 import { completeLoginPB, confirmPasswordResetPB, loginPB, requestPasswordResetPB, verifyPasswordResetCodePB } from '../services/dataService';
 import { userErrorMessage } from '../utils/errorMessages';
 import { useBranding } from '../utils/branding';
-import { CAPTCHA_ERROR_CODES, LoginCaptcha, NexusApiError, SessionLimitChallenge, SessionLimitError, requestLoginCaptcha } from '../services/nexusApi';
+import { CAPTCHA_ERROR_CODES, LoginCaptcha, NexusApiError, SessionLimitChallenge, SessionLimitError, requestLoginCaptcha, wasSignedOutBySession } from '../services/nexusApi';
 import { SessionLimitPicker } from './SessionLimitPicker';
 
 
@@ -52,8 +52,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [identity, setIdentity] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  // Read-only until focused: the browser cannot fill a saved username/password after sign-out or expiry.
-  const [loginFieldsUnlocked, setLoginFieldsUnlocked] = useState(false);
+  // After the session ended by itself or was closed (idle, absolute, revoked...) the browser must not
+  // offer saved credentials; after the user's own sign-out it may. Read-only until focused stops autofill.
+  const [noSuggestions] = useState(() => wasSignedOutBySession());
+  const [loginFieldsUnlocked, setLoginFieldsUnlocked] = useState(!noSuggestions);
 
   // CAPTCHA: shown only once the server asks for one (after a failed sign-in). Each one can be
   // used once; the server checks it, this only displays it.
@@ -307,7 +309,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             />
           ) : mode === 'login' ? (
             /* Login Form */
-            <form onSubmit={handleLogin} autoComplete="off" className="app-form space-y-4">
+            <form onSubmit={handleLogin} autoComplete={noSuggestions ? 'off' : 'on'} className="app-form space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   نام کاربری یا شماره تلفن همراه
@@ -318,7 +320,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     value={identity}
                     onChange={(e) => setIdentity(e.target.value)}
                     placeholder="نام کاربری یا ۰۹۱۲۳۴۵۶۷۸۹"
-                    autoComplete="off"
+                    name={noSuggestions ? 'login-id-x' : 'username'}
+                    autoComplete={noSuggestions ? 'off' : 'username'}
                     readOnly={!loginFieldsUnlocked}
                     onFocus={() => setLoginFieldsUnlocked(true)}
                     className="w-full pl-3 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all dir-ltr text-right"
@@ -353,7 +356,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
+                    name={noSuggestions ? 'login-secret-x' : 'password'}
+                    autoComplete={noSuggestions ? 'new-password' : 'current-password'}
                     readOnly={!loginFieldsUnlocked}
                     onFocus={() => setLoginFieldsUnlocked(true)}
                     placeholder="••••••••"

@@ -461,7 +461,36 @@ export function sessionEndReasonOf(event: Event): string | null {
   return ((event as CustomEvent).detail?.reason as string | undefined) ?? null;
 }
 
+const FORCED_SIGNOUT_KEY = 'nexus-forced-signout';
+
+/**
+ * Whether the last sign-out was not the user's own choice (idle, absolute, revoked, administrator...).
+ * Then the sign-in form must not offer saved usernames or passwords; after a normal sign-out it may.
+ */
+export function wasSignedOutBySession(): boolean {
+  try {
+    return !!localStorage.getItem(FORCED_SIGNOUT_KEY);
+  } catch {
+    return false;
+  }
+}
+
+export function clearForcedSignOut(): void {
+  try {
+    localStorage.removeItem(FORCED_SIGNOUT_KEY);
+  } catch {
+    // Storage blocked: nothing to clear.
+  }
+}
+
 function endSession(reason?: string | null): void {
+  if (reason && reason !== 'session.logged_out') {
+    try {
+      localStorage.setItem(FORCED_SIGNOUT_KEY, reason);
+    } catch {
+      // Storage blocked: the form falls back to allowing suggestions.
+    }
+  }
   tokens = null;
   writeSession(null);
   clearPrivateData();
@@ -485,6 +514,7 @@ function writeSession(session: StoredSession | null): void {
   try {
     if (session) {
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      clearForcedSignOut();
     } else {
       localStorage.removeItem(SESSION_KEY);
     }
