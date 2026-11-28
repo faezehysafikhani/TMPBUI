@@ -364,25 +364,78 @@ const PolicyCard: React.FC<{ canUpdate: boolean }> = ({ canUpdate }) => {
 /** The emergency button: ends every session of the organization except the caller's own. */
 const EMERGENCY_CONFIRM_PHRASE = 'خاتمه همه نشست ها';
 const EMERGENCY_MIN_REASON = 10;
+const MASK_CHAR = '•';
+
+// Password managers (Chrome, LastPass, 1Password, Bitwarden) must not offer anything here.
+const NO_AUTOFILL = {
+  autoComplete: 'off',
+  autoCorrect: 'off',
+  autoCapitalize: 'off',
+  spellCheck: false,
+  'data-lpignore': 'true',
+  'data-1p-ignore': 'true',
+  'data-bwignore': 'true',
+  'data-form-type': 'other',
+} as const;
+
+/** Browsers that hide a text field's characters themselves (Chrome, Safari, Edge, new Firefox). */
+const SUPPORTS_TEXT_SECURITY = typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('-webkit-text-security', 'disc');
+
+const blockPaste = (event: React.ClipboardEvent | React.DragEvent) => event.preventDefault();
+
+/**
+ * A secret typed into a plain text field (type="password" is what makes Chrome offer saved
+ * passwords). It is shown as dots by -webkit-text-security; where that is not supported the
+ * field shows only dots and the real value is kept in state.
+ */
+const SecretInput: React.FC<{ id: string; value: string; onChange: (value: string) => void; className: string }> = ({ id, value, onChange, className }) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const shown = event.target.value;
+    if (SUPPORTS_TEXT_SECURITY) {
+      onChange(shown);
+      return;
+    }
+    // Masked mode: the new characters are the ones that are not dots, just before the caret.
+    const inserted = Array.from(shown).filter((ch) => ch !== MASK_CHAR).join('');
+    const caret = event.target.selectionStart ?? shown.length;
+    const start = Math.max(0, caret - inserted.length);
+    const removed = value.length - (shown.length - inserted.length);
+    onChange(value.slice(0, start) + inserted + value.slice(start + Math.max(0, removed)));
+  };
+  return (
+    <input
+      type="text"
+      id={id}
+      name={id}
+      {...NO_AUTOFILL}
+      value={SUPPORTS_TEXT_SECURITY ? value : MASK_CHAR.repeat(value.length)}
+      onChange={handleChange}
+      onPaste={blockPaste}
+      onDrop={blockPaste}
+      className={className}
+      style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
+      dir="ltr"
+    />
+  );
+};
 
 const EmergencyCard: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
   const [reason, setReason] = useState('');
   const [confirmText, setConfirmText] = useState('');
-  // The browser fills a saved password into a field that is editable as the page loads;
-  // keeping the fields read-only until the user focuses them stops that.
-  const [unlocked, setUnlocked] = useState({ reason: false, password: false });
+  // New random names each time the form opens, so nothing can be matched to a saved entry.
+  const [suffix, setSuffix] = useState(() => Math.random().toString(36).slice(2, 10));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message>(null);
+  const ids = { reason: `er-${suffix}-a`, confirm: `er-${suffix}-b`, secret: `er-${suffix}-c` };
 
   const reset = () => {
     setPassword('');
     setReason('');
     setConfirmText('');
-    setUnlocked({ reason: false, password: false });
   };
-  const openForm = () => { reset(); setMessage(null); setOpen(true); };
+  const openForm = () => { reset(); setSuffix(Math.random().toString(36).slice(2, 10)); setMessage(null); setOpen(true); };
   const cancel = () => { reset(); setOpen(false); };
 
   const reasonOk = reason.trim().length >= EMERGENCY_MIN_REASON;
@@ -391,12 +444,14 @@ const EmergencyCard: React.FC = () => {
   const run = async () => {
     if (!reasonOk || !confirmOk || !password) return;
     setBusy(true);
+    const secret = password;
+    const why = reason.trim();
+    reset();
     try {
-      const count = await revokeAllOrganizationSessions(password, reason.trim());
+      const count = await revokeAllOrganizationSessions(secret, why);
       setMessage({ type: 'success', text: `${toPersianDigits(count)} نشست بسته شد.` });
-      cancel();
+      setOpen(false);
     } catch (err) {
-      setPassword('');
       setMessage({ type: 'error', text: userErrorMessage(err, 'انجام نشد.') });
     } finally {
       setBusy(false);
@@ -416,42 +471,23 @@ const EmergencyCard: React.FC = () => {
       {!open ? (
         <SecondaryButton type="button" onClick={openForm} className="text-rose-600">خاتمه‌ی نشست‌ها…</SecondaryButton>
       ) : (
-        <form autoComplete="off" onSubmit={(event) => { event.preventDefault(); void run(); }} className="space-y-3">
+        <div className="space-y-3">
           <Field label="دلیل" required hint={`حداقل ${toPersianDigits(EMERGENCY_MIN_REASON)} نویسه.`}>
-            <input
-              name="emergency-reason"
-              autoComplete="off"
-              readOnly={!unlocked.reason}
-              onFocus={() => setUnlocked((value) => ({ ...value, reason: true }))}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              maxLength={300}
-              className={inputClass}
-            />
+            <input type="text" id={ids.reason} name={ids.reason} {...NO_AUTOFILL} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={300} className={inputClass} />
           </Field>
           <Field label={`برای تأیید عبارت «${EMERGENCY_CONFIRM_PHRASE}» را تایپ کنید`} required>
-            <input name="emergency-confirm" autoComplete="off" value={confirmText} onChange={(event) => setConfirmText(event.target.value)} className={inputClass} />
+            <input type="text" id={ids.confirm} name={ids.confirm} {...NO_AUTOFILL} value={confirmText} onChange={(event) => setConfirmText(event.target.value)} onPaste={blockPaste} onDrop={blockPaste} className={inputClass} />
           </Field>
-          <Field label="رمز عبور شما" required>
-            <input
-              type="password"
-              name="emergency-password"
-              autoComplete="new-password"
-              readOnly={!unlocked.password}
-              onFocus={() => setUnlocked((value) => ({ ...value, password: true }))}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className={inputClass}
-              dir="ltr"
-            />
+          <Field label="تأیید هویت (رمز ورود فعلی)" required>
+            <SecretInput id={ids.secret} value={password} onChange={setPassword} className={inputClass} />
           </Field>
           <div className="flex gap-2">
-            <PrimaryButton type="submit" disabled={busy || !reasonOk || !confirmOk || !password} className="!bg-rose-700 hover:!bg-rose-800">
+            <PrimaryButton type="button" onClick={() => void run()} disabled={busy || !reasonOk || !confirmOk || !password} className="!bg-rose-700 hover:!bg-rose-800">
               {busy && <Loader2 className="w-4 h-4 animate-spin" />} تأیید و خاتمه
             </PrimaryButton>
             <SecondaryButton type="button" onClick={cancel}>انصراف</SecondaryButton>
           </div>
-        </form>
+        </div>
       )}
     </AdminCard>
   );
