@@ -212,6 +212,7 @@ export const SESSION_END_MESSAGES: Record<string, string> = {
   'session.account_disabled': 'حساب کاربری شما غیرفعال شده است.',
   'session.reuse_detected': 'به‌دلایل امنیتی نشست شما بسته شد. لطفاً دوباره وارد شوید و در صورت لزوم رمز عبور را تغییر دهید.',
   'session.missing': 'نشست شما معتبر نیست. لطفاً دوباره وارد شوید.',
+  'session.replaced_by_relogin': 'از همین دستگاه دوباره وارد شدید و این نشست جایگزین شد.',
   'session.logged_out': '',
 };
 
@@ -491,9 +492,20 @@ function endSession(reason?: string | null): void {
       // Storage blocked: the form falls back to allowing suggestions.
     }
   }
+  const refreshToken = tokens?.refreshToken;
   tokens = null;
   writeSession(null);
   clearPrivateData();
+  // Before the sign-in screen: tell the server, so the refresh token is revoked and the cookie of
+  // this browser is cleared. Otherwise the next sign-in from here would find it still set.
+  // Not when it was replaced by a new sign-in here: the cookie is then the new session's.
+  if (reason !== 'session.replaced_by_relogin') request<void>('POST', '/api/identity/auth/logout', {
+    body: refreshToken ? { refreshToken } : undefined,
+    auth: false,
+    retryOnUnauthorized: false,
+    cookieSession: true,
+    keepalive: true,
+  }).catch(() => undefined);
   try {
     window.dispatchEvent(new CustomEvent(SESSION_ENDED_EVENT, { detail: { reason: reason ?? null } }));
   } catch {

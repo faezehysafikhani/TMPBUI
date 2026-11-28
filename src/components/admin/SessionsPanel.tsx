@@ -36,6 +36,7 @@ const END_LABELS: Record<string, string> = {
   'session.account_disabled': 'غیرفعال‌شدن حساب',
   'session.reuse_detected': 'استفاده‌ی مجدد از توکن (احتمال سرقت)',
   'session.concurrent_limit': 'بسته‌شده برای ورود جدید',
+  'session.replaced_by_relogin': 'ورود دوباره از همین دستگاه',
 };
 const endLabel = (session: SessionInfo) => {
   const base = (session.endReason && (END_LABELS[session.endReason] || SESSION_END_MESSAGES[session.endReason])) || 'پایان یافته';
